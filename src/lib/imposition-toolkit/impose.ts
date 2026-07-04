@@ -34,6 +34,7 @@ export interface MarkStyle {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   color?: any;
   dash?: number[];
+  knockout?: boolean;   // paint a white underlay so marks stay visible on dark art
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,6 +57,8 @@ function drawCropMarks(page: any, rgb: any, tx: number, ty: number, tw: number, 
       [tx+tw+off,cy,    tx+tw+off+len,cy],     // right-centre
     );
   }
+  if (style?.knockout) for (const [x1,y1,x2,y2] of segs)
+    page.drawLine({ start:{x:x1,y:y1}, end:{x:x2,y:y2}, thickness: thickness+1.4, color: rgb(1,1,1) });
   for (const [x1,y1,x2,y2] of segs)
     page.drawLine({ start:{x:x1,y:y1}, end:{x:x2,y:y2}, thickness, color:c, ...(dashArray ? { dashArray } : {}) });
 }
@@ -76,32 +79,81 @@ export interface BookletOptions {
   // many SHEETS (×4 pages); each signature is imposed on its own and concatenated
   // — how perfect-bound and thick books are actually gathered.
   signatureSheets?: number;
+  // ── Press-sheet controls (all optional; legacy behaviour when omitted) ──
+  sheetWIn?: number;        // explicit output sheet width; spread is derived from
+  sheetHIn?: number;        //   the source pages when not given
+  autoscale?: boolean;      // scale pages to fill the sheet cells (default true when sheet set)
+  preserveAspect?: boolean; // keep the page aspect ratio while autoscaling (default true)
+  marginTopIn?: number;     // top/bottom margin override (defaults to marginIn)
+  fillLastSaddle?: boolean; // pad a short final signature with blanks (default true);
+                            //   false shrinks the last signature to the fewest sheets
+  creepOutward?: boolean;   // true (default) shifts inner-sheet content outward;
+                            //   false compensates inward instead
+  centerOutput?: boolean;   // center the 2-up block on the sheet instead of margin-anchoring
+  fourColorBlack?: boolean; // draw marks in 100% C+M+Y+K (registration black)
+  knockout?: boolean;       // white underlay beneath marks
+  bleedIn?: number;         // fixed bleed: trim marks sit this far inside each page edge
+  bleedFromDoc?: boolean;   // read the bleed inset from the source TrimBox instead
+  rotatePages?: boolean;    // rotate output 90° (portrait orientation for office printers)
 }
 
 export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Promise<Uint8Array> {
-  const { PDFDocument, rgb } = await import('pdf-lib');
+  const { PDFDocument, rgb, cmyk, degrees } = await import('pdf-lib');
   const srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const srcPages = srcDoc.getPages();
   const N = srcPages.length;
   const { width: pw, height: ph } = srcPages[0]!.getSize();
-  const mPt = opts.marginIn*PT, gPt = opts.gutterIn*PT, offPt = opts.markOffIn*PT, lenPt = opts.markLenIn*PT;
-  const spreadW = mPt*2 + pw*2 + gPt, spreadH = mPt*2 + ph;
+  const mx = opts.marginIn*PT, my = (opts.marginTopIn ?? opts.marginIn)*PT;
+  const gPt = opts.gutterIn*PT, offPt = opts.markOffIn*PT, lenPt = opts.markLenIn*PT;
+
+  // Placed page size: with an explicit sheet the pages scale into the two cells;
+  // otherwise the spread wraps the source pages 1:1 (legacy behaviour).
+  let dw = pw, dh = ph, spreadW: number, spreadH: number;
+  if (opts.sheetWIn && opts.sheetHIn) {
+    spreadW = opts.sheetWIn*PT; spreadH = opts.sheetHIn*PT;
+    const cellW = Math.max(1, (spreadW - mx*2 - gPt)/2), cellH = Math.max(1, spreadH - my*2);
+    if (opts.autoscale !== false) {
+      if (opts.preserveAspect !== false) { const s = Math.min(cellW/pw, cellH/ph); dw = pw*s; dh = ph*s; }
+      else { dw = cellW; dh = cellH; }
+    }
+  } else { spreadW = mx*2 + pw*2 + gPt; spreadH = my*2 + ph; }
+  const blockW = dw*2 + gPt;
+  const x0 = opts.centerOutput ? (spreadW - blockW)/2 : mx;
+  const yB = opts.centerOutput ? (spreadH - dh)/2 : spreadH - my - dh;
+
+  // Bleed inset: trim marks land this far inside the placed page edge.
+  let bleedSrcPt = (opts.bleedIn ?? 0)*PT;
+  if (opts.bleedFromDoc) {
+    try {
+      const tb = srcPages[0]!.getTrimBox(), mb = srcPages[0]!.getMediaBox();
+      bleedSrcPt = Math.max(0, tb.x - mb.x);
+    } catch { bleedSrcPt = 0; }
+  }
+  const bPt = bleedSrcPt * (dw/pw);
+
   const outDoc = await PDFDocument.create();
   const embeds = await outDoc.embedPages(srcPages);
-  const markStyle: MarkStyle = { center: !!opts.centerMarks, weight: opts.markWeightPt };
+  const markStyle: MarkStyle = {
+    center: !!opts.centerMarks, weight: opts.markWeightPt, knockout: opts.knockout,
+    color: opts.fourColorBlack ? cmyk(1,1,1,1) : cmyk(0,0,0,1),
+  };
   function emb(n: number) { return (n>=1&&n<=N)?embeds[n-1]!:null; }   // n = GLOBAL 1-indexed
 
-  // Pages per signature: a set number of sheets (×4) for perfect binding, else the
-  // whole book padded up to one saddle.
-  const sigPages = opts.signatureSheets && opts.signatureSheets>0
+  const sigPagesBase = opts.signatureSheets && opts.signatureSheets>0
     ? opts.signatureSheets*4
     : Math.ceil(Math.max(1,N)/4)*4;
+  const creepDir = opts.creepOutward === false ? -1 : 1;
 
-  for (let start=1; start<=Math.max(1,N); start+=sigPages) {
-    const numSheets=sigPages/4;
+  let start = 1;
+  while (start <= Math.max(1,N)) {
+    const remaining = Math.max(1,N) - (start-1);
+    const sigPages = (opts.signatureSheets && opts.signatureSheets>0 && opts.fillLastSaddle === false && remaining < sigPagesBase)
+      ? Math.max(4, Math.ceil(remaining/4)*4)
+      : sigPagesBase;
+    const numSheets = sigPages/4;
     for (let s=0; s<numSheets; s++) {
-      const creepPt = numSheets>1 ? (s/(numSheets-1))*opts.creepIn*PT : 0;
-      const xL = mPt-creepPt, xR = mPt+pw+gPt+creepPt, yB = mPt;
+      const creepPt = numSheets>1 ? (s/(numSheets-1))*opts.creepIn*PT*creepDir : 0;
+      const xL = x0-creepPt, xR = x0+dw+gPt+creepPt;
       // local page numbers within this signature (1..sigPages)
       let aL:number,aR:number,bL:number,bR:number;
       if (!opts.rtl) { aL=sigPages-s*2; aR=s*2+1; bL=s*2+2; bR=sigPages-s*2-1; }
@@ -110,12 +162,17 @@ export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Pr
       for (const [left,right] of [[aL,aR],[bL,bR]] as [number,number][]) {
         const pg = outDoc.addPage([spreadW,spreadH]);
         const eL=emb(g(left)), eR=emb(g(right));
-        if (eL) pg.drawPage(eL, {x:xL,y:yB,width:pw,height:ph});
-        if (eR) pg.drawPage(eR, {x:xR,y:yB,width:pw,height:ph});
-        if (opts.addMarks) { drawCropMarks(pg,rgb,xL,yB,pw,ph,offPt,lenPt,markStyle); drawCropMarks(pg,rgb,xR,yB,pw,ph,offPt,lenPt,markStyle); }
+        if (eL) pg.drawPage(eL, {x:xL,y:yB,width:dw,height:dh});
+        if (eR) pg.drawPage(eR, {x:xR,y:yB,width:dw,height:dh});
+        if (opts.addMarks) {
+          drawCropMarks(pg,rgb,xL+bPt,yB+bPt,dw-2*bPt,dh-2*bPt,offPt,lenPt,markStyle);
+          drawCropMarks(pg,rgb,xR+bPt,yB+bPt,dw-2*bPt,dh-2*bPt,offPt,lenPt,markStyle);
+        }
       }
     }
+    start += sigPages;
   }
+  if (opts.rotatePages) for (const p of outDoc.getPages()) p.setRotation(degrees(90));
   return outDoc.save();
 }
 
@@ -3257,6 +3314,215 @@ async function renderNest(outDoc: any, srcPages: any[], sheets: NestPlaced[][], 
     }
   }
   return outDoc.save();
+}
+
+// ── Press color bar (Step 2 of the press workflow) ──────────────────────────
+// Overlays a strip of process/tint/registration patches along one edge of each
+// selected sheet — unlike `addColorBar` the page is NOT grown; the bar sits in
+// the sheet margin like a real press control strip.
+
+export interface PressColorBarOptions {
+  location: 'top' | 'bottom' | 'left' | 'right';
+  marginAlongIn: number;    // inset from the sheet corners along the bar
+  marginAcrossIn: number;   // inset from the sheet edge (perpendicular)
+  pages?: string;
+  sizeIn: number;           // patch size (bar thickness)
+  colors: boolean;          // CMYK process patches + tints + grays
+  spotColors: boolean;      // registration black + spot approximations
+  shapes: { solid?: boolean; diagonal?: boolean; tint?: boolean; rings?: boolean; starburst?: boolean; target?: boolean };
+  repeat: boolean;          // tile the sequence across the full edge
+  layer?: string;           // informational (carried into JDF; PDFs stay flat)
+}
+
+export async function addPressColorBar(bytes: Uint8Array, opts: PressColorBarOptions): Promise<Uint8Array> {
+  const { PDFDocument, cmyk, rgb } = await import('pdf-lib');
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const pages = doc.getPages();
+  const sel = parsePageRange(opts.pages ?? 'all', pages.length);
+  const s = Math.max(2, opts.sizeIn*PT);
+  const vertical = opts.location === 'left' || opts.location === 'right';
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type Painter = (pg: any, x: number, y: number) => void;
+  const painters: Painter[] = [];
+  const K = (c:number,m:number,y2:number,k:number) => cmyk(c,m,y2,k);
+  const patch = (col: unknown): Painter => (pg,x,y) => pg.drawRectangle({ x, y, width: s, height: s, color: col });
+  const diag = (col: unknown): Painter => (pg,x,y) => {
+    pg.drawRectangle({ x, y, width: s, height: s, borderColor: col, borderWidth: 0.5 });
+    pg.drawSvgPath(`M0 0 L${s} 0 L0 ${s} Z`, { x, y: y+s, color: col });
+  };
+  const target: Painter = (pg,x,y) => {
+    const cx=x+s/2, cy=y+s/2, r=s*0.38, col=K(1,1,1,1);
+    pg.drawCircle({ x: cx, y: cy, size: r, borderColor: col, borderWidth: 0.6 });
+    pg.drawLine({ start:{x:cx-s/2,y:cy}, end:{x:cx+s/2,y:cy}, thickness:0.6, color: col });
+    pg.drawLine({ start:{x:cx,y:cy-s/2}, end:{x:cx,y:cy+s/2}, thickness:0.6, color: col });
+  };
+  const rings: Painter = (pg,x,y) => {
+    const cx=x+s/2, cy=y+s/2, col=K(0,0,0,1);
+    for (const f of [0.45, 0.3, 0.15]) pg.drawCircle({ x: cx, y: cy, size: s*f, borderColor: col, borderWidth: 0.5 });
+  };
+  const starburst: Painter = (pg,x,y) => {
+    const cx=x+s/2, cy=y+s/2, r=s*0.45, col=K(0,0,0,1);
+    for (let i=0;i<12;i++) { const a=(i/12)*Math.PI*2;
+      pg.drawLine({ start:{x:cx+Math.cos(a)*r*0.25,y:cy+Math.sin(a)*r*0.25}, end:{x:cx+Math.cos(a)*r,y:cy+Math.sin(a)*r}, thickness:0.5, color: col });
+    }
+  };
+
+  if (opts.colors) {
+    painters.push(patch(K(1,0,0,0)), patch(K(0,1,0,0)), patch(K(0,0,1,0)), patch(K(0,0,0,1)));
+    if (opts.shapes.tint !== false) painters.push(patch(K(0.5,0,0,0)), patch(K(0,0.5,0,0)), patch(K(0,0,0.5,0)), patch(K(0,0,0,0.5)));
+    painters.push(patch(K(0,0,0,0.25)), patch(K(0,0,0,0.75)), patch(K(1,1,0,0)), patch(K(0,1,1,0)), patch(K(1,0,1,0)));
+  }
+  if (opts.spotColors) painters.push(patch(K(1,1,1,1)), patch(rgb(0.42,0.2,0.6)), patch(rgb(0.06,0.55,0.45)));
+  if (opts.shapes.diagonal) painters.push(diag(K(1,0,0,0)), diag(K(0,0,0,1)));
+  if (opts.shapes.rings) painters.push(rings);
+  if (opts.shapes.starburst) painters.push(starburst);
+  if (opts.shapes.target !== false) painters.push(target);
+  if (!painters.length) painters.push(patch(K(0,0,0,1)), target);
+
+  for (let i = 0; i < pages.length; i++) {
+    if (!sel.has(i+1)) continue;
+    const pg = pages[i]!;
+    const { width: w, height: h } = pg.getSize();
+    const mAlong = opts.marginAlongIn*PT, mAcross = opts.marginAcrossIn*PT;
+    const track = (vertical ? h : w) - 2*mAlong;
+    if (track < s) continue;
+    const count = opts.repeat ? Math.floor(track/s) : Math.min(painters.length, Math.floor(track/s));
+    for (let j = 0; j < count; j++) {
+      const paint = painters[j % painters.length]!;
+      const along = mAlong + j*s;
+      if (opts.location === 'top') paint(pg, along, h - mAcross - s);
+      else if (opts.location === 'bottom') paint(pg, along, mAcross);
+      else if (opts.location === 'left') paint(pg, mAcross, along);
+      else paint(pg, w - mAcross - s, along);
+    }
+  }
+  return doc.save();
+}
+
+// ── Cutter / registration marks (digital cutting tables) ────────────────────
+// Adds the optical registration targets cutters (Zünd, Kongsberg, Graphtec,
+// Summa…) use to locate the sheet, plus optional dielines per cut type and a
+// marks-only output for cut-file separation.
+
+export interface CutterMarksOptions {
+  cutTypes: Array<'thru' | 'kiss' | 'crease' | 'perf' | 'fold'>;
+  shape: 'circle' | 'square' | 'corner';
+  sizeIn: number;
+  placement: 'inside' | 'outside';   // relative to the reference box
+  refBox: 'media' | 'trim';
+  marginIn: number;
+  cornersAndEdges?: boolean;         // false = corners only
+  keySlot?: number;                  // 0-11 clockwise from top-left; -1/undefined = none
+  keyDistIn?: number;                // distance of the key mark from its corner mark
+  layer?: string;                    // informational (JDF regmark layer name)
+  pages?: string;
+  addDielines?: boolean;
+  removeArtwork?: boolean;           // output a cut-marks-only file
+}
+
+export async function addCutterMarks(bytes: Uint8Array, opts: CutterMarksOptions): Promise<Uint8Array> {
+  const { PDFDocument, rgb } = await import('pdf-lib');
+  const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const srcPages = src.getPages();
+  const sel = parsePageRange(opts.pages ?? 'all', srcPages.length);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let doc: any = src, pages: any[] = srcPages;
+  if (opts.removeArtwork) {
+    doc = await PDFDocument.create();
+    pages = srcPages.map((p) => { const { width, height } = p.getSize(); return doc.addPage([width, height]); });
+  }
+  const size = Math.max(1, opts.sizeIn*PT), m = opts.marginIn*PT;
+  const black = rgb(0, 0, 0);
+  const DIE: Record<string, { c: [number,number,number]; dash?: number[] }> = {
+    thru:   { c: [0.0, 0.65, 0.32] },
+    kiss:   { c: [0.18, 0.36, 1.0] },
+    crease: { c: [0.9, 0.28, 0.3] },
+    perf:   { c: [1.0, 0.18, 0.63], dash: [4, 3] },
+    fold:   { c: [0.1, 0.75, 0.75], dash: [7, 4] },
+  };
+
+  for (let i = 0; i < pages.length; i++) {
+    if (!sel.has(i+1)) continue;
+    const pg = pages[i]!, refPg = srcPages[i]!;
+    const { width: w, height: h } = refPg.getSize();
+    let bx = 0, by = 0, bw = w, bh = h;
+    if (opts.refBox === 'trim') {
+      try { const tb = refPg.getTrimBox(); bx = tb.x; by = tb.y; bw = tb.width; bh = tb.height; } catch { /* media */ }
+    }
+    // Mark centres sit `margin` inside (or outside) the reference box corners.
+    const d = opts.placement === 'outside' ? -m : m;
+    const x0 = bx + d, x1 = bx + bw - d, y0 = by + d, y1 = by + bh - d;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const drawMark = (x: number, y: number, cornerDir?: [number, number]) => {
+      if (opts.shape === 'circle') pg.drawCircle({ x, y, size: size/2, color: black });
+      else if (opts.shape === 'square') pg.drawRectangle({ x: x-size/2, y: y-size/2, width: size, height: size, color: black });
+      else {
+        const [dx, dy] = cornerDir ?? [1, -1];
+        pg.drawLine({ start: { x, y }, end: { x: x + dx*size, y }, thickness: 1.1, color: black });
+        pg.drawLine({ start: { x, y }, end: { x, y: y + dy*size }, thickness: 1.1, color: black });
+      }
+    };
+    drawMark(x0, y1, [1, -1]); drawMark(x1, y1, [-1, -1]);
+    drawMark(x0, y0, [1, 1]);  drawMark(x1, y0, [-1, 1]);
+    if (opts.cornersAndEdges) {
+      const cx = bx + bw/2, cy = by + bh/2;
+      drawMark(cx, y1, [1, -1]); drawMark(cx, y0, [1, 1]);
+      drawMark(x0, cy, [1, -1]); drawMark(x1, cy, [-1, -1]);
+    }
+    // Key mark: an extra target near one corner so the cutter can identify the
+    // sheet orientation. 12 slots run clockwise from the top-left corner.
+    if (opts.keySlot !== undefined && opts.keySlot >= 0) {
+      const kd = Math.max(size, (opts.keyDistIn ?? 2)*PT);
+      const slots: [number, number][] = [
+        [x0, y1], [x0 + kd, y1], [x1 - kd, y1], [x1, y1],          // top edge
+        [x1, y1 - kd], [x1, y0 + kd],                              // right edge
+        [x1, y0], [x1 - kd, y0], [x0 + kd, y0], [x0, y0],          // bottom edge
+        [x0, y0 + kd], [x0, y1 - kd],                              // left edge
+      ];
+      const [kx, ky] = slots[opts.keySlot % slots.length]!;
+      drawMark(kx, ky);
+      if (opts.shape !== 'corner') pg.drawCircle({ x: kx, y: ky, size: size*0.9, borderColor: black, borderWidth: 0.8 });
+    }
+    if (opts.addDielines) {
+      let inset = 0;
+      for (const t of opts.cutTypes) {
+        const dl = DIE[t]; if (!dl) continue;
+        pg.drawRectangle({
+          x: bx + inset, y: by + inset, width: bw - 2*inset, height: bh - 2*inset,
+          borderColor: rgb(dl.c[0], dl.c[1], dl.c[2]), borderWidth: 0.8,
+          ...(dl.dash ? { borderDashArray: dl.dash } : {}),
+        });
+        inset += 2.2;
+      }
+    }
+  }
+  return doc.save();
+}
+
+// ── Job info → PDF document properties ──────────────────────────────────────
+
+export interface PdfJobInfo {
+  jobName?: string; jobNumber?: string; client?: string; salesperson?: string;
+  date?: string; createdBy?: string; description?: string; tags?: string;
+}
+
+export async function setPdfJobInfo(bytes: Uint8Array, info: PdfJobInfo): Promise<Uint8Array> {
+  const { PDFDocument } = await import('pdf-lib');
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const subject = [info.jobNumber && `Job ${info.jobNumber}`, info.client && `Client: ${info.client}`,
+    info.salesperson && `Sales: ${info.salesperson}`, info.description]
+    .filter(Boolean).join(' — ');
+  if (info.jobName) doc.setTitle(info.jobName);
+  if (subject) doc.setSubject(subject);
+  if (info.createdBy) doc.setAuthor(info.createdBy);
+  if (info.tags) doc.setKeywords(info.tags.split(',').map((t) => t.trim()).filter(Boolean));
+  doc.setCreator('ImpositionPDF');
+  doc.setProducer('ImpositionPDF Editor');
+  if (info.date) { const d = new Date(info.date); if (!Number.isNaN(d.getTime())) doc.setCreationDate(d); }
+  doc.setModificationDate(new Date());
+  return doc.save();
 }
 
 // ── Download helper ─────────────────────────────────────────────────────────

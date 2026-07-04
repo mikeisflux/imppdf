@@ -1,297 +1,358 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
+import { getPdfInfo, shufflePages, downloadPdf, downloadFile, makeZip, preflight, setPdfJobInfo } from '@/lib/imposition-toolkit/impose';
+import type { PdfPageInfo, PreflightReport } from '@/lib/imposition-toolkit/impose';
+import { rasterizePdfThumbs, rasterizePdfSheets, type RenderedSheet } from '@/lib/imposition-toolkit/page-thumbs';
+import { findOp } from './operations';
 import {
-  getPdfInfo, computeNUpGrid, imposeNUp, imposeBooklet, imposeNUpBook,
-  shufflePages, rotatePdf, flipPdf, mergePdfs, splitPdf, downloadPdf, downloadFile,
-} from '@/lib/imposition-toolkit/impose';
-import type { NUpOptions, BookletOptions, NUpBookOptions, PdfPageInfo } from '@/lib/imposition-toolkit/impose';
-import { rasterizePdfThumbs } from '@/lib/imposition-toolkit/page-thumbs';
-import { Icons, OP_GROUPS, findOp, type OpDef } from './operations';
+  makeStep, runPipeline, splitStep, runSplit, buildJdf, resolveName,
+  listWorkflows, saveWorkflow, deleteWorkflow, workflowToSteps,
+  type StepType, type WorkflowStep,
+} from './steps';
+import { Ic, ChooseOperation, StepCard, paperName, fmtIn, type Unit } from './panels';
+import {
+  loadSettings, persistSettings, DEFAULT_SETTINGS, SettingsModal, JobInfoModal, PageManagerModal,
+  BatchModal, QualityMenu, PreflightModal, loadDefaultJob, EMPTY_JOB, useCountdown,
+  type AppSettings, type JobInfo, type PreviewQuality, type BatchFile,
+} from './modals';
+import { TemplatesModal } from './catalog-bridge';
 import './press.css';
 
-// ── Units & paper presets ────────────────────────────────────────────────────
-type Unit = 'in' | 'mm' | 'pt';
-const toIn = (v: number, u: Unit) => (u === 'mm' ? v / 25.4 : u === 'pt' ? v / 72 : v);
-const fromIn = (v: number, u: Unit) => (u === 'mm' ? v * 25.4 : u === 'pt' ? v * 72 : v);
-const fmt = (inch: number, u: Unit) => {
-  const v = fromIn(inch, u);
-  return u === 'pt' ? String(Math.round(v)) : (Math.round(v * 100) / 100).toString();
-};
-const PAPERS: Record<string, [number, number]> = {
-  Letter: [8.5, 11], Legal: [8.5, 14], Tabloid: [11, 17],
-  A4: [8.27, 11.69], A3: [11.69, 16.54], A5: [5.83, 8.27], SRA3: [12.6, 17.72],
-};
-function paperName(wIn: number, hIn: number): string {
-  for (const [k, [w, h]] of Object.entries(PAPERS)) {
-    if ((Math.abs(w - wIn) < 0.05 && Math.abs(h - hIn) < 0.05) || (Math.abs(h - wIn) < 0.05 && Math.abs(w - hIn) < 0.05)) return k;
-  }
-  return 'Custom';
-}
-const PAGE_COLORS = ['#e5484d', '#3fb950', '#4361ee', '#f5d90a', '#c74bc2', '#22c3c3', '#f0883e', '#7d7d7d'];
-
 interface LoadedFile { name: string; bytes: Uint8Array; info: PdfPageInfo; }
-type Status = 'idle' | 'processing' | 'done' | 'error';
 
-// ── Sheet geometry (preview) ─────────────────────────────────────────────────
-interface PCell { n: number; blank: boolean; rot?: boolean; }
-interface Sheet { wIn: number; hIn: number; cols: number; rows: number; cells: PCell[]; }
+export interface PressUsage { authenticated: boolean; isPro: boolean; remaining: number; limit: number; cooldownUntil?: number; }
 
-function buildSheets(engine: string, nup: NUpOptions, booklet: BookletOptions, nupbook: NUpBookOptions, stepRep: boolean, pageCount: number): Sheet[] {
-  const N = Math.max(1, pageCount);
-  if (engine === 'booklet') {
-    const sig = booklet.signatureSheets && booklet.signatureSheets > 0 ? booklet.signatureSheets * 4 : Math.ceil(N / 4) * 4;
-    const sides = sig / 2;
-    const sheets: Sheet[] = [];
-    const start = 0;
-    for (let s = 0; s < Math.ceil(N / sig) * sides; s++) {
-      const k = Math.floor(s / 2);
-      const isBack = s % 2 === 1;
-      let L: number, R: number;
-      if (!isBack) { L = sig - k * 2; R = k * 2 + 1; } else { L = k * 2 + 2; R = sig - k * 2 - 1; }
-      if (booklet.rtl) { const t = L; L = R; R = t; }
-      const gp = (p: number) => start + p;
-      sheets.push({ wIn: 11, hIn: 8.5, cols: 2, rows: 1, cells: [
-        { n: gp(L), blank: gp(L) > N || gp(L) < 1 }, { n: gp(R), blank: gp(R) > N || gp(R) < 1 },
-      ] });
-    }
-    return sheets;
-  }
-  if (engine === 'nupbook') {
-    // Quarto 4-up: top row rotated 180°.
-    const sigPages = 8, numSigs = Math.ceil(N / sigPages);
-    const sheets: Sheet[] = [];
-    for (let si = 0; si < numSigs * 2; si++) {
-      const sigNo = Math.floor(si / 2), isBack = si % 2 === 1;
-      const FRONT: [number, number, number][] = [[5, 0, 0], [4, 0, 1], [8, 1, 0], [1, 1, 1]];
-      const BACK: [number, number, number][] = [[3, 0, 0], [6, 0, 1], [2, 1, 0], [7, 1, 1]];
-      const cells: PCell[] = [];
-      for (const [p, r, c] of (isBack ? BACK : FRONT)) {
-        const gp = sigNo * sigPages + p; const cc = nupbook.rtl ? 1 - c : c;
-        void cc;
-        cells[r * 2 + (nupbook.rtl ? 1 - c : c)] = { n: gp, blank: gp > N, rot: r === 0 };
-      }
-      sheets.push({ wIn: nupbook.sheetWIn, hIn: nupbook.sheetHIn, cols: 2, rows: 2, cells });
-    }
-    return sheets;
-  }
-  // nup family
-  const g = computeNUpGrid(nup);
-  const perSheet = g.cols * g.rows;
-  const sheets: Sheet[] = [];
-  if (engine === 'cards' || (engine === 'grid' && stepRep)) {
-    for (let p = 1; p <= N; p++) {
-      sheets.push({ wIn: nup.sheetWIn, hIn: nup.sheetHIn, cols: g.cols, rows: g.rows, cells: Array.from({ length: perSheet }, () => ({ n: p, blank: false })) });
-    }
-    return sheets;
-  }
-  const total = Math.ceil(N / perSheet);
-  for (let si = 0; si < total; si++) {
-    const cells: PCell[] = [];
-    for (let i = 0; i < perSheet; i++) {
-      const cellIdx = i;
-      const itemIdx = engine === 'cutstack' ? cellIdx * total + si : si * perSheet + cellIdx;
-      const pg = itemIdx + 1;
-      cells.push({ n: pg, blank: pg > N });
-    }
-    sheets.push({ wIn: nup.sheetWIn, hIn: nup.sheetHIn, cols: g.cols, rows: g.rows, cells });
-  }
-  return sheets;
-}
+// Sheets rendered per quality tier (preview only — exports are always complete).
+const QUALITY_PX: Record<PreviewQuality, number> = { auto: 0, ultralow: 520, low: 820, standard: 1240, high: 1900 };
+const MAX_SHEETS = 32;
 
-// ── Small UI atoms ───────────────────────────────────────────────────────────
-function Ic({ name, size = 20 }: { name: keyof typeof Icons; size?: number }) {
-  const C = Icons[name] as (p: Record<string, unknown>) => React.ReactElement;
-  return C({ width: size, height: size });
-}
-function Section({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
-  return (
-    <div className="pe-section">
-      <div className="pe-section-head">
-        <span className="pe-section-label">{label}</span>
-        <span className="pe-help" title={help}>?</span>
-      </div>
-      {children}
-    </div>
-  );
-}
-function Check({ label, sub, checked, onChange }: { label: string; sub?: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <>
-      <label className="pe-check">
-        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-        <span className="pe-box"><Ic name="close" size={0} />{checked && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L19 6" /></svg>}</span>
-        {label}
-      </label>
-      {sub && <div className="pe-check-sub">{sub}</div>}
-    </>
-  );
-}
-function Radio({ label, sub, on, onSelect }: { label: string; sub?: string; on: boolean; onSelect: () => void }) {
-  return (
-    <label className={`pe-radio ${on ? 'pe-on' : ''}`} onClick={onSelect}>
-      <input type="radio" checked={on} readOnly />
-      <span className="pe-dot"><i /></span>
-      <span><div className="pe-radio-main">{label}</div>{sub && <div className="pe-radio-sub">{sub}</div>}</span>
-    </label>
-  );
-}
-function UnitSelect({ unit, onChange }: { unit: Unit; onChange: (u: Unit) => void }) {
-  return (
-    <select className="pe-select pe-unit" value={unit} onChange={(e) => onChange(e.target.value as Unit)}>
-      <option value="in">in</option><option value="mm">mm</option><option value="pt">pt</option>
-    </select>
-  );
-}
-function NumIn({ valueIn, unit, onIn, step }: { valueIn: number; unit: Unit; onIn: (v: number) => void; step?: number }) {
-  const [txt, setTxt] = useState(fmt(valueIn, unit));
-  useEffect(() => { setTxt(fmt(valueIn, unit)); }, [valueIn, unit]);
-  return (
-    <input className="pe-input pe-num" inputMode="decimal" value={txt} step={step}
-      onChange={(e) => { setTxt(e.target.value); const v = parseFloat(e.target.value); if (!Number.isNaN(v)) onIn(toIn(v, unit)); }} />
-  );
-}
-function SelCard({ on, off, cap, children, onClick }: { on?: boolean; off?: boolean; cap: string; children: React.ReactNode; onClick?: () => void }) {
-  return (
-    <div className={`pe-selcard ${on ? 'pe-on' : ''} ${off ? 'pe-off' : ''}`} onClick={onClick}>
-      {children}
-      <span className="pe-selcard-cap">{cap}</span>
-    </div>
-  );
-}
-function PaperSizeSection({ wIn, hIn, unit, onUnit, onSize }: { wIn: number; hIn: number; unit: Unit; onUnit: (u: Unit) => void; onSize: (w: number, h: number) => void }) {
-  const [lock, setLock] = useState(false);
-  const name = paperName(wIn, hIn);
-  const land = wIn > hIn;
-  return (
-    <Section label="// PAPER SIZE" help="Output sheet dimensions — the physical paper going through your press.">
-      <div className="pe-row">
-        <select className="pe-select" value={name} onChange={(e) => { const p = PAPERS[e.target.value]; if (p) onSize(land ? Math.max(...p) : Math.min(...p), land ? Math.min(...p) : Math.max(...p)); }}>
-          {Object.keys(PAPERS).map((k) => <option key={k}>{k}</option>)}
-          <option>Custom</option>
-        </select>
-        <button className="pe-preset-add" title="Save preset"><Ic name="addstep" size={16} /></button>
-      </div>
-      <div className="pe-row"><span className="pe-label" style={{ width: 52 }}>Width</span><NumIn valueIn={wIn} unit={unit} onIn={(v) => onSize(v, hIn)} /><UnitSelect unit={unit} onChange={onUnit} /></div>
-      <div className="pe-row"><span className="pe-label" style={{ width: 52 }}>Height</span><NumIn valueIn={hIn} unit={unit} onIn={(v) => onSize(lock ? v * (wIn / hIn) : wIn, v)} /><button className="pe-lock" onClick={() => setLock((l) => !l)} title="Lock aspect">{lock ? '🔒' : '🔓'}</button></div>
-      <Check label="Landscape" checked={land} onChange={(v) => { const lo = Math.min(wIn, hIn), hi = Math.max(wIn, hIn); onSize(v ? hi : lo, v ? lo : hi); }} />
-    </Section>
-  );
-}
-function WhiteSpaceSection({ marginIn, gutterIn, unit, onUnit, onMargin, onGutter, gutterLabel = 'Gutters:' }: { marginIn: number; gutterIn: number; unit: Unit; onUnit: (u: Unit) => void; onMargin: (v: number) => void; onGutter: (v: number) => void; gutterLabel?: string }) {
-  return (
-    <Section label="// WHITE SPACE" help="Margins around the sheet edge and gutters between items.">
-      <div className="pe-row"><span className="pe-label">Margins:</span><span style={{ flex: 1 }} /><UnitSelect unit={unit} onChange={onUnit} /></div>
-      <div className="pe-grid2">
-        <div className="pe-field-col"><span className="pe-label-sm">Left</span><NumIn valueIn={marginIn} unit={unit} onIn={onMargin} /></div>
-        <div className="pe-field-col"><span className="pe-label-sm">Top</span><NumIn valueIn={marginIn} unit={unit} onIn={onMargin} /></div>
-      </div>
-      <div className="pe-row" style={{ marginTop: 10 }}><span className="pe-label">{gutterLabel}</span></div>
-      <div className="pe-grid2">
-        <div className="pe-field-col"><span className="pe-label-sm">Horizontal</span><NumIn valueIn={gutterIn} unit={unit} onIn={onGutter} /></div>
-        <div className="pe-field-col"><span className="pe-label-sm">Vertical</span><NumIn valueIn={gutterIn} unit={unit} onIn={onGutter} /></div>
-      </div>
-    </Section>
-  );
-}
+const HIDE_BY_FEATURE: Record<string, string[]> = {
+  advancedTools: ['distort', 'slugline', 'foldmarks', 'regmarks', 'collating', 'omr', 'gathering', 'laymarks'],
+  watermark: ['watermark'],
+  bleedMaker: ['bleed'],
+};
 
-// ── The editor ───────────────────────────────────────────────────────────────
-export interface PressUsage { authenticated: boolean; isPro: boolean; remaining: number; limit: number; }
-export function PressEditor({ initialOp, usage, onUpgrade, onSignIn }: {
-  initialOp?: string | null; usage?: PressUsage; onUpgrade?: React.ReactNode; onSignIn?: React.ReactNode;
+export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport }: {
+  initialOp?: string | null;
+  usage?: PressUsage;
+  onUpgrade?: React.ReactNode;
+  onSignIn?: React.ReactNode;
+  // Returns true when an export (Download / Print / Batch item) may proceed;
+  // records the consumption. When it returns false the host shows its paywall.
+  gateExport?: () => boolean;
 }) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [unit, setUnit] = useState<Unit>('mm');
-  const [activeOp, setActiveOp] = useState<string | null>(initialOp ?? null);
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [steps, setSteps] = useState<WorkflowStep[]>(() => {
+    const op = findOp(initialOp ?? null);
+    return op ? [makeStep(op.id)] : [];
+  });
   const [file, setFile] = useState<LoadedFile | null>(null);
-  const [thumbs, setThumbs] = useState<string[]>([]);
-  const [status, setStatus] = useState<Status>('idle');
+  const [srcThumbs, setSrcThumbs] = useState<string[]>([]);
+  const [sheets, setSheets] = useState<RenderedSheet[]>([]);
+  const [totalSheets, setTotalSheets] = useState(0);
+  const [rendering, setRendering] = useState(false);
+  const [error, setError] = useState('');
+  const [jobInfo, setJobInfo] = useState<JobInfo>(EMPTY_JOB);
+  const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null);
+
+  // Viewer state
   const [zoom, setZoom] = useState(1);
+  const [paused, setPaused] = useState(false);
+  const [showNumbers, setShowNumbers] = useState(false);
+  const [showRules, setShowRules] = useState(false);
+  const [fillBg, setFillBg] = useState(true);
   const [drag, setDrag] = useState(false);
+  const [currentSheet, setCurrentSheet] = useState(1);
+  const [modal, setModal] = useState<null | 'settings' | 'jobinfo' | 'pagemanager' | 'batch' | 'preflight' | 'templates'>(null);
+  const [menu, setMenu] = useState<null | 'quality' | 'file' | 'load'>(null);
+  const [adding, setAdding] = useState(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const outBytesRef = useRef<Uint8Array | null>(null);
+  const renderSeq = useRef(0);
 
-  const [nup, setNup] = useState<NUpOptions>({ cols: 2, rows: 2, sheetWIn: 8.5, sheetHIn: 11, marginIn: 0.2, gutterIn: 0, repeatFirst: false, addMarks: false, markLenIn: 0.25, markOffIn: 0.125 });
-  const [booklet, setBooklet] = useState<BookletOptions>({ rtl: false, marginIn: 0.2, gutterIn: 0.2, creepIn: 0, addMarks: false, markLenIn: 0.25, markOffIn: 0.125 });
-  const [nupbook, setNupbook] = useState<NUpBookOptions>({ nUp: 4, sheetWIn: 11, sheetHIn: 17, marginIn: 0.2, gutterIn: 0, creepIn: 0, rtl: false, signatureSheets: 4, addMarks: false, markLenIn: 0.25, markOffIn: 0.125 });
-  const [stepRep, setStepRep] = useState(false);
-  const [autoscale, setAutoscale] = useState(true);
-  const [preserveAR, setPreserveAR] = useState(true);
-  const [bleedMode, setBleedMode] = useState<'none' | 'doc' | 'fixed'>('doc');
-  const [drawMarks, setDrawMarks] = useState(false);
-  const [shuffleOrder, setShuffleOrder] = useState('all');
-  const [rotateDeg, setRotateDeg] = useState(90);
-  const [flipDir, setFlipDir] = useState<'h' | 'v'>('h');
-  const [splitRanges, setSplitRanges] = useState('1-1');
-  const [mergeFiles, setMergeFiles] = useState<LoadedFile[]>([]);
-
-  const op = findOp(activeOp);
-
-  useEffect(() => { setActiveOp(initialOp ?? null); }, [initialOp]);
-
-  // Rasterise pages for the preview.
+  // ── Settings persistence + session restore ─────────────────────────────────
   useEffect(() => {
-    let cancelled = false;
-    if (!file) { setThumbs([]); return; }
-    setThumbs([]);
-    rasterizePdfThumbs(file.bytes).then((t) => { if (!cancelled) setThumbs(t); }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [file]);
+    const s = loadSettings();
+    setSettings(s);
+    setJobInfo(loadDefaultJob());
+    if (s.features.sessionRestore) {
+      try {
+        const sess = JSON.parse(localStorage.getItem('pp_session') || 'null');
+        if (sess?.steps?.length) setSteps(workflowToSteps({ name: '', savedAt: 0, steps: sess.steps }));
+      } catch { /* ignore */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const updateSettings = useCallback((s: AppSettings) => { setSettings(s); persistSettings(s); }, []);
+  useEffect(() => {
+    if (!settings.features.sessionRestore) return;
+    try { localStorage.setItem('pp_session', JSON.stringify({ steps: steps.map((st) => ({ type: st.type, s: { ...st.s, files: [], stamp: null } })) })); } catch { /* full */ }
+  }, [steps, settings.features.sessionRestore]);
 
+  const unit = settings.unit;
+  const setUnit = (u: Unit) => updateSettings({ ...settings, unit: u });
+
+  // ── File loading ────────────────────────────────────────────────────────────
   const loadFile = useCallback(async (f: File) => {
-    setStatus('idle');
+    setError('');
     try {
       const bytes = new Uint8Array(await f.arrayBuffer());
       const info = await getPdfInfo(bytes);
       setFile({ name: f.name, bytes, info });
-      setSplitRanges(`1-${info.count}`);
-    } catch { setStatus('error'); }
+    } catch { setError('Could not read that PDF.'); }
   }, []);
   const onPick = (files: FileList | null) => { const f = files?.[0]; if (f) void loadFile(f); };
 
-  const pageCount = file?.info.count ?? 0;
-  const sheets = useMemo(() => (file && op ? buildSheets(op.engine, { ...nup, addMarks: drawMarks }, { ...booklet, addMarks: drawMarks }, { ...nupbook, addMarks: drawMarks }, stepRep, pageCount) : []), [file, op, nup, booklet, nupbook, stepRep, drawMarks, pageCount]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!file) { setSrcThumbs([]); return; }
+    rasterizePdfThumbs(file.bytes).then((t) => { if (!cancelled) setSrcThumbs(t); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [file]);
 
-  async function runEngine(): Promise<{ bytes: Uint8Array; name: string } | { multi: Uint8Array[]; base: string } | null> {
-    if (!file || !op) return null;
-    const b = file.bytes; const base = file.name.replace(/\.pdf$/i, '');
-    switch (op.engine) {
-      case 'cards': return { bytes: await imposeNUp(b, { ...nup, addMarks: drawMarks, repeatFirst: true }), name: `${base}-cards.pdf` };
-      case 'grid': return { bytes: await imposeNUp(b, { ...nup, addMarks: drawMarks, repeatFirst: stepRep }), name: `${base}-grid.pdf` };
-      case 'cutstack': return { bytes: await imposeNUp(b, { ...nup, addMarks: drawMarks, cutStack: true }), name: `${base}-cutstack.pdf` };
-      case 'booklet': return { bytes: await imposeBooklet(b, { ...booklet, addMarks: drawMarks }), name: `${base}-booklet.pdf` };
-      case 'nupbook': return { bytes: await imposeNUpBook(b, { ...nupbook, addMarks: drawMarks }), name: `${base}-nupbook.pdf` };
-      case 'shuffle': return { bytes: await shufflePages(b, shuffleOrder), name: `${base}-shuffled.pdf` };
-      case 'rotate': return { bytes: await rotatePdf(b, rotateDeg), name: `${base}-rotated.pdf` };
-      case 'flip': return { bytes: await flipPdf(b, flipDir), name: `${base}-flipped.pdf` };
-      case 'merge': return { bytes: await mergePdfs([b, ...mergeFiles.map((m) => m.bytes)]), name: `${base}-merged.pdf` };
-      case 'split': return { multi: await splitPdf(b, splitRanges), base };
+  // ── Steps helpers ───────────────────────────────────────────────────────────
+  const visibleHidden = useMemo(() => {
+    const hidden = new Set(settings.hiddenTools);
+    for (const [feat, ids] of Object.entries(HIDE_BY_FEATURE)) {
+      if (!settings.features[feat as keyof AppSettings['features']]) ids.forEach((i) => hidden.add(i));
     }
-    void imposeNUp; void nup;
-    return null;
+    return [...hidden];
+  }, [settings]);
+
+  const addStep = (type: StepType) => {
+    if (type === 'preflight') {
+      if (file) preflight(file.bytes).then(setPreflightReport).catch(() => setPreflightReport(null));
+      setModal('preflight');
+      setAdding(false);
+      return;
+    }
+    setSteps((s) => [...s.map((st) => ({ ...st, collapsed: true })), makeStep(type)]);
+    setAdding(false);
+  };
+  const changeStep = (i: number, next: WorkflowStep) => setSteps((s) => s.map((st, j) => (j === i ? next : st)));
+  const removeStep = (i: number) => setSteps((s) => s.filter((_, j) => j !== i));
+  const moveStep = (i: number, dir: -1 | 1) => setSteps((s) => {
+    const j = i + dir;
+    if (j < 0 || j >= s.length) return s;
+    const c = [...s]; const t = c[i]!; c[i] = c[j]!; c[j] = t;
+    return c;
+  });
+
+  // Steps as actually run (inject the file name for slug tokens).
+  const pipelineSteps = useMemo(() => steps.map((st) =>
+    st.type === 'slugline' ? { ...st, s: { ...st.s, fileName: file?.name ?? '' } } : st,
+  ), [steps, file]);
+
+  // ── Live preview ────────────────────────────────────────────────────────────
+  const stepsSig = useMemo(() => JSON.stringify(steps.map((st) => [st.type, st.enabled, st.s])), [steps]);
+  useEffect(() => {
+    if (!file || paused) return;
+    const seq = ++renderSeq.current;
+    const t = setTimeout(async () => {
+      setRendering(true); setError('');
+      try {
+        const out = await runPipeline(file.bytes, pipelineSteps);
+        if (seq !== renderSeq.current) return;
+        outBytesRef.current = out;
+        const px = settings.previewQuality === 'auto'
+          ? (file.info.count > 16 ? 700 : 1000)
+          : QUALITY_PX[settings.previewQuality];
+        const r = await rasterizePdfSheets(out, { maxPx: px, maxPages: MAX_SHEETS, fillWhite: fillBg });
+        if (seq !== renderSeq.current) return;
+        setSheets(r.sheets); setTotalSheets(r.total);
+      } catch (e) {
+        if (seq === renderSeq.current) setError(e instanceof Error ? e.message : 'Processing failed');
+      } finally {
+        if (seq === renderSeq.current) setRendering(false);
+      }
+    }, 450);
+    return () => clearTimeout(t);
+  }, [file, stepsSig, pipelineSteps, paused, fillBg, settings.previewQuality]);
+
+  // Track the sheet nearest the top of the viewport for the page pill.
+  const onCanvasScroll = () => {
+    const el = canvasRef.current; if (!el) return;
+    const kids = el.querySelectorAll('[data-sheet]');
+    let best = 1, bestD = Infinity;
+    kids.forEach((k) => {
+      const r = (k as HTMLElement).getBoundingClientRect();
+      const d = Math.abs(r.top - el.getBoundingClientRect().top - 20);
+      if (d < bestD) { bestD = d; best = +(k as HTMLElement).dataset.sheet!; }
+    });
+    setCurrentSheet(best);
+  };
+
+  const fitToWindow = () => {
+    const el = canvasRef.current;
+    if (!el || !sheets.length) return;
+    const sh = sheets[0]!;
+    const availH = el.clientHeight - 90, availW = el.clientWidth - 70;
+    const baseH = 260, baseW = 260 * (sh.wPt / sh.hPt);
+    setZoom(Math.max(0.2, Math.min(availH / baseH, availW / baseW, 4)));
+  };
+
+  // ── Export ──────────────────────────────────────────────────────────────────
+  const toolLabel = useMemo(() => {
+    const first = steps.find((st) => findOp(st.type));
+    return first ? findOp(first.type)!.label.replace(/\s+/g, '') : 'Pipeline';
+  }, [steps]);
+
+  const outPaper = sheets.length ? paperName(sheets[0]!.wPt / 72, sheets[0]!.hPt / 72) : file ? paperName(file.info.widthIn, file.info.heightIn) : '';
+
+  async function buildFinal(bytes?: Uint8Array): Promise<Uint8Array> {
+    let out = bytes ?? (outBytesRef.current && !paused ? outBytesRef.current : await runPipeline(file!.bytes, pipelineSteps));
+    if (Object.values(jobInfo).some((v) => v.trim())) out = await setPdfJobInfo(out, jobInfo);
+    return out;
   }
+  const namedOutput = () => resolveName(settings.nameTemplate, {
+    fileName: file?.name ?? 'output', tool: toolLabel, pages: totalSheets || file?.info.count || 0,
+    paperSize: outPaper, custom: settings.customText,
+  });
+
   async function doDownload() {
-    if (!file || status === 'processing') return;
-    setStatus('processing');
+    if (!file || rendering) return;
+    if (gateExport && !gateExport()) return;
     try {
-      const r = await runEngine();
-      if (!r) { setStatus('error'); return; }
-      if ('multi' in r) { r.multi.forEach((bytes, i) => downloadFile(bytes, `${r.base}-${i + 1}.pdf`, 'application/pdf')); }
-      else downloadPdf(r.bytes, r.name);
-      setStatus('done'); setTimeout(() => setStatus('idle'), 2000);
-    } catch { setStatus('error'); }
+      setRendering(true);
+      const out = await buildFinal();
+      const sp = splitStep(steps);
+      if (sp) {
+        const parts = await runSplit(out, sp);
+        parts.forEach((p, i) => downloadPdf(p, namedOutput().replace(/\.pdf$/, `-part${i + 1}.pdf`)));
+      } else {
+        downloadPdf(out, namedOutput());
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Export failed'); }
+    finally { setRendering(false); }
   }
 
-  const sheetName = paperName(nup.sheetWIn, nup.sheetHIn);
-  const pillW = op?.engine === 'booklet' ? 11 : op?.engine === 'nupbook' ? nupbook.sheetWIn : nup.sheetWIn;
-  const pillH = op?.engine === 'booklet' ? 8.5 : op?.engine === 'nupbook' ? nupbook.sheetHIn : nup.sheetHIn;
+  async function doPrint() {
+    if (!file) return;
+    if (gateExport && !gateExport()) return;
+    try {
+      const out = await buildFinal();
+      const url = URL.createObjectURL(new Blob([out as BlobPart], { type: 'application/pdf' }));
+      const frame = document.createElement('iframe');
+      frame.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden';
+      frame.src = url;
+      frame.onload = () => {
+        try { frame.contentWindow?.focus(); frame.contentWindow?.print(); } catch { window.open(url, '_blank'); }
+        setTimeout(() => { document.body.removeChild(frame); URL.revokeObjectURL(url); }, 60000);
+      };
+      document.body.appendChild(frame);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Print failed'); }
+  }
 
+  function downloadJdf() {
+    if (!file || !sheets.length) return;
+    const cutter = steps.find((st) => st.enabled && (st.type === 'cuttermarks' || st.type === 'regmarks'));
+    const dims = sheets.map((sh) => ({ wPt: sh.wPt, hPt: sh.hPt }));
+    // Preview may be capped — extend by repeating the last sheet size.
+    while (dims.length < totalSheets) dims.push(dims[dims.length - 1]!);
+    const xml = buildJdf({
+      fileName: `${file.name.replace(/\.pdf$/i, '')}-${steps.map((st) => findOp(st.type)?.label.replace(/\s+/g, '')).filter(Boolean).join('-')}.pdf`,
+      sheets: dims,
+      cutMarginPt: (cutter?.s.marginIn ?? 0.2) * 72,
+    });
+    downloadFile(new TextEncoder().encode(xml), namedOutput().replace(/\.pdf$/, '.jdf'), 'application/vnd.cip4-jdf+xml');
+  }
+
+  async function runBatch(files: BatchFile[], progress: (d: number, t: number) => void) {
+    const outs: { name: string; data: Uint8Array }[] = [];
+    for (let i = 0; i < files.length; i++) {
+      progress(i, files.length);
+      const out = await runPipeline(files[i]!.bytes, pipelineSteps);
+      outs.push({ name: resolveName(settings.nameTemplate, { fileName: files[i]!.name, tool: toolLabel, pages: 0, paperSize: outPaper, custom: settings.customText }), data: out });
+    }
+    progress(files.length, files.length);
+    if (outs.length === 1) downloadPdf(outs[0]!.data, outs[0]!.name);
+    else downloadFile(makeZip(outs), 'batch-output.zip', 'application/zip');
+  }
+
+  // Page-manager apply: reorder/delete/duplicate the SOURCE document.
+  async function applyPageOrder(order: number[]) {
+    if (!file) return;
+    try {
+      const next = await shufflePages(file.bytes, order.map((i) => i + 1).join(','));
+      const info = await getPdfInfo(next);
+      setFile({ ...file, bytes: next, info });
+    } catch (e) { setError(e instanceof Error ? e.message : 'Reorder failed'); }
+  }
+  async function downloadPageOrder(order: number[]) {
+    if (!file) return;
+    if (gateExport && !gateExport()) return;
+    try {
+      const next = await shufflePages(file.bytes, order.map((i) => i + 1).join(','));
+      downloadPdf(next, file.name.replace(/\.pdf$/i, '') + '-pages.pdf');
+    } catch { /* surfaced via preview */ }
+  }
+
+  const cooldownLeft = useCountdown(usage?.cooldownUntil ?? 0);
+  void cooldownLeft;
+
+  const sheet1 = sheets[0];
+  const pillW = sheet1 ? sheet1.wPt / 72 : file?.info.widthIn ?? 0;
+  const pillH = sheet1 ? sheet1.hPt / 72 : file?.info.heightIn ?? 0;
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className={`pe ${theme === 'dark' ? 'pe-dark' : ''}`}>
       {/* App bar */}
       <div className="pe-appbar">
         <div className="pe-brand"><span className="pe-brand-mark"><Ic name="gridview" size={15} /></span>ImpositionPDF</div>
-        <button className="pe-filemenu">File <Ic name="chevron" size={14} /></button>
+        <div style={{ position: 'relative' }}>
+          <button className="pe-filemenu" onClick={() => setMenu(menu === 'file' ? null : 'file')}>File <Ic name="chevron" size={14} /></button>
+          {menu === 'file' && (
+            <div className="pe-menu pe-menu-left" onMouseLeave={() => setMenu(null)}>
+              <button className="pe-menu-item" onClick={() => { inputRef.current?.click(); setMenu(null); }}><span className="pe-menu-main">Open PDF…</span></button>
+              <button className="pe-menu-item" disabled={!steps.length} onClick={() => {
+                const name = window.prompt('Workflow name', 'My workflow');
+                if (name) saveWorkflow(name, steps);
+                setMenu(null);
+              }}><span className="pe-menu-main">Save Workflow</span></button>
+              <button className="pe-menu-item" onClick={() => setMenu('load')}><span className="pe-menu-main">Load Workflow ▸</span></button>
+              <button className="pe-menu-item" disabled={!steps.length} onClick={() => {
+                const blob = new Blob([JSON.stringify(steps.map((st) => ({ type: st.type, s: st.s })), null, 2)], { type: 'application/json' });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'workflow.json'; a.click();
+                setMenu(null);
+              }}><span className="pe-menu-main">Export Workflow JSON</span></button>
+              <button className="pe-menu-item" onClick={() => {
+                const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json';
+                inp.onchange = async () => {
+                  try {
+                    const f = inp.files?.[0]; if (!f) return;
+                    const data = JSON.parse(await f.text());
+                    if (Array.isArray(data)) setSteps(workflowToSteps({ name: '', savedAt: 0, steps: data }));
+                  } catch { /* invalid */ }
+                };
+                inp.click(); setMenu(null);
+              }}><span className="pe-menu-main">Import Workflow JSON</span></button>
+              <button className="pe-menu-item" disabled={!file} onClick={() => { setFile(null); setSheets([]); setTotalSheets(0); setMenu(null); }}>
+                <span className="pe-menu-main">Close File</span>
+              </button>
+            </div>
+          )}
+          {menu === 'load' && (
+            <div className="pe-menu pe-menu-left" onMouseLeave={() => setMenu(null)}>
+              <div className="pe-menu-label">SAVED WORKFLOWS</div>
+              {listWorkflows().length === 0 && <div className="pe-menu-foot">Nothing saved yet.</div>}
+              {listWorkflows().map((w) => (
+                <div key={w.name} className="pe-menu-item" style={{ display: 'flex', alignItems: 'center' }}>
+                  <button style={{ all: 'unset', cursor: 'pointer', flex: 1 }} onClick={() => { setSteps(workflowToSteps(w)); setMenu(null); }}>
+                    <span className="pe-menu-main">{w.name}</span>
+                    <span className="pe-menu-sub">{w.steps.map((s2) => findOp(s2.type)?.label).filter(Boolean).join(' → ')}</span>
+                  </button>
+                  <button className="pe-iconbtn" onClick={() => { deleteWorkflow(w.name); setMenu(null); }}><Ic name="trash" size={13} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="pe-appbar-right">
+          {settings.features.dpiPreflight && <span className="pe-usage" title={`DPI preflight target: ${settings.dpiProfile}`}>{settings.dpiProfile.toUpperCase()}</span>}
           {usage && (usage.isPro ? <span className="pe-usage pe-pro">✦ Pro · unlimited</span> : <span className="pe-usage">{usage.remaining} free download{usage.remaining === 1 ? '' : 's'} left</span>)}
           {onUpgrade}
           {onSignIn ?? <span className="pe-signin"><Ic name="user" size={16} /> Sign In</span>}
@@ -301,61 +362,91 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn }: {
         </div>
       </div>
 
-      {/* Toolbar */}
+      {/* Preview toolbar */}
       <div className="pe-toolbar">
-        <button className="pe-iconbtn" title="Search"><Ic name="search" size={18} /></button>
-        <button className="pe-iconbtn" title="List view"><Ic name="list" size={18} /></button>
-        <button className="pe-iconbtn pe-active" title="Grid view"><Ic name="gridview" size={18} /></button>
-        <button className="pe-iconbtn" title="Layers"><Ic name="layers" size={18} /></button>
-        <button className="pe-iconbtn" title="Sort"><Ic name="sort" size={18} /></button>
+        <button className="pe-iconbtn" title="Fit to window" onClick={fitToWindow}><Ic name="fit" size={18} /></button>
+        <button className="pe-iconbtn" title="Zoom in" onClick={() => setZoom((z) => Math.min(4, z + 0.15))}><Ic name="zoomin" size={18} /></button>
+        <button className="pe-iconbtn" title="Zoom out" onClick={() => setZoom((z) => Math.max(0.2, z - 0.15))}><Ic name="zoomout" size={18} /></button>
         <span className="pe-tb-div" />
-        <button className="pe-iconbtn" onClick={() => setZoom((z) => Math.min(2.5, z + 0.15))} title="Zoom in"><Ic name="zoomin" size={18} /></button>
-        <button className="pe-iconbtn" onClick={() => setZoom((z) => Math.max(0.4, z - 0.15))} title="Zoom out"><Ic name="zoomout" size={18} /></button>
-        <button className="pe-iconbtn" title="Spreads"><Ic name="spreads" size={18} /></button>
-        <button className="pe-iconbtn" title="Page numbers"><Ic name="hash" size={18} /></button>
-        <button className="pe-iconbtn" title="Layers"><Ic name="layers" size={18} /></button>
-        <button className="pe-iconbtn" title="Grid"><Ic name="grid" size={18} /></button>
-        <button className="pe-iconbtn" title="Checklist"><Ic name="batch" size={18} /></button>
-        <button className="pe-iconbtn" title="Settings"><Ic name="settings" size={18} /></button>
-        <button className="pe-iconbtn" title="Info"><Ic name="info" size={18} /></button>
-        <button className="pe-iconbtn" title="Split view"><Ic name="columns" size={18} /></button>
-        <span className="pe-tb-chip"><Ic name="jdf" size={16} /> JDF</span>
-        <span className="pe-tb-chip"><Ic name="batch" size={16} /> BATCH</span>
+        <button className={`pe-iconbtn ${paused ? 'pe-active' : ''}`} title={paused ? 'Resume live preview' : 'Pause live preview'} onClick={() => setPaused((p) => !p)}><Ic name={paused ? 'play' : 'pause'} size={18} /></button>
+        <span className="pe-tb-div" />
+        <button className={`pe-iconbtn ${showNumbers ? 'pe-active' : ''}`} title="Overlay page numbers" onClick={() => setShowNumbers((v) => !v)}><Ic name="hash" size={18} /></button>
+        <button className={`pe-iconbtn ${settings.showCutBlocks ? 'pe-active' : ''}`} title="Show JDF cut blocks" onClick={() => updateSettings({ ...settings, showCutBlocks: !settings.showCutBlocks })}><Ic name="layers" size={18} /></button>
+        <button className={`pe-iconbtn ${showRules ? 'pe-active' : ''}`} title="Draw rules" onClick={() => setShowRules((v) => !v)}><Ic name="rules" size={18} /></button>
+        <button className={`pe-iconbtn ${fillBg ? 'pe-active' : ''}`} title="Fill background" onClick={() => setFillBg((v) => !v)}><Ic name="fillbg" size={18} /></button>
+        <button className="pe-iconbtn" title="Settings" onClick={() => setModal('settings')}><Ic name="settings" size={18} /></button>
+        <button className="pe-iconbtn" title="Job info" onClick={() => setModal('jobinfo')}><Ic name="info" size={18} /></button>
+        <button className="pe-iconbtn" title="Page manager" disabled={!file} onClick={() => setModal('pagemanager')}><Ic name="columns" size={18} /></button>
+        <button className="pe-tb-chip pe-tb-chip-btn" title="Download JDF" disabled={!file || !sheets.length} onClick={downloadJdf}><Ic name="jdf" size={16} /> JDF</button>
         <div className="pe-tb-right">
-          <button className="pe-btn pe-btn-print" disabled={!file} onClick={doDownload}><Ic name="print" size={16} /> Print</button>
-          <button className="pe-btn pe-btn-dl" disabled={!file || status === 'processing'} onClick={doDownload}>
-            <Ic name="download" size={16} /> {status === 'processing' ? '…' : status === 'done' ? 'Saved ✓' : 'Download'}
+          <div style={{ position: 'relative' }}>
+            <button className="pe-tb-chip pe-tb-chip-btn" onClick={() => setMenu(menu === 'quality' ? null : 'quality')}>
+              <i className="pe-menu-dot" style={{ background: 'var(--pe-violet)' }} />
+              {settings.previewQuality === 'auto' ? 'Auto' : settings.previewQuality === 'ultralow' ? 'Ultra Low' : settings.previewQuality[0]!.toUpperCase() + settings.previewQuality.slice(1)}
+              <Ic name="chevron" size={13} />
+            </button>
+            {menu === 'quality' && <QualityMenu value={settings.previewQuality} onChange={(q) => updateSettings({ ...settings, previewQuality: q })} onClose={() => setMenu(null)} />}
+          </div>
+          <button className="pe-tb-chip pe-tb-chip-btn" disabled={!file || !steps.length} onClick={() => setModal('batch')}>
+            <Ic name="batch" size={15} /> Batch {!usage?.isPro && <span className="pe-crown"><Ic name="crown" size={13} /></span>}
           </button>
-          <button className="pe-iconbtn" title="Close" onClick={() => setActiveOp(null)}><Ic name="close" size={18} /></button>
+          <button className="pe-tb-chip pe-tb-chip-btn" disabled title="Ask AI — coming soon"><Ic name="sparkle" size={15} /> Ask AI</button>
+          <button className="pe-btn pe-btn-print" disabled={!file} onClick={doPrint}><Ic name="print" size={16} /> Print</button>
+          <button className="pe-btn pe-btn-dl" disabled={!file || rendering} onClick={doDownload}>
+            <Ic name="download" size={16} /> {rendering ? '…' : 'Download'}
+          </button>
+          <button className="pe-iconbtn" title="Clear operations" disabled={!steps.length} onClick={() => setSteps([])}><Ic name="eraser" size={17} /></button>
         </div>
       </div>
 
       {/* Body */}
       <div className="pe-body">
         <aside className="pe-side">
-          {!op ? (
-            <ChooseOperation onSelect={setActiveOp} />
+          {steps.length === 0 || adding ? (
+            <>
+              {adding && (
+                <button className="pe-back" style={{ marginBottom: 10 }} onClick={() => setAdding(false)}><Ic name="back" size={14} /> Back to workflow</button>
+              )}
+              <button className="pe-templates-cta" onClick={() => setModal('templates')}>
+                <Ic name="save" size={16} /> Templates &amp; Recipes
+                <span className="pe-label-sm" style={{ marginLeft: 'auto' }}>225 presets</span>
+              </button>
+              <ChooseOperation
+                title={adding ? 'Add Step' : 'Choose Operation'}
+                onSelect={addStep}
+                hidden={visibleHidden}
+                onToggleHidden={(id, hide) => updateSettings({
+                  ...settings,
+                  hiddenTools: hide ? [...settings.hiddenTools, id] : settings.hiddenTools.filter((t) => t !== id),
+                })}
+              />
+            </>
           ) : (
             <>
-              <div className="pe-panel-head">
-                <div className="pe-panel-title"><Ic name={op.icon} size={20} />{op.label}</div>
-                <div className="pe-panel-head-actions">
-                  <button className="pe-iconbtn" title="Reset"><Ic name="undo" size={16} /></button>
-                  <button className="pe-iconbtn" title="Help"><Ic name="help" size={16} /></button>
-                  <button className="pe-back" onClick={() => setActiveOp(null)}><Ic name="back" size={14} /> Back</button>
-                </div>
-              </div>
-              <div className="pe-tip"><Ic name="bulb" size={16} /> {op.tip}</div>
-              {renderPanel(op)}
+              {steps.map((st, i) => (
+                <React.Fragment key={st.id}>
+                  {i > 0 && <div className="pe-step-connector"><i /></div>}
+                  <StepCard
+                    step={st} index={i} unit={unit} onUnit={setUnit} pageCount={file?.info.count}
+                    onChange={(next) => changeStep(i, next)}
+                    onRemove={() => removeStep(i)}
+                    onMove={(dir) => moveStep(i, dir)}
+                    canUp={i > 0} canDown={i < steps.length - 1}
+                  />
+                </React.Fragment>
+              ))}
               <div className="pe-panel-foot">
-                <button className="pe-foot-btn pe-foot-add"><Ic name="addstep" size={15} /> ADD STEP</button>
-                <button className="pe-foot-btn pe-foot-save"><Ic name="save" size={15} /> SAVE WORKFLOW</button>
+                <button className="pe-foot-btn pe-foot-add" onClick={() => setAdding(true)}><Ic name="addstep" size={15} /> ADD STEP</button>
+                <button className="pe-foot-btn pe-foot-save" onClick={() => {
+                  const name = window.prompt('Workflow name', 'My workflow');
+                  if (name) saveWorkflow(name, steps);
+                }}><Ic name="save" size={15} /> SAVE WORKFLOW</button>
               </div>
             </>
           )}
         </aside>
 
-        <main className="pe-canvas-wrap"
+        <main ref={canvasRef} className={`pe-canvas-wrap ${fillBg ? '' : 'pe-nofill'}`} onScroll={onCanvasScroll}
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
           onDragLeave={() => setDrag(false)}
           onDrop={(e) => { e.preventDefault(); setDrag(false); onPick(e.dataTransfer.files); }}>
@@ -365,272 +456,86 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn }: {
               <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--pe-ink)' }}>Drop a PDF to start</div>
               <div style={{ fontSize: 13 }}>Processed locally — nothing is uploaded.</div>
               <button className="pe-drop-btn" onClick={() => inputRef.current?.click()}>Choose PDF</button>
-              <input ref={inputRef} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => onPick(e.target.files)} />
             </div>
-          ) : !op ? (
-            <div className="pe-drop"><div style={{ fontSize: 15, color: 'var(--pe-muted)' }}>Choose an operation from the left to begin.</div></div>
           ) : (
-            <SheetCanvas sheets={sheets} thumbs={thumbs} zoom={zoom} />
+            <>
+              <div className="pe-sheets">
+                {sheets.map((sh, si) => {
+                  const baseH = 260 * zoom;
+                  const w = baseH * (sh.wPt / sh.hPt), h = baseH;
+                  const pxPerIn = w / (sh.wPt / 72);
+                  const spacingPx = Math.max(4, settings.rulerSpacingIn * pxPerIn);
+                  const cutM = (steps.find((st) => st.enabled && (st.type === 'cuttermarks' || st.type === 'regmarks'))?.s.marginIn ?? 0.2) * pxPerIn;
+                  return (
+                    <div key={si} data-sheet={si + 1} className={`pe-sheet ${fillBg ? '' : 'pe-sheet-clear'}`} style={{ width: w, height: h }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={sh.url} alt={`Sheet ${si + 1}`} draggable={false} />
+                      {showRules && (
+                        <span className="pe-rules" style={{
+                          backgroundSize: `${spacingPx}px ${spacingPx}px`,
+                          backgroundPosition: settings.rulerOrigin === 'tl' ? '0 0' : settings.rulerOrigin === 'tr' ? '100% 0' : settings.rulerOrigin === 'bl' ? '0 100%' : '100% 100%',
+                        }} />
+                      )}
+                      {settings.showCutBlocks && (
+                        <span className="pe-cutblock" style={{ inset: cutM, borderColor: settings.cutBlockColor }} />
+                      )}
+                      {showNumbers && <span className="pe-sheetnum">{si + 1}{totalSheets > 1 ? ` · ${si % 2 === 0 ? 'A' : 'B'}` : ''}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              {totalSheets > sheets.length && (
+                <div className="pe-more-note">Preview shows the first {sheets.length} of {totalSheets} sheets — exports always include every sheet.</div>
+              )}
+              {rendering && <div className="pe-rendering"><span className="pe-spin" /> Imposing…</div>}
+              {paused && <div className="pe-paused-note"><Ic name="pause" size={13} /> Live preview paused</div>}
+              {error && <div className="pe-error">{error}</div>}
+            </>
           )}
 
-          {file && op && (
+          {file && sheets.length > 0 && (
             <div className="pe-pill">
-              <Ic name="file" size={14} /> <b>PAGE 1</b>
-              <span className="pe-pill-badge">{sheetName.toUpperCase()}</span>
+              <Ic name="file" size={14} /> <b>PAGE {currentSheet}</b>
+              <span className="pe-pill-badge">{outPaper.toUpperCase()}</span>
               <span style={{ opacity: 0.5 }}>·</span>
               <span className="pe-violet-dot">⤢</span>
-              <b>{fmt(pillW, unit)} × {fmt(pillH, unit)}</b> <span style={{ opacity: 0.6 }}>{unit}</span>
+              <b>{fmtIn(pillH, unit)} × {fmtIn(pillW, unit)}</b> <span style={{ opacity: 0.6 }}>{unit}</span>
               <Ic name="info" size={13} />
             </div>
           )}
-          {file && <span className="pe-avatar pe-avatar-loose">{usage?.authenticated ? 'U' : 'N'}</span>}
         </main>
       </div>
-    </div>
-  );
 
-  // ── Panel renderer ──────────────────────────────────────────────────────────
-  function renderPanel(o: OpDef): React.ReactNode {
-    const paper = (getW: number, getH: number, set: (w: number, h: number) => void) => (
-      <PaperSizeSection wIn={getW} hIn={getH} unit={unit} onUnit={setUnit} onSize={set} />
-    );
-    switch (o.engine) {
-      case 'cards':
-      case 'grid':
-      case 'cutstack':
-        return (
-          <>
-            {paper(nup.sheetWIn, nup.sheetHIn, (w, h) => setNup((s) => ({ ...s, sheetWIn: w, sheetHIn: h })))}
-            {o.engine === 'grid' && (
-              <Section label="// PAGE ORDER" help="Reading direction and fill pattern.">
-                <div className="pe-row">
-                  <select className="pe-select" value={stepRep ? 'step' : 'seq'} onChange={(e) => setStepRep(e.target.value === 'step')}>
-                    <option value="seq">Sequential</option><option value="step">Step and Rep</option>
-                  </select>
-                  <label className="pe-check" style={{ margin: 0 }}><input type="checkbox" checked={nup.duplex ?? false} onChange={(e) => setNup((s) => ({ ...s, duplex: e.target.checked }))} /><span className="pe-box">{nup.duplex && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4"><path d="M5 12l5 5L19 6" /></svg>}</span>Double Sided</label>
-                </div>
-              </Section>
-            )}
-            <Section label="// LAYOUT" help="Rows, columns and scaling.">
-              <Check label="Autoscale" checked={autoscale} onChange={setAutoscale} />
-              <Check label="Preserve aspect ratio" checked={preserveAR} onChange={setPreserveAR} />
-              <div className="pe-grid2" style={{ marginTop: 6 }}>
-                <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 56 }}>Columns</span><input className="pe-input pe-num" type="number" min={1} value={nup.cols} onChange={(e) => setNup((s) => ({ ...s, cols: Math.max(1, +e.target.value) }))} /></div>
-                <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 40 }}>Rows</span><input className="pe-input pe-num" type="number" min={1} value={nup.rows} onChange={(e) => setNup((s) => ({ ...s, rows: Math.max(1, +e.target.value) }))} /></div>
-              </div>
-              <div className="pe-cards2" style={{ marginTop: 12 }}>
-                <SelCard on={!nup.cutStack} cap="Z-PATTERN" onClick={() => setNup((s) => ({ ...s, cutStack: false }))}><Flow arrows="z" /></SelCard>
-                <SelCard off cap="S-PATTERN"><Flow arrows="s" /></SelCard>
-              </div>
-              <div className="pe-note">Need a precise layout? Use Custom Impose for per-cell control. <a href="#">Custom Impose guide</a></div>
-            </Section>
-            <WhiteSpaceSection marginIn={nup.marginIn} gutterIn={nup.gutterIn} unit={unit} onUnit={setUnit} onMargin={(v) => setNup((s) => ({ ...s, marginIn: v }))} onGutter={(v) => setNup((s) => ({ ...s, gutterIn: v }))} />
-            <PrintersMarks />
-            <BleedsSection />
-          </>
-        );
-      case 'booklet':
-        return (
-          <>
-            {paper(11, 8.5, () => {})}
-            <Section label="// BOOK BINDING" help="Saddle-stitch or perfect binding.">
-              <div className="pe-row"><span className="pe-label">Saddle size</span><input className="pe-input pe-num" style={{ width: 70 }} type="number" min={0} value={booklet.signatureSheets ?? ''} placeholder="" onChange={(e) => setBooklet((s) => ({ ...s, signatureSheets: e.target.value ? +e.target.value : 0 }))} /><span className="pe-label-sm">sheets</span></div>
-              <div className="pe-label-sm" style={{ marginBottom: 10 }}>{booklet.signatureSheets ? 'Perfect binding' : 'Saddle stitch (single stack)'}</div>
-              <div className="pe-cards2">
-                <SelCard on={!booklet.rtl} cap="LEFT TO RIGHT" onClick={() => setBooklet((s) => ({ ...s, rtl: false }))}><Flow arrows="ltr" /></SelCard>
-                <SelCard on={booklet.rtl} off={!booklet.rtl} cap="RIGHT TO LEFT" onClick={() => setBooklet((s) => ({ ...s, rtl: true }))}><Flow arrows="rtl" /></SelCard>
-              </div>
-            </Section>
-            <Section label="// SCALE" help="Fit pages to the spread.">
-              <Check label="Autoscale" checked={autoscale} onChange={setAutoscale} />
-              <Check label="Preserve aspect ratio" checked={preserveAR} onChange={setPreserveAR} />
-            </Section>
-            <WhiteSpaceSection marginIn={booklet.marginIn} gutterIn={booklet.gutterIn} unit={unit} onUnit={setUnit} onMargin={(v) => setBooklet((s) => ({ ...s, marginIn: v }))} onGutter={(v) => setBooklet((s) => ({ ...s, gutterIn: v }))} />
-            <PrintersMarks />
-            <BleedsSection />
-          </>
-        );
-      case 'nupbook':
-        return (
-          <>
-            <Section label="// BOOK BINDING" help="Signature binding method.">
-              <Radio label="Perfect Bound" on={(nupbook.signatureSheets ?? 0) > 0} onSelect={() => setNupbook((s) => ({ ...s, signatureSheets: 4 }))} />
-              <Radio label="Saddle Stitch" on={(nupbook.signatureSheets ?? 0) === 0} onSelect={() => setNupbook((s) => ({ ...s, signatureSheets: 0 }))} />
-              <div className="pe-row" style={{ marginTop: 8 }}><span className="pe-label">N up</span><input className="pe-input pe-num" style={{ width: 70 }} type="number" value={nupbook.nUp} onChange={(e) => setNupbook((s) => ({ ...s, nUp: +e.target.value }))} /></div>
-              <div className="pe-cards2" style={{ marginTop: 10 }}>
-                <SelCard on={!nupbook.rtl} cap="LEFT TO RIGHT" onClick={() => setNupbook((s) => ({ ...s, rtl: false }))}><Flow arrows="ltr" /></SelCard>
-                <SelCard on={nupbook.rtl} off={!nupbook.rtl} cap="RIGHT TO LEFT" onClick={() => setNupbook((s) => ({ ...s, rtl: true }))}><Flow arrows="rtl" /></SelCard>
-              </div>
-              <div className="pe-note">Need a precise layout? Use Custom Impose for per-cell control. <a href="#">Custom Impose guide</a></div>
-            </Section>
-            <Section label="// MARGINS" help="Non-printable border around each sheet.">
-              <div className="pe-row"><span className="pe-label" style={{ width: 88 }}>Left &amp; right</span><NumIn valueIn={nupbook.marginIn} unit={unit} onIn={(v) => setNupbook((s) => ({ ...s, marginIn: v }))} /><UnitSelect unit={unit} onChange={setUnit} /></div>
-              <div className="pe-row"><span className="pe-label" style={{ width: 88 }}>Top &amp; bottom</span><NumIn valueIn={nupbook.marginIn} unit={unit} onIn={(v) => setNupbook((s) => ({ ...s, marginIn: v }))} /></div>
-            </Section>
-            <Section label="// GUTTERS" help="Spacing between adjacent pages.">
-              <div className="pe-row"><span className="pe-label" style={{ width: 88 }}>Binding Gutter</span><NumIn valueIn={nupbook.gutterIn} unit={unit} onIn={(v) => setNupbook((s) => ({ ...s, gutterIn: v }))} /><NumIn valueIn={nupbook.creepIn} unit={unit} onIn={(v) => setNupbook((s) => ({ ...s, creepIn: v }))} /></div>
-              <div style={{ marginTop: 10 }}>
-                <Radio label="Creep Inward" on={nupbook.creepIn >= 0} onSelect={() => setNupbook((s) => ({ ...s, creepIn: Math.abs(s.creepIn) }))} />
-                <Radio label="Creep Outward" on={nupbook.creepIn < 0} onSelect={() => setNupbook((s) => ({ ...s, creepIn: -Math.abs(s.creepIn || 0.01) }))} />
-              </div>
-            </Section>
-            <PrintersMarks />
-          </>
-        );
-      case 'shuffle':
-        return (
-          <>
-            <Section label="// PAGES" help="Page reordering expression.">
-              <span className="pe-label-sm">Pattern</span>
-              <input className="pe-input" style={{ marginTop: 5 }} value={shuffleOrder} onChange={(e) => setShuffleOrder(e.target.value)} />
-              <div className="pe-note" style={{ marginTop: 12 }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>Syntax:</div>
-                <div><code>all</code> — All pages</div>
-                <div><code>1-5</code> Range, <code>5-1</code> Reverse</div>
-                <div><code>odd</code>, <code>even</code>, <code>last</code>, <code>first</code></div>
-                <div><code>5*(1)</code> Repeat, <code>[a, b]</code> Interleave</div>
-              </div>
-            </Section>
-            <Section label="// QUICK ACTIONS" help="Common presets.">
-              <div className="pe-row" style={{ flexWrap: 'wrap' }}>
-                <button className="pe-chipbtn" onClick={() => setShuffleOrder('last-1')}><Ic name="shuffle" size={14} /> Reverse</button>
-                <button className="pe-chipbtn" onClick={() => setShuffleOrder('odd')}>Odd only</button>
-                <button className="pe-chipbtn" onClick={() => setShuffleOrder('even')}>Even only</button>
-              </div>
-            </Section>
-          </>
-        );
-      case 'rotate':
-        return (
-          <Section label="// ROTATION" help="Rotate all pages.">
-            <div className="pe-cards2" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
-              {[90, 180, 270].map((d) => <SelCard key={d} on={rotateDeg === d} off={rotateDeg !== d} cap={`${d}°`} onClick={() => setRotateDeg(d)}><Ic name="rotate" size={22} /></SelCard>)}
-            </div>
-          </Section>
-        );
-      case 'flip':
-        return (
-          <Section label="// FLIP" help="Mirror pages.">
-            <div className="pe-cards2">
-              <SelCard on={flipDir === 'h'} off={flipDir !== 'h'} cap="HORIZONTAL" onClick={() => setFlipDir('h')}><Ic name="flip" size={22} /></SelCard>
-              <SelCard on={flipDir === 'v'} off={flipDir !== 'v'} cap="VERTICAL" onClick={() => setFlipDir('v')}><Ic name="flip" size={22} /></SelCard>
-            </div>
-          </Section>
-        );
-      case 'split':
-        return (
-          <Section label="// RANGES" help="Comma-separated page ranges; each becomes a file.">
-            <input className="pe-input" value={splitRanges} onChange={(e) => setSplitRanges(e.target.value)} placeholder="1-5, 6-10" />
-            <div className="pe-note">Each range downloads as a separate PDF.</div>
-          </Section>
-        );
-      case 'merge':
-        return (
-          <Section label="// FILES" help="Add PDFs to append after the current one.">
-            <div className="pe-note" style={{ marginBottom: 10 }}>Base: {file?.name ?? '—'}</div>
-            {mergeFiles.map((m, i) => <div key={i} className="pe-label-sm" style={{ marginBottom: 6 }}>+ {m.name}</div>)}
-            <button className="pe-chipbtn" onClick={() => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/pdf'; inp.multiple = true; inp.onchange = async () => { const list = Array.from(inp.files ?? []); const loaded = await Promise.all(list.map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()), info: await getPdfInfo(new Uint8Array(await f.arrayBuffer())) }))); setMergeFiles((s) => [...s, ...loaded]); }; inp.click(); }}><Ic name="addstep" size={14} /> Add PDFs</button>
-          </Section>
-        );
-      default:
-        return null;
-    }
-  }
-  function PrintersMarks() {
-    return (
-      <Section label="// PRINTER'S MARKS" help="Trim guides and alignment marks outside the live area.">
-        <Check label="Draw crop marks" checked={drawMarks} onChange={setDrawMarks} />
-      </Section>
-    );
-  }
-  function BleedsSection() {
-    return (
-      <Section label="// BLEEDS" help="Extend artwork beyond the trim edge.">
-        <Radio label="No bleeds" sub="Cards placed with no bleed extension" on={bleedMode === 'none'} onSelect={() => setBleedMode('none')} />
-        <Radio label="From document" sub="Use bleed info from source PDF" on={bleedMode === 'doc'} onSelect={() => setBleedMode('doc')} />
-        <Radio label="Fixed bleeds" sub="Specify custom bleed amounts" on={bleedMode === 'fixed'} onSelect={() => setBleedMode('fixed')} />
-      </Section>
-    );
-  }
-}
+      <input ref={inputRef} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => onPick(e.target.files)} />
 
-function Flow({ arrows }: { arrows: 'z' | 's' | 'ltr' | 'rtl' }) {
-  if (arrows === 'ltr' || arrows === 'rtl') {
-    return (
-      <div className="pe-flow">
-        <b>{arrows === 'ltr' ? '2' : '3'}</b>
-        <span className="pe-flow-arrow">{arrows === 'ltr' ? '→' : '←'}</span>
-        <b>{arrows === 'ltr' ? '3' : '2'}</b>
-      </div>
-    );
-  }
-  const rows = arrows === 'z' ? [[1, 2, 3], [4, 5, 6]] : [[1, 2, 3], [6, 5, 4]];
-  return (
-    <div style={{ display: 'grid', gap: 4 }}>
-      {rows.map((r, i) => (
-        <div key={i} className="pe-flow" style={{ gap: 3 }}>
-          {r.map((n, j) => <React.Fragment key={j}><b style={{ width: 20, height: 18, fontSize: 11 }}>{n}</b>{j < 2 && <span className="pe-flow-arrow" style={{ fontSize: 11 }}>{arrows === 'z' ? '→' : (i === 0 ? '→' : '←')}</span>}</React.Fragment>)}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ChooseOperation({ onSelect }: { onSelect: (id: string) => void }) {
-  return (
-    <>
-      <div className="pe-choose-head">
-        <span className="pe-choose-title">Choose Operation</span>
-        <div className="pe-choose-views">
-          <button className="pe-iconbtn" title="Search"><Ic name="search" size={16} /></button>
-          <button className="pe-iconbtn" title="List"><Ic name="list" size={16} /></button>
-          <button className="pe-iconbtn pe-active" title="Grid"><Ic name="gridview" size={16} /></button>
-          <button className="pe-iconbtn" title="Layers"><Ic name="layers" size={16} /></button>
-          <button className="pe-iconbtn" title="Sort"><Ic name="sort" size={16} /></button>
-        </div>
-      </div>
-      {OP_GROUPS.map((g) => (
-        <div key={g.label}>
-          <div className="pe-group-label">{g.label}</div>
-          <div className="pe-op-grid">
-            {g.ops.map((o) => (
-              <button key={o.id} className="pe-op" onClick={() => onSelect(o.id)}>
-                <span className="pe-op-ic"><Ic name={o.icon} size={22} /></span>
-                <span className="pe-op-label">{o.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </>
-  );
-}
-
-function SheetCanvas({ sheets, thumbs, zoom }: { sheets: Sheet[]; thumbs: string[]; zoom: number }) {
-  return (
-    <div className="pe-sheets">
-      {sheets.map((sh, si) => {
-        const baseH = 260 * zoom;
-        const aspect = sh.wIn / sh.hIn;
-        const w = baseH * aspect, h = baseH;
-        return (
-          <div key={si} className="pe-sheet" style={{ width: w, height: h }}>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${sh.cols}, 1fr)`, gridTemplateRows: `repeat(${sh.rows}, 1fr)`, gap: 2, width: '100%', height: '100%' }}>
-              {sh.cells.map((c, i) => {
-                const img = !c.blank ? thumbs[c.n - 1] : undefined;
-                const color = PAGE_COLORS[(c.n - 1) % PAGE_COLORS.length];
-                return (
-                  <div key={i} className={`pe-page ${c.blank ? 'pe-page-blank' : ''}`} style={{ background: c.blank ? '#fff' : color, transform: c.rot ? 'rotate(180deg)' : undefined }}>
-                    {img && <img src={img} alt="" />}
-                    {!c.blank && !img && <span className="pe-page-num">{c.n}</span>}
-                    {img && !c.blank && <span className="pe-page-badge">{c.n}</span>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+      {/* Modals */}
+      {modal === 'settings' && (
+        <SettingsModal settings={settings} onChange={updateSettings} onClose={() => setModal(null)}
+          exampleCtx={{ fileName: file?.name ?? 'MyDocument.pdf', tool: toolLabel, pages: totalSheets || 8, paperSize: outPaper || 'A3' }} />
+      )}
+      {modal === 'jobinfo' && (
+        <JobInfoModal job={jobInfo} onChange={setJobInfo} onClose={() => setModal(null)} sourceBytes={file?.bytes ?? null}
+          onFillSlugline={(text) => {
+            setSteps((s) => {
+              const i = s.findIndex((st) => st.type === 'slugline');
+              if (i >= 0) return s.map((st, j) => (j === i ? { ...st, s: { ...st.s, text } } : st));
+              const st = makeStep('slugline'); st.s.text = text;
+              return [...s, st];
+            });
+          }} />
+      )}
+      {modal === 'pagemanager' && file && (
+        <PageManagerModal thumbs={srcThumbs} pageCount={file.info.count} onClose={() => setModal(null)}
+          onApply={applyPageOrder} onDownload={downloadPageOrder} />
+      )}
+      {modal === 'batch' && (
+        <BatchModal initial={file ? [{ name: file.name, bytes: file.bytes }] : []} isPro={!!usage?.isPro}
+          onClose={() => setModal(null)} onRun={runBatch} />
+      )}
+      {modal === 'preflight' && <PreflightModal report={preflightReport} onClose={() => setModal(null)} />}
+      {modal === 'templates' && (
+        <TemplatesModal onClose={() => setModal(null)} onApply={(next) => setSteps(next)} />
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import type { StepType } from './steps';
 
 // ── Line icons (stroke-based, match the reference screenshots) ───────────────
 const S = (p: React.SVGProps<SVGSVGElement> & { children: React.ReactNode }) => (
@@ -12,10 +13,14 @@ const S = (p: React.SVGProps<SVGSVGElement> & { children: React.ReactNode }) => 
 export const Icons = {
   cards: (p = {}) => <S {...p}><rect x="3" y="4" width="14" height="16" rx="1.5" /><path d="M7 8h6M7 12h6" /><rect x="9" y="6" width="12" height="14" rx="1.5" fill="var(--pe-bg)" /></S>,
   booklet: (p = {}) => <S {...p}><path d="M12 5v15" /><path d="M12 5C10 3.5 6 3.5 4 5v13c2-1.5 6-1.5 8 0 2-1.5 6-1.5 8 0V5c-2-1.5-6-1.5-8 0Z" /></S>,
+  zine: (p = {}) => <S {...p}><rect x="4" y="3" width="16" height="18" rx="1.5" /><path d="M8 3v18M8 8h8M12 12h4M12 16h4" /></S>,
   shuffle: (p = {}) => <S {...p}><path d="M16 4h4v4" /><path d="M4 20 20 4" /><path d="M4 4l5 5" /><path d="M16 20h4v-4" /><path d="M14 14l6 6" /></S>,
   grid: (p = {}) => <S {...p}><rect x="4" y="4" width="16" height="16" rx="1.5" /><path d="M4 12h16M12 4v16" /></S>,
   nupbook: (p = {}) => <S {...p}><rect x="3" y="5" width="8" height="14" rx="1" /><rect x="13" y="5" width="8" height="14" rx="1" /><path d="M7 9v6M17 9v6" /></S>,
   cutstack: (p = {}) => <S {...p}><circle cx="6" cy="6" r="2" /><circle cx="6" cy="18" r="2" /><path d="M8 6h12M8 18h12M14 6l-6 12" /></S>,
+  preflight: (p = {}) => <S {...p}><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /><path d="m9 12 2 2 4-4" /></S>,
+  gangsheet: (p = {}) => <S {...p}><rect x="3" y="3" width="9" height="7" rx="1" /><rect x="14" y="3" width="7" height="11" rx="1" /><rect x="3" y="12" width="7" height="9" rx="1" /><rect x="12" y="16" width="9" height="5" rx="1" /></S>,
+  cuttermarks: (p = {}) => <S {...p}><circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" /><path d="M9.5 6.5 20 17M9.5 17.5 20 7" /></S>,
   resize: (p = {}) => <S {...p}><path d="M4 9V4h5M20 15v5h-5" /><path d="M4 4l6 6M20 20l-6-6" /></S>,
   rotate: (p = {}) => <S {...p}><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 3v5h-5" /></S>,
   crop: (p = {}) => <S {...p}><path d="M6 2v14a2 2 0 0 0 2 2h14" /><path d="M2 6h14a2 2 0 0 1 2 2v14" /></S>,
@@ -25,76 +30,117 @@ export const Icons = {
   overlay: (p = {}) => <S {...p}><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></S>,
   distort: (p = {}) => <S {...p}><path d="M4 6c4-2 12-2 16 0M4 18c4 2 12 2 16 0M4 6v12M20 6v12" /></S>,
   bleed: (p = {}) => <S {...p}><path d="M4 4h5V2M20 4h-5V2M4 20h5v2M20 20h-5v2M4 9v6M20 9v6" /><rect x="8" y="8" width="8" height="8" rx="1" /></S>,
-  nudge: (p = {}) => <S {...p}><path d="M12 3v18M3 12h18" /><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" /></S>,
   headerfooter: (p = {}) => <S {...p}><rect x="4" y="4" width="16" height="16" rx="1.5" /><path d="M4 8h16M4 16h16" /></S>,
   colorbar: (p = {}) => <S {...p}><rect x="3" y="9" width="18" height="6" rx="1" /><path d="M7 9v6M11 9v6M15 9v6" /></S>,
-  stickers: (p = {}) => <S {...p}><path d="M4 4h16v11l-5 5H4Z" /><path d="M20 15h-5v5" /></S>,
-  calendar: (p = {}) => <S {...p}><rect x="3" y="5" width="18" height="16" rx="1.5" /><path d="M3 9h18M8 3v4M16 3v4" /></S>,
-  insertpages: (p = {}) => <S {...p}><rect x="4" y="3" width="12" height="18" rx="1.5" /><path d="M18 8v8M22 12h-8" /></S>,
-  mix: (p = {}) => <S {...p}><path d="M4 7h6M14 7h6M4 12h16M4 17h6M14 17h6" /></S>,
   slugline: (p = {}) => <S {...p}><rect x="3" y="4" width="18" height="16" rx="1.5" /><path d="M7 20v-3h5v3" /><path d="M7 8h6" /></S>,
   foldmarks: (p = {}) => <S {...p}><path d="M8 3v18M16 3v18" strokeDasharray="3 3" /><path d="M3 12h18" /></S>,
   registration: (p = {}) => <S {...p}><circle cx="12" cy="12" r="7" /><path d="M12 2v20M2 12h20" /></S>,
   collating: (p = {}) => <S {...p}><rect x="4" y="6" width="12" height="14" rx="1" /><rect x="8" y="3" width="12" height="14" rx="1" fill="var(--pe-bg)" /></S>,
+  omr: (p = {}) => <S {...p}><path d="M5 5v4M9 5v4M13 5v4M17 5v4M5 15v4M11 15v4M17 15v4" /></S>,
+  gathering: (p = {}) => <S {...p}><circle cx="5" cy="6" r="1.2" /><circle cx="10" cy="9" r="1.2" /><circle cx="15" cy="12" r="1.2" /><circle cx="20" cy="15" r="1.2" /><path d="M3 20h18" /></S>,
+  laymarks: (p = {}) => <S {...p}><path d="M12 20V8m0 0-4 4m4-4 4 4" /><path d="M4 20h16M4 20v-4" /></S>,
+  watermark: (p = {}) => <S {...p}><path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 1 1-12 0c0-3.4 3-6.5 6-11Z" /></S>,
+  pagenumbers: (p = {}) => <S {...p}><rect x="4" y="3" width="16" height="18" rx="1.5" /><path d="M9 16h6M12 8v8" /></S>,
+  calendar: (p = {}) => <S {...p}><rect x="3" y="5" width="18" height="16" rx="1.5" /><path d="M3 9h18M8 3v4M16 3v4" /></S>,
   // toolbar
   search: (p = {}) => <S {...p}><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></S>,
   list: (p = {}) => <S {...p}><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></S>,
   gridview: (p = {}) => <S {...p}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></S>,
   layers: (p = {}) => <S {...p}><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></S>,
   sort: (p = {}) => <S {...p}><path d="M7 4v16M7 20l-3-3M7 4l3 3M17 4v16M17 4l-3 3M17 20l3-3" /></S>,
+  fit: (p = {}) => <S {...p}><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4" /></S>,
   zoomin: (p = {}) => <S {...p}><circle cx="11" cy="11" r="7" /><path d="M11 8v6M8 11h6m6 9-3-3" /></S>,
   zoomout: (p = {}) => <S {...p}><circle cx="11" cy="11" r="7" /><path d="M8 11h6m6 9-3-3" /></S>,
+  pause: (p = {}) => <S {...p}><path d="M9 5v14M15 5v14" strokeWidth="2.4" /></S>,
+  play: (p = {}) => <S {...p}><path d="M7 5v14l12-7Z" /></S>,
   spreads: (p = {}) => <S {...p}><rect x="3" y="5" width="8" height="14" rx="1" /><rect x="13" y="5" width="8" height="14" rx="1" /></S>,
   hash: (p = {}) => <S {...p}><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18" /></S>,
-  settings: (p = {}) => <S {...p}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 2.6 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 2.6 1.7 1.7 0 0 0 10 1V.9a2 2 0 1 1 4 0V1a1.7 1.7 0 0 0 2.9 1.2 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H23a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></S>,
+  rules: (p = {}) => <S {...p}><rect x="3" y="3" width="18" height="18" rx="1.5" /><path d="M3 9h18M3 15h18M9 3v18M15 3v18" /></S>,
+  fillbg: (p = {}) => <S {...p}><rect x="4" y="4" width="16" height="16" rx="2" /><path d="m9 12 2.2 2.2L15.5 9.5" /></S>,
+  settings: (p = {}) => <S {...p}><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" /></S>,
   info: (p = {}) => <S {...p}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></S>,
   columns: (p = {}) => <S {...p}><rect x="3" y="4" width="16" height="16" rx="1.5" /><path d="M11 4v16" /></S>,
   jdf: (p = {}) => <S {...p}><rect x="4" y="3" width="16" height="18" rx="1.5" /><path d="M8 8h8M8 12h5" /></S>,
   batch: (p = {}) => <S {...p}><rect x="3" y="7" width="14" height="14" rx="1.5" /><path d="M7 7V4a1 1 0 0 1 1-1h13v13a1 1 0 0 1-1 1h-3" /></S>,
+  sparkle: (p = {}) => <S {...p}><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" /><path d="M19 16l.9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9L19 16Z" /></S>,
+  crown: (p = {}) => <S {...p}><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-1.6 10H4.6L3 8Z" /></S>,
+  eraser: (p = {}) => <S {...p}><path d="m8 20-5-5a2 2 0 0 1 0-2.8l8.2-8.2a2 2 0 0 1 2.8 0l6 6a2 2 0 0 1 0 2.8L13 20H8Z" /><path d="M6 12l7 7" /></S>,
+  eye: (p = {}) => <S {...p}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></S>,
+  eyeoff: (p = {}) => <S {...p}><path d="M3 3l18 18M10 5.3A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3 3.9M6.6 6.6A16.5 16.5 0 0 0 2 12s3.5 7 10 7a9.8 9.8 0 0 0 4.4-1" /></S>,
   print: (p = {}) => <S {...p}><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" rx="1" /></S>,
   download: (p = {}) => <S {...p}><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16" /></S>,
+  upload: (p = {}) => <S {...p}><path d="M12 15V3m0 0 4 4m-4-4-4 4M4 19h16" /></S>,
   close: (p = {}) => <S {...p}><path d="M6 6l12 12M18 6 6 18" /></S>,
   globe: (p = {}) => <S {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18Z" /></S>,
   user: (p = {}) => <S {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></S>,
   file: (p = {}) => <S {...p}><path d="M6 2h8l4 4v16H6Z" /><path d="M14 2v4h4" /></S>,
   chevron: (p = {}) => <S {...p}><path d="m6 9 6 6 6-6" /></S>,
+  chevronup: (p = {}) => <S {...p}><path d="m6 15 6-6 6 6" /></S>,
   undo: (p = {}) => <S {...p}><path d="M3 7v6h6" /><path d="M3 13a9 9 0 1 0 3-7L3 9" /></S>,
   back: (p = {}) => <S {...p}><path d="M15 6l-6 6 6 6" /></S>,
   help: (p = {}) => <S {...p}><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.5-2 2-2 3M12 17h.01" /></S>,
   bulb: (p = {}) => <S {...p}><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3 11 2 2 0 0 1 1 1.7V17h4v-1.3a2 2 0 0 1 1-1.7 6 6 0 0 0-3-11Z" /></S>,
   addstep: (p = {}) => <S {...p}><path d="M12 5v14M5 12h14" /></S>,
   save: (p = {}) => <S {...p}><path d="M5 3h11l3 3v15H5Z" /><path d="M8 3v5h7V3M8 21v-6h8v6" /></S>,
+  duplicate: (p = {}) => <S {...p}><rect x="8" y="8" width="12" height="12" rx="1.5" /><path d="M4 16V5a1 1 0 0 1 1-1h11" /></S>,
+  trash: (p = {}) => <S {...p}><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6" /></S>,
+  scissors: (p = {}) => <S {...p}><circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" /><path d="M8.2 7.7 20 19M8.2 16.3 20 5" /></S>,
+  tofront: (p = {}) => <S {...p}><path d="M12 19V6m0 0-4 4m4-4 4 4M5 3h14" /></S>,
+  toback: (p = {}) => <S {...p}><path d="M12 5v13m0 0-4-4m4 4 4-4M5 21h14" /></S>,
+  extract: (p = {}) => <S {...p}><circle cx="6" cy="6" r="2" /><circle cx="6" cy="18" r="2" /><path d="M8 6h12M8 18h12M14 6l-6 12" /></S>,
+  reverse: (p = {}) => <S {...p}><path d="M8 4v14M8 4 5 7M8 4l3 3M16 20V6M16 20l-3-3M16 20l3-3" /></S>,
 };
+export type IconName = keyof typeof Icons;
 
-export type OpEngine =
-  | 'cards' | 'grid' | 'cutstack' | 'booklet' | 'nupbook' | 'shuffle'
-  | 'rotate' | 'flip' | 'merge' | 'split';
+// ── Operation catalog (grouped like the reference "Choose Operation" panel) ──
 
-export interface OpDef { id: string; label: string; icon: keyof typeof Icons; engine: OpEngine; tip: string; }
-
+export interface OpDef { id: StepType; label: string; icon: IconName; tip: string; }
 export interface OpGroup { label: string; ops: OpDef[]; }
 
-// Stage-1 operation catalog. Grouped + labelled to match the reference
-// "Choose Operation" sidebar; every op here is fully wired to the engine.
 export const OP_GROUPS: OpGroup[] = [
   { label: '// LAYOUT', ops: [
-    { id: 'cards', label: 'Cards', icon: 'cards', engine: 'cards', tip: 'Use Cards to tile identical copies of your pages onto larger sheets for efficient cutting.' },
-    { id: 'booklet', label: 'Booklet', icon: 'booklet', engine: 'booklet', tip: 'Use Booklet to create saddle-stitch booklets.' },
-    { id: 'shuffle', label: 'Shuffle', icon: 'shuffle', engine: 'shuffle', tip: 'Use Shuffle to reorder pages for printing.' },
-    { id: 'grid', label: 'Grid', icon: 'grid', engine: 'grid', tip: 'Use Grid to arrange pages in a grid layout.' },
-    { id: 'nupbook', label: 'N-up Book', icon: 'nupbook', engine: 'nupbook', tip: 'Use N-up Book for multi-up signature imposition.' },
-    { id: 'cutstack', label: 'Cut and Stack', icon: 'cutstack', engine: 'cutstack', tip: 'Use Cut & Stack so sequential numbers fall into order after cutting.' },
+    { id: 'cards', label: 'Cards', icon: 'cards', tip: 'Use Cards to tile identical copies of your pages onto larger sheets for efficient cutting.' },
+    { id: 'booklet', label: 'Booklet', icon: 'booklet', tip: 'Use Booklet for orders pages so a folded, center-stapled stack reads correctly.' },
+    { id: 'zine', label: 'Zine', icon: 'zine', tip: 'Use Zine for a quick fold-and-staple mini-booklet on office paper.' },
+    { id: 'shuffle', label: 'Shuffle', icon: 'shuffle', tip: 'Use Shuffle to reorder pages for printing.' },
+    { id: 'grid', label: 'Grid', icon: 'grid', tip: 'Use Grid to arrange pages in an N-up grid layout.' },
+    { id: 'nupbook', label: 'N-up Book', icon: 'nupbook', tip: 'Use N-up Book for multi-up signature imposition (folio / quarto).' },
+    { id: 'cutstack', label: 'Cut and Stack', icon: 'cutstack', tip: 'Use Cut & Stack so sequential pages fall into order after guillotining.' },
+  ] },
+  { label: '// ADVANCED', ops: [
+    { id: 'preflight', label: 'PDF Preflight', icon: 'preflight', tip: 'Inspect page geometry, boxes and warnings before you impose.' },
+    { id: 'gangsheet', label: 'Gang Sheet', icon: 'gangsheet', tip: 'Nest mixed-size artwork onto sheets or roll media with minimal waste.' },
+    { id: 'cuttermarks', label: 'Cutter Marks', icon: 'scissors', tip: 'Use Cutter Marks to add registration targets digital cutting tables read to find your cuts.' },
   ] },
   { label: '// TRANSFORM', ops: [
-    { id: 'rotate', label: 'Rotate', icon: 'rotate', engine: 'rotate', tip: 'Rotate pages by 90°, 180° or 270°.' },
-    { id: 'flip', label: 'Flip', icon: 'flip', engine: 'flip', tip: 'Flip / mirror pages horizontally or vertically.' },
-    { id: 'split', label: 'Split', icon: 'split', engine: 'split', tip: 'Split a PDF into separate files by page ranges.' },
-    { id: 'merge', label: 'Merge PDFs', icon: 'merge', engine: 'merge', tip: 'Merge multiple PDFs into one document.' },
+    { id: 'resize', label: 'Resize', icon: 'resize', tip: 'Scale or fit pages to a new size.' },
+    { id: 'rotate', label: 'Rotate', icon: 'rotate', tip: 'Rotate pages by 90°, 180° or 270°.' },
+    { id: 'crop', label: 'Crop', icon: 'crop', tip: 'Trim page edges by setting the crop/trim boxes inward.' },
+    { id: 'split', label: 'Split', icon: 'split', tip: 'Split the output into separate files by page ranges.' },
+    { id: 'flip', label: 'Flip', icon: 'flip', tip: 'Mirror pages horizontally or vertically (true content mirror).' },
+    { id: 'merge', label: 'Merge PDFs', icon: 'merge', tip: 'Append other PDFs before the pipeline runs.' },
+    { id: 'overlay', label: 'Overlay', icon: 'overlay', tip: 'Stamp another PDF over every page (proofs, brands, forms).' },
+    { id: 'distort', label: 'Distortion Comp.', icon: 'distort', tip: 'Pre-compensate flexo plate distortion around the cylinder.' },
+  ] },
+  { label: '// ENHANCE', ops: [
+    { id: 'bleed', label: 'BleedMaker', icon: 'bleed', tip: 'Fabricate a bleed margin on artwork that has none.' },
+    { id: 'headerfooter', label: 'Header or Footer', icon: 'headerfooter', tip: 'Running header/footer text bands on every page.' },
+    { id: 'colorbar', label: 'Color Bar', icon: 'colorbar', tip: 'Use Color Bar to add color and registration test strips for press quality control.' },
+    { id: 'slugline', label: 'Slugline', icon: 'slugline', tip: 'A thin job-info strip along one edge.' },
+    { id: 'foldmarks', label: 'Folding Marks', icon: 'foldmarks', tip: 'Fold position ticks for half, letter, Z-fold, gate and custom schemes.' },
+    { id: 'regmarks', label: 'Registration Marks', icon: 'registration', tip: 'Simple corner/edge registration targets without cutter setup.' },
+    { id: 'collating', label: 'Collating Marks', icon: 'collating', tip: 'Stepped spine ticks so mis-gathered signatures are obvious.' },
+    { id: 'omr', label: 'OMR Marks', icon: 'omr', tip: 'Optical marks for inserters and folders.' },
+    { id: 'gathering', label: 'Gathering Marks', icon: 'gathering', tip: 'Staircase marks along the gripper edge for gathering lines.' },
+    { id: 'laymarks', label: 'Lay Marks', icon: 'laymarks', tip: 'Front-lay and side-lay arrows for hand-fed presses.' },
+    { id: 'watermark', label: 'Watermark', icon: 'watermark', tip: 'Diagonal proof/draft stamp across each page.' },
+    { id: 'pagenumbers', label: 'Page Numbers', icon: 'pagenumbers', tip: 'Stamp folio numbers / Bates numbering.' },
   ] },
 ];
 
-export function findOp(id: string | null): OpDef | undefined {
+export function findOp(id: string | null | undefined): OpDef | undefined {
   if (!id) return undefined;
   for (const g of OP_GROUPS) { const o = g.ops.find((x) => x.id === id); if (o) return o; }
   return undefined;
 }
+export const ALL_OPS: OpDef[] = OP_GROUPS.flatMap((g) => g.ops);

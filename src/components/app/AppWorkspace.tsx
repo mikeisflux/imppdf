@@ -75,53 +75,72 @@ export function AppWorkspace() {
       });
   }, [recompute]);
 
-  // Intercept the plugin's download anchors to enforce the free tier.
+  const markConsume = useCallback((pro: boolean) => {
+    lastConsume.current = Date.now();
+    if (pro) return;
+    const e0 = entRef.current!;
+    if (e0.authenticated) {
+      fetch('/api/usage/consume', { method: 'POST' })
+        .then((r) => r.json())
+        .then((d) => {
+          if (typeof d.remaining === 'number') { setRemaining(d.remaining); remainingRef.current = d.remaining; }
+          if (typeof d.cooldownUntil === 'number') { setCooldownUntil(d.cooldownUntil); cooldownRef.current = d.cooldownUntil; }
+        })
+        .catch(() => {});
+    } else {
+      const times = readLocalTimes();
+      times.push(Date.now());
+      writeLocalTimes(times);
+      recompute(entRef.current!);
+    }
+  }, [recompute]);
+
+  // One free export per job: Download AND Print both pass through this gate.
+  // Returns true when the export may proceed (and records the consumption).
+  const gateExport = useCallback((): boolean => {
+    const e0 = entRef.current;
+    if (!e0 || e0.plan === 'pro') { markConsume(true); return true; }
+    const now = Date.now();
+    if (now - lastConsume.current < 2000) return true;   // burst = same job
+    if (remainingRef.current <= 0) { setModal('limit'); return false; }
+    if (now < cooldownRef.current) { setModal('cooldown'); return false; }
+    markConsume(false);
+    return true;
+  }, [markConsume]);
+
+  // Intercept download anchors as a safety net (e.g. legacy gallery paths).
   useEffect(() => {
     function onClick(e: MouseEvent) {
       const target = e.target as HTMLElement | null;
       const anchor = target?.closest?.('a[download]') as HTMLAnchorElement | null;
       if (!anchor) return;
       const e0 = entRef.current;
-      if (!e0 || e0.plan === 'pro') { markConsume(true); return; }
-
+      if (!e0 || e0.plan === 'pro') { lastConsume.current = Date.now(); return; }
       const now = Date.now();
-      // Treat a burst of anchors (multi-file export) as a single job.
-      if (now - lastConsume.current < 2000) return;
-
+      if (now - lastConsume.current < 2000) return;   // already gated by gateExport
       const canByLimit = remainingRef.current > 0;
       const canByCooldown = now >= cooldownRef.current;
-      if (!canByLimit) { block(e); setModal('limit'); return; }
-      if (!canByCooldown) { block(e); setModal('cooldown'); return; }
-
-      // Allowed — let the download proceed and record it.
+      if (!canByLimit) { e.preventDefault(); e.stopImmediatePropagation(); setModal('limit'); return; }
+      if (!canByCooldown) { e.preventDefault(); e.stopImmediatePropagation(); setModal('cooldown'); return; }
       markConsume(false);
-    }
-    function block(e: MouseEvent) { e.preventDefault(); e.stopImmediatePropagation(); }
-    function markConsume(pro: boolean) {
-      lastConsume.current = Date.now();
-      if (pro) return;
-      const e0 = entRef.current!;
-      if (e0.authenticated) {
-        fetch('/api/usage/consume', { method: 'POST' })
-          .then((r) => r.json())
-          .then((d) => {
-            if (typeof d.remaining === 'number') { setRemaining(d.remaining); remainingRef.current = d.remaining; }
-            if (typeof d.cooldownUntil === 'number') { setCooldownUntil(d.cooldownUntil); cooldownRef.current = d.cooldownUntil; }
-          })
-          .catch(() => {});
-      } else {
-        const times = readLocalTimes();
-        times.push(Date.now());
-        writeLocalTimes(times);
-        recompute(entRef.current!);
-      }
     }
     document.addEventListener('click', onClick, true);
     return () => document.removeEventListener('click', onClick, true);
-  }, [recompute]);
+  }, [markConsume]);
+
+  // Live countdown for the cooldown paywall.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (modal !== 'cooldown' && modal !== 'limit') return;
+    const t = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [modal]);
 
   const isPro = ent?.plan === 'pro';
-  const cdLeftH = cooldownUntil > Date.now() ? Math.ceil((cooldownUntil - Date.now()) / 3600000) : 0;
+  const cdLeft = cooldownUntil > Date.now() ? cooldownUntil - Date.now() : 0;
+  const cdText = cdLeft
+    ? `${Math.floor(cdLeft / 3600000)}h ${String(Math.floor((cdLeft % 3600000) / 60000)).padStart(2, '0')}m ${String(Math.floor((cdLeft % 60000) / 1000)).padStart(2, '0')}s`
+    : '';
 
   const initialOp = initialTool ? (PLUGIN_TO_PRESS_OP[initialTool] ?? null) : null;
 
@@ -130,7 +149,8 @@ export function AppWorkspace() {
       <PressEditor
         key={initialTool ?? '__gallery__'}
         initialOp={initialOp}
-        usage={ent ? { authenticated: ent.authenticated, isPro, remaining, limit: ent.limit } : undefined}
+        gateExport={gateExport}
+        usage={ent ? { authenticated: ent.authenticated, isPro, remaining, limit: ent.limit, cooldownUntil } : undefined}
         onUpgrade={!isPro ? (
           <Link href="/pricing" className="pe-btn pe-btn-dl" style={{ padding: '6px 12px' }}>Upgrade to Pro</Link>
         ) : undefined}
@@ -142,12 +162,18 @@ export function AppWorkspace() {
       {modal && (
         <div className="app-modal-backdrop" onClick={() => setModal(null)}>
           <div className="app-modal card" onClick={(e) => e.stopPropagation()}>
-            <h2>{modal === 'limit' ? 'Free download limit reached' : 'Cooldown in progress'}</h2>
+            <h2>{modal === 'limit' ? 'Download Limit Reached' : 'Cooldown in progress'}</h2>
             <p className="muted">
+              Printing and downloading both use a free export.
               {modal === 'limit'
-                ? `Free accounts include ${ent?.limit} downloads. Upgrade to Pro for unlimited, cooldown-free exports.`
-                : `Free downloads have a cooldown of about ${ent?.cooldownHours} hours between exports${cdLeftH ? ` (~${cdLeftH}h left)` : ''}. Upgrade to Pro to remove it.`}
+                ? ` Free accounts include ${ent?.limit} exports — upgrade to Pro for unlimited, cooldown-free output.`
+                : ` Your next one unlocks when the timer ends — or go Pro to skip the ${ent?.cooldownHours}h cooldown.`}
             </p>
+            {cdText && (
+              <p style={{ marginTop: 12, fontFamily: 'ui-monospace, monospace', fontSize: 14 }}>
+                ⏱ Next free download: <b>{cdText}</b>
+              </p>
+            )}
             <div className="row wrap" style={{ marginTop: 18 }}>
               <Link href="/pricing" className="btn btn-primary btn-plain">Upgrade to Pro</Link>
               <button className="btn btn-ghost btn-plain" onClick={() => setModal(null)}>Keep working</button>
