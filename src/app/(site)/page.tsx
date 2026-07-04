@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import '@/components/home/home.css';
 import { Hero } from '@/components/home/Hero';
-import { StatCounter } from '@/components/home/StatCounter';
 import { Reviews } from '@/components/home/Reviews';
 import { Faq } from '@/components/home/Faq';
 import { ToolMockup } from '@/components/home/ToolMockup';
@@ -50,8 +49,6 @@ export default function HomePage() {
   return (
     <>
       <Hero />
-
-      <StatCounter />
 
       {/* Animated emoji tagline */}
       <section className="section tagline-section">
