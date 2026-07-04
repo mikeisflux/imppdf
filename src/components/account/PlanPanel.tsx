@@ -39,7 +39,7 @@ export function PlanPanel({
     return (
       <div className="card card-pad panel">
         <h2>Your plan</h2>
-        <p className="panel-sub">Thanks for supporting PDF Press.</p>
+        <p className="panel-sub">Thanks for supporting ImpositionPDF.</p>
         <div className="kv"><span className="k">Plan</span><span><span className="badge badge-brand">Pro</span></span></div>
         <div className="kv"><span className="k">Status</span><span>{subscription?.status || 'ACTIVE'}</span></div>
         {subscription?.billing_cycle && (

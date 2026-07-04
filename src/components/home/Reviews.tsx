@@ -26,7 +26,7 @@ export function Reviews() {
           <span className="pill-badge">✦ Reviews</span>
           <h2 style={{ marginTop: 16 }}>Loved by prepress and print teams</h2>
           <p>
-            Designers, copy centres and print shops who moved to PDF Press from Quite
+            Designers, copy centres and print shops who moved to ImpositionPDF from Quite
             Imposing, pdfsnake, Imposition Wizard and other desktop imposers.
           </p>
           <div className="reviews-agg">

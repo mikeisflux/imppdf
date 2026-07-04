@@ -1,7 +1,7 @@
-# PDF Press
+# ImpositionPDF
 
 A complete website built around the **Imposition Toolkit** plugin — a browser-based
-PDF imposition & prepress app (à la pdfpress.app) with PayPal subscriptions, a full
+PDF imposition & prepress app (à la impositionpdf.com) with PayPal subscriptions, a full
 `/admin` panel, an authenticated HTTP API, and reCAPTCHA on every form.
 
 - **Framework:** Next.js 15 (App Router) · React 19 · TypeScript
@@ -20,7 +20,7 @@ The imposition tool itself lives on the **front end at `/app`** (not behind `/ad
 ```bash
 npm install
 cp .env.example .env.local     # then fill in the values below
-npm run db:init                # creates ./data/pdfpress.db + the bootstrap admin
+npm run db:init                # creates ./data/impositionpdf.db + the bootstrap admin
 npm run dev                    # http://localhost:3000
 ```
 

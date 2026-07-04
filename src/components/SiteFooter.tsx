@@ -33,7 +33,7 @@ export function SiteFooter() {
         </div>
 
         <div className="pp-footer-bottom">
-          <div className="muted">© 2026 PDF Press. Files stay on your device.</div>
+          <div className="muted">© 2026 ImpositionPDF. Files stay on your device.</div>
           <div className="pp-footer-links">
             <Link href="/about">About</Link>
             <span className="sep">/</span>

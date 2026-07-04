@@ -169,7 +169,7 @@ export const USE_CASES = [
   { icon: '📖', title: 'Zine & indie publishers', blurb: 'Fold an 8-page mini-zine from a single sheet. The pages reorder themselves, so one print, one fold and one cut is all it takes.', link: 'Make a zine', href: '/tools/zine' },
 ];
 
-// "Why print pros choose PDF Press" feature cards.
+// "Why print pros choose ImpositionPDF" feature cards.
 export const WHY_CARDS = [
   { icon: '🖨️', title: 'Real imposition, not PDF editing', blurb: "Saddle-stitch and perfect-bound booklets, n-up, step and repeat, cut and stack and gang sheets: the print layouts generic PDF tools can't do." },
   { icon: '🔒', title: 'Private by design', blurb: 'Files never leave your device. Every page is imposed locally in your browser, with nothing uploaded to a server.' },
@@ -182,31 +182,31 @@ export const WHY_CARDS = [
 // FAQ (homepage accordion).
 export const FAQ = [
   { q: 'What is PDF imposition?', a: 'Imposition is arranging a document’s individual pages onto a larger press sheet in the exact order and position a printer needs, so that after printing, folding and cutting, the pages end up in the right sequence.' },
-  { q: 'Is PDF Press an imposition program?', a: 'Yes. PDF Press is browser-based imposition software: booklets, N-up, step-and-repeat, cut-and-stack, gang sheets, dielines and prepress marks — all running locally in your browser.' },
+  { q: 'Is ImpositionPDF an imposition program?', a: 'Yes. ImpositionPDF is browser-based imposition software: booklets, N-up, step-and-repeat, cut-and-stack, gang sheets, dielines and prepress marks — all running locally in your browser.' },
   { q: 'What does it mean to impose a PDF?', a: 'To impose a PDF is to place its pages onto a press sheet with the correct rotation, order, margins, gutters and marks so the printed sheet folds and trims into a finished product.' },
-  { q: 'How do I impose a PDF?', a: 'Open PDF Press, drop in your PDF, pick a layout (booklet, N-up, step & repeat…), set the sheet size, margins, bleed and marks, preview the result and export a print-ready PDF.' },
+  { q: 'How do I impose a PDF?', a: 'Open ImpositionPDF, drop in your PDF, pick a layout (booklet, N-up, step & repeat…), set the sheet size, margins, bleed and marks, preview the result and export a print-ready PDF.' },
   { q: 'Can I impose a PDF online for free?', a: 'Yes. The free tier lets you use every tool in the browser. Pro removes download cooldowns for unlimited output.' },
   { q: "What's the difference between imposition and prepress?", a: 'Prepress is everything that prepares a file for printing — color conversion, preflight, marks, trapping. Imposition is the specific prepress step of laying pages out on the press sheet.' },
   { q: 'What is a printing signature?', a: 'A signature is a single sheet printed with multiple pages that, once folded, forms a section of a book — commonly 4, 8, 16 or 32 pages.' },
-  { q: 'What is the best free imposition software?', a: 'PDF Press is a strong free, browser-based option: no install, no per-seat license, and files never leave your device.' },
+  { q: 'What is the best free imposition software?', a: 'ImpositionPDF is a strong free, browser-based option: no install, no per-seat license, and files never leave your device.' },
   { q: 'What is step-and-repeat printing?', a: 'Step-and-repeat places one design many times across a sheet with precise spacing and cut marks — ideal for business cards, labels and stickers.' },
-  { q: 'Is PDF Press a good Fiery Impose or Quite Imposing alternative?', a: 'Yes. PDF Press does booklets, N-up and step-and-repeat in the browser without the per-seat license cost of desktop imposers.' },
-  { q: 'How do I add bleed and crop marks to a PDF?', a: 'Use the Bleed & Crop Marks tool: set your bleed amount and mark length, and PDF Press adds trim, bleed and crop marks around every page.' },
-  { q: 'How do I put multiple PDF pages on one sheet (N-up)?', a: 'Use the N-up / Grid tool: choose rows and columns, sheet size, gutters and margins, and PDF Press arranges the pages onto each sheet.' },
+  { q: 'Is ImpositionPDF a good Fiery Impose or Quite Imposing alternative?', a: 'Yes. ImpositionPDF does booklets, N-up and step-and-repeat in the browser without the per-seat license cost of desktop imposers.' },
+  { q: 'How do I add bleed and crop marks to a PDF?', a: 'Use the Bleed & Crop Marks tool: set your bleed amount and mark length, and ImpositionPDF adds trim, bleed and crop marks around every page.' },
+  { q: 'How do I put multiple PDF pages on one sheet (N-up)?', a: 'Use the N-up / Grid tool: choose rows and columns, sheet size, gutters and margins, and ImpositionPDF arranges the pages onto each sheet.' },
   { q: 'How do I make a booklet from a PDF?', a: 'Use the Booklet tool. It reorders pages into saddle-stitch or perfect-bound signatures with automatic creep compensation.' },
   { q: 'How do I impose business cards for printing?', a: 'Use Business Cards / Step & Repeat: set the card size and bleed, and gang many cards per sheet with cut marks.' },
-  { q: 'Does PDF Press do variable data printing (VDP)?', a: 'Yes. Upload a CSV and PDF Press serializes tickets, vouchers, badges and labels — including a scannable QR code per record.' },
+  { q: 'Does ImpositionPDF do variable data printing (VDP)?', a: 'Yes. Upload a CSV and ImpositionPDF serializes tickets, vouchers, badges and labels — including a scannable QR code per record.' },
   { q: 'What is cut-and-stack imposition?', a: 'Cut-and-stack lays out sequential numbers so that after printing, cutting and stacking, each stack is in consecutive order — used for numbered tickets and cards.' },
   { q: 'What is the Expert grid for?', a: 'The Expert Grid gives full manual control over rows, columns, gutters, margins and per-cell placement for bespoke impositions.' },
   { q: 'Can I run preflight checks on my PDF?', a: 'Yes. The Preflight Inspector checks resolution, color space, bleed, fonts, overprint and minimum line width before output.' },
-  { q: 'Does PDF Press export JDF or cut files?', a: 'Yes. JDF / CIP4 export emits a CIP4 JDF 1.4 job ticket for your MIS or cutter workflow, and the Die Lines tool adds cut-contour spot toolpaths.' },
-  { q: 'Can I impose a PDF without Adobe Acrobat or InDesign?', a: 'Yes — PDF Press runs entirely in your browser, no Adobe software required.' },
-  { q: 'How many pages should a booklet PDF have?', a: 'Saddle-stitch booklets need a page count divisible by 4. PDF Press pads with blanks automatically if needed.' },
-  { q: 'Who is PDF Press for?', a: 'Print shops, copy centers, designers, prepress operators, publishers, packaging and label printers — anyone preparing files for print.' },
-  { q: 'How does the browser-based tool work?', a: 'PDF Press reads your file with the browser File API, imposes it in memory with pdf-lib, and hands back a downloadable PDF — nothing is uploaded.' },
+  { q: 'Does ImpositionPDF export JDF or cut files?', a: 'Yes. JDF / CIP4 export emits a CIP4 JDF 1.4 job ticket for your MIS or cutter workflow, and the Die Lines tool adds cut-contour spot toolpaths.' },
+  { q: 'Can I impose a PDF without Adobe Acrobat or InDesign?', a: 'Yes — ImpositionPDF runs entirely in your browser, no Adobe software required.' },
+  { q: 'How many pages should a booklet PDF have?', a: 'Saddle-stitch booklets need a page count divisible by 4. ImpositionPDF pads with blanks automatically if needed.' },
+  { q: 'Who is ImpositionPDF for?', a: 'Print shops, copy centers, designers, prepress operators, publishers, packaging and label printers — anyone preparing files for print.' },
+  { q: 'How does the browser-based tool work?', a: 'ImpositionPDF reads your file with the browser File API, imposes it in memory with pdf-lib, and hands back a downloadable PDF — nothing is uploaded.' },
   { q: 'Is my file uploaded anywhere?', a: 'No. All processing is local to your browser. There is no server component that touches your document contents.' },
   { q: 'What file types and sizes are supported?', a: 'PDF is the primary input; images and CSV are supported for photo layouts and variable data. Large files are handled in-browser subject to your device memory.' },
-  { q: 'Do I need Adobe Acrobat or any install?', a: 'No install of any kind. PDF Press works in any modern browser on any operating system.' },
+  { q: 'Do I need Adobe Acrobat or any install?', a: 'No install of any kind. ImpositionPDF works in any modern browser on any operating system.' },
 ];
 
 // Guides (homepage "Popular imposition & prepress guides").
@@ -221,21 +221,21 @@ export const GUIDES = [
 
 // Reviews (homepage testimonials).
 export const REVIEWS = [
-  { stars: 5, body: "We ran Quite Imposing on Acrobat for years. PDF Press does the same booklet and N-up impositions right in the browser, with no plug-in and no per-seat licence, and it's genuinely quicker to set up.", name: 'David Brennan', role: 'Prepress lead, commercial printer' },
-  { stars: 4, body: 'I print zines on a Risograph and the imposition was always the painful part. PDF Press lays out my zine pages for saddle-stitch booklet printing in seconds, page order, creep and all.', name: 'Sofia Marchetti', role: 'Zine maker & illustrator' },
-  { stars: 5, body: "I'd tried Imposition Wizard and Montax before this. PDF Press wins on speed. Open a tab, drop the PDF, and crop marks and bleed are already where I need them.", name: 'Aisha Rahman', role: 'Freelance packaging designer' },
+  { stars: 5, body: "We ran Quite Imposing on Acrobat for years. ImpositionPDF does the same booklet and N-up impositions right in the browser, with no plug-in and no per-seat licence, and it's genuinely quicker to set up.", name: 'David Brennan', role: 'Prepress lead, commercial printer' },
+  { stars: 4, body: 'I print zines on a Risograph and the imposition was always the painful part. ImpositionPDF lays out my zine pages for saddle-stitch booklet printing in seconds, page order, creep and all.', name: 'Sofia Marchetti', role: 'Zine maker & illustrator' },
+  { stars: 5, body: "I'd tried Imposition Wizard and Montax before this. ImpositionPDF wins on speed. Open a tab, drop the PDF, and crop marks and bleed are already where I need them.", name: 'Aisha Rahman', role: 'Freelance packaging designer' },
   { stars: 5, body: "Best browser tool I've found for booklet printing. Saddle-stitch, perfect-bound signatures, automatic page imposition, and our zine and catalogue clients love the turnaround.", name: 'Yuki Tanaka', role: 'Print & bindery lead' },
   { stars: 5, body: "Imposing a saddle-stitched booklet used to be the part of prepress I dreaded. Now it's a layout dropdown and a live preview. Easily the easiest impose tool I've used.", name: 'Maria Gonçalves', role: 'Print production designer' },
   { stars: 4, body: 'Grid printing for flyers and postcards is dead simple now. I set rows and columns and it n-ups the PDF onto the press sheet with bleed and registration marks ready for the printer.', name: 'Rafael Mendes', role: 'Quick-print operator' },
   { stars: 5, body: 'Moved our team over from pdfsnake. Same step-and-repeat and gang-up work, but the live preview means we catch creep and bleed problems before the plate, not after.', name: 'Tomáš Novák', role: 'Studio owner' },
   { stars: 5, body: 'We gang up sticker sheets all day. Drop the artwork, set the grid, add cut marks, and N-up sticker imposition that used to need an Illustrator script now takes one click.', name: 'Daniel Okoye', role: 'Sticker & label print shop' },
-  { stars: 5, body: 'The custom imposition options are why I stayed. Odd page sizes, mixed orientations, bespoke grids: PDF Press handles custom impose jobs my old tools just refused.', name: 'Hannah Berg', role: 'Bookbinder & print artist' },
+  { stars: 5, body: 'The custom imposition options are why I stayed. Odd page sizes, mixed orientations, bespoke grids: ImpositionPDF handles custom impose jobs my old tools just refused.', name: 'Hannah Berg', role: 'Bookbinder & print artist' },
 ];
 
 // Footer "COMPARE & ALTERNATIVES" links.
 export const COMPARE_LINKS = [
-  'PDF Press vs Quite Imposing Plus', 'PDF Press vs PDF Snake', 'PDF Press vs Fiery Impose',
-  'PDF Press vs Montax Imposer', 'PDF Press vs Imposition Studio', 'Quite Imposing alternative',
+  'ImpositionPDF vs Quite Imposing Plus', 'ImpositionPDF vs PDF Snake', 'ImpositionPDF vs Fiery Impose',
+  'ImpositionPDF vs Montax Imposer', 'ImpositionPDF vs Imposition Studio', 'Quite Imposing alternative',
   'PDFsnake alternative', 'Montax Imposer alternative', 'Imposition Wizard alternative',
   'Imposer Pro alternative', 'imPRESS Studio alternative', 'DevaliPI alternative',
   'Sejda N-up alternative', 'Online2PDF booklet alternative', 'PDF24 pages-per-sheet alternative',

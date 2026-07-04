@@ -11,7 +11,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
       <div className="auth-top"><Logo /></div>
       <div className="auth-card card">{children}</div>
       <div className="auth-foot muted">
-        <Link href="/">← Back to PDF Press</Link>
+        <Link href="/">← Back to ImpositionPDF</Link>
       </div>
     </div>
   );

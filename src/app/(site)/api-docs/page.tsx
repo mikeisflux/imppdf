@@ -23,7 +23,7 @@ export default function ApiDocsPage() {
   return (
     <div className="container" style={{ padding: '64px 24px 40px' }}>
       <div className="eyebrow">Developers</div>
-      <h1 style={{ fontSize: 'clamp(32px,4.4vw,48px)', marginBottom: 16 }}>PDF Press API</h1>
+      <h1 style={{ fontSize: 'clamp(32px,4.4vw,48px)', marginBottom: 16 }}>ImpositionPDF API</h1>
       <p className="muted" style={{ fontSize: 18, maxWidth: 620, marginBottom: 26 }}>
         POST a PDF and a steps pipeline — get a print-ready, imposed PDF back. One key works
         across the web app, the desktop app, and the API.

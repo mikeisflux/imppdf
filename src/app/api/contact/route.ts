@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
   const to = serverEnv().contactTo;
   const topicLabel = topic || 'general';
-  const subjLine = `[PDF Press · ${topicLabel}] ${subject || 'New message'}`;
+  const subjLine = `[ImpositionPDF · ${topicLabel}] ${subject || 'New message'}`;
 
   const emailed = await sendMail({
     to,

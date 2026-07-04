@@ -2,7 +2,7 @@ import { ContactForm } from '@/components/forms/ContactForm';
 
 export const metadata = {
   title: 'Contact',
-  description: 'Get in touch with PDF Press — support, enterprise licensing and general enquiries.',
+  description: 'Get in touch with ImpositionPDF — support, enterprise licensing and general enquiries.',
 };
 
 export default function ContactPage() {

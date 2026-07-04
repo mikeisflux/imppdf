@@ -1,24 +1,24 @@
 import Link from 'next/link';
 
-export const metadata = { title: 'About', description: 'About PDF Press — browser-based PDF imposition and prepress.' };
+export const metadata = { title: 'About', description: 'About ImpositionPDF — browser-based PDF imposition and prepress.' };
 
 export default function AboutPage() {
   return (
     <div className="container" style={{ maxWidth: 780, padding: '64px 24px 40px' }}>
-      <h1 style={{ fontSize: 'clamp(32px,4.4vw,46px)', marginBottom: 18 }}>About PDF Press</h1>
+      <h1 style={{ fontSize: 'clamp(32px,4.4vw,46px)', marginBottom: 18 }}>About ImpositionPDF</h1>
       <p className="muted" style={{ fontSize: 18, marginBottom: 34 }}>
-        PDF Press is a browser-based PDF imposition and prepress tool built for print
+        ImpositionPDF is a browser-based PDF imposition and prepress tool built for print
         professionals, designers, and production teams.
       </p>
 
-      <Section title="What PDF Press does">
-        PDF Press arranges pages into print-ready layouts like booklets, n-up grids, gang
+      <Section title="What ImpositionPDF does">
+        ImpositionPDF arranges pages into print-ready layouts like booklets, n-up grids, gang
         sheets, and cut-and-stack runs. It also adds production marks, header/footer info,
         and other prepress details so your output is ready for press or finishing.
       </Section>
 
       <Section title="Imposition only — no content editing">
-        PDF Press is a layout and imposition tool. It rearranges, transforms, and imposes
+        ImpositionPDF is a layout and imposition tool. It rearranges, transforms, and imposes
         existing PDF pages for printing. It does not alter the contents of your documents —
         only the arrangement and presentation for print production.
       </Section>

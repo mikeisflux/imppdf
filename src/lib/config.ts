@@ -1,7 +1,7 @@
 // Centralised environment/config access. Server-only values are read lazily so
 // they are never bundled into client code. NEXT_PUBLIC_* values are safe on both.
 
-export const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'PDF Press';
+export const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'ImpositionPDF';
 export const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
@@ -38,7 +38,7 @@ export const freeTier = {
 export function serverEnv() {
   return {
     authSecret: process.env.AUTH_SECRET || 'insecure-dev-secret-change-me',
-    databasePath: process.env.DATABASE_PATH || './data/pdfpress.db',
+    databasePath: process.env.DATABASE_PATH || './data/impositionpdf.db',
     contactTo: process.env.CONTACT_TO_EMAIL || 'divinitycomicsinc@gmail.com',
     recaptchaSecret: process.env.RECAPTCHA_SECRET_KEY || '',
     recaptchaV3MinScore: Number(process.env.RECAPTCHA_V3_MIN_SCORE || '0.5'),
@@ -52,7 +52,7 @@ export function serverEnv() {
       secure: process.env.SMTP_SECURE === 'true',
       user: process.env.SMTP_USER || '',
       pass: process.env.SMTP_PASS || '',
-      from: process.env.SMTP_FROM || 'PDF Press <no-reply@pdfpress.app>',
+      from: process.env.SMTP_FROM || 'ImpositionPDF <no-reply@impositionpdf.com>',
     },
   };
 }

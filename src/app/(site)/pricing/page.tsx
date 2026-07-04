@@ -78,7 +78,7 @@ export default async function PricingPage() {
         <div>
           <div className="plan-name">Enterprise team plans <span className="badge badge-gray">Team licensing</span></div>
           <p className="muted" style={{ marginTop: 8, maxWidth: 560 }}>
-            Share PDF Press across a studio, print shop or production team with centralized
+            Share ImpositionPDF across a studio, print shop or production team with centralized
             billing and concurrent-user access.
           </p>
         </div>

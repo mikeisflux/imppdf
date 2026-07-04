@@ -43,7 +43,7 @@ export function LoginForm({ next = '/account', admin = false }: { next?: string;
     <form onSubmit={submit}>
       <h1 className="auth-title">{admin ? 'Admin sign in' : 'Sign in'}</h1>
       <p className="auth-subtitle muted">
-        {admin ? 'Restricted access.' : 'Welcome back to PDF Press.'}
+        {admin ? 'Restricted access.' : 'Welcome back to ImpositionPDF.'}
       </p>
       {error && <div className="form-error">{error}</div>}
       <div className="field">

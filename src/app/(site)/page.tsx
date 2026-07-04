@@ -12,7 +12,7 @@ import {
 import { IconArrow, IconPrinter, IconGrid } from '@/components/icons';
 
 const HOW_TO = [
-  { n: 1, title: 'Add your PDF', body: 'Open PDF Press in your browser and add the PDF or images you want to impose.' },
+  { n: 1, title: 'Add your PDF', body: 'Open ImpositionPDF in your browser and add the PDF or images you want to impose.' },
   { n: 2, title: 'Choose an imposition layout', body: 'Pick booklet, N-up grid, or step & repeat to gang up cards, labels and stickers.' },
   { n: 3, title: 'Set the sheet details', body: 'Choose page size, margins, gutters and bleed, and add crop, cut or registration marks.' },
   { n: 4, title: 'Preview and export', body: 'Check the live press-sheet preview, fix the page order, then export a print-ready PDF, processed locally with nothing uploaded.' },
@@ -64,12 +64,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Why PDF Press */}
+      {/* Why ImpositionPDF */}
       <section className="section">
         <div className="container">
           <div className="section-head">
-            <span className="pill-badge">✦ Why PDF Press</span>
-            <h2 style={{ marginTop: 16 }}>Why print pros choose PDF Press</h2>
+            <span className="pill-badge">✦ Why ImpositionPDF</span>
+            <h2 style={{ marginTop: 16 }}>Why print pros choose ImpositionPDF</h2>
           </div>
           <div className="grid-3">
             {WHY_CARDS.map((c) => (
@@ -89,7 +89,7 @@ export default function HomePage() {
           <div className="section-head">
             <span className="pill-badge">✦ Use cases</span>
             <h2 style={{ marginTop: 16 }}>Built for every print job</h2>
-            <p>From a corner copy shop to a packaging line, PDF Press imposes the layout each job needs and exports a print-ready PDF.</p>
+            <p>From a corner copy shop to a packaging line, ImpositionPDF imposes the layout each job needs and exports a print-ready PDF.</p>
           </div>
           <div className="grid-3">
             {USE_CASES.map((u) => (
@@ -110,7 +110,7 @@ export default function HomePage() {
           <div className="section-head">
             <span className="pill-badge">✦ Step by step</span>
             <h2 style={{ marginTop: 16 }}>How to impose a PDF</h2>
-            <p>To impose a PDF, you arrange its single pages onto a larger press sheet in the exact order and position your printer needs. PDF Press does it right in your browser.</p>
+            <p>To impose a PDF, you arrange its single pages onto a larger press sheet in the exact order and position your printer needs. ImpositionPDF does it right in your browser.</p>
           </div>
           <div className="grid-4">
             {HOW_TO.map((s) => (
@@ -185,7 +185,7 @@ export default function HomePage() {
           <div className="eyebrow">Every imposition layout, in your browser</div>
           <h2 className="seo-title">Solve all your PDF imposition needs</h2>
           <p className="muted seo-copy">
-            PDF Press is browser-based PDF imposition software for print professionals. It runs
+            ImpositionPDF is browser-based PDF imposition software for print professionals. It runs
             entirely on your device, so customer files never leave the browser. Turn ordinary
             PDFs into print-ready booklets, N-up sheets, business cards, labels, tickets and gang
             sheets with crop and cutter marks, variable data printing and live preflight. No
@@ -212,7 +212,7 @@ export default function HomePage() {
         <div className="container">
           <div className="eyebrow">Compare &amp; alternatives</div>
           <p className="muted" style={{ maxWidth: 640, marginBottom: 24 }}>
-            How PDF Press compares to other imposition software and why it is a strong free,
+            How ImpositionPDF compares to other imposition software and why it is a strong free,
             browser-based alternative to the tools print pros search for.
           </p>
           <div className="link-columns">

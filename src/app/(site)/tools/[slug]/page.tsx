@@ -44,7 +44,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
           {!tool.inPlugin && (
             <div className="form-note" style={{ marginBottom: 18 }}>
               <span className="badge badge-brand">Coming soon</span>{' '}
-              This tool ships in the next PDF Press release.
+              This tool ships in the next ImpositionPDF release.
             </div>
           )}
 

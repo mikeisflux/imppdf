@@ -24,7 +24,7 @@ function loadEnv(file) {
 loadEnv(resolve(process.cwd(), '.env.local'));
 loadEnv(resolve(process.cwd(), '.env'));
 
-const dbPath = resolve(process.cwd(), process.env.DATABASE_PATH || './data/pdfpress.db');
+const dbPath = resolve(process.cwd(), process.env.DATABASE_PATH || './data/impositionpdf.db');
 const dir = dirname(dbPath);
 if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
@@ -66,7 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_usage_user ON usage_events(user_id);
 `;
 db.exec(schema);
 
-const email = (process.env.ADMIN_EMAIL || 'admin@pdfpress.app').toLowerCase().trim();
+const email = (process.env.ADMIN_EMAIL || 'admin@impositionpdf.com').toLowerCase().trim();
 const password = process.env.ADMIN_PASSWORD || 'change-me-please';
 
 const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);

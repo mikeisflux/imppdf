@@ -8,7 +8,7 @@ import { serverEnv } from './config';
 // modules across hot reloads in dev, so we cache the connection on globalThis.
 declare global {
   // eslint-disable-next-line no-var
-  var __pdfpress_db: Database.Database | undefined;
+  var __impositionpdf_db: Database.Database | undefined;
 }
 
 function open(): Database.Database {
@@ -23,8 +23,8 @@ function open(): Database.Database {
 }
 
 export function getDb(): Database.Database {
-  if (!globalThis.__pdfpress_db) globalThis.__pdfpress_db = open();
-  return globalThis.__pdfpress_db;
+  if (!globalThis.__impositionpdf_db) globalThis.__impositionpdf_db = open();
+  return globalThis.__impositionpdf_db;
 }
 
 function migrate(db: Database.Database) {
