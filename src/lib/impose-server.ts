@@ -24,7 +24,7 @@ export const OPERATIONS: OperationSpec[] = [
   { kind: 'Crop', summary: 'Crop every page (inches).', fields: { top: 'number=0', right: 'number=0', bottom: 'number=0', left: 'number=0' } },
   { kind: 'Bleed', summary: 'Add bleed around each page.', fields: { bleedIn: 'number=0.125' } },
   { kind: 'CropMarks', summary: 'Add crop/trim marks.', fields: { bleedIn: 'number=0.125', marginIn: 'number=0.25', markLenIn: 'number=0.25', markOffIn: 'number=0.125' } },
-  { kind: 'ColorBar', summary: 'Add a color control strip.', fields: { position: 'top|bottom=bottom', heightIn: 'number=0.25' } },
+  { kind: 'ColorBar', summary: 'Add a color control strip.', fields: { edge: 'top|bottom=bottom', heightIn: 'number=0.25' } },
   { kind: 'PageNumbers', summary: 'Stamp page numbers.', fields: { position: 'bottom-center|…=bottom-center', startAt: 'int=1', prefix: 'string=', suffix: 'string=', fontSizePt: 'number=10', marginPt: 'number=18' } },
   { kind: 'Watermark', summary: 'Add a text watermark.', fields: { text: 'string', opacity: 'number=0.2', angleDeg: 'number=45', fontSizePt: 'number=48' } },
   { kind: 'HeaderFooter', summary: 'Add header/footer text.', fields: { header: 'string=', footer: 'string=', fontSizePt: 'number=9', marginPt: 'number=18', align: 'left|center|right=center' } },
@@ -74,7 +74,7 @@ export async function applyStep(bytes: Uint8Array, step: any): Promise<Uint8Arra
     case 'CropMarks':
       return addCropMarksOnly(bytes, { bleedIn: num(step.bleedIn, 0.125), marginIn: num(step.marginIn, 0.25), markLenIn: num(step.markLenIn, 0.25), markOffIn: num(step.markOffIn, 0.125) });
     case 'ColorBar':
-      return addColorBar(bytes, { position: step.position === 'top' ? 'top' : 'bottom', heightIn: num(step.heightIn, 0.25) });
+      return addColorBar(bytes, { edge: step.edge === 'top' ? 'top' : 'bottom', heightIn: num(step.heightIn, 0.25) });
     case 'PageNumbers':
       return addPageNumbers(bytes, { position: str(step.position, 'bottom-center') as any, startAt: num(step.startAt, 1), prefix: str(step.prefix), suffix: str(step.suffix), fontSizePt: num(step.fontSizePt, 10), marginPt: num(step.marginPt, 18) });
     case 'Watermark':

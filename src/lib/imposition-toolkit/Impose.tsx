@@ -2,16 +2,26 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import type { DragEvent, ChangeEvent } from 'react';
 import {
-  getPdfInfo, imposeBooklet, imposeNUp, computeNUpGrid, addCropMarksOnly,
-  mergePdfs, rotatePdf, flipPdf, splitPdf, overlayPdf, shufflePages, cropPdf,
+  getPdfInfo, imposeBooklet, imposeNUpBook, imposeCalendar, imposeNUp, computeNUpGrid, addCropMarksOnly,
+  mergePdfs, rotatePdf, flipPdf, splitPdf, splitPdfChunks, makeZip, overlayPdf, shufflePages, cropPdf, resizePdf,
   addPageNumbers, addColorBar, imposeTiledPoster, imposeTickets,
-  generateBleed, addHeaderFooter, addTextWatermark, addJobSlug, addCollatingMarks, preflight,
-  makeDieline, imposeDataMerge, downloadPdf, downloadMultiple,
+  generateBleed, addHeaderFooter, addTextWatermark, addJobSlug, addCollatingMarks, addOmrMarks, addGatheringMarks, addFoldMarks, addLayMarks,
+  addCutContour, addWhiteVarnish, addBraille, addBarcodeStamp, addBackdropFile, applyColorEffects, applyColorManagement, assignOutputIntent,
+  preflight, preflightClean, computeGangPlan, readLayers, setLayers, imposeCustomGrid, optimizePdf, decryptPdf,
+  editPdf, exportJdf,
+  makeDieline, imposeDataMerge, downloadPdf, downloadFile, downloadMultiple,
+  addRegistrationMarks, insertPages, mixPdfs, nudgePdf, repairPdf, addBackdrop, addQrStamp, addDimensions,
+  distortPdf, distortFactorFromCylinder, nestPdf,
 } from './impose';
 import type {
   PdfPageInfo, BookletOptions, NUpOptions, CropMarksOptions,
-  OverlayOptions, PageNumberOptions, TicketOptions,
+  OverlayOptions, PageNumberOptions, TicketOptions, ResizeOptions,
   HeaderFooterOptions, WatermarkOptions, JobSlugOptions, PreflightReport, DielineOptions, DataMergeOptions,
+  RegMarkOptions, InsertOptions, NudgeOptions, BackdropOptions, QrStampOptions, NUpBookOptions, BleedOptions, DistortOptions, CalendarOptions, NestOptions,
+  CollatingOptions, OmrOptions, GatheringOptions, FoldMarksOptions, LayMarksOptions,
+  CutContourOptions, WhiteVarnishOptions, BrailleOptions, BarcodeStampOptions, BackdropFileOptions,
+  ColorEffectsOptions, ColorManageOptions, RepairOptions,
+  PreflightCleanOptions, PdfLayer, LayerState, CustomImposeOptions, CustomCell, OptimizeOptions, EditOp, JdfOptions,
 } from './impose';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -43,8 +53,9 @@ interface PosterOptions {
   tilesAcross: number; tilesDown: number;
   sheetWIn: number; sheetHIn: number;
   overlapIn: number; addMarks: boolean; markLenIn: number; markOffIn: number;
+  centerMarks?: boolean; markWeightPt?: number;
 }
-interface ColorBarOptions { position: 'bottom' | 'top'; heightIn: number; }
+interface ColorBarOptions { edge: 'bottom' | 'top' | 'left' | 'right'; heightIn: number; shape?: 'square' | 'circle' | 'rect'; spot?: boolean; pages?: string; }
 interface CropBoxOptions { top: number; right: number; bottom: number; left: number; }
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -52,7 +63,11 @@ interface CropBoxOptions { top: number; right: number; bottom: number; left: num
 type ToolEngine =
   | 'booklet' | 'nup' | 'poster' | 'cropmarks' | 'colorbar' | 'pagenumbers'
   | 'tickets' | 'merge' | 'rotate' | 'flip' | 'split' | 'overlay' | 'shuffle' | 'crop'
-  | 'bleed' | 'preflight' | 'dieline' | 'datamerge';
+  | 'bleed' | 'preflight' | 'dieline' | 'datamerge' | 'resize'
+  | 'watermark' | 'headerfooter' | 'slug' | 'collating' | 'registration'
+  | 'insert' | 'mix' | 'nudge' | 'repair' | 'backdrop' | 'qrstamp' | 'dimensions' | 'nupbook' | 'distort' | 'calendar' | 'nest' | 'omr' | 'gathering' | 'foldmarks' | 'laymarks'
+  | 'cutcontour' | 'whitevarnish' | 'braille' | 'barcode' | 'backdropfile' | 'coloreffects' | 'colormanage'
+  | 'layers' | 'customgrid' | 'pdftools' | 'editpdf' | 'jdf';
 type Status = 'idle' | 'loading' | 'processing' | 'done' | 'error';
 type TopTab = 'tools' | 'workflows' | 'calculators';
 type CalcTab = 'saddle' | 'perfectbind' | 'nup' | 'cost' | 'bleed';
@@ -301,6 +316,170 @@ const CropToolThumb = () => (
   </svg>
 );
 
+const ResizeThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">
+    <rect x="34" y="30" width="132" height="88" rx="2" fill="#f8fafc" stroke="#cbd5e1" strokeDasharray="3,3" />
+    <rect x="58" y="48" width="70" height="52" rx="2" fill="#f1f5f9" stroke="#334155" strokeWidth="2" />
+    <path d="M128 100 L156 118" stroke="#64748b" strokeWidth="2" />
+    <polygon points="156,118 146,116 152,108" fill="#64748b" />
+    <path d="M58 48 L34 30" stroke="#64748b" strokeWidth="2" />
+    <polygon points="34,30 44,32 38,40" fill="#64748b" />
+  </svg>
+);
+
+const A = '#7c3aed';
+const frame = <rect x="52" y="22" width="96" height="104" rx="3" fill="#f1f5f9" stroke="#94a3b8" />;
+const RegThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    {([[70,40],[130,40],[70,108],[130,108]] as [number,number][]).map(([x,y],i)=>(<g key={i}>
+      <line x1={x-9} y1={y} x2={x+9} y2={y} stroke={A} strokeWidth="1.4" /><line x1={x} y1={y-9} x2={x} y2={y+9} stroke={A} strokeWidth="1.4" />
+      <circle cx={x} cy={y} r="5" stroke={A} strokeWidth="1.4" fill="none" /></g>))}
+  </svg>
+);
+const InsertThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">
+    <rect x="34" y="34" width="52" height="80" rx="2" fill="#f1f5f9" stroke="#94a3b8" />
+    <rect x="114" y="34" width="52" height="80" rx="2" fill="#f1f5f9" stroke="#94a3b8" />
+    <rect x="90" y="34" width="20" height="80" rx="2" fill="#ede9fe" stroke={A} strokeDasharray="3,3" />
+    <path d="M100 58 v32 M90 74 h20" stroke={A} strokeWidth="2" />
+  </svg>
+);
+const MixThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">
+    {[30,64,98,132].map((y,i)=>(<rect key={i} x="60" y={y-6} width="80" height="20" rx="2" fill={i%2?'#ede9fe':'#f1f5f9'} stroke={i%2?A:'#94a3b8'} />))}
+  </svg>
+);
+const NudgeThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">
+    <rect x="60" y="34" width="80" height="80" rx="2" fill="#f8fafc" stroke="#cbd5e1" strokeDasharray="3,3" />
+    <rect x="74" y="44" width="80" height="80" rx="2" fill="#ede9fe" stroke={A} strokeWidth="2" />
+    <path d="M50 74 h18 M120 128 v-18" stroke={A} strokeWidth="2" />
+  </svg>
+);
+const RepairThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    <path d="M118 52 l14 14 -8 8 -14-14 a10 10 0 0 1 8-8z" fill="#ede9fe" stroke={A} strokeWidth="1.6" />
+    <path d="M116 66 l-30 30 8 8 30-30" stroke={A} strokeWidth="3" />
+  </svg>
+);
+const BackdropThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">
+    <rect x="46" y="26" width="108" height="96" rx="3" fill="#ede9fe" stroke={A} />
+    <rect x="66" y="44" width="68" height="60" rx="2" fill="#fff" stroke="#94a3b8" />
+  </svg>
+);
+const QrThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    {([[64,34],[64,52],[82,34],[110,34],[128,34],[110,52],[64,82],[64,100],[82,100],[110,82],[128,100],[110,100]] as [number,number][]).map(([x,y],i)=>(
+      <rect key={i} x={x} y={y} width="14" height="14" fill={A} />))}
+  </svg>
+);
+const ColorEffectsThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    <defs><linearGradient id="ceg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#f472b6" /><stop offset="0.5" stopColor="#a78bfa" /><stop offset="1" stopColor="#38bdf8" /></linearGradient></defs>
+    <rect x="62" y="34" width="76" height="80" rx="4" fill="url(#ceg)" />
+    <circle cx="100" cy="74" r="16" fill="#fff" opacity="0.85" /><circle cx="100" cy="74" r="16" fill="none" stroke="#fff" />
+  </svg>
+);
+const ColorManageThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    <circle cx="86" cy="66" r="24" fill="#f87171" opacity="0.8" />
+    <circle cx="114" cy="66" r="24" fill="#34d399" opacity="0.8" />
+    <circle cx="100" cy="90" r="24" fill="#60a5fa" opacity="0.8" />
+  </svg>
+);
+const DimThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">
+    <rect x="56" y="34" width="88" height="72" rx="2" fill="#f1f5f9" stroke="#94a3b8" />
+    <path d="M56 118 h88 M56 114 v8 M144 114 v8" stroke={A} strokeWidth="1.4" />
+    <path d="M40 34 v72 M36 34 h8 M36 106 h8" stroke={A} strokeWidth="1.4" />
+  </svg>
+);
+const CollateThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    {[34,52,70,88].map((y,i)=>(<rect key={i} x="52" y={y} width="10" height="12" fill={A} transform={`translate(${i*3},0)`} />))}
+  </svg>
+);
+const OmrThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    {/* a row of OMR bars along the bottom edge; program 0b1011010 pattern */}
+    {[0,1,0,1,1,0,1,0].map((b,i)=>(<rect key={i} x={60+i*10} y={110} width="4" height={b?16:8} fill={b?'#111':'#cbd5e1'} />))}
+    <rect x={52} y={110} width="4" height="16" fill={A} />
+  </svg>
+);
+const GatherThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    {/* horizontal staircase of gripper-edge marks along the top */}
+    {[0,1,2,3].map(i=>(<rect key={i} x={62+i*16} y={28} width="12" height="10" fill={A} transform={`translate(0,${i*3})`} />))}
+  </svg>
+);
+const FoldMarksThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    {/* dashed fold-tick guides at 1/3 and 2/3 */}
+    {[84,116].map((x,i)=>(<g key={i}>
+      <line x1={x} y1={22} x2={x} y2={40} stroke={A} strokeWidth="1.5" strokeDasharray="4,3" />
+      <line x1={x} y1={108} x2={x} y2={126} stroke={A} strokeWidth="1.5" strokeDasharray="4,3" />
+    </g>))}
+  </svg>
+);
+const LayThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    {/* front-lay arrows on the gripper (bottom) + side-lay arrow on the left */}
+    <g stroke={A} strokeWidth="1.5">
+      <line x1={70} y1={122} x2={70} y2={106} /><line x1={70} y1={106} x2={66} y2={112} /><line x1={70} y1={106} x2={74} y2={112} />
+      <line x1={130} y1={122} x2={130} y2={106} /><line x1={130} y1={106} x2={126} y2={112} /><line x1={130} y1={106} x2={134} y2={112} />
+      <line x1={58} y1={74} x2={74} y2={74} /><line x1={74} y1={74} x2={68} y2={70} /><line x1={74} y1={74} x2={68} y2={78} />
+    </g>
+  </svg>
+);
+const CutContourThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    <rect x="62" y="34" width="76" height="80" rx="10" fill="none" stroke="#e5228a" strokeWidth="1.5" strokeDasharray="5,3" />
+    <text x="100" y="80" textAnchor="middle" fill="#94a3b8" fontSize="10">cut</text>
+  </svg>
+);
+const WhiteVarnishThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    <rect x="58" y="30" width="84" height="88" rx="3" fill="#c7d2fe" opacity="0.65" />
+    <path d="M100 44 l10 20 -20 0 z" fill="#fff" stroke="#818cf8" strokeWidth="1.2" />
+    <circle cx="100" cy="72" r="9" fill="#fff" stroke="#818cf8" strokeWidth="1.2" />
+  </svg>
+);
+const BrailleThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    {/* three braille cells (2×3 dot grids) */}
+    {[70, 100, 130].map((ox, ci) => (
+      <g key={ci}>
+        {([[0,0],[0,1],[0,2],[1,0],[1,1],[1,2]] as [number, number][]).map((p, di) => {
+          const on = [[0,1,3],[0,1,2,3],[0,3]][ci]!.includes(di);
+          return <circle key={di} cx={ox + p[0] * 12} cy={44 + p[1] * 12} r="3.4" fill={on ? A : '#e2e8f0'} />;
+        })}
+      </g>
+    ))}
+  </svg>
+);
+const HFThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">{frame}
+    <rect x="64" y="32" width="72" height="8" rx="2" fill={A} /><rect x="64" y="108" width="72" height="8" rx="2" fill={A} />
+    <rect x="64" y="58" width="72" height="6" rx="1" fill="#cbd5e1" /><rect x="64" y="72" width="52" height="6" rx="1" fill="#e2e8f0" />
+  </svg>
+);
+const SlugThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">
+    <rect x="46" y="26" width="108" height="88" rx="2" fill="#f1f5f9" stroke="#94a3b8" />
+    <rect x="46" y="114" width="108" height="14" fill="#ede9fe" stroke={A} />
+    <rect x="52" y="118" width="60" height="5" rx="1" fill={A} />
+  </svg>
+);
+const DistortThumb = () => (
+  <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">
+    <rect x="60" y="24" width="80" height="100" rx="2" fill="#f8fafc" stroke="#cbd5e1" strokeDasharray="3,3" />
+    <rect x="62" y="40" width="76" height="68" rx="2" fill="#ede9fe" stroke={A} strokeWidth="2" />
+    <path d="M100 20 v-8 M100 128 v8" stroke={A} strokeWidth="2" />
+    <path d="M92 16 l8 -6 8 6 M92 132 l8 6 8 -6" stroke={A} strokeWidth="2" fill="none" />
+  </svg>
+);
+
 const PosterThumb = () => (
   <svg viewBox="0 0 200 148" fill="none" width="100%" height="100%">
     {Array.from({ length: 6 }, (_, i) => { const c = i % 3, r = Math.floor(i / 3); return (
@@ -320,6 +499,20 @@ const TicketThumb = () => (
         <text x="153" y={y + 20} textAnchor="middle" fill="#c2410c" fontSize="11" fontWeight="700">{`00${i + 1}`}</text>
       </g>
     ))}
+  </svg>
+);
+
+const NestThumb = () => (
+  <svg viewBox="0 0 200 148" width="100%" height="100%">
+    <Sheet>
+      {/* irregular shapes packed tight to show true-shape nesting */}
+      <circle cx={48} cy={46} r={22} fill="#ecfeff" stroke="#22d3ee" />
+      <polygon points="88,26 118,34 112,66 82,62" fill="#f0fdfa" stroke="#2dd4bf" />
+      <path d="M138 28 l26 6 -6 26 -22 -4 z" fill="#f5f3ff" stroke="#a78bfa" />
+      <polygon points="26,78 54,72 62,102 34,110" fill="#fef2f2" stroke="#fb7185" />
+      <circle cx={92} cy={98} r={20} fill="#fefce8" stroke="#facc15" />
+      <path d="M128 76 l34 4 4 30 -30 6 -10 -22 z" fill="#eff6ff" stroke="#60a5fa" />
+    </Sheet>
   </svg>
 );
 
@@ -385,10 +578,10 @@ const TOOLS: ToolDef[] = [
 
   // ── Booklets & books ──
   {
-    id: 'nupbook', name: 'N-up Book', preset: 'N-up book', category: 'Booklets & books', engine: 'booklet',
-    desc: 'Booklet pages, imposed automatically.',
-    tags: ['4 / 8 / 16-up in binding order', 'perfect or nested', 'creep compensation'],
-    defaultBooklet: { marginIn: 0.5, creepIn: 0.125 }, Thumb: gridThumb(2, 2, { numbered: true }),
+    id: 'nupbook', name: 'N-up Book', preset: 'N-up book', category: 'Booklets & books', engine: 'nupbook',
+    desc: 'Multi-up signature imposition — 2-up folio or 4-up quarto, folded to read in order.',
+    tags: ['2-up folio / 4-up quarto', 'perfect or nested', 'true fold imposition'],
+    Thumb: gridThumb(2, 2, { numbered: true }),
   },
   {
     id: 'booklet', name: 'Booklet', preset: 'Booklet', category: 'Booklets & books', engine: 'booklet',
@@ -473,7 +666,7 @@ const TOOLS: ToolDef[] = [
     defaultNup: { cols: 3, rows: 3, sheetWIn: 11, sheetHIn: 17, repeatFirst: true }, Thumb: gridThumb(3, 3),
   },
   {
-    id: 'calendar', name: 'Calendar', preset: 'Desk Calendar (Tent Style)', category: 'Cards & labels', engine: 'booklet',
+    id: 'calendar', name: 'Calendar', preset: 'Desk Calendar (Tent Style)', category: 'Cards & labels', engine: 'calendar',
     desc: 'Build print-ready calendar layouts.',
     tags: ['Half-sheet calendar pages', 'Letter landscape', 'spine gutter', 'outward creep'],
     defaultBooklet: { marginIn: 0.5, creepIn: 0.1 }, Thumb: BookletThumb,
@@ -708,6 +901,347 @@ const TOOLS: ToolDef[] = [
     desc: 'Trim margins off every page by setting a crop inset per edge.',
     tags: ['trim edges', 'crop box'], Thumb: CropToolThumb,
   },
+  {
+    id: 'resize', name: 'Resize / Scale', preset: 'Resize', category: 'Page & PDF tools', engine: 'resize',
+    desc: 'Scale pages by a percentage, or drop them onto a fixed paper size (fit or stretch).',
+    tags: ['scale %', 'fit to paper', 'stretch'], Thumb: ResizeThumb,
+  },
+  {
+    id: 'insertpages', name: 'Insert Pages', preset: 'Insert Pages', category: 'Page & PDF tools', engine: 'insert',
+    desc: 'Insert blank pages before a chosen page, or after every N pages (slip-sheets).',
+    tags: ['blank pages', 'slip-sheets', 'every N'], Thumb: InsertThumb,
+  },
+  {
+    id: 'mix', name: 'Mix / Interleave', preset: 'Mix', category: 'Page & PDF tools', engine: 'mix',
+    desc: 'Weave two PDFs together (A1, B1, A2, B2…) — combine single-sided front & back scans.',
+    tags: ['interleave', 'two files', 'ABAB'], Thumb: MixThumb,
+  },
+  {
+    id: 'nudge', name: 'Nudge', preset: 'Nudge', category: 'Page & PDF tools', engine: 'nudge',
+    desc: 'Shift page content by a small offset and/or rotate it about the centre — fix mis-registration.',
+    tags: ['shift', 'micro-rotate', 'press fudge'], Thumb: NudgeThumb,
+  },
+  {
+    id: 'distort', name: 'Distortion Comp.', preset: 'Distortion Compensation', category: 'Large & specialty', engine: 'distort',
+    desc: 'Pre-shrink artwork for flexo / gravure cylinder stretch so it prints at the right size.',
+    tags: ['flexo / gravure', 'cylinder pre-distort', 'circumferential'], Thumb: DistortThumb,
+  },
+  {
+    id: 'repair', name: 'PDF Repair', preset: 'PDF Repair', category: 'Page & PDF tools', engine: 'repair',
+    desc: 'Rebuild a PDF from scratch — drops broken cross-references and dead objects, and optionally strips metadata, annotations and JavaScript.',
+    tags: ['normalize', 'rebuild', 'fix xref'], Thumb: RepairThumb,
+  },
+  {
+    id: 'coloreffects', name: 'Color Effects', preset: 'Color Effects', category: 'Page & PDF tools', engine: 'coloreffects',
+    desc: 'Apply brightness / contrast / saturation and grayscale / warm / invert / hue effects by rasterising the targeted pages. Runs in the browser.',
+    tags: ['colour grade', 'grayscale / sepia', 'rasterise'], Thumb: ColorEffectsThumb,
+  },
+  {
+    id: 'colormanage', name: 'Color Management', preset: 'Color Management', category: 'Large & specialty', engine: 'colormanage',
+    desc: 'Embed a destination ICC profile as a PDF/X OutputIntent, and/or convert pages to the CMYK-reproducible gamut with an out-of-gamut warning.',
+    tags: ['ICC / OutputIntent', 'RGB→CMYK', 'gamut warning'], Thumb: ColorManageThumb,
+  },
+  {
+    id: 'layers', name: 'Layers', preset: 'Layers', category: 'Page & PDF tools', engine: 'layers',
+    desc: 'Show or hide named PDF layers (Optional Content Groups) in the output — force each layer on, off, or leave at its default.',
+    tags: ['OCG layers', 'toggle visibility', 'selective output'], Thumb: () => (<svg viewBox="0 0 200 148" width="100%" height="100%">{frame}<g fill="none" stroke={A} strokeWidth="2">{[0,1,2].map(i=>(<polygon key={i} points={`100,${44+i*14} 138,${58+i*14} 100,${72+i*14} 62,${58+i*14}`} fill={i===0?'#ede9fe':'none'} />))}</g></svg>),
+  },
+  {
+    id: 'customgrid', name: 'Custom Impose', preset: 'Custom Impose (Expert Grid)', category: 'Imposition & layout', engine: 'customgrid',
+    desc: 'Full manual control — define a column×row grid and assign any source page to any cell with per-cell rotation. The escape hatch for non-standard signatures.',
+    tags: ['expert grid', 'per-cell placement', 'manual imposition'], Thumb: gridThumb(2, 2, { numbered: true, accent: A }),
+  },
+  {
+    id: 'pdftools', name: 'PDF Tools', preset: 'PDF Optimizer', category: 'Page & PDF tools', engine: 'pdftools',
+    desc: 'Optimize (shrink), decrypt (remove password), or repair a PDF. Encryption and linearization need a server-side pass and are flagged as such.',
+    tags: ['optimize / shrink', 'decrypt', 'repair'], Thumb: RepairThumb,
+  },
+  {
+    id: 'editpdf', name: 'Edit PDF', preset: 'Edit PDF', category: 'Page & PDF tools', engine: 'editpdf',
+    desc: 'Apply page edits — add text, redact (opaque box), draw boxes/lines, rotate individual pages, and delete pages.',
+    tags: ['annotate', 'redact', 'rotate / delete pages'], Thumb: () => (<svg viewBox="0 0 200 148" width="100%" height="100%">{frame}<rect x="64" y="40" width="72" height="9" rx="2" fill="#cbd5e1" /><rect x="64" y="58" width="52" height="9" rx="2" fill="#111" /><rect x="64" y="76" width="60" height="9" rx="2" fill="#cbd5e1" /><path d="M120 96 l14 -14 8 8 -14 14 -10 2 z" fill="#fde68a" stroke={A} strokeWidth="1.5" /></svg>),
+  },
+  {
+    id: 'jdf', name: 'JDF / CIP4 Export', preset: 'JDF / CIP4 Export', category: 'Large & specialty', engine: 'jdf',
+    desc: 'Export a CIP4 JDF 1.4 Product-intent job ticket (.jdf XML) describing the finished size, media, quantity, sides and binding for MIS / prepress scheduling.',
+    tags: ['JDF 1.4', 'CIP4', 'job ticket'], Thumb: () => (<svg viewBox="0 0 200 148" width="100%" height="100%">{frame}<text x="100" y="70" textAnchor="middle" fontFamily="monospace" fontSize="13" fill={A}>&lt;JDF/&gt;</text><rect x="64" y="86" width="72" height="6" rx="1" fill="#cbd5e1" /><rect x="64" y="98" width="52" height="6" rx="1" fill="#cbd5e1" /></svg>),
+  },
+  {
+    id: 'registration', name: 'Registration Marks', preset: 'Registration Marks', category: 'Marks & prepress', engine: 'registration',
+    desc: 'Add press registration targets (bullseye + crosshair) at the corners and edge midpoints.',
+    tags: ['target', 'crosshair', 'colour align'], Thumb: RegThumb,
+  },
+  {
+    id: 'watermark', name: 'Watermark', preset: 'Watermark', category: 'Marks & prepress', engine: 'watermark',
+    desc: 'Stamp a diagonal text watermark (PROOF, DRAFT, CONFIDENTIAL) across every page.',
+    tags: ['proof', 'draft', 'diagonal text'], Thumb: OverlayThumb,
+  },
+  {
+    id: 'headerfooter', name: 'Header / Footer', preset: 'Header / Footer', category: 'Marks & prepress', engine: 'headerfooter',
+    desc: 'Add a running header and/or footer line to every page, aligned left, centre or right.',
+    tags: ['running head', 'footer', 'title'], Thumb: HFThumb,
+  },
+  {
+    id: 'slug', name: 'Slugline', preset: 'Slugline', category: 'Marks & prepress', engine: 'slug',
+    desc: 'Add a thin job-info strip (name, date, notes) along the top or bottom edge.',
+    tags: ['job info', 'slug strip', 'metadata'], Thumb: SlugThumb,
+  },
+  {
+    id: 'collating', name: 'Collating Marks', preset: 'Collating Marks', category: 'Marks & prepress', engine: 'collating',
+    desc: 'Stepped spine ticks that form a descending staircase so mis-gathered signatures show at a glance.',
+    tags: ['gather marks', 'spine', 'signatures'], Thumb: CollateThumb,
+  },
+  {
+    id: 'omr', name: 'OMR Marks', preset: 'OMR Marks', category: 'Marks & prepress', engine: 'omr',
+    desc: 'Add optical machine-readable bars along a sheet edge that automated bindery equipment reads to trigger fold / collate / cut / stack.',
+    tags: ['optical marks', 'bindery automation', 'fold/collate/cut'], Thumb: OmrThumb,
+  },
+  {
+    id: 'gathering', name: 'Gathering Marks', preset: 'Gathering Marks', category: 'Marks & prepress', engine: 'gathering',
+    desc: 'Gripper-edge marks that step across the leading edge so a mis-gathered sheet stack shows a broken staircase — a front-of-press QC check.',
+    tags: ['gripper edge', 'gather QC', 'sheet sequence'], Thumb: GatherThumb,
+  },
+  {
+    id: 'foldmarks', name: 'Folding Marks', preset: 'Folding Marks', category: 'Marks & prepress', engine: 'foldmarks',
+    desc: 'Dashed fold-tick guides in the trim margin for half / letter / Z / gate / double-parallel / roll / accordion / custom fold schemes.',
+    tags: ['fold guides', 'brochure', 'tri-fold / Z / gate'], Thumb: FoldMarksThumb,
+  },
+  {
+    id: 'laymarks', name: 'Lay Marks', preset: 'Lay Marks', category: 'Marks & prepress', engine: 'laymarks',
+    desc: 'Press-sheet alignment guides — front lay at the gripper edge and side lay on the guide side — as arrow, line or crosshair marks.',
+    tags: ['front lay', 'side lay', 'press alignment'], Thumb: LayThumb,
+  },
+  {
+    id: 'cutcontour', name: 'Die Lines', preset: 'Cut Contour', category: 'Marks & prepress', engine: 'cutcontour',
+    desc: 'Draw a die-line path (rectangle / rounded / ellipse) on a real spot-colour channel (CutContour, KissCut, Crease, Perf, DieCut) that RIPs and digital cutters read as a toolpath.',
+    tags: ['cut contour', 'kiss-cut / thru-cut', 'spot colour'], Thumb: CutContourThumb,
+  },
+  {
+    id: 'whitevarnish', name: 'White / Varnish', preset: 'White / Varnish', category: 'Marks & prepress', engine: 'whitevarnish',
+    desc: 'Add a white-ink under-base or spot-varnish / gloss layer as a named Separation spot colour — flood, trim, bleed or custom coverage.',
+    tags: ['white ink', 'spot varnish', 'under-base / gloss'], Thumb: WhiteVarnishThumb,
+  },
+  {
+    id: 'braille', name: 'Braille', preset: 'Braille', category: 'Marks & prepress', engine: 'braille',
+    desc: 'Add raised Grade-1 (uncontracted) Braille dots at ADA metrics, optionally on an emboss / varnish spot channel.',
+    tags: ['Grade-1 braille', 'ADA', 'raised dots'], Thumb: BrailleThumb,
+  },
+  {
+    id: 'qrstamp', name: 'Barcode / QR', preset: 'Barcode / QR', category: 'Marks & prepress', engine: 'barcode',
+    desc: 'Stamp a QR, Code 128, DataMatrix (ECC200) or EAN-13 barcode — scale, quiet zone, 9-point position, rotation, colours and human-readable text.',
+    tags: ['QR / DataMatrix', 'Code 128 / EAN-13', 'scannable'], Thumb: QrThumb,
+  },
+  {
+    id: 'backdropfile', name: 'Backdrop', preset: 'Backdrop', category: 'Marks & prepress', engine: 'backdropfile',
+    desc: 'Place an uploaded PDF or image behind your page content — pre-printed stationery, textured stock or a brand frame — with scale, offset, opacity and repeat.',
+    tags: ['background layer', 'stationery', 'underlay'], Thumb: BackdropThumb,
+  },
+  {
+    id: 'backdrop', name: 'Background Fill', preset: 'Background Fill', category: 'Marks & prepress', engine: 'backdrop',
+    desc: 'Paint a solid colour behind every page — put borderless art onto a coloured stock.',
+    tags: ['background', 'flatten', 'coloured stock'], Thumb: BackdropThumb,
+  },
+  {
+    id: 'dimensions', name: 'Dimensions', preset: 'Dimensions', category: 'Marks & prepress', engine: 'dimensions',
+    desc: 'Annotate each page with its exact trim size in inches and points — a quick pre-impose check.',
+    tags: ['measure', 'trim size', 'inspect'], Thumb: DimThumb,
+  },
+  {
+    id: 'nest', name: 'Nesting / Stickers', preset: 'True-Shape Nesting', category: 'Cards & labels', engine: 'nest',
+    desc: 'Pack many die-cut shapes onto a sheet or roll with the least waste — skyline bin-packing, optional true-shape (contour-aware) mode.',
+    tags: ['sticker gang', 'bin-pack', 'true-shape nest', 'roll or sheet'], Thumb: NestThumb,
+  },
+];
+
+// ── Templates ─────────────────────────────────────────────────────────────────
+// Named, industry-organized presets. Each opens one of the tools above with a
+// specific set of option overrides pre-applied — the pdfpress "Templates" idea.
+
+interface TemplatePreset {
+  nup?: Partial<NUpOptions>;
+  booklet?: Partial<BookletOptions>;
+  poster?: Partial<PosterOptions>;
+  ticket?: Partial<TicketOptions>;
+  resize?: Partial<ResizeOptions>;
+}
+
+interface TemplateDef {
+  id: string;
+  name: string;
+  industry: string;
+  toolId: string;      // which tool this template opens
+  specs: string;       // one-line size/finish summary
+  preset?: TemplatePreset;
+}
+
+const TEMPLATE_INDUSTRIES = [
+  'Commercial Print', 'Packaging', 'Publishing', 'Large Format', 'Office', 'Variable Data', 'Real Estate',
+];
+
+const TEMPLATES: TemplateDef[] = [
+  // ── Commercial Print ──
+  { id: "t000-10-up-business-cards", name: "10-Up Business Cards", industry: "Commercial Print", toolId: "business", specs: "Standard US business cards (3.5×2\") ganged 10-up on Letter with bleeds and crop marks.", preset: { nup: { cellWIn: 3.5, cellHIn: 2.0, sheetWIn: 8.5, sheetHIn: 11, bleedIn: 0.125, addMarks: true } } },
+  { id: "t001-14-up-business-cards-tabloid", name: "14-Up Business Cards (Tabloid)", industry: "Commercial Print", toolId: "business", specs: "Production-run business cards ganged 14-up on 11×17\" tabloid for commercial offset.", preset: { nup: { cols: 2, rows: 7, sheetWIn: 11.0, sheetHIn: 17.0, addMarks: true } } },
+  { id: "t002-2-up-door-hangers", name: "2-Up Door Hangers", industry: "Commercial Print", toolId: "gangsheet", specs: "Standard door hangers (3.875×8.75\") ganged 2-up on Letter with trim marks.", preset: { nup: { cols: 1, rows: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t003-2-up-gift-certificates-5-7", name: "2-Up Gift Certificates (5×7\")", industry: "Commercial Print", toolId: "coupons", specs: "5×7\" gift certificates, 2-up on Letter stock with crop marks." },
+  { id: "t004-2-up-invitation-cards-5-7", name: "2-Up Invitation Cards (5×7\")", industry: "Commercial Print", toolId: "wedding", specs: "Wedding/event invitations (5×7\") printed 2-up on Letter with premium bleeds.", preset: { nup: { cols: 1, rows: 2, sheetWIn: 8.5, sheetHIn: 11, bleedIn: 0.125, addMarks: true } } },
+  { id: "t005-2-up-notepad-sheets", name: "2-Up Notepad Sheets", industry: "Commercial Print", toolId: "ncrpads", specs: "Half-letter notepads (5.5×8.5\") printed 2-up on Letter (laid landscape) for padding.", preset: { nup: { cols: 2, rows: 1, sheetWIn: 11, sheetHIn: 8.5, addMarks: true } } },
+  { id: "t006-2-up-postcards-4-6", name: "2-Up Postcards (4×6\")", industry: "Commercial Print", toolId: "postcard", specs: "USPS-standard 4×6\" postcards, 2-up on Letter for desktop or short-run digital.", preset: { nup: { cols: 1, rows: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t007-2-up-rack-cards-4-9", name: "2-Up Rack Cards (4×9\")", industry: "Commercial Print", toolId: "postcard", specs: "Standard rack cards for brochure holders, 2-up on tabloid stock.", preset: { nup: { cellWIn: 4.0, cellHIn: 9.0, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t008-3-up-door-hangers", name: "3-Up Door Hangers", industry: "Commercial Print", toolId: "gangsheet", specs: "3.5×8.5\" door hangers ganged 3-up across on Tabloid for die-cutting.", preset: { nup: { cols: 1, rows: 3, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t009-4-up-rack-cards-3-5-7", name: "4-Up Rack Cards (3.5×7\")", industry: "Commercial Print", toolId: "postcard", specs: "Vertical rack cards ganged 4-up on Tabloid. Standard tourism and retail display size (Letter cannot h…", preset: { nup: { cellWIn: 3.5, cellHIn: 7.0, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t010-4-up-ticket-strips", name: "4-Up Ticket Strips", industry: "Commercial Print", toolId: "raffle", specs: "Event/raffle tickets (8×2.5\") stacked 4-up on Letter with perforation marks." },
+  { id: "t011-bi-fold-restaurant-menu", name: "Bi-Fold Restaurant Menu", industry: "Commercial Print", toolId: "menu", specs: "Standard bi-fold menu on Tabloid. Print both sides, fold in half for 4-panel menu." },
+  { id: "t012-business-card-8-up-step-repeat", name: "Business Card 8-Up (Step & Repeat)", industry: "Commercial Print", toolId: "business", specs: "8-up step-and-repeat business cards using Expert Grid. All slots print the same card for maximum thro…", preset: { nup: { cols: 2, rows: 4, sheetWIn: 8.5, sheetHIn: 11, repeatFirst: true, addMarks: true } } },
+  { id: "t013-business-cards-with-qr-code", name: "Business Cards with QR Code", industry: "Commercial Print", toolId: "business", specs: "10-up business cards on Letter with a QR code on the back — links to website or vCard.", preset: { nup: { sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t014-business-checks-3-up", name: "Business Checks (3-Up)", industry: "Commercial Print", toolId: "ncrpads", specs: "Standard 3-up business checks on Letter stock. MICR-safe layout with perforation marks.", preset: { nup: { cols: 1, rows: 3, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t015-cd-tray-card-2-up", name: "CD Tray Card 2-Up", industry: "Commercial Print", toolId: "gangsheet", specs: "Standard CD jewel case tray cards (4.75×4.75\") ganged 2-up on Letter.", preset: { nup: { cols: 1, rows: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t016-certificate-2-up", name: "Certificate 2-Up", industry: "Commercial Print", toolId: "flyer", specs: "Award or training certificates 2-up on tabloid for desktop proofing or short-run printing.", preset: { nup: { cols: 1, rows: 2, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t017-compliment-slips-dl-3-up", name: "Compliment Slips (DL 3-Up)", industry: "Commercial Print", toolId: "complimentslip", specs: "DL compliment slips (210×99 mm) ganged 3-up, centered on an oversized SRA4 sheet with crop marks in t…", preset: { nup: { cols: 1, rows: 3, sheetWIn: 8.86, sheetHIn: 12.6, addMarks: true } } },
+  { id: "t018-coupon-sheets-10-up", name: "Coupon Sheets (10-Up)", industry: "Commercial Print", toolId: "coupons", specs: "3.5×2\" coupons ganged 10-up on Letter with perforation-ready marks." },
+  { id: "t019-eddm-postcard-6-25-9", name: "EDDM Postcard (6.25×9\")", industry: "Commercial Print", toolId: "postcard", specs: "USPS Every Door Direct Mail oversized postcard on 13×19\" stock.", preset: { nup: { cellWIn: 6.25, cellHIn: 9.0, sheetWIn: 13.0, sheetHIn: 19.0, addMarks: true } } },
+  { id: "t020-folder-insert-tabloid", name: "Folder Insert (Tabloid)", industry: "Commercial Print", toolId: "presfolder", specs: "Presentation folder insert (9×12\") centered on tabloid with trim marks." },
+  { id: "t021-full-bleed-brochure-booklet", name: "Full-Bleed Brochure Booklet", industry: "Commercial Print", toolId: "trifold", specs: "Add 3mm bleed to brochure pages, then impose as saddle-stitch booklet on Tabloid.", preset: { nup: { sheetWIn: 11, sheetHIn: 17, bleedIn: 0.125, addMarks: true } } },
+  { id: "t022-full-bleed-postcards-4-up-bleed", name: "Full-Bleed Postcards (4-Up + Bleed)", industry: "Commercial Print", toolId: "postcard", specs: "Add 1/8″ bleed to postcard artwork missing bleeds, then gang 4-up on Letter with crop marks.", preset: { nup: { cols: 2, rows: 2, sheetWIn: 8.5, sheetHIn: 11, bleedIn: 0.125, addMarks: true } } },
+  { id: "t023-gatefold-brochure-4-panel-letter", name: "Gatefold Brochure (4-Panel, Letter)", industry: "Commercial Print", toolId: "zfold", specs: "4-panel gatefold marketing brochure on Letter landscape. Two inner panels fold inward to meet at center.", preset: { nup: { sheetWIn: 11, sheetHIn: 8.5, addMarks: true } } },
+  { id: "t024-loyalty-punch-cards-10-up", name: "Loyalty/Punch Cards (10-Up)", industry: "Commercial Print", toolId: "business", specs: "Standard business-card-size loyalty/punch cards, 10-up on Letter with crop marks.", preset: { nup: { cellWIn: 3.5, cellHIn: 2.0, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t025-ncr-form-3-part-carbon", name: "NCR Form (3-Part Carbon)", industry: "Commercial Print", toolId: "ncrpads", specs: "3-part carbonless form on Letter. Each part prints on separate sheet for collating.", preset: { nup: { sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t026-perfect-bound-a5-signatures", name: "Perfect Bound A5 Signatures", industry: "Commercial Print", toolId: "perfectbound", specs: "4-up perfect-bound book signatures for A5 trade paperbacks on A4 landscape.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t027-photo-contact-sheet-8-up", name: "Photo Contact Sheet (8-Up)", industry: "Commercial Print", toolId: "contact", specs: "Photographer's proof sheet with 8 images (2×4) on Letter. Quick client review layout.", preset: { nup: { cols: 2, rows: 4, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t028-postcard-2-up-work-turn", name: "Postcard 2-Up (Work & Turn)", industry: "Commercial Print", toolId: "postcard", specs: "2-up work-and-turn postcard imposition. Front and back print on the same sheet – flip along the short…", preset: { nup: { cols: 1, rows: 2, duplex: true, addMarks: true, duplexFlip: "long" } } },
+  { id: "t029-proof-sheet-with-proof-watermark", name: "Proof Sheet with PROOF Watermark", industry: "Commercial Print", toolId: "contact", specs: "2-up proofing layout on Tabloid with a diagonal PROOF watermark — prevents client from using proofs a…", preset: { nup: { sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t030-rsvp-cards-4-up-3-5-5", name: "RSVP Cards (4-Up, 3.5×5\")", industry: "Commercial Print", toolId: "wedding", specs: "Response/RSVP cards (3.5×5\") printed 4-up on Letter with crop marks.", preset: { nup: { cellWIn: 3.5, cellHIn: 5.0, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t031-saddle-stitch-a4-magazine", name: "Saddle-Stitch A4 Magazine", industry: "Commercial Print", toolId: "magazine", specs: "32-page A4 magazine signatures on A3 landscape sheets for commercial offset.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t032-saddle-stitch-a5-booklet", name: "Saddle-Stitch A5 Booklet", industry: "Commercial Print", toolId: "booklet", specs: "Creates print-ready A5 saddle-stitched booklets from A5 source pages on A4 landscape sheets." },
+  { id: "t033-shingled-3-up-cut-stack", name: "Shingled 3-Up (Cut & Stack)", industry: "Commercial Print", toolId: "cutstack", specs: "Classic cut-and-stack imposition for sequentially ordered pieces. Cut the stack into 3 strips and the…", preset: { nup: { cols: 1, rows: 3, cutStack: true, addMarks: true } } },
+  { id: "t034-square-coasters-4-up", name: "Square Coasters (4-Up)", industry: "Commercial Print", toolId: "coasters", specs: "4\" square drink coasters printed 4-up on Tabloid stock with crop marks for die cutting.", preset: { nup: { cols: 2, rows: 2, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t035-step-and-repeat-flyer", name: "Step-and-Repeat Flyer", industry: "Commercial Print", toolId: "flyer", specs: "Fill a sheet with sequential flyer pages, auto-scaled to fit. Ideal for different-content handouts.", preset: { nup: { repeatFirst: true, addMarks: true } } },
+  { id: "t036-tear-off-flyer-with-tabs", name: "Tear-Off Flyer with Tabs", industry: "Commercial Print", toolId: "magazine", specs: "Community bulletin flyer with tear-off contact tabs designed into the bottom of the artwork, placed 1…" },
+  { id: "t037-tent-card-2-up", name: "Tent Card 2-Up", industry: "Commercial Print", toolId: "zfold", specs: "Fold-in-half table tent cards (4.25×5.5\" finished), 2-up on Letter for double-sided printing.", preset: { nup: { cols: 1, rows: 2, sheetWIn: 8.5, sheetHIn: 11, duplex: true, addMarks: true, duplexFlip: "long" } } },
+  { id: "t038-tri-fold-brochure-letter", name: "Tri-Fold Brochure (Letter)", industry: "Commercial Print", toolId: "trifold", specs: "Standard tri-fold brochure on Letter stock. 6 panels (3 front, 3 back) with fold marks.", preset: { nup: { sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t039-tri-fold-brochure-2-up", name: "Tri-Fold Brochure 2-Up", industry: "Commercial Print", toolId: "trifold", specs: "Imposes two copies of each finished tri-fold brochure side on tabloid/A3-style duplex sheets.", preset: { nup: { cols: 1, rows: 2, sheetWIn: 11, sheetHIn: 17, duplex: true, addMarks: true, duplexFlip: "long" } } },
+  { id: "t040-tri-fold-event-program", name: "Tri-Fold Event Program", industry: "Commercial Print", toolId: "trifold", specs: "Tri-fold event or church program on Letter landscape. 6 panels with fold marks.", preset: { nup: { sheetWIn: 11, sheetHIn: 8.5, addMarks: true } } },
+  { id: "t041-wall-calendar-signatures", name: "Wall Calendar Signatures", industry: "Commercial Print", toolId: "perfectbound", specs: "Coil-bound wall calendar with back cover rotation on tabloid landscape.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t042-z-fold-accordion-6-panel-tabloid", name: "Z-Fold Accordion (6-Panel, Tabloid)", industry: "Commercial Print", toolId: "zfold", specs: "6-panel accordion-style brochure on 11×17\" tabloid. Zigzag folds, ~5.67\" per panel (17/3).", preset: { nup: { sheetWIn: 11.0, sheetHIn: 17.0, addMarks: true } } },
+  // ── Packaging ──
+  { id: "t043-bakery-tray-liner-1-up", name: "Bakery Tray Liner (1-Up)", industry: "Packaging", toolId: "packaging", specs: "Bakery/deli tray liners printed 1-up on Tabloid (two 10.5″ liners cannot stack on a 17″ sheet)." },
+  { id: "t044-blister-card-4-up", name: "Blister Card 4-Up", industry: "Packaging", toolId: "packaging", specs: "Retail blister packaging cards (3.5×5\") ganged 4-up on Tabloid with dieline paths." },
+  { id: "t045-box-flat-with-bleed-prep", name: "Box Flat with Bleed Prep", industry: "Packaging", toolId: "boxcarton", specs: "Add 5mm bleed to a box dieline flat, then resize to fit press sheet — ready for die-cutting." },
+  { id: "t046-cd-dvd-jewel-case-wrap", name: "CD/DVD Jewel Case Wrap", industry: "Packaging", toolId: "packaging", specs: "Optical disc jewel case wrap (9.5×4.72\") on Tabloid with trim marks." },
+  { id: "t047-candle-wraps-4-up", name: "Candle Wraps (4-Up)", industry: "Packaging", toolId: "labels", specs: "Candle label wraps (3×8\") printed 4-up on Tabloid for wrapping round candles.", preset: { nup: { cols: 2, rows: 2, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t048-candy-bar-wrappers-3-up", name: "Candy Bar Wrappers (3-Up)", industry: "Packaging", toolId: "packaging", specs: "Candy bar wraps (7.5×5.5\") placed 3-up on a 13×19″ press sheet for wrapping and gluing." },
+  { id: "t049-envelope-flats-4-up-10", name: "Envelope Flats 4-Up (#10)", industry: "Packaging", toolId: "envelope", specs: "Standard #10 envelope flats (9.5×4.125\") ganged 4-up on Tabloid with dieline paths.", preset: { nup: { cols: 2, rows: 2, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t050-hang-tags-8-up-2-5-4", name: "Hang Tags 8-Up (2.5×4\")", industry: "Packaging", toolId: "hangtag", specs: "Retail garment hang tags ganged 8-up on Tabloid with die-cut contour paths.", preset: { nup: { cols: 2, rows: 4, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t051-lp-record-sleeve-insert", name: "LP Record Sleeve Insert", industry: "Packaging", toolId: "stickers", specs: "12×12\" vinyl record sleeve insert, 1-up on 13×19\" stock (12″ square cannot fit 2-up on a 13×19″ sheet).", preset: { nup: { sheetWIn: 13.0, sheetHIn: 19.0, addMarks: true } } },
+  { id: "t052-pizza-box-lid-13-19", name: "Pizza Box Lid (13×19\")", industry: "Packaging", toolId: "boxcarton", specs: "10×10\" pizza box lid flat, 1-up on 13×19\" stock with trim marks (10″ square cannot fit 2-up)." },
+  { id: "t053-poly-bag-headers-6-up", name: "Poly Bag Headers (6-Up)", industry: "Packaging", toolId: "packaging", specs: "Retail poly bag header cards (4×2.5\") printed 6-up on Letter with hang-hole marks." },
+  { id: "t054-pouch-flats-2-up-tabloid", name: "Pouch Flats (2-Up Tabloid)", industry: "Packaging", toolId: "packaging", specs: "Stand-up pouch flats (6×9\") printed 2-up on landscape Tabloid for heat-seal pouches." },
+  { id: "t055-seed-packets-6-up", name: "Seed Packets (6-Up)", industry: "Packaging", toolId: "envelope", specs: "Small seed packets (3×4.5\") ganged 6-up on Tabloid with crop marks (Letter cannot hold 3 rows of 4.5″…", preset: { nup: { cols: 2, rows: 3, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t056-shopping-bag-flat-2-up", name: "Shopping Bag Flat 2-Up", industry: "Packaging", toolId: "packaging", specs: "Retail shopping bag flats 2-up on Tabloid with fold and die-cut paths." },
+  { id: "t057-soap-band-wraps-8-up", name: "Soap Band Wraps (8-Up)", industry: "Packaging", toolId: "packaging", specs: "Narrow soap bands (1.5×6\") ganged 8-up on Tabloid for bar soap wrapping (Letter cannot hold two 6″ ro…" },
+  { id: "t058-soap-bar-wrap-4-up", name: "Soap Bar Wrap 4-Up", industry: "Packaging", toolId: "packaging", specs: "Body care product wraps (3×4\") ganged 4-up on Letter." },
+  { id: "t059-tube-label-wrap-4-up", name: "Tube Label Wrap (4-Up)", industry: "Packaging", toolId: "labels", specs: "Cosmetic tube label wraps (6×2.5\") printed 4-up on a 13×19″ sheet for roll-on application.", preset: { nup: { cols: 2, rows: 2, sheetWIn: 13.0, sheetHIn: 19.0, addMarks: true } } },
+  { id: "t060-wine-bottle-label-6-up", name: "Wine Bottle Label 6-Up", industry: "Packaging", toolId: "labels", specs: "Standard wine bottle labels (3.5×4\") ganged 6-up on Tabloid with trim marks.", preset: { nup: { cols: 2, rows: 3, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  // ── Publishing ──
+  { id: "t061-16-page-church-bulletin-a4", name: "16-Page Church Bulletin (A4)", industry: "Publishing", toolId: "magazine", specs: "Saddle-stitched A4 bulletin on A3 landscape. Standard for weekly church programs." },
+  { id: "t062-a5-pocket-book", name: "A5 Pocket Book", industry: "Publishing", toolId: "notebook", specs: "A5 (148×210mm) pocket paperback using saddle-stitch binding on A4 landscape." },
+  { id: "t063-a5-saddle-stitch-2-up-on-sra3", name: "A5 Saddle-Stitch 2-Up on SRA3", industry: "Publishing", toolId: "booklet", specs: "Commercial A5 saddle-stitch workflow: impose each booklet side on SRA4, then repeat two copies on SRA3." },
+  { id: "t064-children-s-book-8-5-square", name: "Children's Book (8.5\" Square)", industry: "Publishing", toolId: "booklet", specs: "Square-format picture book on Tabloid landscape with saddle-stitch binding." },
+  { id: "t065-coloring-book-letter", name: "Coloring Book (Letter)", industry: "Publishing", toolId: "zine", specs: "US Letter coloring book with saddle-stitch binding. Single-sided interior (back pages blank)." },
+  { id: "t066-concert-program-a5", name: "Concert Program (A5)", industry: "Publishing", toolId: "program", specs: "A5 saddle-stitched concert or theater program. 12-16 pages typical, fits in pocket." },
+  { id: "t067-desk-calendar-tent-style", name: "Desk Calendar (Tent Style)", industry: "Publishing", toolId: "calendar", specs: "Desk tent calendar on Letter landscape with half-sheet layout." },
+  { id: "t068-digest-magazine-5-5-8-5", name: "Digest Magazine (5.5×8.5\")", industry: "Publishing", toolId: "magazine", specs: "Reader's Digest-size magazine signatures. 4-up saddle-stitch on Tabloid.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t069-hymnal-songbook-a5", name: "Hymnal / Songbook (A5)", industry: "Publishing", toolId: "perfectbound", specs: "A5 hymnal or songbook with perfect binding on A4 stock. For churches and choirs.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t070-instruction-booklet-a6-4-up", name: "Instruction Booklet (A6 4-Up)", industry: "Publishing", toolId: "program", specs: "Small product instruction booklet. 4-up nested on A4 for cost-effective production." },
+  { id: "t071-instruction-manual-a5", name: "Instruction Manual (A5)", industry: "Publishing", toolId: "program", specs: "A5 product instruction booklet, saddle-stitched on A4. Compact format for product packaging." },
+  { id: "t072-landscape-wall-calendar", name: "Landscape Wall Calendar", industry: "Publishing", toolId: "calendar", specs: "Coil-bound wall calendar with back cover rotation on Tabloid landscape." },
+  { id: "t073-lay-flat-photo-book-12-12", name: "Lay-Flat Photo Book (12×12\")", industry: "Publishing", toolId: "perfectbound", specs: "Square photo album with zero creep for lay-flat binding on 24×12\" stock.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t074-manga-rtl-comic-booklet", name: "Manga / RTL Comic Booklet", industry: "Publishing", toolId: "comic", specs: "Right-to-left saddle-stitched booklet for manga, Arabic, and Hebrew comics on B5 landscape.", preset: { booklet: { rtl: true } } },
+  { id: "t075-memorial-funeral-program", name: "Memorial / Funeral Program", industry: "Publishing", toolId: "program", specs: "Half-letter memorial program, saddle-stitched on Letter landscape. Single fold, 4-8 pages." },
+  { id: "t076-memorial-service-program", name: "Memorial Service Program", industry: "Publishing", toolId: "program", specs: "Half-letter bi-fold memorial program. 4 pages — cover, obituary spread, back." },
+  { id: "t077-newsletter-4-page-single-fold", name: "Newsletter 4-Page (Single Fold)", industry: "Publishing", toolId: "gangsheet", specs: "Simple 4-page newsletter — one sheet folded in half on Letter landscape.", preset: { nup: { sheetWIn: 11, sheetHIn: 8.5, addMarks: true } } },
+  { id: "t078-one-sheet-8-page-zine", name: "One-Sheet 8-Page Zine", industry: "Publishing", toolId: "zine", specs: "Classic fold-and-cut mini zine from 8 panels on one sheet. Print one-sided, cut the center slit, and…" },
+  { id: "t079-perfect-bound-trade-paperback-4-up", name: "Perfect Bound Trade Paperback (4-Up)", industry: "Publishing", toolId: "perfectbound", specs: "4-up signatures for A5 perfect-bound trade paperbacks. Standard for novels, manuals, and catalogs.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t080-photo-book-landscape-a4", name: "Photo Book (Landscape A4)", industry: "Publishing", toolId: "perfectbound", specs: "Landscape A4 photo book with perfect binding. Full-bleed photo spreads.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t081-playbill-theater-program", name: "Playbill / Theater Program", industry: "Publishing", toolId: "program", specs: "A5 saddle-stitched theater program booklet on A4 stock." },
+  { id: "t082-pocket-book-a6-from-a5", name: "Pocket Book (A6 from A5)", industry: "Publishing", toolId: "notebook", specs: "Small-format pocket book in A6 with 2-up perfect binding." },
+  { id: "t083-pocket-digest-5-8", name: "Pocket Digest (5×8\")", industry: "Publishing", toolId: "perfectbound", specs: "5×8\" digest-size booklet using perfect binding. Common for literary journals and anthologies.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t084-quarter-letter-zine", name: "Quarter-Letter Zine", industry: "Publishing", toolId: "zine", specs: "Micro-zine at 4.25×5.5\" using 4-up saddle-stitch on Letter. Cut, fold, staple." },
+  { id: "t085-recipe-book-letter", name: "Recipe Book (Letter)", industry: "Publishing", toolId: "perfectbound", specs: "US Letter recipe book with perfect binding. Ideal for cookbooks and recipe collections.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t086-saddle-stitch-a6-mini-booklet-8-up", name: "Saddle-Stitch A6 Mini Booklet (8-Up)", industry: "Publishing", toolId: "zine", specs: "8-up mini booklet for A6 saddle-stitched inserts and leaflets on A4." },
+  { id: "t087-square-catalog-8-8", name: "Square Catalog (8×8\")", industry: "Publishing", toolId: "catalog", specs: "8×8\" square product catalog with saddle-stitch binding. Popular for retail and portfolio." },
+  { id: "t088-student-planner-4-up", name: "Student Planner (4-Up)", industry: "Publishing", toolId: "perfectbound", specs: "A6 student planner pages imposed 4-up on A4 for perfect binding. 52+ weeks.", preset: { booklet: { signatureSheets: 4 } } },
+  { id: "t089-us-comic-book-6-625-10-25", name: "US Comic Book (6.625×10.25\")", industry: "Publishing", toolId: "comic", specs: "Standard US comic book format on Tabloid with saddle-stitch binding." },
+  { id: "t090-wedding-program", name: "Wedding Program", industry: "Publishing", toolId: "wedding", specs: "Half-letter (5.5×8.5\") wedding program booklet, saddle-stitched on Letter landscape.", preset: { nup: { sheetWIn: 11, sheetHIn: 8.5, addMarks: true } } },
+  // ── Large Format ──
+  { id: "t091-2-up-movie-posters-27-40", name: "2-Up Movie Posters (27×40\")", industry: "Large Format", toolId: "poster", specs: "Standard one-sheet cinema posters ganged 2-up on 54×40\" wide-format stock.", preset: { poster: { tilesAcross: 2, tilesDown: 1 } } },
+  { id: "t092-4-up-18-24-posters", name: "4-Up 18×24\" Posters", industry: "Large Format", toolId: "poster", specs: "Four 18×24\" posters ganged on a 36×48\" sheet for screen printing or large-format digital.", preset: { poster: { tilesAcross: 4, tilesDown: 1 } } },
+  { id: "t093-a-frame-sign-inserts", name: "A-Frame Sign Inserts", industry: "Large Format", toolId: "rollerbanner", specs: "Sidewalk A-frame sign inserts at 24×36\" with double-sided printing.", preset: { nup: { cols: 1, rows: 1, addMarks: false, sheetWIn: 24.0, sheetHIn: 36.0 } } },
+  { id: "t094-banner-tiles-4-up-24-36-panels", name: "Banner Tiles 4-Up (24×36\" panels)", industry: "Large Format", toolId: "banner", specs: "Four 24×36\" banner panels on a single 96×36\" wide-format sheet for trade show displays.", preset: { poster: { tilesAcross: 4, tilesDown: 1 } } },
+  { id: "t095-bus-shelter-poster-46-67", name: "Bus Shelter Poster (46×67\")", industry: "Large Format", toolId: "rollerbanner", specs: "Standard bus shelter/transit advertising poster at 46×67\" for backlit display.", preset: { nup: { cols: 1, rows: 1, addMarks: false, sheetWIn: 46.0, sheetHIn: 67.0 } } },
+  { id: "t096-canvas-wrap-print-tiling", name: "Canvas Wrap Print Tiling", industry: "Large Format", toolId: "poster", specs: "Gallery-wrap canvas tiles auto-scaled in a 2×2 grid for large art prints." },
+  { id: "t097-fabric-banner-24-72", name: "Fabric Banner (24×72\")", industry: "Large Format", toolId: "rollerbanner", specs: "Vertical fabric banner at 24×72\" for dye-sublimation printing.", preset: { nup: { cols: 1, rows: 1, addMarks: false, sheetWIn: 24.0, sheetHIn: 72.0 } } },
+  { id: "t098-feather-flag-soft-signage", name: "Feather Flag (Soft Signage)", industry: "Large Format", toolId: "featherflag", specs: "Single-panel feather / teardrop flag artwork scaled to a Medium print area (700×2300 mm) for dye-subl…", preset: { nup: { cols: 1, rows: 1, addMarks: false } } },
+  { id: "t099-floor-graphics-24-24", name: "Floor Graphics (24×24\")", industry: "Large Format", toolId: "stickers", specs: "Square floor decals at 24×24\" for retail wayfinding and promotional graphics.", preset: { nup: { cellWIn: 24.0, cellHIn: 24.0, addMarks: true } } },
+  { id: "t100-menu-board-tabloid", name: "Menu Board (Tabloid)", industry: "Large Format", toolId: "menu", specs: "Restaurant menu board at 11×17\" Tabloid with color bar for print verification." },
+  { id: "t101-real-estate-signs-24-36", name: "Real Estate Signs (24×36\")", industry: "Large Format", toolId: "rollerbanner", specs: "Large real estate signs at 24×36\" for property listings and open house signage.", preset: { nup: { cols: 1, rows: 1, addMarks: false, sheetWIn: 24.0, sheetHIn: 36.0 } } },
+  { id: "t102-retractable-banner-33-80", name: "Retractable Banner (33×80\")", industry: "Large Format", toolId: "rollerbanner", specs: "Standard retractable/roll-up banner at 33×80\" for trade shows and events.", preset: { nup: { cols: 1, rows: 1, addMarks: false, sheetWIn: 33.0, sheetHIn: 80.0 } } },
+  { id: "t103-step-and-repeat-photo-print", name: "Step-and-Repeat Photo Print", industry: "Large Format", toolId: "photo", specs: "Fill a sheet with identical photos. Perfect for passport photos, photo booth strips, and proofing.", preset: { nup: { repeatFirst: true, addMarks: true } } },
+  { id: "t104-street-pole-banner-24-60", name: "Street Pole Banner (24×60\")", industry: "Large Format", toolId: "rollerbanner", specs: "Standard street/light pole banner at 24×60\" with bleed for pole pocket.", preset: { nup: { cols: 1, rows: 1, addMarks: false, sheetWIn: 24.0, sheetHIn: 60.0 } } },
+  { id: "t105-table-runner-30-72", name: "Table Runner (30×72\")", industry: "Large Format", toolId: "rollerbanner", specs: "Conference table runner at 30×72\" for 6ft tables. Resized for large-format output.", preset: { nup: { cols: 1, rows: 1, addMarks: false, sheetWIn: 30.0, sheetHIn: 72.0 } } },
+  { id: "t106-tiled-poster-a4-tiles-to-a0", name: "Tiled Poster (A4 tiles to A0)", industry: "Large Format", toolId: "poster", specs: "Tiles a large poster across multiple sheets. Each source page fills one cell in an 4×2 grid." },
+  { id: "t107-trade-show-display-graphics", name: "Trade Show Display Graphics", industry: "Large Format", toolId: "poster", specs: "Exhibition pop-up display panels on 48×96\" wide-format with color bar for proofing." },
+  { id: "t108-window-clings-a3", name: "Window Clings (A3)", industry: "Large Format", toolId: "rollerbanner", specs: "A3 (297×420mm) window cling graphics for storefront and vehicle windows.", preset: { nup: { cols: 1, rows: 1, addMarks: false } } },
+  { id: "t109-yard-sign-24-18", name: "Yard Sign (24×18\")", industry: "Large Format", toolId: "rollerbanner", specs: "Standard coroplast yard sign at 24×18\" landscape for real estate, political, and event signage.", preset: { nup: { cols: 1, rows: 1, addMarks: false, sheetWIn: 24.0, sheetHIn: 18.0 } } },
+  { id: "t110-yard-signs-18-24", name: "Yard Signs (18×24\")", industry: "Large Format", toolId: "rollerbanner", specs: "Corrugated yard signs at 18×24\" for real estate, political campaigns, and event signage.", preset: { nup: { cols: 1, rows: 1, addMarks: false, sheetWIn: 18.0, sheetHIn: 24.0 } } },
+  // ── Office ──
+  { id: "t111-2-sided-a5-flyer", name: "2-Sided A5 Flyer", industry: "Office", toolId: "flyer", specs: "Quick double-sided A5 flyer from your desktop printer. No marks, no bleeds — just fold or cut.", preset: { nup: { sheetWIn: 5.83, sheetHIn: 8.27, duplex: true, bleedIn: 0.125, addMarks: false, duplexFlip: "long" } } },
+  { id: "t112-2-up-proofing-on-tabloid", name: "2-Up Proofing on Tabloid", industry: "Office", toolId: "overlay", specs: "Proof Letter-size artwork 2-up on Tabloid with crop marks to verify bleed and trim." },
+  { id: "t113-4-up-index-cards-3-5", name: "4-Up Index Cards (3×5\")", industry: "Office", toolId: "trading", specs: "Study flashcards or index cards, 4-up on Letter for cutting.", preset: { nup: { cellWIn: 3.0, cellHIn: 5.0, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t114-add-page-numbers", name: "Add Page Numbers", industry: "Office", toolId: "pagenumbers", specs: "Adds \"Page X of Y\" to every page. Simple and universal — works with any PDF." },
+  { id: "t115-binder-spine-labels-10-up", name: "Binder Spine Labels (10-Up)", industry: "Office", toolId: "labels", specs: "1\" binder spine labels printed 10-up on Letter. Standard 3-ring binder spine width.", preset: { nup: { cols: 2, rows: 5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t116-bookmarks-6-up", name: "Bookmarks (6-Up)", industry: "Office", toolId: "bookmark", specs: "Standard bookmarks (2×6\") printed 6-up on Letter stock.", preset: { nup: { cols: 2, rows: 3, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t117-certificates-2-up", name: "Certificates (2-Up)", industry: "Office", toolId: "flyer", specs: "Half-letter classroom certificates printed 2-up on Letter for quick teacher printing.", preset: { nup: { cols: 1, rows: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t118-confidential-watermark", name: "Confidential Watermark", industry: "Office", toolId: "overlay", specs: "Red CONFIDENTIAL watermark for sensitive documents — visible but non-destructive." },
+  { id: "t119-desk-name-plates-4-up", name: "Desk Name Plates (4-Up)", industry: "Office", toolId: "zfold", specs: "Folding desk name plates (8×2\" flat) printed 4-up on Letter.", preset: { nup: { cols: 2, rows: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t120-door-signs-2-up", name: "Door Signs (2-Up)", industry: "Office", toolId: "zfold", specs: "Do Not Disturb / office door signs (4×10\") printed 2-up on Letter.", preset: { nup: { cellWIn: 4.0, cellHIn: 10.0, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t121-draft-watermark", name: "Draft Watermark", industry: "Office", toolId: "overlay", specs: "Stamp a diagonal DRAFT watermark on every page — prevents accidental use of unfinished documents." },
+  { id: "t122-emergency-contact-cards-10-up", name: "Emergency Contact Cards (10-Up)", industry: "Office", toolId: "business", specs: "Wallet-size emergency contact cards (3.5×2\") printed 10-up on Letter.", preset: { nup: { cols: 2, rows: 5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t123-flash-cards-12-up", name: "Flash Cards (12-Up)", industry: "Office", toolId: "trading", specs: "Study flash cards (3.5×2\") printed 12-up on Letter. Perfect for students and educators.", preset: { nup: { cols: 3, rows: 4, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t124-full-bleed-photo-cards-4-6", name: "Full-Bleed Photo Cards (4×6)", industry: "Office", toolId: "wedding", specs: "Add bleed to borderless photo cards, then print 2-up on Letter — perfect for holiday cards or invitat…", preset: { nup: { cellWIn: 4.0, cellHIn: 6.0, sheetWIn: 8.5, sheetHIn: 11, bleedIn: 0.125, addMarks: true } } },
+  { id: "t125-greeting-card-a5-fold", name: "Greeting Card (A5 Fold)", industry: "Office", toolId: "greeting", specs: "Single-fold greeting card on Letter landscape. Print, fold in half, done." },
+  { id: "t126-half-sheet-handout-2-up", name: "Half-Sheet Handout 2-Up", industry: "Office", toolId: "flyer", specs: "Two half-letter handouts per sheet. Perfect for meeting agendas, sign-up sheets, and flyers.", preset: { nup: { cols: 1, rows: 2, sheetWIn: 5.5, sheetHIn: 8.5, addMarks: true } } },
+  { id: "t127-interleave-two-documents", name: "Interleave Two Documents", industry: "Office", toolId: "shuffle", specs: "Merges pages from two PDFs in alternating order (A1, B1, A2, B2...). Great for double-sided printing…" },
+  { id: "t128-luggage-tags-6-up", name: "Luggage Tags (6-Up)", industry: "Office", toolId: "hangtag", specs: "Luggage tags (2.5×4.25\") printed 6-up on Letter with crop marks for die cutting.", preset: { nup: { cols: 2, rows: 3, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t129-mailing-labels-avery-5160-style", name: "Mailing Labels (Avery 5160 Style)", industry: "Office", toolId: "labels", specs: "Address labels nested on Letter. Compatible with Avery 5160 and similar 30-up label sheets.", preset: { nup: { sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t130-mini-booklet-a7-zine", name: "Mini Booklet (A7 Zine)", industry: "Office", toolId: "zine", specs: "DIY mini zine using 4-up saddle-stitch on A4. Cut, fold, staple — instant pocket booklet." },
+  { id: "t131-name-badges-8-up", name: "Name Badges (8-Up)", industry: "Office", toolId: "namebadge", specs: "Conference name badges (3.5×2.25\") printed 8-up on Letter for badge holders." },
+  { id: "t132-parking-permits-4-up", name: "Parking Permits (4-Up)", industry: "Office", toolId: "hangtag", specs: "Parking permits / hang tags (3.5×5\") printed 4-up on Letter stock.", preset: { nup: { cols: 2, rows: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t133-place-cards-8-up", name: "Place Cards (8-Up)", industry: "Office", toolId: "wedding", specs: "Event place cards (3.5×2\") printed 8-up on Letter. Fold in half for tent-style seating cards.", preset: { nup: { cols: 2, rows: 4, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t134-proof-booklet-with-watermark", name: "Proof Booklet with Watermark", industry: "Office", toolId: "booklet", specs: "Saddle-stitch booklet on Letter with a PROOF watermark — for client review copies." },
+  { id: "t135-raffle-tickets-8-up", name: "Raffle Tickets (8-Up)", industry: "Office", toolId: "raffle", specs: "Numbered raffle tickets (2×5.5\") printed 8-up on Letter with perforation marks." },
+  { id: "t136-recipe-cards-4-6-4-up", name: "Recipe Cards (4×6\", 4-Up)", industry: "Office", toolId: "postcard", specs: "Standard recipe cards (4×6\") printed 4-up on Tabloid. Double-sided for ingredients + instructions.", preset: { nup: { cellWIn: 4.0, cellHIn: 6.0, sheetWIn: 11, sheetHIn: 17, duplex: true, addMarks: true, duplexFlip: "long" } } },
+  { id: "t137-rotate-all-pages-landscape", name: "Rotate All Pages Landscape", industry: "Office", toolId: "rotate", specs: "Rotates all pages 90° clockwise. Useful for converting portrait scans to landscape." },
+  { id: "t138-shipping-labels-6-up", name: "Shipping Labels (6-Up)", industry: "Office", toolId: "labels", specs: "Shipping/mailing labels (4×3.33\") printed 6-up on Letter. Fits standard label sheets.", preset: { nup: { cols: 2, rows: 3, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t139-tent-cards-4-up", name: "Tent Cards (4-Up)", industry: "Office", toolId: "zfold", specs: "Table tent cards (5×5\" flat, folds to 5×2.5\") printed 4-up on Letter.", preset: { nup: { cols: 2, rows: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t140-visitor-passes-10-up", name: "Visitor Passes (10-Up)", industry: "Office", toolId: "business", specs: "Business-card-size visitor passes (3.5×2\") printed 10-up on Letter stock.", preset: { nup: { cols: 2, rows: 5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  // ── Variable Data ──
+  { id: "t141-asset-tags-datamatrix", name: "Asset Tags (DataMatrix)", industry: "Variable Data", toolId: "namebadge", specs: "Compact DataMatrix asset tags, 10-up on Letter for inventory tracking." },
+  { id: "t142-conference-badges-qr", name: "Conference Badges (QR)", industry: "Variable Data", toolId: "namebadge", specs: "Name badges with unique QR codes from CSV, 4-up on A4." },
+  { id: "t143-event-tickets-qr-code", name: "Event Tickets (QR Code)", industry: "Variable Data", toolId: "tickets", specs: "QR code tickets from CSV data, 2-up on Letter sheets for easy cutting." },
+  { id: "t144-gift-vouchers-qr-code", name: "Gift Vouchers (QR Code)", industry: "Variable Data", toolId: "coupons", specs: "Gift vouchers with unique QR redemption codes, 2-up on A4." },
+  { id: "t145-loyalty-cards-code-128", name: "Loyalty Cards (Code 128)", industry: "Variable Data", toolId: "coupons", specs: "Loyalty/membership cards with unique Code 128 barcodes, 10-up on Letter." },
+  { id: "t146-parking-permits-qr-code", name: "Parking Permits (QR Code)", industry: "Variable Data", toolId: "hangtag", specs: "Parking permits with unique QR validation codes, 4-up on Letter.", preset: { nup: { sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t147-product-labels-ean-13", name: "Product Labels (EAN-13)", industry: "Variable Data", toolId: "tickets", specs: "EAN-13 retail barcodes from CSV, 12-up on A4 for product labelling." },
+  { id: "t148-raffle-tickets-numbered", name: "Raffle Tickets (Numbered)", industry: "Variable Data", toolId: "raffle", specs: "Code 128 barcode raffle tickets from CSV, 4-up on Letter." },
+  { id: "t149-shipping-labels-code-128", name: "Shipping Labels (Code 128)", industry: "Variable Data", toolId: "tickets", specs: "Shipping labels with unique Code 128 barcodes, 10-up on Letter." },
+  { id: "t150-wristbands-qr-code", name: "Wristbands (QR Code)", industry: "Variable Data", toolId: "coupons", specs: "Event wristbands with unique QR codes, 8-up on Letter." },
+  // ── Real Estate ──
+  { id: "t151-just-listed-flyer-2-up-8-5-5-5", name: "Just-Listed Flyer 2-Up (8.5×5.5\")", industry: "Real Estate", toolId: "flyer", specs: "Half-sheet landscape just-listed flyers, 2-up on Letter for feature sheets and open-house handouts.", preset: { nup: { cols: 2, rows: 1, sheetWIn: 11, sheetHIn: 8.5, addMarks: true } } },
+  { id: "t152-just-listed-flyer-4-up-4-25-5-5", name: "Just-Listed Flyer 4-Up (4.25×5.5\")", industry: "Real Estate", toolId: "flyer", specs: "Quarter-sheet just-listed flyers, 4-up on Letter — the cheapest way to print open-house handouts.", preset: { nup: { cols: 2, rows: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
+  { id: "t153-just-sold-postcard-4-up-4-6", name: "Just-Sold Postcard 4-Up (4×6\")", industry: "Real Estate", toolId: "postcard", specs: "USPS-standard 4×6\" just-sold / farming postcards, 4-up on Tabloid for short-run direct mail.", preset: { nup: { cellWIn: 4.0, cellHIn: 6.0, sheetWIn: 11, sheetHIn: 17, addMarks: true } } },
+  { id: "t154-open-house-yard-sign-2-up-18-24", name: "Open-House Yard Sign 2-Up (18×24\")", industry: "Real Estate", toolId: "rollerbanner", specs: "Two 18×24\" open-house / for-sale yard signs ganged on a 36×24\" large-format sheet.", preset: { nup: { cols: 2, rows: 1, sheetWIn: 36.0, sheetHIn: 24.0, addMarks: false } } },
+  { id: "t155-property-brochure-tri-fold-2-up", name: "Property Brochure Tri-Fold 2-Up", industry: "Real Estate", toolId: "trifold", specs: "Imposes two copies of each finished property brochure side on tabloid duplex sheets with tri-fold cre…", preset: { nup: { cols: 1, rows: 2, sheetWIn: 11, sheetHIn: 17, duplex: true, addMarks: true, duplexFlip: "long" } } },
 ];
 
 // ── Shared UI primitives ─────────────────────────────────────────────────────
@@ -830,6 +1364,27 @@ function FileBar({ file, onClear, label = 'Change' }: { file: LoadedFile; onClea
   );
 }
 
+// Shared "extra marks" controls — center marks + line weight. Appears wherever
+// crop/trim marks are enabled, driven by the engine's MarkStyle.
+function MarkExtras<T extends { addMarks: boolean; centerMarks?: boolean; markWeightPt?: number }>(
+  { opts, onChange }: { opts: T; onChange: (o: T) => void },
+) {
+  if (!opts.addMarks) return null;
+  return (
+    <>
+      <Field label="Center marks" note="Ticks at each edge midpoint">
+        <Row>
+          <input type="checkbox" checked={!!opts.centerMarks} onChange={e => onChange({ ...opts, centerMarks: e.target.checked })} />
+          <span style={{ fontSize: '.85rem' }}>Add center marks</span>
+        </Row>
+      </Field>
+      <Field label="Mark weight (pt)" note="Stroke thickness">
+        <input type="number" min={0.25} max={3} step={0.25} value={opts.markWeightPt ?? 0.5} onChange={e => onChange({ ...opts, markWeightPt: +e.target.value })} style={iStyle} />
+      </Field>
+    </>
+  );
+}
+
 // ── Booklet settings + preview ────────────────────────────────────────────────
 
 const DEFAULT_BOOKLET: BookletOptions = {
@@ -856,12 +1411,68 @@ function BookletSettings({ opts, onChange }: { opts: BookletOptions; onChange: (
       <Field label="Creep compensation (in)" note="Total shift across all sheets">
         <input type="number" min={0} max={0.5} step={0.0625} value={opts.creepIn} onChange={e => set('creepIn', +e.target.value)} style={iStyle} />
       </Field>
+      <Field label="Binding / signatures" note="How the book is gathered">
+        <select value={opts.signatureSheets && opts.signatureSheets > 0 ? String(opts.signatureSheets) : '0'} onChange={e => set('signatureSheets', +e.target.value)} style={iStyle}>
+          <option value="0">Single saddle-stitch</option>
+          <option value="1">Perfect-bound — 4-pg signatures</option>
+          <option value="2">Perfect-bound — 8-pg signatures</option>
+          <option value="4">Perfect-bound — 16-pg signatures</option>
+          <option value="8">Perfect-bound — 32-pg signatures</option>
+        </select>
+      </Field>
       <Field label="Crop marks">
         <Row>
           <input type="checkbox" checked={opts.addMarks} onChange={e => set('addMarks', e.target.checked)} />
           <span style={{ fontSize: '.85rem' }}>Add crop marks</span>
         </Row>
       </Field>
+      <MarkExtras opts={opts} onChange={onChange} />
+    </Grid>
+  );
+}
+
+const DEFAULT_NUPBOOK: NUpBookOptions = {
+  nUp: 4, sheetWIn: 11, sheetHIn: 17, marginIn: 0.25, gutterIn: 0, creepIn: 0,
+  rtl: false, signatureSheets: 0, addMarks: true, markLenIn: 0.25, markOffIn: 0.125,
+};
+
+function NUpBookSettings({ opts, onChange }: { opts: NUpBookOptions; onChange: (o: NUpBookOptions) => void }) {
+  const set = <K extends keyof NUpBookOptions>(k: K, v: NUpBookOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="N-up (fold scheme)" note="Pages per sheet side">
+        <select value={opts.nUp} onChange={e => set('nUp', +e.target.value)} style={iStyle}>
+          <option value={2}>2-up — folio (1 fold)</option>
+          <option value={4}>4-up — quarto (2 folds)</option>
+        </select>
+      </Field>
+      <SheetPicker opts={opts} set={set} />
+      <Field label="Binding">
+        <select value={opts.signatureSheets > 0 ? String(opts.signatureSheets) : '0'} onChange={e => set('signatureSheets', +e.target.value)} style={iStyle}>
+          <option value="0">Nested (saddle-stitch)</option>
+          <option value="1">Perfect-bound — 1-sheet signatures</option>
+          <option value="2">Perfect-bound — 2-sheet signatures</option>
+          <option value="4">Perfect-bound — 4-sheet signatures</option>
+        </select>
+      </Field>
+      <Field label="Reading direction">
+        <select value={opts.rtl ? 'rtl' : 'ltr'} onChange={e => set('rtl', e.target.value === 'rtl')} style={iStyle}>
+          <option value="ltr">Left-to-right</option>
+          <option value="rtl">Right-to-left (manga)</option>
+        </select>
+      </Field>
+      <Field label="Margin (in)"><input type="number" min={0} max={2} step={0.0625} value={opts.marginIn} onChange={e => set('marginIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Binding gutter (in)"><input type="number" min={0} max={0.5} step={0.0625} value={opts.gutterIn} onChange={e => set('gutterIn', +e.target.value)} style={iStyle} /></Field>
+      {opts.nUp <= 2 && (
+        <Field label="Creep (in)" note="Only for 2-up nested"><input type="number" min={0} max={0.5} step={0.0625} value={opts.creepIn} onChange={e => set('creepIn', +e.target.value)} style={iStyle} /></Field>
+      )}
+      <Field label="Crop marks">
+        <Row><input type="checkbox" checked={opts.addMarks} onChange={e => set('addMarks', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Add crop marks</span></Row>
+      </Field>
+      <MarkExtras opts={opts} onChange={onChange} />
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        2-up folds one sheet in half (saddle/perfect). 4-up quarto folds an 8-page signature onto a 2×2 grid per side (top row rotates 180° so it reads correctly after folding + trimming).
+      </div>
     </Grid>
   );
 }
@@ -983,12 +1594,34 @@ function NUpSettings({ opts, onChange, cardMode }: { opts: NUpOptions; onChange:
           <option value="cutstack">Cut &amp; stack</option>
         </select>
       </Field>
+      <Field label="Fill pattern" note="Z = all rows L→R; S = snake">
+        <select value={opts.snake ? 's' : 'z'} onChange={e => set('snake', e.target.value === 's')} style={iStyle}>
+          <option value="z">Z-pattern</option>
+          <option value="s">S-pattern (snake)</option>
+        </select>
+      </Field>
+      <Field label="Direction">
+        <Row><input type="checkbox" checked={!!opts.rtl} onChange={e => set('rtl', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Right-to-left columns</span></Row>
+      </Field>
+      <Field label="Sides" note="Duplex reads source as front,back,front,back…">
+        <select value={opts.duplex ? (opts.duplexFlip === 'short' ? 'short' : 'long') : 'single'} onChange={e => onChange({ ...opts, duplex: e.target.value !== 'single', duplexFlip: e.target.value === 'short' ? 'short' : 'long' })} style={iStyle}>
+          <option value="single">Single-sided</option>
+          <option value="long">Double-sided — long-edge flip</option>
+          <option value="short">Double-sided — short-edge flip</option>
+        </select>
+      </Field>
+      {cardMode && (
+        <Field label="Bleed (in)" note="Art fills cell; marks drawn at trim">
+          <input type="number" min={0} max={0.5} step={0.0625} value={opts.bleedIn ?? 0} onChange={e => set('bleedIn', +e.target.value)} style={iStyle} />
+        </Field>
+      )}
       <Field label="Crop marks">
         <Row>
           <input type="checkbox" checked={opts.addMarks} onChange={e => set('addMarks', e.target.checked)} />
           <span style={{ fontSize: '.85rem' }}>Add crop marks</span>
         </Row>
       </Field>
+      <MarkExtras opts={opts} onChange={onChange} />
     </Grid>
   );
 }
@@ -1027,6 +1660,179 @@ function NUpPreview({ opts, pageCount }: { opts: NUpOptions; pageCount: number }
   );
 }
 
+// ── Live imposition canvas (pdfpress-style preview) ───────────────────────────
+
+const CELL_COLORS = ['#e5484d', '#22c55e', '#3b82f6', '#f5d90a', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899', '#64748b', '#14b8a6', '#a855f7', '#ef4444'];
+const MM_PER_IN = 25.4;
+function fmtDim(inch: number, unit: 'in' | 'mm' | 'pt'): string {
+  return unit === 'mm' ? (inch * MM_PER_IN).toFixed(1) : unit === 'pt' ? String(Math.round(inch * 72)) : inch.toFixed(2);
+}
+
+// A single numbered/coloured cell.
+function Cell({ x, y, w, h, n, blank }: { x: number; y: number; w: number; h: number; n: number; blank: boolean }) {
+  const fs = Math.min(w, h) * 0.42;
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill={blank ? '#ffffff' : CELL_COLORS[(n - 1) % CELL_COLORS.length]} stroke={blank ? '#e2e8f0' : 'none'} strokeWidth={blank ? 0.01 : 0} />
+      {!blank && <text x={x + w / 2} y={y + h / 2} fontSize={fs} fontWeight={800} fill="#fff" textAnchor="middle" dominantBaseline="central" fontFamily="system-ui, sans-serif">{n}</text>}
+    </g>
+  );
+}
+
+// Corner crop-mark ticks (+ optional center marks) around a cell, in inches.
+function CellMarks({ x, y, w, h, off, len, center }: { x: number; y: number; w: number; h: number; off: number; len: number; center?: boolean }) {
+  const L: [number, number, number, number][] = [
+    [x - off - len, y, x - off, y], [x, y - off - len, x, y - off],
+    [x + w + off, y, x + w + off + len, y], [x + w, y - off - len, x + w, y - off],
+    [x - off - len, y + h, x - off, y + h], [x, y + h + off, x, y + h + off + len],
+    [x + w + off, y + h, x + w + off + len, y + h], [x + w, y + h + off, x + w, y + h + off + len],
+  ];
+  if (center) {
+    const cx = x + w / 2, cy = y + h / 2;
+    L.push([cx, y - off - len, cx, y - off], [cx, y + h + off, cx, y + h + off + len], [x - off - len, cy, x - off, cy], [x + w + off, cy, x + w + off + len, cy]);
+  }
+  return <>{L.map(([x1, y1, x2, y2], i) => <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#111" strokeWidth={0.01} />)}</>;
+}
+
+// The imposition preview for a given engine + settings + current output sheet.
+function ImpositionCanvas({
+  engine, nupOpts, bookletOpts, nupBookOpts, posterOpts, ticketOpts, pageCount, unit, sheetLabel, sheetIndex, onSheetCount, zoom,
+}: {
+  engine: ToolEngine; nupOpts: NUpOptions; bookletOpts: BookletOptions; nupBookOpts: NUpBookOptions; posterOpts: PosterOptions; ticketOpts: TicketOptions;
+  pageCount: number; unit: 'in' | 'mm' | 'pt'; sheetLabel: string; sheetIndex: number; onSheetCount: (n: number) => void; zoom: number;
+}) {
+  // Build the geometry for the CURRENT output sheet.
+  let shW = 8.5, shH = 11, cells: { x: number; y: number; w: number; h: number; n: number; blank: boolean }[] = [];
+  let marks: { x: number; y: number; w: number; h: number }[] = [];
+  let sheetCount = 1, addMarks = false, centerMarks = false, off = 0.06, len = 0.12, bleed = 0;
+
+  if (engine === 'nup' || engine === 'tickets' || engine === 'datamerge') {
+    const o = nupOpts;
+    shW = o.sheetWIn; shH = o.sheetHIn;
+    const g = computeNUpGrid(o);
+    const perSheet = g.cols * g.rows;
+    const duplex = !!o.duplex;
+    const total = engine === 'tickets' ? ticketOpts.count : duplex ? Math.ceil(pageCount / 2) : pageCount;
+    const frontSheets = o.repeatFirst ? 1 : Math.max(1, Math.ceil(total / perSheet));
+    sheetCount = duplex ? frontSheets * 2 : frontSheets;
+    addMarks = !!o.addMarks; centerMarks = !!o.centerMarks; off = o.markOffIn; len = o.markLenIn; bleed = o.bleedIn ?? 0;
+    const si = Math.min(sheetIndex, sheetCount - 1);
+    const isBack = duplex && si % 2 === 1;
+    const fsi = duplex ? Math.floor(si / 2) : si;
+    const lg = g.leftGapPt / 72, tg = g.topGapPt / 72, cw = g.cellWPt / 72, ch = g.cellHPt / 72, gx = g.gxPt / 72, gy = g.gyPt / 72;
+    for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
+      const cellIdx = r * g.cols + c;
+      const itemIdx = o.repeatFirst ? 0 : o.cutStack ? cellIdx * frontSheets + fsi : fsi * perSheet + cellIdx;
+      let n: number, blank = false;
+      if (engine === 'tickets') { n = itemIdx < total ? ticketOpts.startNumber + itemIdx : 0; blank = itemIdx >= total; }
+      else { const pg = duplex ? itemIdx * 2 + (isBack ? 1 : 0) + 1 : itemIdx + 1; n = pg; blank = pg > pageCount; }
+      let cc = c; if (isBack) cc = (o.duplexFlip === 'short') ? c : g.cols - 1 - c;
+      const x = lg + cc * (cw + gx), y = tg + r * (ch + gy);
+      cells.push({ x, y, w: cw, h: ch, n: n || 1, blank });
+      if (addMarks) marks.push({ x: x + bleed, y: y + bleed, w: cw - 2 * bleed, h: ch - 2 * bleed });
+    }
+  } else if (engine === 'booklet') {
+    const o = bookletOpts;
+    // A booklet output sheet-side is a 2-up spread. Show the current spread.
+    const N = Math.max(1, pageCount);
+    const sig = o.signatureSheets && o.signatureSheets > 0 ? o.signatureSheets * 4 : Math.ceil(N / 4) * 4;
+    const sigs = Math.ceil(N / sig);
+    sheetCount = sigs * (sig / 4) * 2; // 2 sides per sheet
+    const si = Math.min(sheetIndex, sheetCount - 1);
+    const sidesPerSig = (sig / 4) * 2;
+    const sigNo = Math.floor(si / sidesPerSig), sideInSig = si % sidesPerSig;
+    const sheetNo = Math.floor(sideInSig / 2), isBack = sideInSig % 2 === 1;
+    let aL: number, aR: number;
+    if (!o.rtl) { if (!isBack) { aL = sig - sheetNo * 2; aR = sheetNo * 2 + 1; } else { aL = sheetNo * 2 + 2; aR = sig - sheetNo * 2 - 1; } }
+    else { if (!isBack) { aL = sheetNo * 2 + 1; aR = sig - sheetNo * 2; } else { aL = sig - sheetNo * 2 - 1; aR = sheetNo * 2 + 2; } }
+    const start = sigNo * sig;
+    const pw = pageCount ? 1 : 1;
+    // spread = 2 pages side by side; each page uses source page aspect (assume 3:4-ish -> use square-ish)
+    shW = 2 * 4.25 + 0.25; shH = 6.5;
+    addMarks = !!o.addMarks; centerMarks = !!o.centerMarks; off = o.markOffIn; len = o.markLenIn;
+    const cw = 4.25, ch = 6.0, m = 0.25, gut = o.gutterIn;
+    void pw;
+    const pairs: [number, number][] = [[start + aL, m], [start + aR, m + cw + gut]];
+    for (const [gp, x] of pairs) {
+      const blank = gp > pageCount || gp < 1;
+      cells.push({ x, y: 0.25, w: cw, h: ch, n: gp, blank });
+      if (addMarks) marks.push({ x, y: 0.25, w: cw, h: ch });
+    }
+  } else if (engine === 'nupbook') {
+    const o = nupBookOpts;
+    if (o.nUp <= 2) {
+      // Folio spread (same as booklet preview).
+      const N = Math.max(1, pageCount), sig = o.signatureSheets > 0 ? o.signatureSheets * 4 : Math.ceil(N / 4) * 4;
+      sheetCount = Math.ceil(N / sig) * (sig / 4) * 2;
+      const si = Math.min(sheetIndex, sheetCount - 1), sheetNo = Math.floor((si % ((sig / 4) * 2)) / 2), isBack = si % 2 === 1;
+      let aL: number, aR: number;
+      if (!isBack) { aL = sig - sheetNo * 2; aR = sheetNo * 2 + 1; } else { aL = sheetNo * 2 + 2; aR = sig - sheetNo * 2 - 1; }
+      shW = 2 * 4.25 + 0.25; shH = 6.5;
+      for (const [gp, x] of [[aL, 0.25], [aR, 4.5]] as [number, number][]) cells.push({ x, y: 0.25, w: 4.25, h: 6, n: gp, blank: gp > pageCount });
+    } else {
+      // Quarto (4-up) — 2×2 per side, top row reads rotated 180°.
+      shW = o.sheetWIn; shH = o.sheetHIn;
+      const sigPages = 8, numSigs = Math.ceil(Math.max(1, pageCount) / sigPages);
+      sheetCount = numSigs * 2;
+      const si = Math.min(sheetIndex, sheetCount - 1), sigNo = Math.floor(si / 2), isBack = si % 2 === 1;
+      const m = o.marginIn, g = o.gutterIn, cw = (shW - 2 * m - g) / 2, chh = (shH - 2 * m - g) / 2;
+      addMarks = !!o.addMarks; centerMarks = !!o.centerMarks; off = o.markOffIn; len = o.markLenIn;
+      const FRONT: [number, number, number][] = [[5, 0, 0], [4, 0, 1], [8, 1, 0], [1, 1, 1]];
+      const BACK: [number, number, number][] = [[3, 0, 0], [6, 0, 1], [2, 1, 0], [7, 1, 1]];
+      for (const [p, r, c] of (isBack ? BACK : FRONT)) {
+        const gp = sigNo * sigPages + p, cc = o.rtl ? 1 - c : c;
+        const x = m + cc * (cw + g), y = m + r * (chh + g);
+        cells.push({ x, y, w: cw, h: chh, n: gp, blank: gp > pageCount });
+        if (addMarks) marks.push({ x, y, w: cw, h: chh });
+      }
+    }
+  } else if (engine === 'poster') {
+    const o = posterOpts;
+    shW = o.sheetWIn; shH = o.sheetHIn;
+    sheetCount = o.tilesAcross * o.tilesDown;
+    const si = Math.min(sheetIndex, sheetCount - 1);
+    cells.push({ x: 0.15, y: 0.15, w: shW - 0.3, h: shH - 0.3, n: si + 1, blank: false });
+  } else {
+    // Generic single-page representation for transform/marks tools.
+    shW = 5; shH = 6.5; sheetCount = Math.max(1, pageCount || 1);
+    cells.push({ x: 0.2, y: 0.2, w: shW - 0.4, h: shH - 0.4, n: Math.min(sheetIndex + 1, sheetCount), blank: false });
+  }
+
+  useEffect(() => { onSheetCount(sheetCount); }, [sheetCount, onSheetCount]);
+
+  // Fit into a sensible pixel box; zoom scales it.
+  const pad = 0.35;
+  const vbW = shW + pad * 2, vbH = shH + pad * 2;
+  const basePx = 460 * zoom;
+  const aspect = vbW / vbH;
+  const pxW = aspect >= 1 ? basePx : basePx * aspect;
+  const pxH = aspect >= 1 ? basePx / aspect : basePx;
+
+  return (
+    <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--canvas-bg)', borderRadius: 12, overflow: 'auto', minHeight: 420 }}>
+      <svg width={pxW} height={pxH} viewBox={`${-pad} ${-pad} ${vbW} ${vbH}`} style={{ display: 'block', filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.28))' }}>
+        <rect x={0} y={0} width={shW} height={shH} fill="#ffffff" stroke="#cbd5e1" strokeWidth={0.012} />
+        {cells.map((c, i) => <Cell key={i} {...c} />)}
+        {marks.map((m, i) => <CellMarks key={i} {...m} off={off} len={len} center={centerMarks} />)}
+      </svg>
+      <SheetStepper index={sheetIndex} count={sheetCount} label={sheetLabel} wIn={shW} hIn={shH} unit={unit} />
+    </div>
+  );
+}
+
+function SheetStepper({ index, count, label, wIn, hIn, unit }: { index: number; count: number; label: string; wIn: number; hIn: number; unit: 'in' | 'mm' | 'pt' }) {
+  return (
+    <div style={{ position: 'absolute', right: 14, bottom: 14, display: 'flex', alignItems: 'center', gap: '.55rem', padding: '.35rem .6rem', borderRadius: 999, background: 'rgba(17,17,24,0.86)', color: '#e5e7eb', fontSize: '.72rem', fontWeight: 600, boxShadow: '0 4px 14px rgba(0,0,0,.3)' }}>
+      <span style={{ opacity: .8 }}>SHEET {index + 1}</span>
+      <span style={{ padding: '.05rem .4rem', borderRadius: 4, background: 'rgba(255,255,255,.12)', letterSpacing: '.04em' }}>{count} total</span>
+      <span style={{ opacity: .55 }}>·</span>
+      <span style={{ color: VIOLET }}>◱</span>
+      <span>{fmtDim(wIn, unit)} × {fmtDim(hIn, unit)} <span style={{ opacity: .6 }}>{unit}</span></span>
+      <span style={{ opacity: .5, marginLeft: '.15rem', fontSize: '.62rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</span>
+    </div>
+  );
+}
+
 // ── Poster settings ───────────────────────────────────────────────────────────
 
 const DEFAULT_POSTER: PosterOptions = {
@@ -1045,6 +1851,7 @@ function PosterSettings({ opts, onChange }: { opts: PosterOptions; onChange: (o:
       <Field label="Trim marks">
         <Row><input type="checkbox" checked={opts.addMarks} onChange={e => set('addMarks', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Add trim marks</span></Row>
       </Field>
+      <MarkExtras opts={opts} onChange={onChange} />
     </Grid>
   );
 }
@@ -1054,32 +1861,50 @@ function PosterSettings({ opts, onChange }: { opts: PosterOptions; onChange: (o:
 const DEFAULT_CROP: CropMarksOptions = { bleedIn: 0.125, marginIn: 0.5, markLenIn: 0.25, markOffIn: 0.125 };
 
 function CropSettings({ opts, onChange }: { opts: CropMarksOptions; onChange: (o: CropMarksOptions) => void }) {
-  const set = <K extends keyof CropMarksOptions>(k: K, v: number) => onChange({ ...opts, [k]: v });
+  const set = <K extends keyof CropMarksOptions>(k: K, v: CropMarksOptions[K]) => onChange({ ...opts, [k]: v });
   return (
     <Grid>
       <Field label="Existing bleed (in)" note="Bleed already in the file"><input type="number" min={0} max={0.5} step={0.0625} value={opts.bleedIn} onChange={e => set('bleedIn', +e.target.value)} style={iStyle} /></Field>
       <Field label="Added margin (in)" note="Blank area added for marks"><input type="number" min={0.25} max={1.5} step={0.0625} value={opts.marginIn} onChange={e => set('marginIn', +e.target.value)} style={iStyle} /></Field>
       <Field label="Mark length (in)"><input type="number" min={0.1} max={0.5} step={0.0625} value={opts.markLenIn} onChange={e => set('markLenIn', +e.target.value)} style={iStyle} /></Field>
       <Field label="Mark offset (in)" note="Gap between trim and mark"><input type="number" min={0.05} max={0.25} step={0.0625} value={opts.markOffIn} onChange={e => set('markOffIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Cut type" note="Colour / line style">
+        <select value={opts.cutType ?? 'thru'} onChange={e => set('cutType', e.target.value as CropMarksOptions['cutType'])} style={iStyle}>
+          <option value="thru">Thru-cut (black)</option>
+          <option value="kiss">Kiss-cut (magenta)</option>
+          <option value="crease">Crease (blue dashed)</option>
+          <option value="perf">Perf (red dashed)</option>
+        </select>
+      </Field>
+      <Field label="Overshoot (in)" note="Extend marks past the corner"><input type="number" min={0} max={0.25} step={0.01} value={opts.overshootIn ?? 0} onChange={e => set('overshootIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Knockout"><Row><input type="checkbox" checked={!!opts.knockout} onChange={e => set('knockout', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>White halo (dark stock)</span></Row></Field>
+      <Field label="Key mark"><Row><input type="checkbox" checked={!!opts.keyMark} onChange={e => set('keyMark', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Orientation key</span></Row></Field>
+      <MarkExtras opts={{ ...opts, addMarks: true }} onChange={o => onChange({ ...opts, centerMarks: o.centerMarks, markWeightPt: o.markWeightPt })} />
     </Grid>
   );
 }
 
 // ── Color-bar settings ────────────────────────────────────────────────────────
 
-const DEFAULT_COLORBAR: ColorBarOptions = { position: 'bottom', heightIn: 0.25 };
+const DEFAULT_COLORBAR: ColorBarOptions = { edge: 'bottom', heightIn: 0.25, shape: 'rect', spot: false, pages: 'all' };
 
 function ColorBarSettings({ opts, onChange }: { opts: ColorBarOptions; onChange: (o: ColorBarOptions) => void }) {
   const set = <K extends keyof ColorBarOptions>(k: K, v: ColorBarOptions[K]) => onChange({ ...opts, [k]: v });
   return (
     <Grid>
-      <Field label="Position">
-        <select value={opts.position} onChange={e => set('position', e.target.value as 'bottom' | 'top')} style={iStyle}>
-          <option value="bottom">Bottom of page</option>
-          <option value="top">Top of page</option>
+      <Field label="Edge">
+        <select value={opts.edge} onChange={e => set('edge', e.target.value as ColorBarOptions['edge'])} style={iStyle}>
+          <option value="bottom">Bottom</option><option value="top">Top</option><option value="left">Left</option><option value="right">Right</option>
         </select>
       </Field>
-      <Field label="Bar height (in)"><input type="number" min={0.1} max={1} step={0.0625} value={opts.heightIn} onChange={e => set('heightIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Bar size (in)"><input type="number" min={0.1} max={1} step={0.0625} value={opts.heightIn} onChange={e => set('heightIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Patch shape">
+        <select value={opts.shape ?? 'rect'} onChange={e => set('shape', e.target.value as ColorBarOptions['shape'])} style={iStyle}>
+          <option value="rect">Rectangle</option><option value="square">Square</option><option value="circle">Circle</option>
+        </select>
+      </Field>
+      <Field label="Spot patches"><Row><input type="checkbox" checked={!!opts.spot} onChange={e => set('spot', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Add spot / registration patches</span></Row></Field>
+      <Field label="Pages" note="all · 1-5 · odd · last"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
     </Grid>
   );
 }
@@ -1147,21 +1972,27 @@ function TicketSettings({ opts, onChange }: { opts: TicketOptions; onChange: (o:
       <Field label="Crop marks">
         <Row><input type="checkbox" checked={opts.addMarks} onChange={e => set('addMarks', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Add crop marks</span></Row>
       </Field>
+      <MarkExtras opts={opts} onChange={onChange} />
     </Grid>
   );
 }
 
 // ── Rotate / Flip / Shuffle / Split / Crop-box settings ──────────────────────
 
-function RotateSettings({ angle, onChange }: { angle: 90 | 180 | 270; onChange: (a: 90 | 180 | 270) => void }) {
+function RotateSettings({ angle, onChange }: { angle: number; onChange: (a: number) => void }) {
   return (
-    <Field label="Rotation">
-      <div style={{ display: 'flex', gap: '.5rem' }}>
-        {([90, 180, 270] as const).map(a => (
-          <button key={a} className={`btn${angle === a ? '' : ' secondary'}`} onClick={() => onChange(a)} style={{ flex: 1 }}>{a}°</button>
-        ))}
-      </div>
-    </Field>
+    <Grid>
+      <Field label="Quick rotate">
+        <div style={{ display: 'flex', gap: '.5rem' }}>
+          {([90, 180, 270] as const).map(a => (
+            <button key={a} className={`btn${angle === a ? '' : ' secondary'}`} onClick={() => onChange(a)} style={{ flex: 1 }}>{a}°</button>
+          ))}
+        </div>
+      </Field>
+      <Field label="Custom angle (deg)" note="Non-90° grows the page box to fit">
+        <input type="number" min={-360} max={360} step={1} value={angle} onChange={e => onChange(+e.target.value)} style={iStyle} />
+      </Field>
+    </Grid>
   );
 }
 
@@ -1177,18 +2008,48 @@ function FlipSettings({ dir, onChange }: { dir: 'h' | 'v'; onChange: (d: 'h' | '
 }
 
 function ShuffleSettings({ order, onChange, count }: { order: string; onChange: (s: string) => void; count: number }) {
+  const chip: React.CSSProperties = { padding: '.28rem .6rem', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-alt)', color: 'var(--ink)', cursor: 'pointer', fontSize: '.76rem', fontWeight: 600 };
+  const quick: [string, string][] = [['Reverse all', 'reverse'], ['Odd only', 'odd'], ['Even only', 'even'], ['Interleave', '[odd,even]'], ['All', 'all']];
   return (
-    <Field label="Page order" note={`This PDF has ${count} page${count !== 1 ? 's' : ''}. List 1-based page numbers in the order you want. Repeat to duplicate, omit to drop.`}>
-      <input type="text" value={order} onChange={e => onChange(e.target.value)} placeholder="e.g. 3, 1, 2, 2, 4" style={iStyle} />
-    </Field>
+    <div>
+      <Field label="Page order" note={`This PDF has ${count} page${count !== 1 ? 's' : ''}.`}>
+        <input type="text" value={order} onChange={e => onChange(e.target.value)} placeholder="e.g. 1, 2>, B, 5-3" style={iStyle} />
+      </Field>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', marginTop: '.55rem' }}>
+        <span style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.06em', color: 'var(--muted)', textTransform: 'uppercase', alignSelf: 'center' }}>Quick:</span>
+        {quick.map(([label, expr]) => <button key={label} style={chip} onClick={() => onChange(expr)}>{label}</button>)}
+      </div>
+      <div style={{ marginTop: '.7rem', fontSize: '.78rem', color: 'var(--muted)', lineHeight: 1.7 }}>
+        <strong style={{ color: 'var(--ink)' }}>Expression syntax</strong><br />
+        <code>3,1,2</code> reorder · <code>all</code> · <code>odd</code> · <code>even</code> · <code>first</code> · <code>last</code><br />
+        <code>1-5</code> range · <code>5-1</code> / <code>reverse</code> / <code>last-1</code> descending<br />
+        <code>4&gt;</code> 90°cw · <code>3&lt;</code> 90°ccw · <code>2^</code> 180° · <code>B</code>/<code>X</code>/<code>_</code> blank<br />
+        <code>5*(1)</code> repeat · <code>[odd,even]</code> interleave · <code>group 3: 3 2 1</code> per-group
+      </div>
+    </div>
   );
 }
 
-function SplitSettings({ ranges, onChange, count }: { ranges: string; onChange: (s: string) => void; count: number }) {
+function SplitSettings({ ranges, onChange, count, mode, onMode, chunk, onChunk, zip, onZip }: {
+  ranges: string; onChange: (s: string) => void; count: number;
+  mode: 'ranges' | 'chunk'; onMode: (m: 'ranges' | 'chunk') => void; chunk: number; onChunk: (n: number) => void; zip: boolean; onZip: (b: boolean) => void;
+}) {
+  const files = mode === 'chunk' ? Math.max(1, Math.ceil(count / Math.max(1, chunk))) : ranges.split(',').filter(s => s.trim()).length;
   return (
-    <Field label="Split ranges" note={`This PDF has ${count} page${count !== 1 ? 's' : ''}. Each comma-separated range becomes its own file.`}>
-      <input type="text" value={ranges} onChange={e => onChange(e.target.value)} placeholder="e.g. 1-3, 4-6, 7" style={iStyle} />
-    </Field>
+    <Grid>
+      <Field label="Split mode">
+        <select value={mode} onChange={e => onMode(e.target.value as 'ranges' | 'chunk')} style={iStyle}>
+          <option value="ranges">By ranges</option>
+          <option value="chunk">Fixed chunk size</option>
+        </select>
+      </Field>
+      {mode === 'ranges'
+        ? <Field label="Ranges" note={`${count} pages — each comma range = one file`}><input type="text" value={ranges} onChange={e => onChange(e.target.value)} placeholder="e.g. 1-3, 4-6, 7" style={iStyle} /></Field>
+        : <Field label="Pages per file" note={`${count} pages → ${files} file${files !== 1 ? 's' : ''}`}><input type="number" min={1} max={Math.max(1, count)} step={1} value={chunk} onChange={e => onChunk(+e.target.value)} style={iStyle} /></Field>}
+      <Field label="Output">
+        <Row><input type="checkbox" checked={zip} onChange={e => onZip(e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Download as one .zip archive</span></Row>
+      </Field>
+    </Grid>
   );
 }
 
@@ -1200,6 +2061,295 @@ function CropBoxSettings({ opts, onChange }: { opts: CropBoxOptions; onChange: (
       <Field label="Right inset (in)"><input type="number" min={0} max={10} step={0.0625} value={opts.right} onChange={e => set('right', +e.target.value)} style={iStyle} /></Field>
       <Field label="Bottom inset (in)"><input type="number" min={0} max={10} step={0.0625} value={opts.bottom} onChange={e => set('bottom', +e.target.value)} style={iStyle} /></Field>
       <Field label="Left inset (in)"><input type="number" min={0} max={10} step={0.0625} value={opts.left} onChange={e => set('left', +e.target.value)} style={iStyle} /></Field>
+    </Grid>
+  );
+}
+
+// ── Resize settings ───────────────────────────────────────────────────────────
+
+const DEFAULT_RESIZE: ResizeOptions = { mode: 'scale', scalePct: 100, targetWIn: 8.5, targetHIn: 11 };
+
+function ResizeSettings({ opts, onChange }: { opts: ResizeOptions; onChange: (o: ResizeOptions) => void }) {
+  const set = <K extends keyof ResizeOptions>(k: K, v: ResizeOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Resize mode">
+        <select value={opts.mode} onChange={e => set('mode', e.target.value as ResizeOptions['mode'])} style={iStyle}>
+          <option value="scale">Scale by percentage</option>
+          <option value="fit">Fit to paper (keep aspect)</option>
+          <option value="stretch">Stretch to paper (fill)</option>
+        </select>
+      </Field>
+      {opts.mode === 'scale' ? (
+        <Field label="Scale (%)" note="100 = unchanged">
+          <input type="number" min={1} max={800} step={1} value={opts.scalePct} onChange={e => set('scalePct', +e.target.value)} style={iStyle} />
+        </Field>
+      ) : (
+        <>
+          <SheetPicker opts={{ sheetWIn: opts.targetWIn, sheetHIn: opts.targetHIn }} set={(k, v) => set(k === 'sheetWIn' ? 'targetWIn' : 'targetHIn', v)} />
+          <Field label="Target width (in)"><input type="number" min={0.5} max={60} step={0.0625} value={opts.targetWIn} onChange={e => set('targetWIn', +e.target.value)} style={iStyle} /></Field>
+          <Field label="Target height (in)"><input type="number" min={0.5} max={60} step={0.0625} value={opts.targetHIn} onChange={e => set('targetHIn', +e.target.value)} style={iStyle} /></Field>
+        </>
+      )}
+    </Grid>
+  );
+}
+
+// ── Registration / Insert / Nudge / Backdrop / QR settings ────────────────────
+
+const DEFAULT_REGMARK: RegMarkOptions = { marginIn: 0.25, sizeIn: 0.18, style: 'target' };
+const DEFAULT_INSERT: InsertOptions = { mode: 'at', position: 1, everyN: 1, count: 1 };
+const DEFAULT_NUDGE: NudgeOptions = { dxIn: 0, dyIn: 0, rotateDeg: 0 };
+const DEFAULT_BACKDROP: BackdropOptions = { r: 1, g: 1, b: 1 };
+const DEFAULT_QRSTAMP: QrStampOptions = { text: 'https://', sizePt: 72, position: 'br', marginPt: 18 };
+const DEFAULT_COLLATING: CollatingOptions = {
+  edge: 'left', startOffsetPt: 18, markWpt: 6, markHpt: 6, smallMarks: false,
+  pagesPerSig: 16, sigsPerSet: 12, stepPt: 8,
+  color: { r: 0, g: 0, b: 0 }, color2: { r: 0, g: 0.6, b: 0.9 }, opacity: 1, pages: 'all',
+};
+const DEFAULT_OMR: OmrOptions = {
+  edge: 'bottom', encoding: 'binary', program: 1, bitCount: 8, repeats: 1,
+  widthPt: 14.17, heightPt: 2.83, spacingPt: 14.17, startOffsetPt: 40, edgeOffsetPt: 8.5,
+  sync: true, color: { r: 0, g: 0, b: 0 }, opacity: 1, pages: 'all',
+};
+const DEFAULT_GATHERING: GatheringOptions = {
+  edge: 'top', startOffsetPt: 18, edgeOffsetPt: 8, markWpt: 6, markHpt: 6,
+  pagesPerSection: 16, sectionsPerSet: 12, stepPt: 8,
+  color: { r: 0, g: 0, b: 0 }, color2: { r: 0, g: 0.6, b: 0.9 }, opacity: 1, pages: 'all',
+};
+const DEFAULT_FOLDMARKS: FoldMarksOptions = {
+  scheme: 'letter', orientation: 'vertical', panels: 4, positions: '33,66',
+  edge: 'both', markLenPt: 18, offsetPt: 0, style: 'dashed', weightPt: 0.75, fullLine: false,
+  color: { r: 0, g: 0, b: 0 }, pages: 'all',
+};
+const DEFAULT_LAYMARKS: LayMarksOptions = {
+  markType: 'arrow', edges: 'both', gripperEdge: 'bottom', sideGuideSide: 'left',
+  sizePt: 14.17, thicknessPt: 0.5, offsetPt: 14.17, color: { r: 0, g: 0, b: 0 }, pages: 'all',
+};
+const DEFAULT_CUTCONTOUR: CutContourOptions = {
+  shape: 'rectangle', target: 'trim', spotName: 'CutContour', thicknessPt: 0.25,
+  dashed: false, dashLenPt: 6, dashGapPt: 3, cornerRadiusPt: 8.5, xOffsetPt: 0, yOffsetPt: 0,
+  previewColor: { r: 0.925, g: 0, b: 0.55 }, pages: 'all',
+};
+const DEFAULT_WHITEVARNISH: WhiteVarnishOptions = {
+  spotName: 'White', coverage: 'flood', tint: 1, under: true, xOffsetPt: 0, yOffsetPt: 0,
+  previewColor: { r: 0.85, g: 0.86, b: 0.92 }, pages: 'all',
+};
+const DEFAULT_BRAILLE: BrailleOptions = {
+  text: 'hello', xPt: 72, dotDiaPt: 4.25, dotPitchPt: 7.09, cellSpacePt: 17, lineSpacePt: 28.35,
+  previewColor: { r: 0.55, g: 0.55, b: 0.6 }, pages: 'all',
+};
+const DEFAULT_BARCODE: BarcodeStampOptions = {
+  text: 'Hello World', symbology: 'qr', scale: 3, quietZone: 4, barHeightMm: 15,
+  position: 'br', marginPt: 18, xOffsetPt: 0, yOffsetPt: 0, rotationDeg: 0,
+  barColor: { r: 0, g: 0, b: 0 }, bgColor: { r: 1, g: 1, b: 1 }, transparent: false, showText: true, pages: 'all',
+};
+const DEFAULT_BACKDROPFILE: BackdropFileOptions = {
+  offsetXPt: 0, offsetYPt: 0, scalePct: 100, opacity: 100, repeat: true, pages: 'all',
+};
+const DEFAULT_COLOREFFECTS: ColorEffectsOptions = {
+  brightness: 100, contrast: 100, saturation: 100, grayscale: 0, warmTone: 0, invert: 0, hueRotate: 0, dpi: 300, pages: 'all',
+};
+const DEFAULT_REPAIR: RepairOptions = {
+  reserialize: true, stripMetadata: false, removeAnnotations: false, removeJavaScript: true, pages: 'all',
+};
+const DEFAULT_COLORMANAGE: ColorManageOptions = {
+  sourceProfile: 'sRGB', destProfile: '', intent: 'perceptual', dpi: 300, gamutWarning: false, pages: 'all',
+};
+const DEFAULT_CUSTOMGRID: { cols: number; rows: number; sheetWIn: number; sheetHIn: number; gutterIn: number; marginIn: number; addMarks: boolean; assign: string } = {
+  cols: 2, rows: 2, sheetWIn: 8.5, sheetHIn: 11, gutterIn: 0, marginIn: 0.25, addMarks: false, assign: 'sequential',
+};
+const DEFAULT_PDFTOOLS: { operation: 'optimize' | 'linearize' | 'encrypt' | 'decrypt' | 'repair'; objectStreams: boolean; removeUnused: boolean } = {
+  operation: 'optimize', objectStreams: true, removeUnused: true,
+};
+const DEFAULT_JDF: JdfOptions = {
+  jobName: 'Untitled Job', productType: 'Brochure', quantity: 500,
+  widthPt: 612, heightPt: 792, pages: 1, sides: 'TwoSidedFlipY',
+  mediaWidthPt: 936, mediaHeightPt: 1368, mediaType: 'Paper', binding: 'None',
+};
+
+const hexToRgb = (hex: string) => {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  return m ? { r: parseInt(m[1]!, 16) / 255, g: parseInt(m[2]!, 16) / 255, b: parseInt(m[3]!, 16) / 255 } : { r: 1, g: 1, b: 1 };
+};
+const rgbToHex = (c: BackdropOptions) => '#' + [c.r, c.g, c.b].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+
+function RegistrationSettings({ opts, onChange }: { opts: RegMarkOptions; onChange: (o: RegMarkOptions) => void }) {
+  const set = <K extends keyof RegMarkOptions>(k: K, v: RegMarkOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Mark style">
+        <select value={opts.style} onChange={e => set('style', e.target.value as RegMarkOptions['style'])} style={iStyle}>
+          <option value="target">Target (bullseye + crosshair)</option>
+          <option value="crosshair">Crosshair only</option>
+        </select>
+      </Field>
+      <Field label="Distance from edge (in)"><input type="number" min={0.1} max={1} step={0.0625} value={opts.marginIn} onChange={e => set('marginIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Mark size (in)"><input type="number" min={0.08} max={0.5} step={0.01} value={opts.sizeIn} onChange={e => set('sizeIn', +e.target.value)} style={iStyle} /></Field>
+    </Grid>
+  );
+}
+
+function InsertSettings({ opts, onChange }: { opts: InsertOptions; onChange: (o: InsertOptions) => void }) {
+  const set = <K extends keyof InsertOptions>(k: K, v: InsertOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Where">
+        <select value={opts.mode} onChange={e => set('mode', e.target.value as InsertOptions['mode'])} style={iStyle}>
+          <option value="at">Before a specific page</option>
+          <option value="everyN">After every N pages</option>
+        </select>
+      </Field>
+      {opts.mode === 'at'
+        ? <Field label="Before page #"><input type="number" min={1} step={1} value={opts.position} onChange={e => set('position', +e.target.value)} style={iStyle} /></Field>
+        : <Field label="Every N pages"><input type="number" min={1} step={1} value={opts.everyN} onChange={e => set('everyN', +e.target.value)} style={iStyle} /></Field>}
+      <Field label="Blank pages to insert"><input type="number" min={1} max={20} step={1} value={opts.count} onChange={e => set('count', +e.target.value)} style={iStyle} /></Field>
+    </Grid>
+  );
+}
+
+function NudgeSettings({ opts, onChange }: { opts: NudgeOptions; onChange: (o: NudgeOptions) => void }) {
+  const set = <K extends keyof NudgeOptions>(k: K, v: NudgeOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Shift right (in)" note="Negative = left"><input type="number" min={-2} max={2} step={0.01} value={opts.dxIn} onChange={e => set('dxIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Shift up (in)" note="Negative = down"><input type="number" min={-2} max={2} step={0.01} value={opts.dyIn} onChange={e => set('dyIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Rotate (deg)" note="About page centre"><input type="number" min={-15} max={15} step={0.1} value={opts.rotateDeg} onChange={e => set('rotateDeg', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Pages" note="all · 1-5 · odd · last"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+    </Grid>
+  );
+}
+
+function BackdropSettings({ opts, onChange }: { opts: BackdropOptions; onChange: (o: BackdropOptions) => void }) {
+  return (
+    <Grid>
+      <Field label="Backdrop colour" note="Painted behind every page">
+        <input type="color" value={rgbToHex(opts)} onChange={e => onChange(hexToRgb(e.target.value))} style={{ ...iStyle, height: 38, padding: 2 }} />
+      </Field>
+    </Grid>
+  );
+}
+
+function QrStampSettings({ opts, onChange }: { opts: QrStampOptions; onChange: (o: QrStampOptions) => void }) {
+  const set = <K extends keyof QrStampOptions>(k: K, v: QrStampOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Symbology">
+        <select value={opts.symbology ?? 'qr'} onChange={e => set('symbology', e.target.value as QrStampOptions['symbology'])} style={iStyle}>
+          <option value="qr">QR code</option>
+          <option value="code128">Code 128</option>
+          <option value="ean13">EAN-13</option>
+        </select>
+      </Field>
+      <Field label={(opts.symbology ?? 'qr') === 'ean13' ? 'Digits (12–13)' : 'Encoded text / URL'}>
+        <input type="text" value={opts.text} onChange={e => set('text', e.target.value)} placeholder={(opts.symbology ?? 'qr') === 'ean13' ? '5901234123457' : 'https://example.com'} style={iStyle} />
+      </Field>
+      <Field label="Position">
+        <select value={opts.position} onChange={e => set('position', e.target.value as QrStampOptions['position'])} style={iStyle}>
+          <option value="br">Bottom right</option><option value="bl">Bottom left</option>
+          <option value="tr">Top right</option><option value="tl">Top left</option><option value="center">Center</option>
+        </select>
+      </Field>
+      <Field label="Size (pt)"><input type="number" min={24} max={288} step={4} value={opts.sizePt} onChange={e => set('sizePt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Edge margin (pt)"><input type="number" min={0} max={96} step={2} value={opts.marginPt} onChange={e => set('marginPt', +e.target.value)} style={iStyle} /></Field>
+    </Grid>
+  );
+}
+
+// ── Distortion Compensation settings ──────────────────────────────────────────
+
+interface DistortUi { mode: 'cylinder' | 'custom'; cylinderDiaMm: number; plateThickMm: number; customPct: number; direction: 'circ' | 'cross' | 'both'; }
+const DEFAULT_DISTORT: DistortUi = { mode: 'cylinder', cylinderDiaMm: 150, plateThickMm: 1.7, customPct: 97.5, direction: 'circ' };
+function distortFactor(ui: DistortUi): number {
+  return ui.mode === 'custom' ? ui.customPct : distortFactorFromCylinder(ui.cylinderDiaMm, ui.plateThickMm);
+}
+
+function DistortSettings({ opts, onChange }: { opts: DistortUi; onChange: (o: DistortUi) => void }) {
+  const set = <K extends keyof DistortUi>(k: K, v: DistortUi[K]) => onChange({ ...opts, [k]: v });
+  const pct = distortFactor(opts);
+  return (
+    <Grid>
+      <Field label="Calculation mode">
+        <select value={opts.mode} onChange={e => set('mode', e.target.value as DistortUi['mode'])} style={iStyle}>
+          <option value="cylinder">From cylinder geometry</option>
+          <option value="custom">Known factor (%)</option>
+        </select>
+      </Field>
+      {opts.mode === 'cylinder' ? (
+        <>
+          <Field label="Cylinder diameter (mm)"><input type="number" min={10} max={800} step={1} value={opts.cylinderDiaMm} onChange={e => set('cylinderDiaMm', +e.target.value)} style={iStyle} /></Field>
+          <Field label="Plate thickness (mm)" note="Common: 1.14 / 1.70 / 2.84"><input type="number" min={0.1} max={5} step={0.01} value={opts.plateThickMm} onChange={e => set('plateThickMm', +e.target.value)} style={iStyle} /></Field>
+        </>
+      ) : (
+        <Field label="Distortion factor (%)" note="Below 100 shrinks"><input type="number" min={80} max={100} step={0.1} value={opts.customPct} onChange={e => set('customPct', +e.target.value)} style={iStyle} /></Field>
+      )}
+      <Field label="Direction">
+        <select value={opts.direction} onChange={e => set('direction', e.target.value as DistortUi['direction'])} style={iStyle}>
+          <option value="circ">Circumferential (height)</option>
+          <option value="cross">Cross-web (width)</option>
+          <option value="both">Both axes</option>
+        </select>
+      </Field>
+      <div style={{ gridColumn: '1 / -1', padding: '.5rem .75rem', borderRadius: 8, background: 'var(--accent-soft)', fontSize: '.82rem', color: VIOLET, fontWeight: 700 }}>
+        Compensation factor: {pct.toFixed(3)}% <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(artwork pre-shrunk to this on the {opts.direction === 'cross' ? 'width' : opts.direction === 'both' ? 'both axes' : 'height'})</span>
+      </div>
+    </Grid>
+  );
+}
+
+// ── Nesting settings ──────────────────────────────────────────────────────────
+
+const DEFAULT_NEST: NestOptions = { sheetWIn: 8.5, sheetHIn: 11, roll: false, paddingIn: 0.08, marginIn: 0.25, allowRotate: true, copies: 20, fillSheet: true, trueShape: false, dpi: 36 };
+
+function NestSettings({ opts, onChange }: { opts: NestOptions; onChange: (o: NestOptions) => void }) {
+  const set = <K extends keyof NestOptions>(k: K, v: NestOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Media">
+        <select value={opts.roll ? 'roll' : 'sheet'} onChange={e => set('roll', e.target.value === 'roll')} style={iStyle}>
+          <option value="sheet">Stacked sheets</option>
+          <option value="roll">Roll (variable length)</option>
+        </select>
+      </Field>
+      <SheetPicker opts={opts} set={set} />
+      <Field label="Quantity">
+        <select value={opts.fillSheet ? 'fill' : 'copies'} onChange={e => set('fillSheet', e.target.value === 'fill')} style={iStyle}>
+          <option value="fill">Fill the sheet</option>
+          <option value="copies">Copy count</option>
+        </select>
+      </Field>
+      {!opts.fillSheet && <Field label="Copies (per design)"><input type="number" min={1} max={2000} step={1} value={opts.copies} onChange={e => set('copies', +e.target.value)} style={iStyle} /></Field>}
+      <Field label="Item padding (in)"><input type="number" min={0} max={0.5} step={0.01} value={opts.paddingIn} onChange={e => set('paddingIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Sheet margin (in)"><input type="number" min={0} max={1} step={0.0625} value={opts.marginIn} onChange={e => set('marginIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Rotation"><Row><input type="checkbox" checked={opts.allowRotate} onChange={e => set('allowRotate', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Allow 90° rotation</span></Row></Field>
+      <Field label="Nesting"><Row><input type="checkbox" checked={!!opts.trueShape} onChange={e => set('trueShape', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>True-shape (pack into negative space)</span></Row></Field>
+      {opts.trueShape && <Field label="Detail (DPI)" note="Higher = tighter but slower"><input type="number" min={12} max={150} step={6} value={opts.dpi ?? 36} onChange={e => set('dpi', +e.target.value)} style={iStyle} /></Field>}
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Packs each source page (different sizes = different stickers) as tightly as it can. <strong>True-shape</strong> rasterises the artwork outline and nests items into each other's negative space (best for irregular die-cut shapes); leave it off for fast rectangular bin-packing.
+      </div>
+    </Grid>
+  );
+}
+
+// ── Calendar settings ─────────────────────────────────────────────────────────
+
+const DEFAULT_CALENDAR: CalendarOptions = { halfSheet: false, rotateBack: true, addMarks: false, markLenIn: 0.2, markOffIn: 0.1 };
+
+function CalendarSettings({ opts, onChange }: { opts: CalendarOptions; onChange: (o: CalendarOptions) => void }) {
+  const set = <K extends keyof CalendarOptions>(k: K, v: CalendarOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Page layout">
+        <select value={opts.halfSheet ? 'half' : 'full'} onChange={e => set('halfSheet', e.target.value === 'half')} style={iStyle}>
+          <option value="full">Full sheet (one page per side)</option>
+          <option value="half">Half sheet (image + grid, fold)</option>
+        </select>
+      </Field>
+      <Field label="Back cover"><Row><input type="checkbox" checked={opts.rotateBack} onChange={e => set('rotateBack', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Rotate back 180° (top-bound hanging)</span></Row></Field>
+      <Field label="Crop marks"><Row><input type="checkbox" checked={opts.addMarks} onChange={e => set('addMarks', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Add crop marks</span></Row></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Pairs consecutive pages for wall/desk calendars. Full-sheet prints one page per side and rotates the back so it hangs the right way up; half-sheet stacks image + month grid on one sheet to fold. Source is typically 13 pages (cover + 12 months).
+      </div>
     </Grid>
   );
 }
@@ -1219,9 +2369,27 @@ function OverlaySettings({ opts, onChange }: { opts: OverlayOptions; onChange: (
           <option value="tile">Tiled</option>
         </select>
       </Field>
+      <Field label="Blend mode" note="Multiply drops white areas">
+        <select value={opts.blend ?? 'normal'} onChange={e => set('blend', e.target.value as OverlayOptions['blend'])} style={iStyle}>
+          <option value="normal">Normal</option>
+          <option value="multiply">Multiply</option>
+        </select>
+      </Field>
       <Field label={`Opacity: ${Math.round(opts.opacity * 100)}%`}>
         <input type="range" min={5} max={100} step={5} value={opts.opacity * 100} onChange={e => set('opacity', +e.target.value / 100)} style={{ width: '100%', marginTop: '.5rem' }} />
       </Field>
+      {opts.mode === 'center' && (
+        <>
+          <Field label="Anchor (9-point)">
+            <select value={opts.anchor ?? 'mc'} onChange={e => set('anchor', e.target.value as OverlayOptions['anchor'])} style={iStyle}>
+              <option value="tl">Top left</option><option value="tc">Top center</option><option value="tr">Top right</option>
+              <option value="ml">Middle left</option><option value="mc">Center</option><option value="mr">Middle right</option>
+              <option value="bl">Bottom left</option><option value="bc">Bottom center</option><option value="br">Bottom right</option>
+            </select>
+          </Field>
+          <Field label="Padding (pt)"><input type="number" min={0} max={144} step={2} value={opts.paddingPt ?? 0} onChange={e => set('paddingPt', +e.target.value)} style={iStyle} /></Field>
+        </>
+      )}
       {opts.mode === 'tile' && (
         <>
           <Field label="Tile columns"><input type="number" min={1} max={8} step={1} value={opts.tileCols ?? 2} onChange={e => set('tileCols', +e.target.value)} style={iStyle} /></Field>
@@ -1354,13 +2522,18 @@ function DataMergeTool({ tool }: { tool: ToolDef }) {
           <Field label="Gutter (in)"><input type="number" min={0} max={1} step={0.0625} value={opts.gutterIn} onChange={e => set('gutterIn', +e.target.value)} style={iStyle} /></Field>
           <Field label="Font size (pt)"><input type="number" min={6} max={24} step={1} value={opts.fontSizePt} onChange={e => set('fontSizePt', +e.target.value)} style={iStyle} /></Field>
           <Field label="Number prefix"><input type="text" value={opts.numberPrefix} onChange={e => set('numberPrefix', e.target.value)} style={iStyle} /></Field>
-          <Field label="QR code from column" note="Encodes each row's value as a scannable QR">
+          <Field label="Barcode from column" note="Encodes each row's value">
             <select value={opts.qrColumn} onChange={e => set('qrColumn', e.target.value)} style={iStyle}>
               <option value="">— none —</option>
               {headers.map(h => <option key={h} value={h}>{h}</option>)}
             </select>
           </Field>
-          {opts.qrColumn && <Field label="QR size (pt)"><input type="number" min={28} max={200} step={2} value={opts.qrSizePt} onChange={e => set('qrSizePt', +e.target.value)} style={iStyle} /></Field>}
+          {opts.qrColumn && <Field label="Symbology">
+            <select value={opts.symbology ?? 'qr'} onChange={e => set('symbology', e.target.value as DataMergeOptions['symbology'])} style={iStyle}>
+              <option value="qr">QR code</option><option value="code128">Code 128</option><option value="ean13">EAN-13</option>
+            </select>
+          </Field>}
+          {opts.qrColumn && <Field label="Barcode size (pt)"><input type="number" min={28} max={200} step={2} value={opts.qrSizePt} onChange={e => set('qrSizePt', +e.target.value)} style={iStyle} /></Field>}
           <Field label="Options">
             <Row>
               <input type="checkbox" checked={opts.autoNumber} onChange={e => set('autoNumber', e.target.checked)} /><span style={{ fontSize: '.82rem' }}>Number</span>
@@ -1381,28 +2554,126 @@ function DataMergeTool({ tool }: { tool: ToolDef }) {
   );
 }
 
-function ToolWorkspace({ tool, onBack }: { tool: ToolDef; onBack: () => void }) {
-  const [file, setFile] = useState<LoadedFile | null>(null);
+// Persistent left tool rail — the four pdfpress groups, searchable, with the
+// tool thumbnails as icons. Switching does not lose the loaded file.
+type RailGroup = 'Layout' | 'Transform' | 'Enhance' | 'Advanced';
+const GROUP_OF: Record<string, RailGroup> = {
+  'Imposition & layout': 'Layout', 'Booklets & books': 'Layout', 'Cards & labels': 'Layout', 'Folding': 'Layout',
+  'Page & PDF tools': 'Transform',
+  'Marks & prepress': 'Enhance', 'Tickets & data': 'Enhance',
+  'Large & specialty': 'Advanced',
+};
+const RAIL_ORDER: RailGroup[] = ['Layout', 'Transform', 'Enhance', 'Advanced'];
+
+function ToolRail({ activeId, onSelect }: { activeId: string; onSelect: (id: string) => void }) {
+  const [q, setQ] = useState('');
+  const groups = useMemo(() => {
+    const ql = q.trim().toLowerCase();
+    const m = new Map<RailGroup, ToolDef[]>();
+    for (const t of TOOLS) {
+      if (ql && !t.name.toLowerCase().includes(ql) && !t.tags.some(tag => tag.toLowerCase().includes(ql))) continue;
+      const g = GROUP_OF[t.category] ?? 'Layout';
+      if (!m.has(g)) m.set(g, []);
+      m.get(g)!.push(t);
+    }
+    return RAIL_ORDER.filter(g => m.has(g)).map(g => [g, m.get(g)!] as const);
+  }, [q]);
+
+  return (
+    <nav style={{ width: 232, flexShrink: 0, position: 'sticky', top: '1rem', alignSelf: 'flex-start', maxHeight: 'calc(100vh - 2rem)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '.9rem', padding: '.85rem .75rem', background: 'var(--bg-alt)', border: '1px solid var(--border)', borderRadius: 12 }}>
+      <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tools…" style={{ ...iStyle, padding: '.4rem .6rem', fontSize: '.82rem' }} />
+      {groups.map(([g, tools]) => (
+        <div key={g}>
+          <div style={{ fontSize: '.6rem', fontWeight: 800, letterSpacing: '.09em', color: 'var(--muted)', textTransform: 'uppercase', margin: '0 0 .35rem .25rem' }}>{g}</div>
+          <div style={{ display: 'grid', gap: 2 }}>
+            {tools.map(t => {
+              const active = t.id === activeId;
+              return (
+                <button key={t.id} onClick={() => onSelect(t.id)} title={t.desc} style={{
+                  display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.32rem .45rem', borderRadius: 7, cursor: 'pointer', textAlign: 'left', width: '100%',
+                  border: '1px solid ' + (active ? VIOLET : 'transparent'), background: active ? 'var(--accent-soft)' : 'transparent', color: active ? VIOLET : 'var(--ink)',
+                  fontSize: '.8rem', fontWeight: active ? 700 : 500,
+                }}>
+                  <span style={{ width: 22, height: 17, flexShrink: 0, borderRadius: 3, overflow: 'hidden', background: 'var(--bg)', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><t.Thumb /></span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+function ToolWorkspace({ tool, preset, file, onFile, onSelectTool, onBack }: { tool: ToolDef; preset?: TemplatePreset; file: LoadedFile | null; onFile: (f: LoadedFile | null) => void; onSelectTool: (id: string) => void; onBack: () => void }) {
   const [status, setStatus] = useState<Status>('idle');
   const [errMsg, setErrMsg] = useState('');
 
-  const cardMode = tool.engine === 'nup' && !!(tool.defaultNup?.cellWIn || tool.fitSource);
+  // A preset that specifies an explicit column count means "grid mode" — the
+  // template wants an exact cols×rows, so any fixed cell size inherited from the
+  // tool default must be dropped (otherwise it would silently override the grid).
+  const gridPreset = preset?.nup?.cols != null;
+  const cardMode = tool.engine === 'nup' && !gridPreset && !!(tool.defaultNup?.cellWIn || preset?.nup?.cellWIn || tool.fitSource);
 
-  // Per-engine settings state (initialised from the tool's presets)
-  const [bookletOpts, setBookletOpts] = useState<BookletOptions>({ ...DEFAULT_BOOKLET, ...tool.defaultBooklet });
-  const [nupOpts, setNupOpts] = useState<NUpOptions>({ ...DEFAULT_NUP, ...tool.defaultNup });
-  const [posterOpts, setPosterOpts] = useState<PosterOptions>({ ...DEFAULT_POSTER, ...tool.defaultPoster });
+  // Per-engine settings state (initialised from the tool's presets, then any
+  // template overrides layered on top).
+  const [bookletOpts, setBookletOpts] = useState<BookletOptions>({ ...DEFAULT_BOOKLET, ...tool.defaultBooklet, ...preset?.booklet });
+  const [nupBookOpts, setNupBookOpts] = useState<NUpBookOptions>({ ...DEFAULT_NUPBOOK, ...(preset?.booklet ? { rtl: preset.booklet.rtl } : {}) });
+  const [nupOpts, setNupOpts] = useState<NUpOptions>(() => {
+    const merged = { ...DEFAULT_NUP, ...tool.defaultNup, ...preset?.nup };
+    if (gridPreset) { delete (merged as Partial<NUpOptions>).cellWIn; delete (merged as Partial<NUpOptions>).cellHIn; }
+    return merged;
+  });
+  const [posterOpts, setPosterOpts] = useState<PosterOptions>({ ...DEFAULT_POSTER, ...tool.defaultPoster, ...preset?.poster });
   const [cropOpts, setCropOpts] = useState<CropMarksOptions>(DEFAULT_CROP);
-  const [bleedOpts, setBleedOpts] = useState<{ bleedIn: number }>({ bleedIn: 0.125 });
+  const [bleedOpts, setBleedOpts] = useState<BleedOptions>({ bleedIn: 0.125, mode: 'scale', color: { r: 1, g: 1, b: 1 } });
   const [colorBarOpts, setColorBarOpts] = useState<ColorBarOptions>(DEFAULT_COLORBAR);
   const [pageNumOpts, setPageNumOpts] = useState<PageNumberOptions>(DEFAULT_PAGENUM);
-  const [ticketOpts, setTicketOpts] = useState<TicketOptions>({ ...DEFAULT_TICKET, ...tool.defaultTicket });
-  const [rotateAngle, setRotateAngle] = useState<90 | 180 | 270>(90);
+  const [ticketOpts, setTicketOpts] = useState<TicketOptions>({ ...DEFAULT_TICKET, ...tool.defaultTicket, ...preset?.ticket });
+  const [rotateAngle, setRotateAngle] = useState<number>(90);
   const [flipDir, setFlipDir] = useState<'h' | 'v'>('h');
+  const [pageRange, setPageRange] = useState('all');
+  const [splitMode, setSplitMode] = useState<'ranges' | 'chunk'>('ranges');
+  const [splitChunk, setSplitChunk] = useState(4);
+  const [splitZip, setSplitZip] = useState(true);
+  const [distortOpts, setDistortOpts] = useState<DistortUi>(DEFAULT_DISTORT);
+  const [calendarOpts, setCalendarOpts] = useState<CalendarOptions>(DEFAULT_CALENDAR);
+  const [nestOpts, setNestOpts] = useState<NestOptions>(DEFAULT_NEST);
   const [overlayOpts, setOverlayOpts] = useState<OverlayOptions>(DEFAULT_OVERLAY);
   const [cropBoxOpts, setCropBoxOpts] = useState<CropBoxOptions>({ top: 0, right: 0, bottom: 0, left: 0 });
-  const [shuffleOrder, setShuffleOrder] = useState('');
-  const [splitRanges, setSplitRanges] = useState('');
+  const [resizeOpts, setResizeOpts] = useState<ResizeOptions>({ ...DEFAULT_RESIZE, ...preset?.resize });
+  const [watermarkOpts, setWatermarkOpts] = useState<WatermarkOptions>(DEFAULT_WATERMARK);
+  const [headerFooterOpts, setHeaderFooterOpts] = useState<HeaderFooterOptions>(DEFAULT_HEADERFOOTER);
+  const [slugOpts, setSlugOpts] = useState<JobSlugOptions>({ text: 'Job • ' + new Date().toISOString().slice(0, 10), position: 'bottom', fontSizePt: 8 });
+  const [collatingOpts, setCollatingOpts] = useState<CollatingOptions>(DEFAULT_COLLATING);
+  const [omrOpts, setOmrOpts] = useState<OmrOptions>(DEFAULT_OMR);
+  const [gatheringOpts, setGatheringOpts] = useState<GatheringOptions>(DEFAULT_GATHERING);
+  const [foldMarksOpts, setFoldMarksOpts] = useState<FoldMarksOptions>(DEFAULT_FOLDMARKS);
+  const [layMarksOpts, setLayMarksOpts] = useState<LayMarksOptions>(DEFAULT_LAYMARKS);
+  const [cutContourOpts, setCutContourOpts] = useState<CutContourOptions>(DEFAULT_CUTCONTOUR);
+  const [whiteVarnishOpts, setWhiteVarnishOpts] = useState<WhiteVarnishOptions>(DEFAULT_WHITEVARNISH);
+  const [brailleOpts, setBrailleOpts] = useState<BrailleOptions>(DEFAULT_BRAILLE);
+  const [regOpts, setRegOpts] = useState<RegMarkOptions>(DEFAULT_REGMARK);
+  const [insertOpts, setInsertOpts] = useState<InsertOptions>(DEFAULT_INSERT);
+  const [nudgeOpts, setNudgeOpts] = useState<NudgeOptions>(DEFAULT_NUDGE);
+  const [backdropOpts, setBackdropOpts] = useState<BackdropOptions>(DEFAULT_BACKDROP);
+  const [qrStampOpts, setQrStampOpts] = useState<QrStampOptions>(DEFAULT_QRSTAMP);
+  const [barcodeOpts, setBarcodeOpts] = useState<BarcodeStampOptions>(DEFAULT_BARCODE);
+  const [backdropFileOpts, setBackdropFileOpts] = useState<BackdropFileOptions>(DEFAULT_BACKDROPFILE);
+  const [colorEffectsOpts, setColorEffectsOpts] = useState<ColorEffectsOptions>(DEFAULT_COLOREFFECTS);
+  const [repairOpts, setRepairOpts] = useState<RepairOptions>(DEFAULT_REPAIR);
+  const [colorManageOpts, setColorManageOpts] = useState<ColorManageOptions>(DEFAULT_COLORMANAGE);
+  const [layerStates, setLayerStates] = useState<Record<string, 'on' | 'off' | 'default'>>({});
+  const [customGridOpts, setCustomGridOpts] = useState<typeof DEFAULT_CUSTOMGRID>(DEFAULT_CUSTOMGRID);
+  const [pdfToolsOpts, setPdfToolsOpts] = useState<typeof DEFAULT_PDFTOOLS>(DEFAULT_PDFTOOLS);
+  const [editOps, setEditOps] = useState<EditOp[]>([]);
+  const [jdfOpts, setJdfOpts] = useState<JdfOptions>(DEFAULT_JDF);
+  const [mixReverse, setMixReverse] = useState(false);
+  // Initialise order-list tools from the (possibly already-loaded) file so they
+  // are correct even when this tool was reached by switching in the rail.
+  const [shuffleOrder, setShuffleOrder] = useState(() => file ? Array.from({ length: file.info.count }, (_, i) => i + 1).join(', ') : '');
+  const [splitRanges, setSplitRanges] = useState(() => file ? `1-${file.info.count}` : '');
   const [stampFile, setStampFile] = useState<MergeFile | null>(null);
 
   // Merge tool has its own multi-file state
@@ -1414,7 +2685,7 @@ function ToolWorkspace({ tool, onBack }: { tool: ToolDef; onBack: () => void }) 
     try {
       const bytes = new Uint8Array(await f.arrayBuffer());
       const info = await getPdfInfo(bytes);
-      setFile({ name: f.name, bytes, info });
+      onFile({ name: f.name, bytes, info });
       // Prefill order-list tools and derive fit-to-source cell sizes.
       const seq = Array.from({ length: info.count }, (_, i) => i + 1).join(', ');
       setShuffleOrder(seq);
@@ -1424,9 +2695,9 @@ function ToolWorkspace({ tool, onBack }: { tool: ToolDef; onBack: () => void }) 
     } catch {
       setStatus('error'); setErrMsg('Could not read PDF. Make sure it is a valid, unencrypted PDF.');
     }
-  }, [tool.fitSource]);
+  }, [tool.fitSource, onFile]);
 
-  const clearFile = () => { setFile(null); setStatus('idle'); setErrMsg(''); };
+  const clearFile = () => { onFile(null); setStatus('idle'); setErrMsg(''); };
 
   const addMergeFiles = useCallback(async (files: File[]) => {
     const loaded = await Promise.all(files.map(async f => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
@@ -1438,46 +2709,149 @@ function ToolWorkspace({ tool, onBack }: { tool: ToolDef; onBack: () => void }) 
     setStampFile({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) });
   }, []);
 
-  const process = async () => {
-    if (!file) return;
-    setStatus('processing'); setErrMsg('');
-    try {
-      const base = file.name.replace(/\.pdf$/i, '');
-      let out: Uint8Array | null = null;
-      let outName = `${base}-imposed.pdf`;
+  // Sheet-navigation + canvas state
+  const [sheetIndex, setSheetIndex] = useState(0);
+  const [sheetCount, setSheetCount] = useState(1);
+  const [zoom, setZoom] = useState(1);
+  const [unit, setUnit] = useState<'in' | 'mm' | 'pt'>('in');
+  useEffect(() => { setSheetIndex(0); }, [tool.id]);
 
-      switch (tool.engine) {
+  // Run the active engine and return the produced PDF (or 'multi' for Split which
+  // downloads its own parts, or null if it bailed with an error).
+  const generate = async (): Promise<{ bytes: Uint8Array; name: string } | 'multi' | null> => {
+    if (!file) return null;
+    const base = file.name.replace(/\.pdf$/i, '');
+    let out: Uint8Array | null = null;
+    let outName = `${base}-imposed.pdf`;
+    switch (tool.engine) {
         case 'booklet': out = await imposeBooklet(file.bytes, bookletOpts); outName = `${base}-booklet.pdf`; break;
+        case 'nupbook': out = await imposeNUpBook(file.bytes, nupBookOpts); outName = `${base}-nupbook-${nupBookOpts.nUp}up.pdf`; break;
+        case 'calendar': out = await imposeCalendar(file.bytes, calendarOpts); outName = `${base}-calendar.pdf`; break;
+        case 'nest': out = await nestPdf(file.bytes, nestOpts); outName = `${base}-nested.pdf`; break;
         case 'nup':
           out = await imposeNUp(file.bytes, nupOpts);
           outName = `${base}-${nupOpts.repeatFirst ? 'repeat' : `${tool.id}`}.pdf`; break;
         case 'poster': out = await imposeTiledPoster(file.bytes, posterOpts); outName = `${base}-poster.pdf`; break;
         case 'cropmarks': out = await addCropMarksOnly(file.bytes, cropOpts); outName = `${base}-marks.pdf`; break;
         case 'bleed': out = await generateBleed(file.bytes, bleedOpts); outName = `${base}-bleed.pdf`; break;
-        case 'preflight': setStatus('idle'); return; // inspection only — no output
+        case 'preflight': return null; // inspection only — no output
         case 'colorbar': out = await addColorBar(file.bytes, colorBarOpts); outName = `${base}-colorbar.pdf`; break;
         case 'pagenumbers': out = await addPageNumbers(file.bytes, pageNumOpts); outName = `${base}-numbered.pdf`; break;
         case 'tickets': out = await imposeTickets(file.bytes, ticketOpts); outName = `${base}-tickets.pdf`; break;
-        case 'rotate': out = await rotatePdf(file.bytes, rotateAngle); outName = `${base}-rotated${rotateAngle}.pdf`; break;
-        case 'flip': out = await flipPdf(file.bytes, flipDir); outName = `${base}-flipped.pdf`; break;
-        case 'crop': out = await cropPdf(file.bytes, cropBoxOpts); outName = `${base}-cropped.pdf`; break;
+        case 'rotate': out = await rotatePdf(file.bytes, rotateAngle, pageRange); outName = `${base}-rotated${rotateAngle}.pdf`; break;
+        case 'flip': out = await flipPdf(file.bytes, flipDir, pageRange); outName = `${base}-flipped.pdf`; break;
+        case 'crop': out = await cropPdf(file.bytes, cropBoxOpts, pageRange); outName = `${base}-cropped.pdf`; break;
+        case 'resize': out = await resizePdf(file.bytes, resizeOpts, pageRange); outName = `${base}-resized.pdf`; break;
         case 'shuffle': out = await shufflePages(file.bytes, shuffleOrder); outName = `${base}-reordered.pdf`; break;
         case 'overlay':
-          if (!stampFile) { setStatus('error'); setErrMsg('Add a watermark / overlay PDF first.'); return; }
+          if (!stampFile) throw new Error('Add a watermark / overlay PDF first.');
           out = await overlayPdf(file.bytes, stampFile.bytes, overlayOpts); outName = `${base}-overlay.pdf`; break;
+        case 'watermark': out = await addTextWatermark(file.bytes, watermarkOpts); outName = `${base}-watermark.pdf`; break;
+        case 'headerfooter': out = await addHeaderFooter(file.bytes, { ...headerFooterOpts, fileName: file.name }); outName = `${base}-headerfooter.pdf`; break;
+        case 'slug': out = await addJobSlug(file.bytes, { ...slugOpts, fileName: file.name }); outName = `${base}-slug.pdf`; break;
+        case 'collating': out = await addCollatingMarks(file.bytes, collatingOpts); outName = `${base}-collated.pdf`; break;
+        case 'omr': out = await addOmrMarks(file.bytes, omrOpts); outName = `${base}-omr.pdf`; break;
+        case 'gathering': out = await addGatheringMarks(file.bytes, gatheringOpts); outName = `${base}-gathered.pdf`; break;
+        case 'foldmarks': out = await addFoldMarks(file.bytes, foldMarksOpts); outName = `${base}-foldmarks.pdf`; break;
+        case 'laymarks': out = await addLayMarks(file.bytes, layMarksOpts); outName = `${base}-laymarks.pdf`; break;
+        case 'cutcontour': out = await addCutContour(file.bytes, cutContourOpts); outName = `${base}-diecut.pdf`; break;
+        case 'whitevarnish': out = await addWhiteVarnish(file.bytes, whiteVarnishOpts); outName = `${base}-spot.pdf`; break;
+        case 'braille': out = await addBraille(file.bytes, brailleOpts); outName = `${base}-braille.pdf`; break;
+        case 'registration': out = await addRegistrationMarks(file.bytes, regOpts); outName = `${base}-regmarks.pdf`; break;
+        case 'insert': out = await insertPages(file.bytes, insertOpts); outName = `${base}-inserted.pdf`; break;
+        case 'nudge': out = await nudgePdf(file.bytes, nudgeOpts); outName = `${base}-nudged.pdf`; break;
+        case 'repair': out = await repairPdf(file.bytes, repairOpts); outName = `${base}-repaired.pdf`; break;
+        case 'coloreffects': out = await applyColorEffects(file.bytes, colorEffectsOpts); outName = `${base}-graded.pdf`; break;
+        case 'colormanage': {
+          let res = file.bytes;
+          if (colorManageOpts.convert || colorManageOpts.gamutWarning) res = await applyColorManagement(res, colorManageOpts);
+          if (stampFile) res = await assignOutputIntent(res, stampFile.bytes, colorManageOpts.destProfile || 'Custom');
+          else if (!colorManageOpts.convert && !colorManageOpts.gamutWarning) throw new Error('Upload an ICC profile to assign, or enable Convert / Gamut warning.');
+          out = res; outName = `${base}-color.pdf`; break;
+        }
+        case 'backdrop': out = await addBackdrop(file.bytes, backdropOpts); outName = `${base}-backdrop.pdf`; break;
+        case 'layers': out = await setLayers(file.bytes, Object.entries(layerStates).map(([name, state]) => ({ name, state }))); outName = `${base}-layers.pdf`; break;
+        case 'customgrid': {
+          const { cols, rows, sheetWIn, sheetHIn, gutterIn, marginIn, addMarks, assign } = customGridOpts;
+          const n = file.info.count, per = cols * rows, numSheets = Math.max(1, Math.ceil(n / per));
+          const sheets: (CustomCell | null)[][] = [];
+          for (let s = 0; s < numSheets; s++) {
+            const cells: (CustomCell | null)[] = [];
+            for (let c = 0; c < per; c++) {
+              const seq = s * per + c;
+              let page: number | null = assign === 'repeat' ? 1 : assign === 'reverse' ? (seq < n ? n - seq : null) : (seq < n ? seq + 1 : null);
+              if (assign === 'saddle') { const half = Math.ceil(n / 2); page = c % 2 === 0 ? (seq < n ? n - Math.floor(seq / 2) : null) : (Math.floor(seq / 2) + 1 <= half ? Math.floor(seq / 2) + 1 : null); }
+              cells.push(page && page >= 1 && page <= n ? { page, rotation: 0 } : null);
+            }
+            sheets.push(cells);
+          }
+          out = await imposeCustomGrid(file.bytes, { cols, rows, sheetWIn, sheetHIn, gutterIn, marginIn, addMarks, sheets });
+          outName = `${base}-custom.pdf`; break;
+        }
+        case 'pdftools': {
+          const op = pdfToolsOpts.operation;
+          if (op === 'optimize') out = await optimizePdf(file.bytes, { objectStreams: pdfToolsOpts.objectStreams, removeUnused: pdfToolsOpts.removeUnused });
+          else if (op === 'decrypt') out = await decryptPdf(file.bytes);
+          else if (op === 'repair') out = await repairPdf(file.bytes, {});
+          else throw new Error(op === 'encrypt' ? 'Writing encryption is not available in the browser engine — use a desktop/server tool.' : 'Linearisation is not available in the browser engine — use Optimize, or a server-side qpdf pass.');
+          outName = `${base}-${op}.pdf`; break;
+        }
+        case 'qrstamp': out = await addQrStamp(file.bytes, qrStampOpts); outName = `${base}-qr.pdf`; break;
+        case 'barcode': out = await addBarcodeStamp(file.bytes, barcodeOpts); outName = `${base}-barcode.pdf`; break;
+        case 'backdropfile':
+          if (!stampFile) throw new Error('Upload the backdrop PDF / image first.');
+          out = await addBackdropFile(file.bytes, stampFile.bytes, { ...backdropFileOpts, opacity: (backdropFileOpts.opacity ?? 100) / 100 });
+          outName = `${base}-backdrop.pdf`; break;
+        case 'dimensions': out = await addDimensions(file.bytes); outName = `${base}-dimensions.pdf`; break;
+        case 'editpdf': out = await editPdf(file.bytes, editOps); outName = `${base}-edited.pdf`; break;
+        case 'jdf': out = exportJdf({ ...jdfOpts, widthPt: file.info.widthPt, heightPt: file.info.heightPt, pages: file.info.count }); outName = `${base}.jdf`; break;
+        case 'distort': out = await distortPdf(file.bytes, { factorPct: distortFactor(distortOpts), direction: distortOpts.direction, pages: pageRange }); outName = `${base}-distort.pdf`; break;
+        case 'mix':
+          if (!stampFile) throw new Error('Add the second PDF to interleave first.');
+          out = await mixPdfs(file.bytes, stampFile.bytes, mixReverse); outName = `${base}-interleaved.pdf`; break;
         case 'split': {
-          const parts = await splitPdf(file.bytes, splitRanges);
-          if (!parts.length) { setStatus('error'); setErrMsg('No valid ranges. Use a format like 1-3, 4-6, 7.'); return; }
-          downloadMultiple(parts, base);
-          setStatus('done'); setTimeout(() => setStatus('idle'), 3000); return;
+          const parts = splitMode === 'chunk' ? await splitPdfChunks(file.bytes, splitChunk) : await splitPdf(file.bytes, splitRanges);
+          if (!parts.length) throw new Error('No valid ranges. Use a format like 1-3, 4-6, 7.');
+          if (splitZip && parts.length > 1) {
+            const zip = makeZip(parts.map((p, i) => ({ name: `${base}-part${i + 1}.pdf`, data: p })));
+            downloadPdf(zip, `${base}-split.zip`);
+          } else {
+            downloadMultiple(parts, base);
+          }
+          return 'multi';
         }
         default: break;
       }
+      return out ? { bytes: out, name: outName } : null;
+  };
 
-      if (out) downloadPdf(out, outName);
+  const process = async () => {
+    if (!file) return;
+    setStatus('processing'); setErrMsg('');
+    try {
+      const r = await generate();
+      if (r === null) { setStatus('idle'); return; }
+      if (r !== 'multi') downloadFile(r.bytes, r.name, r.name.endsWith('.jdf') ? 'application/vnd.cip4-jdf+xml' : 'application/pdf');
       setStatus('done'); setTimeout(() => setStatus('idle'), 3000);
     } catch (e) {
       setStatus('error'); setErrMsg(e instanceof Error ? e.message : 'Processing failed');
+    }
+  };
+
+  // Print: generate the output and open it in a new tab for the browser print dialog.
+  const printOut = async () => {
+    if (!file) return;
+    setStatus('processing'); setErrMsg('');
+    try {
+      const r = await generate();
+      if (!r || r === 'multi') { setStatus('idle'); return; }
+      const url = URL.createObjectURL(new Blob([r.bytes as BlobPart], { type: 'application/pdf' }));
+      const w = window.open(url);
+      if (w) w.addEventListener('load', () => { try { w.print(); } catch { /* popup blocked */ } });
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setStatus('idle');
+    } catch (e) {
+      setStatus('error'); setErrMsg(e instanceof Error ? e.message : 'Print failed');
     }
   };
 
@@ -1500,9 +2874,11 @@ function ToolWorkspace({ tool, onBack }: { tool: ToolDef; onBack: () => void }) 
       : 'Process & Download';
 
   return (
-    <div>
+    <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start' }}>
+      <ToolRail activeId={tool.id} onSelect={onSelectTool} />
+      <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-        <button className="btn secondary" onClick={onBack} style={{ padding: '.35rem .75rem', fontSize: '.85rem' }}>← Back</button>
+        <button className="btn secondary" onClick={onBack} style={{ padding: '.35rem .75rem', fontSize: '.85rem' }}>← Gallery</button>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.3rem' }}>{tool.badge ? `${tool.name} ${tool.badge}` : tool.name}</h2>
           <div style={{ color: 'var(--muted)', fontSize: '.85rem' }}>{tool.desc}</div>
@@ -1539,12 +2915,17 @@ function ToolWorkspace({ tool, onBack }: { tool: ToolDef; onBack: () => void }) 
           {!file ? (
             <FileDrop onFile={fs => { if (fs[0]) loadFile(fs[0]); }} />
           ) : (
-            <>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              {/* LEFT — options sidebar */}
+              <aside style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 300 }}>
               <FileBar file={file} onClear={clearFile} />
 
               <div className="admin-card" style={{ margin: 0, padding: '1rem 1.25rem' }}>
                 <h4 style={{ margin: '0 0 .75rem' }}>{tool.engine === 'preflight' ? 'Preflight report' : 'Settings'}</h4>
                 {tool.engine === 'booklet' && <BookletSettings opts={bookletOpts} onChange={setBookletOpts} />}
+                {tool.engine === 'nupbook' && <NUpBookSettings opts={nupBookOpts} onChange={setNupBookOpts} />}
+                {tool.engine === 'calendar' && <CalendarSettings opts={calendarOpts} onChange={setCalendarOpts} />}
+                {tool.engine === 'nest' && <NestSettings opts={nestOpts} onChange={setNestOpts} />}
                 {tool.engine === 'nup' && <NUpSettings opts={nupOpts} onChange={setNupOpts} cardMode={cardMode} />}
                 {tool.engine === 'poster' && <PosterSettings opts={posterOpts} onChange={setPosterOpts} />}
                 {tool.engine === 'cropmarks' && <CropSettings opts={cropOpts} onChange={setCropOpts} />}
@@ -1556,20 +2937,63 @@ function ToolWorkspace({ tool, onBack }: { tool: ToolDef; onBack: () => void }) 
                 {tool.engine === 'rotate' && <RotateSettings angle={rotateAngle} onChange={setRotateAngle} />}
                 {tool.engine === 'flip' && <FlipSettings dir={flipDir} onChange={setFlipDir} />}
                 {tool.engine === 'crop' && <CropBoxSettings opts={cropBoxOpts} onChange={setCropBoxOpts} />}
+                {tool.engine === 'resize' && <ResizeSettings opts={resizeOpts} onChange={setResizeOpts} />}
+                {tool.engine === 'distort' && <DistortSettings opts={distortOpts} onChange={setDistortOpts} />}
+                {(tool.engine === 'rotate' || tool.engine === 'flip' || tool.engine === 'crop' || tool.engine === 'resize' || tool.engine === 'distort') && (
+                  <div style={{ marginTop: '.75rem' }}>
+                    <Field label="Pages" note="all · 1-5 · odd · even · last · last-2">
+                      <input type="text" value={pageRange} onChange={e => setPageRange(e.target.value)} placeholder="all" style={iStyle} />
+                    </Field>
+                  </div>
+                )}
                 {tool.engine === 'shuffle' && <ShuffleSettings order={shuffleOrder} onChange={setShuffleOrder} count={file.info.count} />}
-                {tool.engine === 'split' && <SplitSettings ranges={splitRanges} onChange={setSplitRanges} count={file.info.count} />}
+                {tool.engine === 'split' && <SplitSettings ranges={splitRanges} onChange={setSplitRanges} count={file.info.count} mode={splitMode} onMode={setSplitMode} chunk={splitChunk} onChunk={setSplitChunk} zip={splitZip} onZip={setSplitZip} />}
                 {tool.engine === 'overlay' && <OverlaySettings opts={overlayOpts} onChange={setOverlayOpts} />}
+                {tool.engine === 'watermark' && <WatermarkSettings opts={watermarkOpts} onChange={setWatermarkOpts} />}
+                {tool.engine === 'headerfooter' && <HeaderFooterSettings opts={headerFooterOpts} onChange={setHeaderFooterOpts} />}
+                {tool.engine === 'slug' && <JobSlugSettings opts={slugOpts} onChange={setSlugOpts} />}
+                {tool.engine === 'collating' && <CollatingSettings opts={collatingOpts} onChange={setCollatingOpts} />}
+                {tool.engine === 'omr' && <OmrSettings opts={omrOpts} onChange={setOmrOpts} />}
+                {tool.engine === 'gathering' && <GatheringSettings opts={gatheringOpts} onChange={setGatheringOpts} />}
+                {tool.engine === 'foldmarks' && <FoldMarksSettings opts={foldMarksOpts} onChange={setFoldMarksOpts} />}
+                {tool.engine === 'laymarks' && <LayMarksSettings opts={layMarksOpts} onChange={setLayMarksOpts} />}
+                {tool.engine === 'cutcontour' && <CutContourSettings opts={cutContourOpts} onChange={setCutContourOpts} />}
+                {tool.engine === 'whitevarnish' && <WhiteVarnishSettings opts={whiteVarnishOpts} onChange={setWhiteVarnishOpts} />}
+                {tool.engine === 'braille' && <BrailleSettings opts={brailleOpts} onChange={setBrailleOpts} />}
+                {tool.engine === 'registration' && <RegistrationSettings opts={regOpts} onChange={setRegOpts} />}
+                {tool.engine === 'insert' && <InsertSettings opts={insertOpts} onChange={setInsertOpts} />}
+                {tool.engine === 'nudge' && <NudgeSettings opts={nudgeOpts} onChange={setNudgeOpts} />}
+                {tool.engine === 'backdrop' && <BackdropSettings opts={backdropOpts} onChange={setBackdropOpts} />}
+                {tool.engine === 'qrstamp' && <QrStampSettings opts={qrStampOpts} onChange={setQrStampOpts} />}
+                {tool.engine === 'barcode' && <BarcodeSettings opts={barcodeOpts} onChange={setBarcodeOpts} />}
+                {tool.engine === 'backdropfile' && <BackdropFileSettings opts={backdropFileOpts} onChange={setBackdropFileOpts} />}
+                {tool.engine === 'mix' && (
+                  <Row><input type="checkbox" checked={mixReverse} onChange={e => setMixReverse(e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Reverse the second file (backs scanned in reverse)</span></Row>
+                )}
+                {tool.engine === 'repair' && <RepairSettings opts={repairOpts} onChange={setRepairOpts} />}
+                {tool.engine === 'coloreffects' && <ColorEffectsSettings opts={colorEffectsOpts} onChange={setColorEffectsOpts} />}
+                {tool.engine === 'colormanage' && <ColorManageSettings opts={colorManageOpts} onChange={setColorManageOpts} />}
+                {tool.engine === 'layers' && file && <LayersPanel file={file} states={layerStates} onChange={setLayerStates} />}
+                {tool.engine === 'customgrid' && <CustomGridSettings opts={customGridOpts} onChange={setCustomGridOpts} />}
+                {tool.engine === 'pdftools' && <PdfToolsSettings opts={pdfToolsOpts} onChange={setPdfToolsOpts} />}
+                {tool.engine === 'editpdf' && <EditPdfSettings ops={editOps} onChange={setEditOps} />}
+                {tool.engine === 'jdf' && <JdfSettings opts={jdfOpts} onChange={setJdfOpts} file={file} />}
+                {tool.engine === 'dimensions' && (
+                  <p style={{ margin: 0, fontSize: '.85rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+                    Stamps each page with its exact trim and bleed size (inches + points) along the edges. No options needed.
+                  </p>
+                )}
               </div>
 
-              {tool.engine === 'overlay' && (
+              {(tool.engine === 'overlay' || tool.engine === 'mix' || tool.engine === 'backdropfile' || tool.engine === 'colormanage') && (
                 <div className="admin-card" style={{ margin: 0, padding: '1rem 1.25rem' }}>
-                  <h4 style={{ margin: '0 0 .75rem' }}>Overlay / watermark PDF</h4>
+                  <h4 style={{ margin: '0 0 .75rem' }}>{tool.engine === 'mix' ? 'Second PDF (interleave)' : tool.engine === 'backdropfile' ? 'Backdrop file (PDF / image)' : tool.engine === 'colormanage' ? 'ICC profile (.icc / .icm) — optional' : 'Overlay / watermark PDF'}</h4>
                   {stampFile
                     ? <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
                         <span style={{ fontSize: '.85rem', flex: 1 }}>📄 {stampFile.name}</span>
                         <button className="btn secondary" style={{ padding: '.3rem .65rem', fontSize: '.8rem' }} onClick={() => setStampFile(null)}>Change</button>
                       </div>
-                    : <FileDrop onFile={loadStamp} label="Drop the watermark / stamp PDF" />}
+                    : <FileDrop onFile={loadStamp} label={tool.engine === 'mix' ? 'Drop the second PDF (the backs)' : tool.engine === 'backdropfile' ? 'Drop the backdrop PDF or image' : tool.engine === 'colormanage' ? 'Drop the ICC profile to embed as an OutputIntent' : 'Drop the watermark / stamp PDF'} />}
                 </div>
               )}
 
@@ -1582,26 +3006,69 @@ function ToolWorkspace({ tool, onBack }: { tool: ToolDef; onBack: () => void }) 
                 </div>
               )}
 
-              {tool.engine === 'booklet' && <BookletPreview pageCount={file.info.count} opts={bookletOpts} />}
-              {tool.engine === 'nup' && <NUpPreview opts={nupOpts} pageCount={file.info.count} />}
-
               {tool.engine !== 'preflight' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <button className="btn" onClick={process} disabled={isBusy} style={{ fontSize: '1rem', padding: '.65rem 1.5rem' }}>
-                    {status === 'processing' ? 'Processing…' : status === 'done' ? '✓ Downloaded' : processLabel}
-                  </button>
-                  {status === 'done' && <button className="btn secondary" onClick={process}>Download again</button>}
-                </div>
+                <button className="btn" onClick={process} disabled={isBusy} style={{ fontSize: '1rem', padding: '.7rem 1.5rem' }}>
+                  {status === 'processing' ? 'Processing…' : status === 'done' ? '✓ Downloaded' : processLabel}
+                </button>
               )}
-
               {status === 'error' && <div style={{ color: '#dc2626', fontSize: '.85rem' }}>{errMsg || 'Processing failed. Try again.'}</div>}
-            </>
+              </aside>
+
+              {/* RIGHT — live preview canvas + toolbar */}
+              <main style={{ flex: 1, minWidth: 340, display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+                <CanvasToolbar
+                  unit={unit} onUnit={setUnit} zoom={zoom} onZoom={setZoom}
+                  sheetIndex={sheetIndex} sheetCount={sheetCount} onSheet={setSheetIndex}
+                  onPrint={printOut} onDownload={process} busy={isBusy} status={status}
+                />
+                <ImpositionCanvas
+                  engine={tool.engine} nupOpts={nupOpts} bookletOpts={bookletOpts} nupBookOpts={nupBookOpts} posterOpts={posterOpts}
+                  ticketOpts={ticketOpts} pageCount={file.info.count} unit={unit}
+                  sheetLabel={tool.engine === 'nup' || tool.engine === 'tickets'
+                    ? `${nupOpts.sheetWIn}×${nupOpts.sheetHIn}` : tool.engine === 'poster' ? `${posterOpts.sheetWIn}×${posterOpts.sheetHIn}` : tool.engine === 'nupbook' ? `${nupBookOpts.sheetWIn}×${nupBookOpts.sheetHIn}` : 'sheet'}
+                  sheetIndex={sheetIndex} onSheetCount={setSheetCount} zoom={zoom}
+                />
+              </main>
+            </div>
           )}
 
           {status === 'loading' && <div style={{ color: 'var(--muted)', fontSize: '.85rem' }}>Reading PDF…</div>}
           {status === 'error' && !file && <div style={{ color: '#dc2626', fontSize: '.85rem', marginTop: '-0.5rem' }}>{errMsg}</div>}
         </div>
       )}
+      </div>
+    </div>
+  );
+}
+
+// Top toolbar over the preview canvas: unit selector, zoom, sheet navigation,
+// Print + Download — mirrors the pdfpress workspace bar.
+function CanvasToolbar({ unit, onUnit, zoom, onZoom, sheetIndex, sheetCount, onSheet, onPrint, onDownload, busy, status }: {
+  unit: 'in' | 'mm' | 'pt'; onUnit: (u: 'in' | 'mm' | 'pt') => void; zoom: number; onZoom: (z: number) => void;
+  sheetIndex: number; sheetCount: number; onSheet: (i: number) => void;
+  onPrint: () => void; onDownload: () => void; busy: boolean; status: Status;
+}) {
+  const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-alt)', color: 'var(--ink)', cursor: 'pointer', fontSize: '.9rem' };
+  const SQRT2 = Math.SQRT2;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '.25rem', padding: 3, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-alt)' }}>
+        {(['in', 'mm', 'pt'] as const).map(u => (
+          <button key={u} onClick={() => onUnit(u)} style={{ padding: '.2rem .55rem', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: '.78rem', fontWeight: 700, background: unit === u ? VIOLET : 'transparent', color: unit === u ? '#fff' : 'var(--muted)' }}>{u}</button>
+        ))}
+      </div>
+      <button style={btn} title="Zoom out" onClick={() => onZoom(Math.max(0.4, zoom / SQRT2))}>−</button>
+      <span style={{ fontSize: '.78rem', color: 'var(--muted)', minWidth: 42, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+      <button style={btn} title="Zoom in" onClick={() => onZoom(Math.min(4, zoom * SQRT2))}>+</button>
+      <div style={{ width: 1, height: 22, background: 'var(--border)', margin: '0 .15rem' }} />
+      <button style={btn} title="Previous sheet" disabled={sheetIndex <= 0} onClick={() => onSheet(Math.max(0, sheetIndex - 1))}>‹</button>
+      <span style={{ fontSize: '.78rem', color: 'var(--muted)', minWidth: 70, textAlign: 'center' }}>Sheet {sheetIndex + 1}/{sheetCount}</span>
+      <button style={btn} title="Next sheet" disabled={sheetIndex >= sheetCount - 1} onClick={() => onSheet(Math.min(sheetCount - 1, sheetIndex + 1))}>›</button>
+      <div style={{ flex: 1 }} />
+      <button className="btn secondary" onClick={onPrint} disabled={busy} style={{ padding: '.4rem .9rem', fontSize: '.82rem' }}>🖨 Print</button>
+      <button className="btn" onClick={onDownload} disabled={busy} style={{ padding: '.4rem 1rem', fontSize: '.82rem' }}>
+        {status === 'processing' ? '…' : status === 'done' ? '✓ Saved' : '↓ Download'}
+      </button>
     </div>
   );
 }
@@ -1616,20 +3083,37 @@ const VIOLET = '#7c3aed';
 // every child (and the .btn/.admin-card classes) adapts. Default is dark, to
 // match the reference gallery.
 const THEMES: Record<'light' | 'dark', React.CSSProperties> = {
-  light: { '--bg': '#ffffff', '--bg-alt': '#f7f5f2', '--ink': '#1a1a1a', '--muted': '#5a5a5a', '--border': '#e6e3df', '--accent-soft': '#f3f0ff' } as React.CSSProperties,
-  dark: { '--bg': '#0b0b12', '--bg-alt': '#15151f', '--ink': '#f3f4f6', '--muted': '#9ca3af', '--border': '#2a2a37', '--accent-soft': 'rgba(139,92,246,0.18)' } as React.CSSProperties,
+  light: { '--bg': '#ffffff', '--bg-alt': '#f7f5f2', '--ink': '#1a1a1a', '--muted': '#5a5a5a', '--border': '#e6e3df', '--accent-soft': '#f3f0ff', '--canvas-bg': '#eef0f3' } as React.CSSProperties,
+  dark: { '--bg': '#0b0b12', '--bg-alt': '#15151f', '--ink': '#f3f4f6', '--muted': '#9ca3af', '--border': '#2a2a37', '--accent-soft': 'rgba(139,92,246,0.18)', '--canvas-bg': '#0f1017' } as React.CSSProperties,
 };
 
 const DEFAULT_HEADERFOOTER: HeaderFooterOptions = { header: 'Document Title', footer: '', fontSizePt: 10, marginPt: 24, align: 'center' };
-const DEFAULT_WATERMARK: WatermarkOptions = { text: 'PROOF', opacity: 0.22, angleDeg: 45, fontSizePt: 96 };
+const DEFAULT_WATERMARK: WatermarkOptions = { text: 'DRAFT', opacity: 0.15, angleDeg: 45, fontSizePt: 72, color: { r: 0.53, g: 0.53, b: 0.53 }, pages: 'all' };
 const DEFAULT_JOBSLUG: JobSlugOptions = { text: 'Job name · client · date', position: 'bottom', fontSizePt: 9 };
 
-function BleedSettings({ opts, onChange }: { opts: { bleedIn: number }; onChange: (o: { bleedIn: number }) => void }) {
+function BleedSettings({ opts, onChange }: { opts: BleedOptions; onChange: (o: BleedOptions) => void }) {
+  const set = <K extends keyof BleedOptions>(k: K, v: BleedOptions[K]) => onChange({ ...opts, [k]: v });
+  const col = opts.color ?? { r: 1, g: 1, b: 1 };
+  const hex = '#' + [col.r, col.g, col.b].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
   return (
     <Grid>
-      <Field label="Bleed per edge (in)" note="Content is scaled to overflow the trim">
-        <input type="number" min={0.0625} max={0.5} step={0.0625} value={opts.bleedIn} onChange={e => onChange({ bleedIn: +e.target.value })} style={iStyle} />
+      <Field label="Bleed per edge (in)">
+        <input type="number" min={0.0625} max={0.5} step={0.0625} value={opts.bleedIn} onChange={e => set('bleedIn', +e.target.value)} style={iStyle} />
       </Field>
+      <Field label="Method">
+        <select value={opts.mode ?? 'scale'} onChange={e => set('mode', e.target.value as BleedOptions['mode'])} style={iStyle}>
+          <option value="scale">Scale (enlarge content)</option>
+          <option value="mirror">Mirror edge</option>
+          <option value="repeat">Repeat edge</option>
+          <option value="solid">Solid colour</option>
+        </select>
+      </Field>
+      {opts.mode === 'solid' && (
+        <Field label="Bleed colour">
+          <input type="color" value={hex} onChange={e => { const m = /#(..)(..)(..)/.exec(e.target.value)!; set('color', { r: parseInt(m[1]!, 16) / 255, g: parseInt(m[2]!, 16) / 255, b: parseInt(m[3]!, 16) / 255 }); }} style={{ ...iStyle, height: 38, padding: 2 }} />
+        </Field>
+      )}
+      <Field label="Pages" note="all · 1-5 · odd · last"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
     </Grid>
   );
 }
@@ -1646,7 +3130,21 @@ function HeaderFooterSettings({ opts, onChange }: { opts: HeaderFooterOptions; o
         </select>
       </Field>
       <Field label="Font size (pt)"><input type="number" min={6} max={36} step={1} value={opts.fontSizePt} onChange={e => set('fontSizePt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Font family">
+        <select value={opts.font ?? 'helvetica'} onChange={e => set('font', e.target.value as HeaderFooterOptions['font'])} style={iStyle}>
+          <option value="helvetica">Helvetica</option><option value="times">Times Roman</option><option value="courier">Courier</option>
+        </select>
+      </Field>
+      <Field label="Rotation">
+        <select value={String(opts.rotationDeg ?? 0)} onChange={e => set('rotationDeg', +e.target.value as HeaderFooterOptions['rotationDeg'])} style={iStyle}>
+          <option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option>
+        </select>
+      </Field>
       <Field label="Edge margin (pt)"><input type="number" min={6} max={96} step={1} value={opts.marginPt} onChange={e => set('marginPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Alternate sides"><Row><input type="checkbox" checked={!!opts.alternate} onChange={e => set('alternate', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Mirror on odd pages (book heads)</span></Row></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Tokens: <code>[page-number]</code> · <code>[page-number:0001]</code> · <code>[page-count]</code> · <code>[file-name]</code> · <code>[timestamp:%Y-%m-%d]</code>
+      </div>
     </Grid>
   );
 }
@@ -1655,10 +3153,318 @@ function WatermarkSettings({ opts, onChange }: { opts: WatermarkOptions; onChang
   const set = <K extends keyof WatermarkOptions>(k: K, v: WatermarkOptions[K]) => onChange({ ...opts, [k]: v });
   return (
     <Grid>
+      <Field label="Presets">
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {['DRAFT', 'CONFIDENTIAL', 'PROOF', 'COPY', 'SAMPLE', 'DO NOT COPY'].map(p => (
+            <button key={p} className="btn secondary" style={{ padding: '.25rem .5rem', fontSize: '.72rem' }} onClick={() => set('text', p)}>{p}</button>
+          ))}
+        </div>
+      </Field>
       <Field label="Watermark text"><input type="text" value={opts.text} onChange={e => set('text', e.target.value)} style={iStyle} /></Field>
-      <Field label={`Opacity: ${Math.round(opts.opacity * 100)}%`}><input type="range" min={5} max={80} step={5} value={opts.opacity * 100} onChange={e => set('opacity', +e.target.value / 100)} style={{ width: '100%', marginTop: '.5rem' }} /></Field>
-      <Field label="Angle (°)"><input type="number" min={-90} max={90} step={5} value={opts.angleDeg} onChange={e => set('angleDeg', +e.target.value)} style={iStyle} /></Field>
       <Field label="Font size (pt)"><input type="number" min={24} max={200} step={4} value={opts.fontSizePt} onChange={e => set('fontSizePt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Colour"><input type="color" value={rgbToHex(opts.color ?? { r: 0.53, g: 0.53, b: 0.53 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label={`Opacity: ${Math.round(opts.opacity * 100)}%`}><input type="range" min={5} max={80} step={5} value={opts.opacity * 100} onChange={e => set('opacity', +e.target.value / 100)} style={{ width: '100%', marginTop: '.5rem' }} /></Field>
+      <Field label="Angle (°)" note="45 diagonal · 0 horizontal · 90 vertical"><input type="number" min={-90} max={360} step={5} value={opts.angleDeg} onChange={e => set('angleDeg', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+    </Grid>
+  );
+}
+
+function BarcodeSettings({ opts, onChange }: { opts: BarcodeStampOptions; onChange: (o: BarcodeStampOptions) => void }) {
+  const set = <K extends keyof BarcodeStampOptions>(k: K, v: BarcodeStampOptions[K]) => onChange({ ...opts, [k]: v });
+  const is2D = opts.symbology === 'qr' || opts.symbology === 'datamatrix';
+  return (
+    <Grid>
+      <Field label="Symbology">
+        <select value={opts.symbology} onChange={e => set('symbology', e.target.value as BarcodeStampOptions['symbology'])} style={iStyle}>
+          <option value="qr">QR Code — URLs, text</option>
+          <option value="code128">Code 128 — alphanumeric IDs</option>
+          <option value="datamatrix">DataMatrix — compact 2D</option>
+          <option value="ean13">EAN-13 — retail (12 digits)</option>
+        </select>
+      </Field>
+      <Field label="Data" note={opts.symbology === 'ean13' ? '12 digits (check auto)' : 'value to encode'}><input type="text" value={opts.text} onChange={e => set('text', e.target.value)} style={iStyle} /></Field>
+      <Field label="Scale (module pt)" note="module size / bar width"><input type="number" min={1} max={12} step={0.5} value={opts.scale ?? 3} onChange={e => set('scale', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Quiet zone (modules)"><input type="number" min={0} max={12} step={1} value={opts.quietZone ?? 4} onChange={e => set('quietZone', +e.target.value)} style={iStyle} /></Field>
+      {!is2D && <Field label="Bar height (mm)"><input type="number" min={3} max={40} step={1} value={opts.barHeightMm ?? 15} onChange={e => set('barHeightMm', +e.target.value)} style={iStyle} /></Field>}
+      {!is2D && <Field label="Human-readable text"><Row><input type="checkbox" checked={!!opts.showText} onChange={e => set('showText', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Show value under bars</span></Row></Field>}
+      <Field label="Position">
+        <select value={opts.position} onChange={e => set('position', e.target.value as BarcodeStampOptions['position'])} style={iStyle}>
+          {[['tl', 'Top-left'], ['tc', 'Top-centre'], ['tr', 'Top-right'], ['ml', 'Mid-left'], ['mc', 'Centre'], ['mr', 'Mid-right'], ['bl', 'Bottom-left'], ['bc', 'Bottom-centre'], ['br', 'Bottom-right']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </Field>
+      <Field label="Margin (pt)"><input type="number" min={0} max={144} step={1} value={opts.marginPt ?? 18} onChange={e => set('marginPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="X offset (pt)"><input type="number" step={1} value={opts.xOffsetPt ?? 0} onChange={e => set('xOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Y offset (pt)"><input type="number" step={1} value={opts.yOffsetPt ?? 0} onChange={e => set('yOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Rotation">
+        <select value={opts.rotationDeg ?? 0} onChange={e => set('rotationDeg', +e.target.value as BarcodeStampOptions['rotationDeg'])} style={iStyle}>
+          {[0, 90, 180, 270].map(d => <option key={d} value={d}>{d}°</option>)}
+        </select>
+      </Field>
+      <Field label="Bar colour"><input type="color" value={rgbToHex(opts.barColor ?? { r: 0, g: 0, b: 0 })} onChange={e => set('barColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Background"><input type="color" value={rgbToHex(opts.bgColor ?? { r: 1, g: 1, b: 1 })} onChange={e => set('bgColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Transparent bg"><Row><input type="checkbox" checked={!!opts.transparent} onChange={e => set('transparent', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>No background panel</span></Row></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Stamps the same barcode on every page (or a page range). <strong>DataMatrix</strong> is a real ECC200 encode (Reed-Solomon + Annex F placement). Print black on white and don't scale after generating. For a unique barcode per CSV row, use the <em>Variable Data</em> tool.
+      </div>
+    </Grid>
+  );
+}
+
+function BackdropFileSettings({ opts, onChange }: { opts: BackdropFileOptions; onChange: (o: BackdropFileOptions) => void }) {
+  const set = <K extends keyof BackdropFileOptions>(k: K, v: BackdropFileOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Repeat"><Row><input type="checkbox" checked={opts.repeat !== false} onChange={e => set('repeat', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Across all pages (else page 1 only)</span></Row></Field>
+      <Field label="Offset X (pt)" note="+ right"><input type="number" step={1} value={opts.offsetXPt ?? 0} onChange={e => set('offsetXPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Offset Y (pt)" note="+ down"><input type="number" step={1} value={opts.offsetYPt ?? 0} onChange={e => set('offsetYPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Scale (%)"><input type="number" min={10} max={400} step={1} value={opts.scalePct ?? 100} onChange={e => set('scalePct', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Opacity (%)"><input type="number" min={0} max={100} step={1} value={opts.opacity ?? 100} onChange={e => set('opacity', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Places the uploaded PDF or image <strong>behind</strong> your page content (the opposite of Overlay). Upload it in the <em>Backdrop file</em> box below. Good for pre-printed stationery, textured stock and brand frames — match or exceed the page size to avoid white edges.
+      </div>
+    </Grid>
+  );
+}
+
+function ColorEffectsSettings({ opts, onChange }: { opts: ColorEffectsOptions; onChange: (o: ColorEffectsOptions) => void }) {
+  const set = <K extends keyof ColorEffectsOptions>(k: K, v: ColorEffectsOptions[K]) => onChange({ ...opts, [k]: v });
+  const slider = (label: string, k: keyof ColorEffectsOptions, min: number, max: number, val: number, suffix = '') => (
+    <Field label={`${label}: ${val}${suffix}`}><input type="range" min={min} max={max} value={val} onChange={e => set(k, +e.target.value)} style={{ width: '100%', marginTop: '.4rem' }} /></Field>
+  );
+  return (
+    <Grid>
+      {slider('Brightness', 'brightness', 0, 200, opts.brightness ?? 100)}
+      {slider('Contrast', 'contrast', 0, 200, opts.contrast ?? 100)}
+      {slider('Saturation', 'saturation', 0, 200, opts.saturation ?? 100)}
+      {slider('Grayscale', 'grayscale', 0, 100, opts.grayscale ?? 0, '%')}
+      {slider('Warm tone', 'warmTone', 0, 100, opts.warmTone ?? 0, '%')}
+      {slider('Invert', 'invert', 0, 100, opts.invert ?? 0, '%')}
+      {slider('Hue rotate', 'hueRotate', 0, 360, opts.hueRotate ?? 0, '°')}
+      <Field label="Rasterize DPI">
+        <select value={opts.dpi ?? 300} onChange={e => set('dpi', +e.target.value)} style={iStyle}>
+          {[150, 300, 600].map(d => <option key={d} value={d}>{d} DPI</option>)}
+        </select>
+      </Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <Row><button className="btn secondary" style={{ padding: '.3rem .7rem', fontSize: '.8rem' }} onClick={() => onChange({ ...DEFAULT_COLOREFFECTS })}>Reset all</button></Row>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Applies brightness / contrast / saturation and creative effects by <strong>rasterising</strong> the targeted pages (vector text/paths become a bitmap at the chosen DPI). For press-accurate colour-space conversion use <em>Color Management</em> instead. Runs in the browser.
+      </div>
+    </Grid>
+  );
+}
+
+function RepairSettings({ opts, onChange }: { opts: RepairOptions; onChange: (o: RepairOptions) => void }) {
+  const set = <K extends keyof RepairOptions>(k: K, v: RepairOptions[K]) => onChange({ ...opts, [k]: v });
+  const chk = (label: string, k: keyof RepairOptions, note: string, disabled = false) => (
+    <Field label={label}><Row><input type="checkbox" disabled={disabled} checked={disabled ? true : !!opts[k]} onChange={e => set(k, e.target.checked as RepairOptions[typeof k])} /><span style={{ fontSize: '.85rem' }}>{note}</span></Row></Field>
+  );
+  return (
+    <Grid>
+      {chk('Re-serialize', 'reserialize', 'Rebuild xref + streams (always on)', true)}
+      {chk('Strip metadata', 'stripMetadata', 'Remove title / author / dates + XMP')}
+      {chk('Remove annotations', 'removeAnnotations', 'Flatten out comments / stamps / links')}
+      {chk('Remove JavaScript', 'removeJavaScript', 'Strip embedded scripts & page actions')}
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Re-writes the PDF from scratch — fixes broken cross-references, stream lengths and object numbering that make RIPs reject a file. The rebuild alone already drops dead objects, document-level JavaScript and source metadata.
+      </div>
+    </Grid>
+  );
+}
+
+const ICC_DEST = ['', 'FOGRA39 (EU coated)', 'GRACoL 2006 (US sheetfed)', 'SWOP (US web)', 'Japan Color 2001 Coated'];
+
+function ColorManageSettings({ opts, onChange }: { opts: ColorManageOptions; onChange: (o: ColorManageOptions) => void }) {
+  const set = <K extends keyof ColorManageOptions>(k: K, v: ColorManageOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Source profile">
+        <select value={opts.sourceProfile} onChange={e => set('sourceProfile', e.target.value)} style={iStyle}>
+          <option value="sRGB">sRGB (built-in)</option><option value="CMYK">CMYK (already device)</option>
+        </select>
+      </Field>
+      <Field label="Destination profile">
+        <select value={opts.destProfile} onChange={e => set('destProfile', e.target.value)} style={iStyle}>
+          {ICC_DEST.map(p => <option key={p} value={p}>{p || 'None (RGB→CMYK model)'}</option>)}
+        </select>
+      </Field>
+      <Field label="Rendering intent">
+        <select value={opts.intent} onChange={e => set('intent', e.target.value as ColorManageOptions['intent'])} style={iStyle}>
+          <option value="perceptual">Perceptual (photos)</option>
+          <option value="relative">Relative colorimetric (logos)</option>
+          <option value="saturation">Saturation (charts)</option>
+          <option value="absolute">Absolute colorimetric (proof)</option>
+        </select>
+      </Field>
+      <Field label="Rasterize DPI">
+        <select value={opts.dpi ?? 300} onChange={e => set('dpi', +e.target.value)} style={iStyle}>
+          {[150, 300, 600].map(d => <option key={d} value={d}>{d} DPI</option>)}
+        </select>
+      </Field>
+      <Field label="Convert to CMYK"><Row><input type="checkbox" checked={!!opts.convert} onChange={e => set('convert', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Rasterise + map to CMYK gamut</span></Row></Field>
+      <Field label="Gamut warning"><Row><input type="checkbox" checked={!!opts.gamutWarning} onChange={e => set('gamutWarning', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Flag out-of-gamut colours (green)</span></Row></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Two independent actions: <strong>assign a profile</strong> — upload an ICC below and it is embedded as a PDF/X <em>OutputIntent</em> (lossless, vectors intact, what a RIP reads); and <strong>convert / gamut-check</strong> — rasterise and map to the CMYK-reproducible gamut (RGB→CMYK→RGB via an 8-primary ink model), optionally flagging out-of-gamut colours. A device-exact ICC transform needs a full CMM; the pixel conversion uses a standard CMYK model — genuine for gamut checking and RGB→CMYK normalisation.
+      </div>
+    </Grid>
+  );
+}
+
+function LayersPanel({ file, states, onChange }: { file: LoadedFile; states: Record<string, 'on' | 'off' | 'default'>; onChange: (s: Record<string, 'on' | 'off' | 'default'>) => void }) {
+  const [layers, setLayers2] = useState<PdfLayer[] | null>(null);
+  useEffect(() => { let live = true; readLayers(file.bytes).then(l => { if (live) setLayers2(l); }); return () => { live = false; }; }, [file]);
+  if (!layers) return <div style={{ color: 'var(--muted)', fontSize: '.85rem' }}>Reading layers…</div>;
+  if (!layers.length) return (
+    <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--muted)', fontSize: '.85rem', lineHeight: 1.6 }}>
+      <div style={{ fontSize: '1.6rem', marginBottom: '.4rem' }}>▤</div>
+      <strong>No layers detected</strong><br />
+      This PDF has no named layers (OCGs). Layers created by upstream tools (or authored in InDesign/Illustrator) appear here with a three-state toggle.
+    </div>
+  );
+  const cycle = (name: string) => { const cur = states[name] ?? 'default'; const next = cur === 'default' ? 'on' : cur === 'on' ? 'off' : 'default'; onChange({ ...states, [name]: next }); };
+  const label = (s: string) => s === 'on' ? 'On (force visible)' : s === 'off' ? 'Off (force hidden)' : 'Default';
+  const col = (s: string) => s === 'on' ? '#16a34a' : s === 'off' ? '#dc2626' : 'var(--muted)';
+  return (
+    <div style={{ display: 'grid', gap: '.5rem' }}>
+      {layers.map(l => {
+        const s = states[l.name] ?? (l.forcedOff ? 'off' : l.forcedOn ? 'on' : 'default');
+        return (
+          <div key={l.name} style={{ display: 'flex', alignItems: 'center', gap: '.6rem', padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 6 }}>
+            <span style={{ flex: 1, fontSize: '.88rem' }}>{l.name}</span>
+            <button className="btn secondary" style={{ padding: '.25rem .6rem', fontSize: '.76rem', color: col(s) }} onClick={() => cycle(l.name)}>{label(s)}</button>
+          </div>
+        );
+      })}
+      <div style={{ fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>Click a layer to cycle Default → On → Off. <em>Off</em> force-hides the layer in the output; <em>On</em> force-shows it. Not all RIPs honour layer visibility — test with yours.</div>
+    </div>
+  );
+}
+
+function CustomGridSettings({ opts, onChange }: { opts: typeof DEFAULT_CUSTOMGRID; onChange: (o: typeof DEFAULT_CUSTOMGRID) => void }) {
+  const set = <K extends keyof typeof DEFAULT_CUSTOMGRID>(k: K, v: (typeof DEFAULT_CUSTOMGRID)[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Columns"><input type="number" min={1} max={12} value={opts.cols} onChange={e => set('cols', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Rows"><input type="number" min={1} max={12} value={opts.rows} onChange={e => set('rows', +e.target.value)} style={iStyle} /></Field>
+      <SheetPicker opts={opts} set={set as never} />
+      <Field label="Gutter (in)"><input type="number" min={0} max={2} step={0.0625} value={opts.gutterIn} onChange={e => set('gutterIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Margin (in)"><input type="number" min={0} max={2} step={0.0625} value={opts.marginIn} onChange={e => set('marginIn', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Page fill" note="Auto-assign strategy">
+        <select value={opts.assign} onChange={e => set('assign', e.target.value)} style={iStyle}>
+          <option value="sequential">Sequential (1,2,3…)</option>
+          <option value="reverse">Reverse (last→first)</option>
+          <option value="repeat">Repeat page 1</option>
+          <option value="saddle">Saddle-stitch pairs</option>
+        </select>
+      </Field>
+      <Field label="Crop marks"><Row><input type="checkbox" checked={opts.addMarks} onChange={e => set('addMarks', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Per-cell corner marks</span></Row></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Full manual control: a <strong>{opts.cols}×{opts.rows}</strong> grid ({opts.cols * opts.rows} cells/sheet). The fill strategy assigns source pages to cells with per-cell rotation; each output page is one sheet. For non-standard signatures this is the escape hatch when no automated tool fits.
+      </div>
+    </Grid>
+  );
+}
+
+function PdfToolsSettings({ opts, onChange }: { opts: typeof DEFAULT_PDFTOOLS; onChange: (o: typeof DEFAULT_PDFTOOLS) => void }) {
+  const set = <K extends keyof typeof DEFAULT_PDFTOOLS>(k: K, v: (typeof DEFAULT_PDFTOOLS)[K]) => onChange({ ...opts, [k]: v });
+  const unavailable = opts.operation === 'encrypt' || opts.operation === 'linearize';
+  return (
+    <Grid>
+      <Field label="Operation">
+        <select value={opts.operation} onChange={e => set('operation', e.target.value as typeof DEFAULT_PDFTOOLS['operation'])} style={iStyle}>
+          <option value="optimize">Optimize (shrink)</option>
+          <option value="decrypt">Decrypt (remove password)</option>
+          <option value="repair">Repair (rebuild)</option>
+          <option value="linearize">Linearize (fast web view)</option>
+          <option value="encrypt">Encrypt (password)</option>
+        </select>
+      </Field>
+      {opts.operation === 'optimize' && <>
+        <Field label="Recompress + object streams"><Row><input type="checkbox" checked={opts.objectStreams} onChange={e => set('objectStreams', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Pack objects (smaller)</span></Row></Field>
+        <Field label="Remove unreferenced objects"><Row><input type="checkbox" checked={opts.removeUnused} onChange={e => set('removeUnused', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Drop orphaned objects</span></Row></Field>
+      </>}
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: unavailable ? '#b45309' : 'var(--muted)', lineHeight: 1.5 }}>
+        {opts.operation === 'optimize' && 'Rebuilds the PDF and packs objects into object streams — drops orphaned objects and re-writes a lean cross-reference table. Typical savings on unoptimised files; already-lean PDFs change little.'}
+        {opts.operation === 'decrypt' && 'Removes password protection / encryption by re-saving the document unencrypted. You must be able to open the file (supply the password in your viewer first if needed).'}
+        {opts.operation === 'repair' && 'Re-writes the whole PDF structure — fixes broken xref tables, stream lengths and object numbering that make viewers/RIPs reject a file.'}
+        {opts.operation === 'linearize' && '⚠ Linearisation (fast web view) reorders the byte stream and is not available in the browser engine — it needs a server-side pass (e.g. qpdf/Ghostscript). Use Optimize to shrink instead.'}
+        {opts.operation === 'encrypt' && '⚠ Writing encryption is not available in the browser engine (pdf-lib cannot author encryption). Encrypt with a desktop tool or a server-side pass. Decrypt (removing protection) is supported here.'}
+      </div>
+    </Grid>
+  );
+}
+
+function EditPdfSettings({ ops, onChange }: { ops: EditOp[]; onChange: (o: EditOp[]) => void }) {
+  const upd = (i: number, patch: any) => onChange(ops.map((o, j) => j === i ? { ...o, ...patch } as EditOp : o)); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const del = (i: number) => onChange(ops.filter((_, j) => j !== i));
+  const add = (op: EditOp) => onChange([...ops, op]);
+  const num = (v: number, on: (n: number) => void, w = 62) => <input type="number" value={v} onChange={e => on(+e.target.value)} style={{ ...iStyle, width: w, padding: '.25rem .4rem' }} />;
+  return (
+    <div style={{ display: 'grid', gap: '.6rem' }}>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        {([['+ Text', { type: 'text', page: 1, xPt: 72, yPt: 72, text: 'Text', sizePt: 12 }],
+        ['+ Redact', { type: 'redact', page: 1, xPt: 72, yPt: 72, wPt: 144, hPt: 20 }],
+        ['+ Box', { type: 'box', page: 1, xPt: 72, yPt: 72, wPt: 100, hPt: 60, fill: false, color: { r: 0.9, g: 0, b: 0 } }],
+        ['+ Line', { type: 'line', page: 1, x1: 72, y1: 72, x2: 200, y2: 72, thicknessPt: 1 }],
+        ['+ Rotate', { type: 'rotate', page: 1, angleDeg: 90 }],
+        ['+ Delete', { type: 'delete', pages: 'last' }]] as [string, EditOp][]).map(([label, op]) => (
+          <button key={label} className="btn secondary" style={{ padding: '.25rem .55rem', fontSize: '.74rem' }} onClick={() => add(op)}>{label}</button>
+        ))}
+      </div>
+      {ops.length === 0 && <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>Add edit operations above. Coordinates are in points from the <strong>bottom-left</strong> corner (72 pt = 1 in).</div>}
+      {ops.map((op, i) => (
+        <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '.5rem .6rem', display: 'grid', gap: '.4rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+            <span style={{ fontSize: '.72rem', fontWeight: 800, textTransform: 'uppercase', color: VIOLET, flex: 1 }}>{op.type}</span>
+            {op.type !== 'delete' && <label style={{ fontSize: '.75rem', color: 'var(--muted)' }}>page {num((op as any).page, n => upd(i, { page: n }), 46)}</label>}
+            <button className="btn secondary" style={{ padding: '.15rem .45rem', fontSize: '.72rem' }} onClick={() => del(i)}>✕</button>
+          </div>
+          <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '.75rem', color: 'var(--muted)' }}>
+            {op.type === 'text' && <>x {num(op.xPt, n => upd(i, { xPt: n }))} y {num(op.yPt, n => upd(i, { yPt: n }))} size {num(op.sizePt ?? 12, n => upd(i, { sizePt: n }), 46)}<input value={op.text} onChange={e => upd(i, { text: e.target.value })} style={{ ...iStyle, flex: 1, minWidth: 120, padding: '.25rem .4rem' }} /></>}
+            {(op.type === 'redact' || op.type === 'box') && <>x {num(op.xPt, n => upd(i, { xPt: n }))} y {num(op.yPt, n => upd(i, { yPt: n }))} w {num(op.wPt, n => upd(i, { wPt: n }))} h {num(op.hPt, n => upd(i, { hPt: n }))}{op.type === 'box' && <label><input type="checkbox" checked={op.fill ?? false} onChange={e => upd(i, { fill: e.target.checked })} /> fill</label>}</>}
+            {op.type === 'line' && <>x1 {num(op.x1, n => upd(i, { x1: n }))} y1 {num(op.y1, n => upd(i, { y1: n }))} x2 {num(op.x2, n => upd(i, { x2: n }))} y2 {num(op.y2, n => upd(i, { y2: n }))} w {num(op.thicknessPt ?? 1, n => upd(i, { thicknessPt: n }), 46)}</>}
+            {op.type === 'rotate' && <>by {num(op.angleDeg, n => upd(i, { angleDeg: n }), 56)}°</>}
+            {op.type === 'delete' && <>pages <input value={op.pages} onChange={e => upd(i, { pages: e.target.value })} style={{ ...iStyle, width: 120, padding: '.25rem .4rem' }} /> <span>(all · 1-5 · odd · last)</span></>}
+          </div>
+        </div>
+      ))}
+      <div style={{ fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>Applies each operation in order — annotate text, redact (opaque black box), draw boxes/lines, rotate or delete pages. Operations run before deletions so page numbers stay stable.</div>
+    </div>
+  );
+}
+
+const JDF_PRODUCTS = ['Brochure', 'Book', 'BusinessCard', 'Flyer', 'Poster', 'Postcard', 'Label', 'Folder', 'Magazine', 'Catalog', 'Unknown'];
+
+function JdfSettings({ opts, onChange, file }: { opts: JdfOptions; onChange: (o: JdfOptions) => void; file: LoadedFile | null }) {
+  const set = <K extends keyof JdfOptions>(k: K, v: JdfOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Job name"><input type="text" value={opts.jobName} onChange={e => set('jobName', e.target.value)} style={iStyle} /></Field>
+      <Field label="Job ID" note="blank = auto"><input type="text" value={opts.jobId ?? ''} onChange={e => set('jobId', e.target.value || undefined)} style={iStyle} /></Field>
+      <Field label="Product type">
+        <select value={opts.productType} onChange={e => set('productType', e.target.value)} style={iStyle}>{JDF_PRODUCTS.map(p => <option key={p} value={p}>{p}</option>)}</select>
+      </Field>
+      <Field label="Quantity"><input type="number" min={1} value={opts.quantity} onChange={e => set('quantity', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Sides">
+        <select value={opts.sides} onChange={e => set('sides', e.target.value as JdfOptions['sides'])} style={iStyle}>
+          <option value="OneSided">One-sided</option><option value="TwoSidedFlipY">Two-sided (flip long)</option><option value="TwoSidedFlipX">Two-sided (flip short)</option>
+        </select>
+      </Field>
+      <Field label="Binding">
+        <select value={opts.binding} onChange={e => set('binding', e.target.value as JdfOptions['binding'])} style={iStyle}>
+          {['None', 'SaddleStitch', 'PerfectBound', 'CaseBound', 'WireO', 'Coil'].map(b => <option key={b} value={b}>{b}</option>)}
+        </select>
+      </Field>
+      <Field label="Media width (pt)"><input type="number" value={opts.mediaWidthPt ?? 936} onChange={e => set('mediaWidthPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Media height (pt)"><input type="number" value={opts.mediaHeightPt ?? 1368} onChange={e => set('mediaHeightPt', +e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Exports a CIP4 <strong>JDF 1.4</strong> Product-intent job ticket (.jdf XML) that MIS / prepress systems read to schedule the job. Finished size ({file ? `${(file.info.widthPt / 72).toFixed(2)}×${(file.info.heightPt / 72).toFixed(2)} in, ${file.info.count} pages` : 'from the loaded PDF'}) and media size are written as intent dimensions in points.
+      </div>
     </Grid>
   );
 }
@@ -1674,18 +3480,310 @@ function JobSlugSettings({ opts, onChange }: { opts: JobSlugOptions; onChange: (
         </select>
       </Field>
       <Field label="Font size (pt)"><input type="number" min={6} max={24} step={1} value={opts.fontSizePt} onChange={e => set('fontSizePt', +e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Tokens: <code>[page-number]</code> · <code>[file-name]</code> · <code>[timestamp:%Y-%m-%d]</code>
+      </div>
     </Grid>
   );
 }
 
-function CollatingSettings({ opts, onChange }: { opts: { edge: 'left' | 'right' }; onChange: (o: { edge: 'left' | 'right' }) => void }) {
+function CollatingSettings({ opts, onChange }: { opts: CollatingOptions; onChange: (o: CollatingOptions) => void }) {
+  const set = <K extends keyof CollatingOptions>(k: K, v: CollatingOptions[K]) => onChange({ ...opts, [k]: v });
   return (
     <Grid>
-      <Field label="Spine edge" note="Where the staircase of marks sits">
-        <select value={opts.edge} onChange={e => onChange({ edge: e.target.value as 'left' | 'right' })} style={iStyle}>
-          <option value="right">Right edge</option><option value="left">Left edge</option>
+      <Field label="Spine side" note="Binding edge the marks sit on">
+        <select value={opts.edge} onChange={e => set('edge', e.target.value as CollatingOptions['edge'])} style={iStyle}>
+          <option value="left">Left edge</option><option value="right">Right edge</option>
         </select>
       </Field>
+      <Field label="Start offset (from top, pt)"><input type="number" min={0} max={400} step={1} value={opts.startOffsetPt ?? 18} onChange={e => set('startOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Mark width (pt)"><input type="number" min={1} max={40} step={1} value={opts.markWpt ?? 6} onChange={e => set('markWpt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Mark height (pt)"><input type="number" min={1} max={40} step={1} value={opts.markHpt ?? 6} onChange={e => set('markHpt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Small marks"><Row><input type="checkbox" checked={!!opts.smallMarks} onChange={e => set('smallMarks', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Half height</span></Row></Field>
+      <Field label="Pages / signature">
+        <select value={opts.pagesPerSig ?? 16} onChange={e => set('pagesPerSig', +e.target.value)} style={iStyle}>
+          {[4, 8, 16, 32].map(v => <option key={v} value={v}>{v}pp</option>)}
+        </select>
+      </Field>
+      <Field label="Signatures / set" note="Staircase resets (wraps) after this many">
+        <select value={opts.sigsPerSet ?? 12} onChange={e => set('sigsPerSet', +e.target.value)} style={iStyle}>
+          {[8, 12, 16, 24, 32].map(v => <option key={v} value={v}>{v} sigs</option>)}
+        </select>
+      </Field>
+      <Field label="Step size (pt)" note="Vertical distance between marks"><input type="number" min={1} max={60} step={1} value={opts.stepPt ?? 8} onChange={e => set('stepPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Mark colour"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Wrap colour" note="2nd-pass (contrasting)"><input type="color" value={rgbToHex(opts.color2 ?? { r: 0, g: 0.6, b: 0.9 })} onChange={e => set('color2', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Opacity"><input type="number" min={0.1} max={1} step={0.05} value={opts.opacity ?? 1} onChange={e => set('opacity', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Pages" note="all · 1-5 · odd · even · last"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        One mark per <strong>signature</strong> (page ÷ pages-per-signature), stepped down the spine. When the staircase reaches <em>signatures / set</em> it resets to the top and switches to the wrap colour so the two passes stay distinguishable — a break in the staircase reveals a mis-gathered book.
+      </div>
+    </Grid>
+  );
+}
+
+function OmrSettings({ opts, onChange }: { opts: OmrOptions; onChange: (o: OmrOptions) => void }) {
+  const set = <K extends keyof OmrOptions>(k: K, v: OmrOptions[K]) => onChange({ ...opts, [k]: v });
+  const maxVal = Math.pow(2, opts.bitCount || 8) - 1;
+  const bits = Array.from({ length: opts.bitCount || 8 }, (_, i) => (Math.max(0, Math.min(maxVal, opts.program)) >> ((opts.bitCount || 8) - 1 - i)) & 1);
+  return (
+    <Grid>
+      <Field label="Edge" note="Must match the machine's sensor">
+        <select value={opts.edge} onChange={e => set('edge', e.target.value as OmrOptions['edge'])} style={iStyle}>
+          <option value="top">Top</option><option value="bottom">Bottom</option>
+          <option value="left">Left</option><option value="right">Right</option>
+        </select>
+      </Field>
+      <Field label="Encoding">
+        <select value={opts.encoding} onChange={e => set('encoding', e.target.value as OmrOptions['encoding'])} style={iStyle}>
+          <option value="binary">Binary (present = 1, absent = 0)</option>
+          <option value="barheight">Bar height (long = 1, short = 0)</option>
+        </select>
+      </Field>
+      <Field label="Program number" note={`0 – ${maxVal}`}><input type="number" min={0} max={maxVal} step={1} value={opts.program} onChange={e => set('program', Math.max(0, Math.min(maxVal, +e.target.value)))} style={iStyle} /></Field>
+      <Field label="Bit count">
+        <select value={opts.bitCount} onChange={e => set('bitCount', +e.target.value)} style={iStyle}>
+          {[4, 8, 12, 16].map(v => <option key={v} value={v}>{v}-bit</option>)}
+        </select>
+      </Field>
+      <Field label="Pattern (MSB→LSB)">
+        <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap', fontSize: '.72rem' }}>
+          {opts.sync && <span title="sync bar" style={{ width: 12, height: 16, background: '#7c3aed', borderRadius: 2, display: 'inline-block' }} />}
+          {bits.map((b, i) => <span key={i} style={{ width: 12, height: 16, background: b ? '#111' : 'transparent', border: '1px solid var(--border)', borderRadius: 2, display: 'inline-block' }} />)}
+          <span style={{ color: 'var(--muted)', marginLeft: 4 }}>{bits.join('')}</span>
+        </div>
+      </Field>
+      <Field label="Repeats" note="Repeat the pattern down the edge"><input type="number" min={1} max={20} step={1} value={opts.repeats ?? 1} onChange={e => set('repeats', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Sync bar"><Row><input type="checkbox" checked={opts.sync !== false} onChange={e => set('sync', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Leading always-on mark</span></Row></Field>
+      <Field label="Bar length (pt)" note="Readable length ⟂ to feed"><input type="number" min={2} max={80} step={0.5} value={opts.widthPt ?? 14.17} onChange={e => set('widthPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Bar width (pt)" note="Thin dimension along feed"><input type="number" min={0.5} max={20} step={0.25} value={opts.heightPt ?? 2.83} onChange={e => set('heightPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Spacing / pitch (pt)"><input type="number" min={2} max={80} step={0.5} value={opts.spacingPt ?? 14.17} onChange={e => set('spacingPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Start offset (pt)"><input type="number" min={0} max={400} step={1} value={opts.startOffsetPt ?? 40} onChange={e => set('startOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Edge offset (pt)" note="Inward from the paper edge"><input type="number" min={0} max={80} step={0.5} value={opts.edgeOffsetPt ?? 8.5} onChange={e => set('edgeOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Encodes the program number as a bar sequence read by automated bindery equipment to trigger fold / collate / cut / stack. Marks must be solid black at 100% density; the edge must match the machine's sensor position. Confirm the exact spec with your finishing vendor — patterns are manufacturer-specific.
+      </div>
+    </Grid>
+  );
+}
+
+function GatheringSettings({ opts, onChange }: { opts: GatheringOptions; onChange: (o: GatheringOptions) => void }) {
+  const set = <K extends keyof GatheringOptions>(k: K, v: GatheringOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Gripper edge" note="Leading edge of the press sheet">
+        <select value={opts.edge} onChange={e => set('edge', e.target.value as GatheringOptions['edge'])} style={iStyle}>
+          <option value="top">Top</option><option value="bottom">Bottom</option>
+        </select>
+      </Field>
+      <Field label="Start offset (from left, pt)"><input type="number" min={0} max={600} step={1} value={opts.startOffsetPt ?? 18} onChange={e => set('startOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Edge offset (pt)" note="Clear the gripper zone (10–15 mm)"><input type="number" min={0} max={80} step={0.5} value={opts.edgeOffsetPt ?? 8} onChange={e => set('edgeOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Mark width (pt)"><input type="number" min={1} max={40} step={1} value={opts.markWpt ?? 6} onChange={e => set('markWpt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Mark height (pt)"><input type="number" min={1} max={40} step={1} value={opts.markHpt ?? 6} onChange={e => set('markHpt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Pages / section">
+        <select value={opts.pagesPerSection ?? 16} onChange={e => set('pagesPerSection', +e.target.value)} style={iStyle}>
+          {[4, 8, 16, 32].map(v => <option key={v} value={v}>{v}pp</option>)}
+        </select>
+      </Field>
+      <Field label="Sections / set" note="Staircase resets after this many">
+        <select value={opts.sectionsPerSet ?? 12} onChange={e => set('sectionsPerSet', +e.target.value)} style={iStyle}>
+          {[8, 12, 16, 24, 32].map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
+      </Field>
+      <Field label="Step size (pt)" note="Horizontal distance between marks"><input type="number" min={1} max={60} step={1} value={opts.stepPt ?? 8} onChange={e => set('stepPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Mark colour"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Wrap colour" note="2nd-pass (contrasting)"><input type="color" value={rgbToHex(opts.color2 ?? { r: 0, g: 0.6, b: 0.9 })} onChange={e => set('color2', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Opacity"><input type="number" min={0.1} max={1} step={0.05} value={opts.opacity ?? 1} onChange={e => set('opacity', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        The gripper-edge cousin of collating marks: one mark per <strong>section</strong>, stepped <em>horizontally</em> along the leading edge (kept clear of the gripper zone). A clean staircase across the cut stack confirms correct gathering; the pattern resets and switches to the wrap colour every <em>sections / set</em>.
+      </div>
+    </Grid>
+  );
+}
+
+function FoldMarksSettings({ opts, onChange }: { opts: FoldMarksOptions; onChange: (o: FoldMarksOptions) => void }) {
+  const set = <K extends keyof FoldMarksOptions>(k: K, v: FoldMarksOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Fold scheme">
+        <select value={opts.scheme} onChange={e => set('scheme', e.target.value as FoldMarksOptions['scheme'])} style={iStyle}>
+          <option value="half">Half fold (bi-fold)</option>
+          <option value="letter">Letter / tri-fold</option>
+          <option value="zfold">Z-fold</option>
+          <option value="gate">Gate fold</option>
+          <option value="doubleparallel">Double parallel</option>
+          <option value="roll">Roll fold</option>
+          <option value="accordion">Accordion (N panels)</option>
+          <option value="custom">Custom positions</option>
+        </select>
+      </Field>
+      <Field label="Fold direction">
+        <select value={opts.orientation} onChange={e => set('orientation', e.target.value as FoldMarksOptions['orientation'])} style={iStyle}>
+          <option value="vertical">Vertical folds (divide width)</option>
+          <option value="horizontal">Horizontal folds (divide height)</option>
+        </select>
+      </Field>
+      {(opts.scheme === 'accordion' || opts.scheme === 'roll') && <Field label="Panels"><input type="number" min={2} max={12} step={1} value={opts.panels ?? 4} onChange={e => set('panels', +e.target.value)} style={iStyle} /></Field>}
+      {opts.scheme === 'custom' && <Field label="Positions" note='"33,66" (%) · "1/3,2/3"'><input type="text" value={opts.positions ?? ''} onChange={e => set('positions', e.target.value)} style={iStyle} /></Field>}
+      <Field label="Tick placement">
+        <select value={opts.edge} onChange={e => set('edge', e.target.value as FoldMarksOptions['edge'])} style={iStyle}>
+          <option value="both">Both ends</option>
+          <option value="top">Top / right end</option>
+          <option value="bottom">Bottom / left end</option>
+        </select>
+      </Field>
+      <Field label="Line style">
+        <select value={opts.style} onChange={e => set('style', e.target.value as FoldMarksOptions['style'])} style={iStyle}>
+          <option value="dashed">Dashed</option><option value="solid">Solid</option><option value="dotted">Dotted</option>
+        </select>
+      </Field>
+      <Field label="Tick length (pt)"><input type="number" min={2} max={200} step={1} value={opts.markLenPt ?? 18} onChange={e => set('markLenPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Edge offset (pt)"><input type="number" min={0} max={80} step={0.5} value={opts.offsetPt ?? 0} onChange={e => set('offsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Line weight (pt)"><input type="number" min={0.25} max={5} step={0.25} value={opts.weightPt ?? 0.75} onChange={e => set('weightPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Full guide line"><Row><input type="checkbox" checked={!!opts.fullLine} onChange={e => set('fullLine', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Across whole sheet</span></Row></Field>
+      <Field label="Colour"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Dashed tick guides in the trim margin at each fold. <strong>Vertical</strong> folds divide the width (brochure panels); <strong>horizontal</strong> divide the height. Roll fold shrinks each panel so it tucks inside the previous; use <em>Custom</em> for exact positions.
+      </div>
+    </Grid>
+  );
+}
+
+function LayMarksSettings({ opts, onChange }: { opts: LayMarksOptions; onChange: (o: LayMarksOptions) => void }) {
+  const set = <K extends keyof LayMarksOptions>(k: K, v: LayMarksOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Mark type">
+        <select value={opts.markType} onChange={e => set('markType', e.target.value as LayMarksOptions['markType'])} style={iStyle}>
+          <option value="arrow">Arrow</option><option value="line">Line</option><option value="cross">Cross</option>
+        </select>
+      </Field>
+      <Field label="Edges">
+        <select value={opts.edges} onChange={e => set('edges', e.target.value as LayMarksOptions['edges'])} style={iStyle}>
+          <option value="both">Both (front + side lay)</option>
+          <option value="gripper">Gripper (front lay)</option>
+          <option value="sideguide">Side guide (side lay)</option>
+        </select>
+      </Field>
+      <Field label="Gripper edge" note="Leading edge (feeds first)">
+        <select value={opts.gripperEdge ?? 'bottom'} onChange={e => set('gripperEdge', e.target.value as 'top' | 'bottom')} style={iStyle}>
+          <option value="bottom">Bottom</option><option value="top">Top</option>
+        </select>
+      </Field>
+      <Field label="Side guide side">
+        <select value={opts.sideGuideSide} onChange={e => set('sideGuideSide', e.target.value as LayMarksOptions['sideGuideSide'])} style={iStyle}>
+          <option value="left">Left</option><option value="right">Right</option>
+        </select>
+      </Field>
+      <Field label="Mark size (pt)"><input type="number" min={2} max={80} step={0.5} value={opts.sizePt ?? 14.17} onChange={e => set('sizePt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Line thickness (pt)"><input type="number" min={0.25} max={5} step={0.25} value={opts.thicknessPt ?? 0.5} onChange={e => set('thicknessPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Offset from corner (pt)"><input type="number" min={0} max={120} step={0.5} value={opts.offsetPt ?? 14.17} onChange={e => set('offsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Colour"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Front lay marks the gripper (leading) edge feed direction; side lay marks the guide side for lateral registration. Lay marks belong on the imposed <strong>press sheet</strong> — after imposition the gripper margin exists; on un-imposed pages the marks land inside the trim.
+      </div>
+    </Grid>
+  );
+}
+
+const SPOT_NAMES = ['CutContour', 'Through-cut', 'ThruCut', 'Crease', 'Perf', 'KissCut', 'DieCut'];
+
+function CutContourSettings({ opts, onChange }: { opts: CutContourOptions; onChange: (o: CutContourOptions) => void }) {
+  const set = <K extends keyof CutContourOptions>(k: K, v: CutContourOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Shape">
+        <select value={opts.shape} onChange={e => set('shape', e.target.value as CutContourOptions['shape'])} style={iStyle}>
+          <option value="rectangle">Rectangle</option><option value="rounded">Rounded rectangle</option><option value="ellipse">Ellipse</option>
+        </select>
+      </Field>
+      <Field label="Target box" note="Which PDF box the die line follows">
+        <select value={opts.target} onChange={e => set('target', e.target.value as CutContourOptions['target'])} style={iStyle}>
+          <option value="trim">Trim</option><option value="bleed">Bleed</option><option value="media">Media</option><option value="custom">Custom</option>
+        </select>
+      </Field>
+      {opts.target === 'custom' && <>
+        <Field label="Custom width (pt)"><input type="number" min={1} step={1} value={opts.customWpt ?? 216} onChange={e => set('customWpt', +e.target.value)} style={iStyle} /></Field>
+        <Field label="Custom height (pt)"><input type="number" min={1} step={1} value={opts.customHpt ?? 144} onChange={e => set('customHpt', +e.target.value)} style={iStyle} /></Field>
+      </>}
+      <Field label="Spot colour name" note="Layer name sent to the RIP / cutter">
+        <input list="spotnames" value={opts.spotName} onChange={e => set('spotName', e.target.value)} style={iStyle} />
+        <datalist id="spotnames">{SPOT_NAMES.map(s => <option key={s} value={s} />)}</datalist>
+      </Field>
+      {opts.shape === 'rounded' && <Field label="Corner radius (pt)"><input type="number" min={0} max={120} step={0.5} value={opts.cornerRadiusPt ?? 8.5} onChange={e => set('cornerRadiusPt', +e.target.value)} style={iStyle} /></Field>}
+      <Field label="Thickness (pt)"><input type="number" min={0.1} max={5} step={0.05} value={opts.thicknessPt ?? 0.25} onChange={e => set('thicknessPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Dashed"><Row><input type="checkbox" checked={!!opts.dashed} onChange={e => set('dashed', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Dashed / dotted line</span></Row></Field>
+      {opts.dashed && <>
+        <Field label="Dash length (pt)"><input type="number" min={0.5} max={40} step={0.5} value={opts.dashLenPt ?? 6} onChange={e => set('dashLenPt', +e.target.value)} style={iStyle} /></Field>
+        <Field label="Dash gap (pt)"><input type="number" min={0.5} max={40} step={0.5} value={opts.dashGapPt ?? 3} onChange={e => set('dashGapPt', +e.target.value)} style={iStyle} /></Field>
+      </>}
+      <Field label="X offset (pt)" note="+ right"><input type="number" step={0.5} value={opts.xOffsetPt ?? 0} onChange={e => set('xOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Y offset (pt)" note="+ down"><input type="number" step={0.5} value={opts.yOffsetPt ?? 0} onChange={e => set('yOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Preview colour" note="Output uses the spot channel"><input type="color" value={rgbToHex(opts.previewColor ?? { r: 0.925, g: 0, b: 0.55 })} onChange={e => set('previewColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Adds a vector die-line path on a real <strong>Separation</strong> spot channel (named above) so a RIP or digital cutter reads it as a toolpath, not artwork. The preview colour is on-screen only. For a closed cut set the shape to enclose the trim; run Preflight to confirm the path is closed before sending to the die maker.
+      </div>
+    </Grid>
+  );
+}
+
+function WhiteVarnishSettings({ opts, onChange }: { opts: WhiteVarnishOptions; onChange: (o: WhiteVarnishOptions) => void }) {
+  const set = <K extends keyof WhiteVarnishOptions>(k: K, v: WhiteVarnishOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Spot colour name">
+        <input list="wvnames" value={opts.spotName} onChange={e => set('spotName', e.target.value)} style={iStyle} />
+        <datalist id="wvnames"><option value="White" /><option value="Varnish" /><option value="Gloss" /><option value="Matte" /></datalist>
+      </Field>
+      <Field label="Coverage">
+        <select value={opts.coverage} onChange={e => set('coverage', e.target.value as WhiteVarnishOptions['coverage'])} style={iStyle}>
+          <option value="flood">Flood (whole page)</option><option value="trim">Trim box</option><option value="bleed">Bleed box</option><option value="custom">Custom</option>
+        </select>
+      </Field>
+      {opts.coverage === 'custom' && <>
+        <Field label="Custom width (pt)"><input type="number" min={1} step={1} value={opts.customWpt ?? 216} onChange={e => set('customWpt', +e.target.value)} style={iStyle} /></Field>
+        <Field label="Custom height (pt)"><input type="number" min={1} step={1} value={opts.customHpt ?? 144} onChange={e => set('customHpt', +e.target.value)} style={iStyle} /></Field>
+      </>}
+      <Field label="Layer order">
+        <select value={opts.under ? 'under' : 'over'} onChange={e => set('under', e.target.value === 'under')} style={iStyle}>
+          <option value="under">Under-base (behind art — white)</option>
+          <option value="over">On top (varnish / gloss)</option>
+        </select>
+      </Field>
+      <Field label="Tint" note="0–1 ink density"><input type="number" min={0} max={1} step={0.05} value={opts.tint ?? 1} onChange={e => set('tint', +e.target.value)} style={iStyle} /></Field>
+      <Field label="X offset (pt)"><input type="number" step={0.5} value={opts.xOffsetPt ?? 0} onChange={e => set('xOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Y offset (pt)"><input type="number" step={0.5} value={opts.yOffsetPt ?? 0} onChange={e => set('yOffsetPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Preview colour"><input type="color" value={rgbToHex(opts.previewColor ?? { r: 0.85, g: 0.86, b: 0.92 })} onChange={e => set('previewColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Lays a named <strong>Separation</strong> layer (White ink or spot Varnish) as a spot-colour fill. <em>Under-base</em> prints behind the artwork (white ink for clear/metallic/dark stock); <em>on top</em> is a gloss/matte varnish over the art. The preview colour is on-screen only.
+      </div>
+    </Grid>
+  );
+}
+
+function BrailleSettings({ opts, onChange }: { opts: BrailleOptions; onChange: (o: BrailleOptions) => void }) {
+  const set = <K extends keyof BrailleOptions>(k: K, v: BrailleOptions[K]) => onChange({ ...opts, [k]: v });
+  return (
+    <Grid>
+      <Field label="Text" note="Grade-1 (letter-for-letter)"><input type="text" value={opts.text} onChange={e => set('text', e.target.value)} style={iStyle} /></Field>
+      <Field label="X position (pt)"><input type="number" step={1} value={opts.xPt ?? 72} onChange={e => set('xPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Y position (pt)" note="From bottom; blank = 1″ from top"><input type="number" step={1} value={opts.yPt ?? 0} onChange={e => set('yPt', e.target.value === '' ? undefined as unknown as number : +e.target.value)} style={iStyle} /></Field>
+      <Field label="Dot diameter (pt)" note="1.5 mm ≈ 4.25"><input type="number" min={1} max={12} step={0.25} value={opts.dotDiaPt ?? 4.25} onChange={e => set('dotDiaPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Dot pitch (pt)" note="within a cell, 2.5 mm ≈ 7.09"><input type="number" min={2} max={20} step={0.25} value={opts.dotPitchPt ?? 7.09} onChange={e => set('dotPitchPt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Cell spacing (pt)" note="6 mm ≈ 17"><input type="number" min={4} max={40} step={0.5} value={opts.cellSpacePt ?? 17} onChange={e => set('cellSpacePt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Line spacing (pt)" note="10 mm ≈ 28.35"><input type="number" min={6} max={60} step={0.5} value={opts.lineSpacePt ?? 28.35} onChange={e => set('lineSpacePt', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Spot channel" note="blank = visible ink"><input list="brspots" value={opts.spotName ?? ''} onChange={e => set('spotName', e.target.value || undefined)} style={iStyle} /><datalist id="brspots"><option value="Varnish" /><option value="Emboss" /><option value="Braille" /></datalist></Field>
+      <Field label="Preview colour"><input type="color" value={rgbToHex(opts.previewColor ?? { r: 0.55, g: 0.55, b: 0.6 })} onChange={e => set('previewColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
+      <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+        Places <strong>Grade-1</strong> (uncontracted) Braille as raised dots at ADA metrics (1.5 mm dots, 2.5 mm within-cell, 6 mm cell, 10 mm line). Digits get an automatic number sign. Target a spot channel (Emboss / Varnish) for a raised-dot plate, or leave blank to draw visible dots.
+      </div>
     </Grid>
   );
 }
@@ -1710,7 +3808,10 @@ function PreflightPanel({ file }: { file: LoadedFile }) {
 // ── Pipeline model + runner ───────────────────────────────────────────────────
 
 type StepKind = 'preflight' | 'booklet' | 'nup' | 'bleed' | 'colorbar' | 'cropmarks'
-  | 'pagenumbers' | 'headerfooter' | 'watermark' | 'jobslug' | 'collating';
+  | 'pagenumbers' | 'headerfooter' | 'watermark' | 'jobslug' | 'collating'
+  | 'gathering' | 'foldmarks' | 'registration' | 'cutcontour' | 'nest' | 'resize'
+  | 'rotate' | 'shuffle' | 'flip' | 'dimensions' | 'barcode' | 'qrstamp'
+  | 'optimize' | 'repair' | 'colormanage' | 'distort' | 'passthrough';
 
 interface PipelineStep { kind: StepKind; label: string; opts: any; } // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -1718,9 +3819,13 @@ const STEP_LABELS: Record<StepKind, string> = {
   preflight: 'Preflight', booklet: 'Impose booklet', nup: 'Impose / gang up', bleed: 'Generate bleed',
   colorbar: 'Add color bar', cropmarks: 'Add marks', pagenumbers: 'Add page numbers',
   headerfooter: 'Add header / footer', watermark: 'Add watermark', jobslug: 'Add job info', collating: 'Add collating marks',
+  gathering: 'Add gathering marks', foldmarks: 'Add fold marks', registration: 'Add registration', cutcontour: 'Add die lines',
+  nest: 'Nest / gang', resize: 'Scale to size', rotate: 'Rotate pages', shuffle: 'Cut-and-stack shuffle', flip: 'Flip / tumble',
+  dimensions: 'Add dimensions', barcode: 'Add barcodes', qrstamp: 'Generate QR', optimize: 'Optimize', repair: 'Repair',
+  colormanage: 'Color convert', distort: 'Apply distortion', passthrough: 'Prep step',
 };
 
-const STEP_KINDS: StepKind[] = ['preflight', 'booklet', 'nup', 'bleed', 'colorbar', 'cropmarks', 'pagenumbers', 'headerfooter', 'watermark', 'jobslug', 'collating'];
+const STEP_KINDS: StepKind[] = ['preflight', 'booklet', 'nup', 'bleed', 'colorbar', 'cropmarks', 'pagenumbers', 'headerfooter', 'watermark', 'jobslug', 'collating', 'gathering', 'foldmarks', 'registration', 'cutcontour', 'nest', 'resize', 'rotate', 'shuffle', 'flip', 'barcode', 'qrstamp', 'optimize', 'repair'];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const stepDefaults: Record<StepKind, () => any> = {
@@ -1735,6 +3840,23 @@ const stepDefaults: Record<StepKind, () => any> = {
   watermark: () => ({ ...DEFAULT_WATERMARK }),
   jobslug: () => ({ ...DEFAULT_JOBSLUG }),
   collating: () => ({ edge: 'right' }),
+  gathering: () => ({ ...DEFAULT_GATHERING }),
+  foldmarks: () => ({ ...DEFAULT_FOLDMARKS }),
+  registration: () => ({ marginIn: 0.25, sizeIn: 0.15, style: 'target' }),
+  cutcontour: () => ({ ...DEFAULT_CUTCONTOUR }),
+  nest: () => ({ ...DEFAULT_NEST }),
+  resize: () => ({ mode: 'scale', scalePct: 100 }),
+  rotate: () => ({ angleDeg: 90 }),
+  shuffle: () => ({ order: 'all' }),
+  flip: () => ({ direction: 'h' }),
+  dimensions: () => ({}),
+  barcode: () => ({ ...DEFAULT_BARCODE }),
+  qrstamp: () => ({ ...DEFAULT_QRSTAMP }),
+  optimize: () => ({ objectStreams: true, removeUnused: true }),
+  repair: () => ({}),
+  colormanage: () => ({ ...DEFAULT_COLORMANAGE, convert: true }),
+  distort: () => ({}),
+  passthrough: () => ({}),
 };
 
 async function runStep(bytes: Uint8Array, step: PipelineStep): Promise<Uint8Array> {
@@ -1750,6 +3872,22 @@ async function runStep(bytes: Uint8Array, step: PipelineStep): Promise<Uint8Arra
     case 'watermark': return addTextWatermark(bytes, step.opts);
     case 'jobslug': return addJobSlug(bytes, step.opts);
     case 'collating': return addCollatingMarks(bytes, step.opts);
+    case 'gathering': return addGatheringMarks(bytes, step.opts);
+    case 'foldmarks': return addFoldMarks(bytes, step.opts);
+    case 'registration': return addRegistrationMarks(bytes, step.opts);
+    case 'cutcontour': return addCutContour(bytes, { spotName: 'CutContour', shape: 'rectangle', target: 'trim', ...step.opts });
+    case 'nest': return nestPdf(bytes, step.opts);
+    case 'resize': return resizePdf(bytes, step.opts);
+    case 'rotate': return rotatePdf(bytes, step.opts.angleDeg ?? 90);
+    case 'shuffle': return shufflePages(bytes, step.opts.order ?? 'all');
+    case 'flip': return flipPdf(bytes, step.opts.direction ?? 'h');
+    case 'dimensions': return addDimensions(bytes);
+    case 'barcode': return addBarcodeStamp(bytes, step.opts);
+    case 'qrstamp': return addQrStamp(bytes, step.opts);
+    case 'optimize': return optimizePdf(bytes, step.opts);
+    case 'repair': return repairPdf(bytes, step.opts);
+    case 'colormanage': return applyColorManagement(bytes, step.opts);
+    case 'passthrough': case 'distort': return bytes;
     default: return bytes;
   }
 }
@@ -1775,7 +3913,107 @@ function StepSettings({ step, onChange, file }: { step: PipelineStep; onChange: 
 // ── Chained-workflow catalog ──────────────────────────────────────────────────
 
 interface WFStep { kind: StepKind; label: string; opts?: any; } // eslint-disable-line @typescript-eslint/no-explicit-any
-interface WorkflowDef { id: string; name: string; desc: string; Thumb: () => React.ReactElement; steps: WFStep[]; }
+interface WorkflowDef { id: string; name: string; desc: string; Thumb: () => React.ReactElement; steps: WFStep[]; cat?: string; input?: string; tip?: string; tags?: string[]; }
+
+// Production-recipe catalog (68 named pipelines) → WorkflowDef. `s(kind,label)`
+// builds a step; a per-category default thumbnail keeps the data compact.
+const CAT_THUMB: Record<string, () => React.ReactElement> = {
+  'Booklets & Books': BookletThumb, 'Cards & Flat': cardThumb(2, 3), 'Labels & Stickers': gridThumb(3, 3),
+  'Packaging': cardThumb(1, 1), 'Large Format': PosterThumb, 'Production Marks': MarksThumb,
+  'Calendars & Specialty': BookletThumb, 'Ganging & Optimization': gridThumb(3, 2), 'Transform & Prep': RepairThumb,
+};
+const s = (kind: StepKind, label: string, opts?: any): WFStep => ({ kind, label, ...(opts ? { opts } : {}) }); // eslint-disable-line @typescript-eslint/no-explicit-any
+function recipe(cat: string, id: string, name: string, desc: string, steps: WFStep[], input: string, tip: string, tags: string[]): WorkflowDef {
+  return { id, name, desc, cat, input, tip, tags, steps, Thumb: CAT_THUMB[cat] ?? MarksThumb };
+}
+const RECIPES: WorkflowDef[] = [
+  // ── Booklets & Books ──
+  recipe('Booklets & Books', 'r-saddle', 'Saddle-Stitch Booklet', 'Standard saddle-stitched booklet — the most common short-run binding.', [s('preflight', 'Preflight'), s('booklet', 'Impose booklet'), s('cropmarks', 'Add trim marks')], 'Single PDF, sequential pages, count a multiple of 4, 3mm bleed.', 'Keep page count ≤ 64 for saddle-stitch; enable creep on stock heavier than 100gsm.', ['saddle-stitch', 'booklet', 'binding']),
+  recipe('Booklets & Books', 'r-saddle-bleed', 'Saddle-Stitch with Bleeds', 'Saddle-stitch with synthetic bleed generation for artwork delivered without bleeds.', [s('preflight', 'Preflight'), s('bleed', 'Generate bleeds', { bleedIn: 0.125, mode: 'mirror' }), s('booklet', 'Impose booklet'), s('cropmarks', 'Add marks')], 'PDF at trim size (no bleed). Page count a multiple of 4.', 'Synthetic bleeds are a rescue technique, not a replacement for real bleeds — flag it on the job ticket.', ['saddle-stitch', 'bleed', 'no-bleed']),
+  recipe('Booklets & Books', 'r-a5-sra3', 'A5 Saddle-Stitch 2-Up on SRA3', 'Impose A5 on SRA4 flats, then repeat two copies on SRA3.', [s('preflight', 'Preflight A5 pages'), s('booklet', 'Impose SRA4 booklet flats'), s('nup', 'Repeat 2-up on SRA3', { cols: 2, rows: 1, sheetWIn: 12.6, sheetHIn: 17.72 })], 'A5 portrait PDF, sequential reading order, preferably 3mm bleed.', 'Use Grid step-and-repeat (adapts to any booklet page count); SRA4 is exactly half of SRA3.', ['a5', 'sra3', '2-up']),
+  recipe('Booklets & Books', 'r-perfect', 'Perfect-Bound Book', 'PUR/hot-melt perfect binding for books with 48+ pages.', [s('preflight', 'Preflight'), s('booklet', 'Impose signatures', { creepIn: 0 }), s('collating', 'Add collating marks'), s('cropmarks', 'Add trim marks')], 'Single PDF, sequential, 3mm bleed, CMYK. Count divisible by 8/16/32.', 'Leave 5mm extra at the spine edge for PUR milling; confirm signature count with your bindery.', ['perfect-binding', 'PUR', 'signatures']),
+  recipe('Booklets & Books', 'r-perfect-cb', 'Perfect-Bound with Color Bar', 'Perfect-bound signatures with inline color bars for press density control.', [s('booklet', 'Impose signatures', { creepIn: 0 }), s('colorbar', 'Add color bars'), s('collating', 'Add collating marks'), s('cropmarks', 'Add trim marks')], 'CMYK PDF, 3mm bleed, page count divisible by 16.', 'Color bars need ≥ 8mm of non-image area along the gripper edge — verify plate size.', ['perfect-binding', 'color-bar', 'offset']),
+  recipe('Booklets & Books', 'r-casebound', 'Case-Bound (Hardcover) Book', 'Smyth-sewn case-bound book with signature imposition and spine marks.', [s('preflight', 'Preflight'), s('booklet', 'Impose signatures'), s('gathering', 'Add gathering marks'), s('cropmarks', 'Add trim marks')], 'Text-block PDF, sequential, 3mm bleed, CMYK. Cover supplied separately.', 'Case-bound needs a separate cover imposition; add 3mm to the spine-side bleed for Smyth-sewing.', ['case-bound', 'hardcover', 'smyth-sewn']),
+  recipe('Booklets & Books', 'r-zine', 'Zine / Mini Booklet', 'Small-format DIY zine from a single sheet (8-page or 16-page fold).', [s('resize', 'Scale pages'), s('booklet', 'Impose as booklet'), s('foldmarks', 'Add fold marks')], '8-page or 16-page PDF at final reading size.', 'For a single-sheet 8-page zine, print duplex, cut a centre slit and fold — verify with a paper dummy.', ['zine', 'mini-booklet', 'fold']),
+  recipe('Booklets & Books', 'r-comic', 'Comic Book Signatures', 'Comic/graphic novel imposed in saddle-stitch or perfect-bound signatures.', [s('preflight', 'Preflight'), s('colormanage', 'Convert to CMYK'), s('booklet', 'Impose booklet'), s('cropmarks', 'Add trim marks')], 'Sequential pages at comic trim size + 3mm bleed. RGB or CMYK.', 'US comic trim is 6.625×10.25"; manga is typically B6 (128×182mm). Confirm with the publisher spec.', ['comic', 'graphic-novel', 'manga']),
+  recipe('Booklets & Books', 'r-childrens', "Children's Book", 'Full-color picture book with heavy stock and case binding.', [s('preflight', 'Preflight'), s('booklet', 'Impose signatures'), s('colorbar', 'Add color bars'), s('cropmarks', 'Add trim marks')], 'Full-color CMYK PDF, min 300 DPI, 5mm bleed for board books.', "Board books need special imposition — each 'page' is two laminated sheets; confirm with the bindery.", ['childrens-book', 'picture-book', 'case-bound']),
+  recipe('Booklets & Books', 'r-photobook', 'Photo Book', 'Lay-flat photo book with flush-mount or perfect binding.', [s('preflight', 'Preflight'), s('colormanage', 'Color convert'), s('booklet', 'Impose signatures'), s('cropmarks', 'Add trim marks')], 'High-res CMYK or sRGB PDF with 3mm bleed. Even page count.', 'Lay-flat requires page pairs printed as spreads — a gutter gap will ruin panoramic photos.', ['photo-book', 'lay-flat', 'flush-mount']),
+  recipe('Booklets & Books', 'r-magazine', 'Magazine Production', 'Full commercial magazine with saddle-stitch or perfect binding and press marks.', [s('preflight', 'Preflight'), s('booklet', 'Impose signatures'), s('colorbar', 'Add color bars'), s('cropmarks', 'Add marks')], 'Complete magazine PDF, sequential, CMYK, 3mm bleed, fonts embedded.', 'Ads from multiple sources have inconsistent color — verify TIC does not exceed 340% for heatset web.', ['magazine', 'web-offset', 'commercial']),
+  recipe('Booklets & Books', 'r-catalog', 'Catalog Signatures', 'Multi-signature catalog for perfect binding on commercial presses.', [s('booklet', 'Impose signatures'), s('gathering', 'Add gathering marks'), s('collating', 'Add collating marks'), s('cropmarks', 'Add trim marks')], 'CMYK PDF, page count divisible by signature size, 3mm bleed.', 'Large catalogs (200+ pages) benefit from 32-up if your press handles the sheet — fewer signatures = fewer errors.', ['catalog', 'signatures', 'gathering']),
+  recipe('Booklets & Books', 'r-annual', 'Annual Report', 'Corporate annual report with mixed content and premium finishing.', [s('preflight', 'Preflight'), s('booklet', 'Impose signatures'), s('colorbar', 'Add color bars'), s('cropmarks', 'Add marks')], 'CMYK + spot color PDF, 3mm bleed, fonts embedded, transparency flattened.', 'If it mixes coated and uncoated stocks, impose each stock type separately and coordinate signature order.', ['annual-report', 'corporate', 'spot-color']),
+
+  // ── Cards & Flat ──
+  recipe('Cards & Flat', 'r-bizcard', 'Business Cards', 'Standard multi-up business card layout on a press sheet.', [s('nup', 'Impose cards', { cellWIn: 3.5, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11, marginIn: 0.25, gutterIn: 0.125 }), s('cropmarks', 'Add cut marks')], 'Business card PDF at trim size with 3mm bleed. Duplex as pages 1 & 2.', 'Standard sizes: 3.5×2" (US), 85×55mm (EU), 91×55mm (AU/NZ). Pull bleeds from the document.', ['business-cards', 'multi-up', 'cutting']),
+  recipe('Cards & Flat', 'r-bizcard-nb', 'Business Cards (No-Bleed Rescue)', 'Business cards from artwork delivered without bleeds.', [s('bleed', 'Generate bleeds', { bleedIn: 0.125, mode: 'mirror' }), s('nup', 'Impose cards', { cellWIn: 3.5, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11 }), s('cropmarks', 'Add cut marks')], 'Business card PDF at exact trim size, no bleed.', 'Synthetic bleeds on edge-to-edge photos show mirrored artefacts — request proper bleeds when possible.', ['business-cards', 'no-bleed', 'rescue']),
+  recipe('Cards & Flat', 'r-postcard', 'Postcards', 'Multi-up postcards (4×6 or A6) on press sheets.', [s('nup', 'Impose postcards', { cellWIn: 6, cellHIn: 4, sheetWIn: 13, sheetHIn: 19 }), s('cropmarks', 'Add marks')], 'Postcard PDF at trim size, front and back pages, 3mm bleed.', 'USPS requires min 3.5×5" and specific barcode clear zones for mailable postcards.', ['postcards', 'direct-mail', 'multi-up']),
+  recipe('Cards & Flat', 'r-greeting', 'Greeting Cards', 'Folded greeting cards imposed for duplex printing and fold finishing.', [s('booklet', 'Impose as booklet'), s('foldmarks', 'Add fold marks'), s('cropmarks', 'Add trim marks')], '4-page PDF in reading order at final folded size with 3mm bleed.', 'Greeting cards are typically 4 pages (front, inside-L, inside-R, back) — the booklet tool reorders spreads.', ['greeting-cards', 'folded', 'score']),
+  recipe('Cards & Flat', 'r-playing', 'Playing Cards', 'Full deck of playing cards imposed for sheet-fed printing.', [s('nup', 'Grid layout', { cols: 5, rows: 4, sheetWIn: 13, sheetHIn: 19 }), s('registration', 'Add registration'), s('cropmarks', 'Add cut marks')], '54 cards as individual pages, poker size (63×88mm) with 3mm bleed.', 'Playing cards need exact front-to-back registration or the back pattern reveals the face at the edges.', ['playing-cards', 'die-cut', 'registration']),
+  recipe('Cards & Flat', 'r-doorhanger', 'Door Hangers', 'Multi-up door hangers with a die-cut hook hole.', [s('nup', 'Grid layout'), s('cutcontour', 'Add die contour'), s('cropmarks', 'Add marks')], 'Door hanger PDF at trim size with die-cut hook area marked. 3mm bleed.', 'Standard door hanger is 4.25×11". Use the cut-contour tool to define the hook die precisely.', ['door-hangers', 'die-cut', 'multi-up']),
+  recipe('Cards & Flat', 'r-rackcard', 'Rack Cards', '4×9 inch rack cards imposed for multi-up printing.', [s('nup', 'Impose rack cards', { cellWIn: 4, cellHIn: 9, sheetWIn: 13, sheetHIn: 19 }), s('cropmarks', 'Add marks')], 'Rack card PDF at 4×9" trim size with 3mm bleed.', 'Rack cards have a narrow aspect — run the grain parallel to the long edge for stiffness.', ['rack-cards', 'display', 'multi-up']),
+  recipe('Cards & Flat', 'r-numticket', 'Numbered Tickets', 'Sequential numbered tickets with cut-and-stack imposition.', [s('shuffle', 'Shuffle for cut-and-stack'), s('nup', 'Grid layout'), s('cropmarks', 'Add marks')], 'PDF with one page per ticket, sequentially numbered. Count divisible by grid cells.', 'Cut-and-stack numbering needs the shuffle order to match your guillotine cut sequence — verify with a test sheet.', ['tickets', 'numbered', 'cut-and-stack']),
+  recipe('Cards & Flat', 'r-vdticket', 'Variable Data Tickets', 'Tickets with variable data (barcodes, names, seats) imposed efficiently.', [s('barcode', 'Add barcodes'), s('nup', 'Grid layout'), s('cropmarks', 'Add marks')], 'PDF with one ticket per page, each containing unique variable data.', 'Variable data tickets need each barcode unique and scannable — verify readability at final printed size.', ['tickets', 'VDP', 'barcode']),
+  recipe('Cards & Flat', 'r-wedding', 'Wedding Invitations', 'Premium invitations with RSVP cards and envelopes imposed together.', [s('passthrough', 'Merge components'), s('nest', 'Gang on sheet'), s('cropmarks', 'Add marks')], 'Separate PDFs for each suite component (invite, RSVP, details), each at trim size with bleed.', 'Wedding suites often include multiple card sizes — gang them so all pieces print in the same pass with identical color.', ['wedding', 'gang', 'suite']),
+
+  // ── Labels & Stickers ──
+  recipe('Labels & Stickers', 'r-sticker-sheet', 'Sticker Sheets', 'Full sticker sheets with kiss-cut contours for peel-and-stick.', [s('nest', 'Nest stickers'), s('cutcontour', 'Add die lines', { spotName: 'KissCut', dashed: true }), s('registration', 'Add registration')], 'Individual sticker artwork as separate pages. 1mm bleed around each.', 'Kiss-cut depth penetrates the vinyl/paper but NOT the liner; keep ≥ 3mm padding for plotter tracking.', ['stickers', 'kiss-cut', 'nesting']),
+  recipe('Labels & Stickers', 'r-diecut-sticker', 'Die-Cut Stickers', 'Individual die-cut stickers (through-cut, no backing sheet).', [s('nest', 'Nest stickers'), s('cutcontour', 'Add thru-cut contour', { spotName: 'ThruCut' }), s('cropmarks', 'Add marks')], 'Individual sticker designs, one per page, at final size with 1mm bleed.', 'Thru-cut on vinyl needs a slightly oversized cut path (0.5mm offset) to avoid white borders from misregistration.', ['die-cut', 'stickers', 'thru-cut']),
+  recipe('Labels & Stickers', 'r-productlabel', 'Product Labels', 'Multi-up product labels for bottles, jars and boxes.', [s('nup', 'Grid layout'), s('colorbar', 'Add color bar'), s('cutcontour', 'Add die marks')], 'Label PDF at flat die size with 2mm bleed. CMYK + spot if brand-critical.', 'Labels for curved surfaces (bottles) need distortion compensation — confirm values with the applicator vendor.', ['product-labels', 'bottles', 'brand']),
+  recipe('Labels & Stickers', 'r-shipping', 'Shipping Labels', 'Shipping labels (4×6") on self-adhesive A4/Letter sheets.', [s('nup', 'Grid layout', { cellWIn: 6, cellHIn: 4 }), s('barcode', 'Add barcodes')], '4×6" label PDF per shipment, one page per label.', 'Shipping labels are usually thermal-printed; for offset/digital use a label-stock template and align to the die exactly.', ['shipping', 'barcode', 'logistics']),
+  recipe('Labels & Stickers', 'r-address', 'Address Labels', 'Avery-style address labels on standard label sheets.', [s('nup', 'Grid layout', { cellWIn: 2.625, cellHIn: 1, sheetWIn: 8.5, sheetHIn: 11, marginIn: 0.1875, addMarks: false }), s('cropmarks', 'Add guides', { markLenIn: 0.1 })], 'Individual label content, one per page, at the Avery cell size.', 'Pre-die-cut label stock needs exact registration — test-print on plain paper and hold against a sheet first.', ['address-labels', 'Avery', 'mail-merge']),
+  recipe('Labels & Stickers', 'r-vinyl', 'Vinyl Stickers', 'Outdoor-rated vinyl stickers with laminate overprint and contour cut.', [s('nest', 'Nest on material'), s('cutcontour', 'Add cut contour'), s('registration', 'Add registration')], 'Sticker artwork on transparent background (PNG/PDF) at final size.', 'For outdoor vinyl add a 2mm white border to prevent edge peel; use solvent or UV-cure inks only.', ['vinyl', 'outdoor', 'contour-cut']),
+  recipe('Labels & Stickers', 'r-qrlabel', 'QR Code Labels', 'Unique QR code labels for product tracking or authentication.', [s('qrstamp', 'Generate QR codes'), s('nup', 'Grid layout'), s('cropmarks', 'Add marks')], 'One QR code per page, or a data file for batch generation. Label size specified.', 'QR codes need min 15mm at print resolution; add error-correction level H (30%) for labels that may get scratched.', ['QR-code', 'labels', 'tracking']),
+  recipe('Labels & Stickers', 'r-coaster', 'Coasters', 'Printed coasters (round or square) imposed for die cutting.', [s('nup', 'Grid layout'), s('cutcontour', 'Add die contour', { shape: 'ellipse' }), s('cropmarks', 'Add marks')], 'Coaster artwork at die size (typically 95mm round/square) with 3mm bleed.', 'Coaster board (1.4mm pulpboard) absorbs ink differently — reduce TIC to 280% and expect color shift.', ['coasters', 'die-cut', 'pulpboard']),
+
+  // ── Packaging ──
+  recipe('Packaging', 'r-box', 'Box Layout', 'Folding carton box flat (die-line) with artwork positioned for die cutting.', [s('passthrough', 'Apply die template'), s('cutcontour', 'Add cut contour'), s('cropmarks', 'Add marks')], 'Flat artwork matching the die-line exactly. Die-line supplied as a separate overlay PDF.', "Always work from the die-maker's approved CAD file — even 0.5mm off can jam the gluing machine.", ['box', 'folding-carton', 'die-line']),
+  recipe('Packaging', 'r-labelwrap', 'Label Wrap', 'Wraparound labels for bottles/cans/tubes with distortion compensation.', [s('distort', 'Apply distortion'), s('nup', 'Multi-up layout'), s('cropmarks', 'Add marks')], 'Flat label artwork at unwrapped dimensions with 2mm bleed. Specify diameter.', 'distortion% = (thickness / (diameter/2 + thickness)) × 100. Round containers need only circumferential distortion.', ['label-wrap', 'bottle', 'distortion']),
+  recipe('Packaging', 'r-corrugated', 'Corrugated Packaging', 'Large-format corrugated box or display printed on flatbed or flexo.', [s('distort', 'Flexo distortion'), s('colormanage', 'Color convert'), s('cropmarks', 'Add marks')], 'Artwork on the corrugated die flat. Spot colors preferred. Verify flute direction.', 'Corrugated print is low resolution (65-100 LPI) — simplify halftones, min type 8pt, avoid reverses < 10pt.', ['corrugated', 'flexo', 'large-format']),
+  recipe('Packaging', 'r-bag', 'Bag Layout', 'Paper or poly bag printed flat and imposed for production.', [s('passthrough', 'Apply bag template'), s('nup', 'Multi-up'), s('cropmarks', 'Add marks')], 'Flat bag artwork with fold lines marked. Gusset panels if applicable.', 'Bag printing wraps around fold edges; side gusset panels are often printed in mirror — verify with a folding dummy.', ['bag', 'poly-bag', 'packaging']),
+  recipe('Packaging', 'r-sleeve', 'Sleeve / Band', 'Shrink sleeves or belly bands for product packaging.', [s('distort', 'Shrink distortion'), s('nup', 'Multi-up layout'), s('registration', 'Add registration')], 'Flat sleeve artwork at pre-shrink dimensions. Specify shrink material and container.', 'Shrink sleeves distort differently circumferentially vs vertically — get the exact shrink ratios from your converter.', ['sleeve', 'shrink-sleeve', 'gravure']),
+  recipe('Packaging', 'r-envelope', 'Envelope Layout', 'Printed envelopes imposed for flatbed or rotary die cutting.', [s('passthrough', 'Apply envelope template'), s('nup', 'Multi-up'), s('cutcontour', 'Add die lines')], 'Envelope artwork on the flat die layout with fold flaps. Die template as overlay.', 'Envelope flaps must be oriented for the fold direction — print on the inside of the flap if the design wraps the seal.', ['envelope', 'die-cut', 'mail']),
+
+  // ── Large Format ──
+  recipe('Large Format', 'r-poster', 'Poster Tiling', 'Large poster split into printable tiles with overlap for assembly.', [s('passthrough', 'Split into tiles'), s('cropmarks', 'Add marks')], 'Single-page PDF at full poster size (e.g. 24×36" or A0). 150-300 DPI.', 'Use 10-15mm overlap between tiles; align the tile grid to avoid splitting faces/text across a seam.', ['poster', 'tiling', 'assembly']),
+  recipe('Large Format', 'r-banner', 'Banner Printing', 'Wide-format banners with tiling for roll-fed printers.', [s('resize', 'Scale to size'), s('passthrough', 'Tile if needed'), s('cropmarks', 'Add marks')], 'Single PDF at final banner size or at 1/4 scale. Specify dimensions.', 'Banners viewed at 3+ metres need only 72-100 DPI; vinyl banners need a 25mm hemming allowance.', ['banner', 'wide-format', 'vinyl']),
+  recipe('Large Format', 'r-signage', 'Signage Repeat', 'Repeated signage (shelf talkers, aisle signs) ganged on large-format sheets.', [s('nup', 'Step-and-repeat'), s('cropmarks', 'Add cut marks')], 'Single sign PDF at trim size with 3mm bleed. Specify substrate sheet dimensions.', 'For rigid substrates add 3mm bleed beyond the cut; the CNC router kerf is 2-3mm — account for it in gutters.', ['signage', 'step-and-repeat', 'rigid']),
+  recipe('Large Format', 'r-tradeshow', 'Trade Show Panels', 'Multi-panel trade show displays split for separate printing and assembly.', [s('passthrough', 'Split into panels'), s('resize', 'Scale panels'), s('cropmarks', 'Add guides')], 'Full continuous artwork at the assembled display size. Specify frame system + panel count.', 'Trade-show frame systems have pockets that add 25-50mm per side — get exact frame specs before sizing panels.', ['trade-show', 'panels', 'display']),
+  recipe('Large Format', 'r-floor', 'Floor Graphics', 'Floor decals and wayfinding graphics with contour cutting.', [s('resize', 'Scale to size'), s('cutcontour', 'Add cut contour'), s('registration', 'Add registration')], 'Floor graphic artwork at final size. Include 10mm bleed for contour shapes.', 'Floor graphics must be laminated with anti-slip overlaminate (ASTM D2047) — always specify the laminate.', ['floor-graphics', 'contour-cut', 'safety']),
+  recipe('Large Format', 'r-vehicle', 'Vehicle Wrap', 'Vehicle wrap panels split for contour-cut application.', [s('passthrough', 'Split into panels'), s('resize', 'Verify scale'), s('cropmarks', 'Add panel marks')], 'Full vehicle artwork on a professional template. Panels pre-separated or as one flat.', 'Vehicle wraps need 50-75mm extra per panel for wrapping edges — use a professional template, not hand-measured.', ['vehicle-wrap', 'vinyl', 'large-format']),
+
+  // ── Production Marks ──
+  recipe('Production Marks', 'r-fullmarks', 'Full Press Marks', 'Complete press mark set for commercial offset production.', [s('cropmarks', 'Crop & fold marks'), s('registration', 'Registration targets'), s('colorbar', 'Color control bar'), s('jobslug', 'Job info slug')], 'Already-imposed press sheet PDF ready for mark application.', 'Standard mark set for any commercial offset job — place marks ≥ 3mm from trim and keep them from overlapping.', ['press-marks', 'offset', 'registration']),
+  recipe('Production Marks', 'r-digitalready', 'Digital Press Ready', 'Mark set optimized for digital presses (HP Indigo, Xerox iGen).', [s('cropmarks', 'Trim marks'), s('colorbar', 'Color bar')], 'Imposed PDF, any tool. CMYK with transparency flattened.', 'Digital presses have built-in registration — focus on color bars and trim marks to keep the DFE file simple.', ['digital-press', 'HP-Indigo', 'Xerox']),
+  recipe('Production Marks', 'r-offsetready', 'Offset Press Ready', 'Full offset press preparation with all required finishing marks.', [s('cropmarks', 'Full trim marks'), s('registration', 'Registration marks'), s('colorbar', 'Color bar'), s('passthrough', 'Lay marks')], 'Imposed press-sheet PDF, CMYK, transparency flattened, fonts embedded.', 'Verify the plate accommodates all marks — on CTP workflows marks are often added by the CTP software.', ['offset', 'CTP', 'commercial-print']),
+  recipe('Production Marks', 'r-saddlefinish', 'Saddle-Stitch Finishing Marks', 'Finishing marks specifically for saddle-stitch bindery operations.', [s('cropmarks', 'Trim marks'), s('foldmarks', 'Fold marks'), s('collating', 'Collating marks')], 'Imposed saddle-stitch signatures, ready for finishing marks.', 'The saddle-stitch line reads collating marks optically — ensure high contrast and consistent placement.', ['saddle-stitch', 'finishing', 'collating']),
+  recipe('Production Marks', 'r-pbfinish', 'Perfect Bind Finishing Marks', 'Finishing marks for perfect binding with gathering verification.', [s('cropmarks', 'Trim marks'), s('gathering', 'Gathering marks'), s('passthrough', 'OMR marks')], 'Imposed perfect-bind signatures with known signature thickness.', 'OMR and gathering marks serve different purposes — gathering is visual, OMR is machine-verified. Use both on high-volume runs.', ['perfect-bind', 'gathering', 'OMR']),
+  recipe('Production Marks', 'r-diecutmarks', 'Die-Cut Production Marks', 'Complete die-cutting mark set for labels, stickers and packaging.', [s('cutcontour', 'Die contour'), s('registration', 'Registration marks'), s('cropmarks', 'Sheet marks')], 'Artwork with die-line paths on separate spot-color layers, imposed on the press sheet.', 'Use industry layer naming: CutContour, KissCut, Crease, Perforation — automated cutters recognise these from the metadata.', ['die-cut', 'contour', 'packaging']),
+  recipe('Production Marks', 'r-proofwm', 'Watermarked Proof', 'Draft proof with watermark and job info for client approval.', [s('watermark', 'Add watermark', { text: 'PROOF', opacity: 0.15 }), s('jobslug', 'Add proof info')], 'Any PDF at any stage. This is a proofing overlay, not production output.', 'Always watermark proofs before sending to clients — an unwatermarked proof has reached press in every shop.', ['proof', 'watermark', 'approval']),
+  recipe('Production Marks', 'r-brandedproof', 'Branded Proof', "Client proof with your shop's branding, job info and color patches.", [s('watermark', 'Add proof watermark', { text: 'PROOF' }), s('headerfooter', 'Add header/footer'), s('colorbar', 'Add reference bar')], 'PDF to be proofed, at any stage of production.', "Include your shop's ICC profile name in the footer so the client can identify the proofing condition.", ['proof', 'branded', 'approval']),
+
+  // ── Calendars & Specialty ──
+  recipe('Calendars & Specialty', 'r-wallcal', 'Wall Calendar', '12-month wall calendar with saddle-stitch or wire-o binding.', [s('passthrough', 'Generate calendar'), s('booklet', 'Impose for binding'), s('cropmarks', 'Add marks')], '13-page PDF (cover + 12 months) in landscape with 3mm bleed.', 'Wall calendars need a hanging hole — add a drill mark top-center; wire-o is preferred so pages lay flat.', ['calendar', 'wall-calendar', 'wire-o']),
+  recipe('Calendars & Specialty', 'r-deskcal', 'Desk Calendar', 'Desk tent calendar with fold-and-stand construction.', [s('passthrough', 'Generate calendar'), s('nup', 'Impose as cards'), s('foldmarks', 'Add fold marks')], '13-page PDF at the flat (unfolded) desk size with 3mm bleed.', 'Desk calendars fold in half to stand — the base half is usually blank; ensure front/back align for the fold.', ['calendar', 'desk-calendar', 'tent']),
+  recipe('Calendars & Specialty', 'r-planner', 'Planner / Diary', 'Wire-o or perfect-bound planner with weekly/daily layouts.', [s('preflight', 'Preflight'), s('booklet', 'Impose signatures'), s('cropmarks', 'Add marks')], 'Complete planner PDF, sequential, 3mm bleed. Count divisible by signature size.', 'Wire-o planners need a 12mm margin on the bind side for wire holes; perfect-bound need 5mm spine milling.', ['planner', 'diary', 'wire-o']),
+  recipe('Calendars & Specialty', 'r-menu', 'Restaurant Menu', 'Folded restaurant menu (bi-fold, tri-fold, or booklet).', [s('booklet', 'Impose as booklet'), s('foldmarks', 'Add fold marks'), s('cropmarks', 'Add trim marks')], 'Menu PDF in reading-order pages, final folded size with 3mm bleed.', 'Menus on heavy stock (300gsm+) must be scored before folding or the paper cracks — add scoring marks.', ['menu', 'restaurant', 'score']),
+  recipe('Calendars & Specialty', 'r-newsletter', 'Newsletter', 'Folded newsletter (4-8 pages) for mailing or distribution.', [s('booklet', 'Impose booklet'), s('headerfooter', 'Add mailing panel'), s('cropmarks', 'Add marks')], '4-page or 8-page newsletter PDF in reading order, folded size, 3mm bleed.', 'For self-mailers the address panel must meet USPS regulations: clear zone around the barcode, correct fold-edge placement.', ['newsletter', 'self-mailer', 'mailing']),
+  recipe('Calendars & Specialty', 'r-envprod', 'Envelope Production', 'Printed envelopes imposed and prepared for envelope-making machinery.', [s('passthrough', 'Apply die template'), s('nup', 'Multi-up'), s('cropmarks', 'Add marks')], 'Flat envelope artwork on the die-maker template with fold flaps.', 'Window envelopes need the window precisely registered to the letter fold — test with the actual insert.', ['envelope', 'die-cut', 'production']),
+
+  // ── Ganging & Optimization ──
+  recipe('Ganging & Optimization', 'r-mixedgang', 'Mixed Gang Run', 'Multiple different jobs ganged on a single press sheet for cost efficiency.', [s('passthrough', 'Merge jobs'), s('nest', 'Gang on sheet'), s('cropmarks', 'Add marks')], 'Multiple job PDFs at their individual trim sizes with bleed. Same stock and coating.', 'Gang runs share ink density — group items with similar color requirements (e.g. all warm tones together).', ['gang', 'multi-job', 'cost-saving']),
+  recipe('Ganging & Optimization', 'r-gangfull', 'Gang Run with Full Marks', 'Ganged production sheet with complete finishing marks for commercial press.', [s('nest', 'Gang items'), s('colorbar', 'Add color bar'), s('cropmarks', 'Add all marks'), s('jobslug', 'Add job info')], 'Multiple production-ready PDFs, trimmed to final size with 3mm bleed. Same substrate.', 'Number each ganged item in the slug so the cutter operator can verify all pieces after cutting.', ['gang', 'full-marks', 'commercial']),
+  recipe('Ganging & Optimization', 'r-expertcustom', 'Expert Custom Imposition', 'Fully custom imposition using Expert Grid for non-standard layouts.', [s('passthrough', 'Custom grid layout'), s('cropmarks', 'Add marks')], 'Source pages ready for custom positioning. Know your press sheet size and grid requirements.', 'Expert Grid is the escape hatch for layouts no standard tool handles — plan your grid on paper first.', ['expert', 'custom', 'imposition']),
+  recipe('Ganging & Optimization', 'r-expertfinish', 'Expert Grid with Finishing', 'Custom Expert Grid imposition with full finishing marks.', [s('passthrough', 'Custom layout'), s('colorbar', 'Add color bar'), s('cropmarks', 'Add marks'), s('registration', 'Add registration')], 'Source pages and a detailed imposition plan (grid spec, gutter widths, rotations).', 'Verify finishing marks do not overlap the grid cells — custom gutters may be narrower than the mark footprint.', ['expert', 'finishing', 'production']),
+  recipe('Ganging & Optimization', 'r-cutstacknum', 'Cut-and-Stack Numbering', 'Sequential numbering with cut-and-stack page ordering for tickets, NCR or raffle books.', [s('shuffle', 'Cut-and-stack shuffle'), s('nup', 'Grid layout'), s('cropmarks', 'Add marks')], 'PDF with one page per numbered item, sequentially numbered. Count = grid cells × sheet count.', 'The shuffle order MUST match your cutting sequence (top-to-bottom then left-to-right). Verify a test sheet first.', ['cut-and-stack', 'numbering', 'NCR']),
+
+  // ── Transform & Prep ──
+  recipe('Transform & Prep', 'r-printready', 'Print-Ready Preparation', 'Standard pre-flight and preparation workflow for incoming files.', [s('preflight', 'Preflight check'), s('colormanage', 'Color convert'), s('optimize', 'Optimize')], 'Any incoming PDF from a client or designer. No specific format required.', 'First-pass workflow for every incoming file — run preflight first, then convert and optimize. Never skip preflight.', ['preflight', 'print-ready', 'first-pass']),
+  recipe('Transform & Prep', 'r-preflightfix', 'Preflight and Fix', 'Identify and repair common PDF issues before production.', [s('preflight', 'Identify issues'), s('repair', 'Repair PDF'), s('optimize', 'Optimize')], 'Problematic PDF that crashes, shows errors, or renders incorrectly.', 'If repair fails the file may be too damaged — re-save as PDF/X in Acrobat, or distill from PostScript as a last resort.', ['preflight', 'repair', 'troubleshoot']),
+  recipe('Transform & Prep', 'r-multimerge', 'Multi-File Merge', 'Merge multiple source files into a single document for unified processing.', [s('passthrough', 'Merge files'), s('resize', 'Normalize size')], 'Multiple PDFs to be combined. Specify the desired page order.', 'Merge order becomes page order — double-check the sequence; convert to a common color profile before merging.', ['merge', 'multi-file', 'consolidate']),
+  recipe('Transform & Prep', 'r-duplex', 'Duplex Interleave', 'Interleave separate front and back files for duplex printing.', [s('passthrough', 'Interleave fronts and backs'), s('resize', 'Normalize dimensions')], 'Two PDFs: one with all fronts, one with all backs. Both must have the same page count.', 'If the back file is in reverse order (common from scanning), reverse it first — one page off cascades through the whole job.', ['duplex', 'interleave', 'two-sided']),
+  recipe('Transform & Prep', 'r-worktumble', 'Work and Tumble', 'Flip backup for the work-and-tumble duplex printing method.', [s('flip', 'Flip for tumble', { direction: 'v' }), s('cropmarks', 'Add marks')], 'Imposed front-side sheet ready for tumble backup creation.', 'Work-and-tumble flips along the short edge; work-and-turn along the long edge — the wrong flip mirrors the backs.', ['work-and-tumble', 'duplex', 'flip']),
+  recipe('Transform & Prep', 'r-landscape', 'Landscape Rotation', 'Rotate pages from portrait to landscape (or vice versa) for press feed direction.', [s('rotate', 'Rotate pages', { angleDeg: 90 }), s('passthrough', 'Verify dimensions')], 'PDF with pages in the wrong orientation for the target press.', 'Confirm rotation direction (CW vs CCW) with a test page — the wrong rotation puts the gripper edge on the wrong side.', ['rotate', 'landscape', 'orientation']),
+  recipe('Transform & Prep', 'r-flexo', 'Flexo Distortion', 'Pre-distort artwork for flexographic plate mounting on cylinders.', [s('distort', 'Apply distortion'), s('colormanage', 'Convert to flexo profile'), s('registration', 'Add registration')], 'Artwork at 1:1 undistorted size. Specify plate thickness and cylinder repeat length.', 'D% = (plate thickness × π / repeat length) × 100. Always get these values from the plate maker.', ['flexo', 'distortion', 'plate']),
+];
 
 const WORKFLOWS: WorkflowDef[] = [
   {
@@ -1837,8 +4075,12 @@ const WORKFLOWS: WorkflowDef[] = [
   },
 ];
 
+// Base chained workflows + the 68 production recipes, rendered together.
+const ALL_WORKFLOWS: WorkflowDef[] = [...WORKFLOWS, ...RECIPES];
+const RECIPE_CATS = ['Booklets & Books', 'Cards & Flat', 'Labels & Stickers', 'Packaging', 'Large Format', 'Production Marks', 'Calendars & Specialty', 'Ganging & Optimization', 'Transform & Prep'];
+
 function buildSteps(wf: WorkflowDef): PipelineStep[] {
-  return wf.steps.map(s => ({ kind: s.kind, label: s.label, opts: { ...stepDefaults[s.kind](), ...(s.opts || {}) } }));
+  return wf.steps.map(st => ({ kind: st.kind, label: st.label, opts: { ...stepDefaults[st.kind](), ...(st.opts || {}) } }));
 }
 
 // ── Chained-workflow gallery ──────────────────────────────────────────────────
@@ -1871,6 +4113,17 @@ function WorkflowCard({ wf, onSelect }: { wf: WorkflowDef; onSelect: () => void 
             </li>
           ))}
         </ol>
+        {wf.tip && (
+          <div style={{ display: 'flex', gap: '.4rem', padding: '.55rem .7rem', marginBottom: '.75rem', borderRadius: 6, background: 'rgba(59,130,246,.08)', border: '1px solid rgba(59,130,246,.2)', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.45 }}>
+            <span style={{ color: '#3b82f6' }}>💡</span><span>{wf.tip}</span>
+          </div>
+        )}
+        {wf.input && <div style={{ fontSize: '.76rem', color: 'var(--muted)', marginBottom: '.6rem', lineHeight: 1.45 }}><strong style={{ color: 'var(--fg)' }}>Input:</strong> {wf.input}</div>}
+        {wf.tags && wf.tags.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginBottom: '.85rem' }}>
+            {wf.tags.map(t => <span key={t} style={{ fontSize: '.66rem', padding: '.1rem .4rem', borderRadius: 4, background: 'var(--bg-alt)', color: 'var(--muted)' }}>{t}</span>)}
+          </div>
+        )}
         <button onClick={onSelect} style={{ width: '100%', padding: '.6rem', border: 'none', borderRadius: 8, background: VIOLET, color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '.9rem' }}>
           Make this →
         </button>
@@ -1882,14 +4135,29 @@ function WorkflowCard({ wf, onSelect }: { wf: WorkflowDef; onSelect: () => void 
 function WorkflowChains({ onSelect }: { onSelect: (id: string) => void }) {
   return (
     <section>
-      <SectionHeading title="Chained workflows" count={WORKFLOWS.length} />
-      <p style={{ color: 'var(--muted)', margin: '-0.5rem 0 1.5rem', maxWidth: 680, fontSize: '.9rem', lineHeight: 1.5 }}>
-        Real multi-step recipes that show how operations stack — impose, then add a header/footer, a color
-        bar or cutter marks. Click “Make this” to load the whole chain into the pipeline, ready to configure.
+      <SectionHeading title="Production recipes" count={ALL_WORKFLOWS.length} />
+      <p style={{ color: 'var(--muted)', margin: '-0.5rem 0 1.5rem', maxWidth: 720, fontSize: '.9rem', lineHeight: 1.5 }}>
+        Step-by-step workflows for common print products, authored from a prepress perspective. Click “Make this”
+        to load the whole chain into the pipeline, ready to configure and run.
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: '1rem' }}>
-        {WORKFLOWS.map(wf => <WorkflowCard key={wf.id} wf={wf} onSelect={() => onSelect(wf.id)} />)}
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ fontSize: '.7rem', fontWeight: 800, letterSpacing: '.08em', color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '.75rem' }}>Starter chains</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: '1rem' }}>
+          {WORKFLOWS.map(wf => <WorkflowCard key={wf.id} wf={wf} onSelect={() => onSelect(wf.id)} />)}
+        </div>
       </div>
+      {RECIPE_CATS.map(cat => {
+        const items = RECIPES.filter(r => r.cat === cat);
+        if (!items.length) return null;
+        return (
+          <div key={cat} style={{ marginBottom: '2rem' }}>
+            <div style={{ fontSize: '.95rem', fontWeight: 800, marginBottom: '.75rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>{cat} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>({items.length})</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: '1rem' }}>
+              {items.map(wf => <WorkflowCard key={wf.id} wf={wf} onSelect={() => onSelect(wf.id)} />)}
+            </div>
+          </div>
+        );
+      })}
     </section>
   );
 }
@@ -2064,6 +4332,76 @@ function ToolGallery({ query, filter, onSelect }: { query: string; filter: strin
           </div>
         </section>
       ))}
+    </div>
+  );
+}
+
+// ── Template gallery ──────────────────────────────────────────────────────────
+
+function TemplateGallery({ query, onSelect }: { query: string; onSelect: (tpl: TemplateDef) => void }) {
+  const groups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const match = (t: TemplateDef) => !q || t.name.toLowerCase().includes(q)
+      || t.specs.toLowerCase().includes(q) || t.industry.toLowerCase().includes(q);
+    const map = new Map<string, TemplateDef[]>();
+    for (const t of TEMPLATES) {
+      if (!match(t)) continue;
+      if (!map.has(t.industry)) map.set(t.industry, []);
+      map.get(t.industry)!.push(t);
+    }
+    return TEMPLATE_INDUSTRIES.filter(i => map.has(i)).map(i => [i, map.get(i)!] as const);
+  }, [query]);
+
+  if (!groups.length) {
+    return <div style={{ color: 'var(--muted)', padding: '2rem 0' }}>No templates match {query ? `“${query}”` : 'this filter'}.</div>;
+  }
+
+  return (
+    <section>
+      <SectionHeading title="Templates" count={TEMPLATES.length} />
+      <p style={{ margin: '-.5rem 0 1.75rem', color: 'var(--muted)', fontSize: '.9rem', maxWidth: 640 }}>
+        Ready-made, industry-grouped presets. Pick one and it opens the matching tool with the sheet,
+        bleed, gutters and finishing marks already dialled in — just drop your file and export.
+      </p>
+      <div style={{ display: 'grid', gap: '2.25rem' }}>
+        {groups.map(([industry, items]) => (
+          <div key={industry}>
+            <div style={{ fontSize: '.7rem', fontWeight: 800, letterSpacing: '.09em', color: VIOLET, textTransform: 'uppercase', marginBottom: '.85rem' }}>
+              {industry} <span style={{ color: 'var(--muted)', fontWeight: 600 }}>· {items.length}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px,1fr))', gap: '.75rem' }}>
+              {items.map(t => <TemplateCard key={t.id} tpl={t} onSelect={() => onSelect(t)} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TemplateCard({ tpl, onSelect }: { tpl: TemplateDef; onSelect: () => void }) {
+  const [hover, setHover] = useState(false);
+  const tool = TOOLS.find(t => t.id === tpl.toolId);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={onSelect}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: '.55rem', padding: '.85rem .9rem', cursor: 'pointer',
+        borderRadius: 10, border: `1px solid ${hover ? VIOLET : 'var(--border)'}`, background: 'var(--bg-alt)',
+        boxShadow: hover ? '0 6px 18px rgba(124,58,237,0.14)' : 'none', transition: 'all .13s',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+        <div style={{ width: 40, height: 30, flexShrink: 0, borderRadius: 5, overflow: 'hidden', background: 'var(--bg-alt)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {tool ? <tool.Thumb /> : null}
+        </div>
+        <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--ink)', lineHeight: 1.2 }}>{tpl.name}</div>
+      </div>
+      <div style={{ fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.4 }}>{tpl.specs}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '.35rem' }}>
+        <span style={{ fontSize: '.68rem', color: 'var(--muted)' }}>via {tool?.name ?? tpl.toolId}</span>
+        <span style={{ fontSize: '.76rem', fontWeight: 700, color: VIOLET }}>{hover ? 'Open →' : 'Use'}</span>
+      </div>
     </div>
   );
 }
@@ -2455,7 +4793,7 @@ function Calculators() {
 
 // ── Page root ─────────────────────────────────────────────────────────────────
 
-const GALLERY_CHIPS = ['All', 'Chained workflows', ...CATEGORY_ORDER, 'Workflow', 'Calculators'];
+const GALLERY_CHIPS = ['All', 'Templates', 'Chained workflows', ...CATEGORY_ORDER, 'Workflow', 'Calculators'];
 
 const HOW_TO_STEPS: [string, string][] = [
   ['01', 'Drop or select your PDF'],
@@ -2466,29 +4804,45 @@ const HOW_TO_STEPS: [string, string][] = [
 
 export function AdminImpose() {
   const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [activeTemplate, setActiveTemplate] = useState<TemplateDef | null>(null);
   const [activeWorkflow, setActiveWorkflow] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('All');
   const [query, setQuery] = useState('');
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  // Loaded file lives here so it survives switching tools via the rail.
+  const [file, setFile] = useState<LoadedFile | null>(null);
   const toolDef = TOOLS.find(t => t.id === activeTool);
 
-  const handleSelect = (id: string) => setActiveTool(id);
+  const handleSelect = (id: string) => { setActiveTemplate(null); setActiveTool(id); };
+  const handleSelectTemplate = (tpl: TemplateDef) => { setActiveTemplate(tpl); setActiveTool(tpl.toolId); };
 
-  const shell = (node: React.ReactNode) => (
+  const shell = (node: React.ReactNode, wide = false) => (
     <div style={{ ...THEMES[theme], background: 'var(--bg)', color: 'var(--ink)', minHeight: '100vh' } as React.CSSProperties}>
-      <div style={{ padding: '2rem 2rem 4rem', maxWidth: 1120, margin: '0 auto' }}>{node}</div>
+      <div style={{ padding: wide ? '1.25rem 1.5rem 3rem' : '2rem 2rem 4rem', maxWidth: wide ? 1680 : 1120, margin: '0 auto' }}>{node}</div>
     </div>
   );
 
-  // A tool or workflow workspace takes over the whole page.
+  // A tool or workflow workspace takes over the whole page (full desktop width).
   if (activeTool && toolDef) {
-    return shell(<ToolWorkspace key={toolDef.id} tool={toolDef} onBack={() => setActiveTool(null)} />);
+    const preset = activeTemplate && activeTemplate.toolId === toolDef.id ? activeTemplate.preset : undefined;
+    return shell(
+      <ToolWorkspace
+        key={toolDef.id + (activeTemplate?.id ?? '')}
+        tool={toolDef}
+        preset={preset}
+        file={file}
+        onFile={setFile}
+        onSelectTool={handleSelect}
+        onBack={() => { setActiveTool(null); setActiveTemplate(null); }}
+      />,
+      true,
+    );
   }
   if (activeWorkflow) {
     return shell(
       <PipelineWorkspace
         key={activeWorkflow}
-        workflow={activeWorkflow === '__custom__' ? null : (WORKFLOWS.find(w => w.id === activeWorkflow) ?? null)}
+        workflow={activeWorkflow === '__custom__' ? null : (ALL_WORKFLOWS.find(w => w.id === activeWorkflow) ?? null)}
         onBack={() => setActiveWorkflow(null)}
       />
     );
@@ -2497,9 +4851,16 @@ export function AdminImpose() {
   const searching = query.trim().length > 0;
   let content: React.ReactNode;
   if (searching) {
-    content = <ToolGallery query={query} filter={null} onSelect={handleSelect} />;
+    content = (
+      <div style={{ display: 'grid', gap: '2.75rem' }}>
+        <ToolGallery query={query} filter={null} onSelect={handleSelect} />
+        <TemplateGallery query={query} onSelect={handleSelectTemplate} />
+      </div>
+    );
   } else if (filter === 'Calculators') {
     content = <Calculators />;
+  } else if (filter === 'Templates') {
+    content = <TemplateGallery query="" onSelect={handleSelectTemplate} />;
   } else if (filter === 'Chained workflows') {
     content = <WorkflowChains onSelect={setActiveWorkflow} />;
   } else if (filter === 'Workflow') {
@@ -2508,6 +4869,7 @@ export function AdminImpose() {
     content = (
       <div style={{ display: 'grid', gap: '2.75rem' }}>
         <WorkflowChains onSelect={setActiveWorkflow} />
+        <TemplateGallery query="" onSelect={handleSelectTemplate} />
         <ToolGallery query="" filter={null} onSelect={handleSelect} />
         <WorkflowBuilderSection onSelect={setActiveWorkflow} />
       </div>
@@ -2531,14 +4893,15 @@ export function AdminImpose() {
         <div style={{ color: VIOLET, fontSize: '.7rem', fontWeight: 800, letterSpacing: '.14em', marginBottom: '.75rem' }}>IMPOSITION GALLERY</div>
         <h1 style={{ fontSize: '2.1rem', margin: '0 0 .75rem', lineHeight: 1.15 }}>See what you can make — and exactly how</h1>
         <p style={{ color: 'var(--muted)', fontSize: '1rem', lineHeight: 1.55, margin: '0 0 1.35rem' }}>
-          Browse {TOOLS.length} real imposition and prepress layouts plus {WORKFLOWS.length} chained workflows.
-          Each one shows the result and the exact steps to create it — right in your browser, never uploaded.
+          Browse {TOOLS.length} real imposition and prepress tools, {TEMPLATES.length} ready-made templates,
+          and {ALL_WORKFLOWS.length} production recipes. Each shows the result and the exact steps to create it —
+          right in your browser, never uploaded.
         </p>
         <button
-          onClick={() => { setFilter('All'); setQuery(''); }}
+          onClick={() => { setFilter('Templates'); setQuery(''); }}
           style={{ padding: '.6rem 1.25rem', border: `1px solid ${VIOLET}`, borderRadius: 8, background: 'var(--accent-soft)', color: VIOLET, fontWeight: 700, cursor: 'pointer', fontSize: '.9rem' }}
         >
-          Browse all {TOOLS.length + WORKFLOWS.length} templates →
+          Browse all {TEMPLATES.length} templates →
         </button>
       </div>
 
