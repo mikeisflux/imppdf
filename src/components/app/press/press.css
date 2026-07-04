@@ -1,0 +1,290 @@
+/* ── PDF Press editor — rebuilt UI to match the reference screenshots ─────────
+   Light theme by default with a dark toggle. All classes are `.pe-` scoped. */
+
+.pe {
+  --pe-violet: #6d5cff;
+  --pe-violet-soft: #efedff;
+  --pe-bg: #ffffff;
+  --pe-canvas: #f1f2f4;
+  --pe-panel: #ffffff;
+  --pe-fill: #f3f4f6;
+  --pe-ink: #14151a;
+  --pe-muted: #8a8f98;
+  --pe-faint: #b6bac1;
+  --pe-border: #e7e8ec;
+  --pe-border-strong: #d8dade;
+  --pe-print: #14151a;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--pe-bg);
+  color: var(--pe-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  z-index: 40;
+}
+.pe.pe-dark {
+  --pe-violet: #8b7bff;
+  --pe-violet-soft: rgba(139, 123, 255, 0.16);
+  --pe-bg: #0b0b12;
+  --pe-canvas: #0f1017;
+  --pe-panel: #14151f;
+  --pe-fill: #1c1e29;
+  --pe-ink: #f3f4f6;
+  --pe-muted: #9096a1;
+  --pe-faint: #5a6069;
+  --pe-border: #262836;
+  --pe-border-strong: #333648;
+  --pe-print: #000000;
+}
+.pe *, .pe *::before, .pe *::after { box-sizing: border-box; }
+
+/* ── App bar ─────────────────────────────────────────────────────────────── */
+.pe-appbar {
+  height: 52px; flex: 0 0 52px;
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 16px;
+  background: var(--pe-bg);
+  border-bottom: 1px solid var(--pe-border);
+}
+.pe-brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
+.pe-brand-mark {
+  width: 26px; height: 26px; border-radius: 8px;
+  background: linear-gradient(135deg, #7c6cff, #5b48ff);
+  display: grid; place-items: center; color: #fff;
+}
+.pe-filemenu {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 13.5px; color: var(--pe-muted); cursor: pointer;
+  padding: 5px 8px; border-radius: 7px; background: none; border: none;
+}
+.pe-filemenu:hover { background: var(--pe-fill); color: var(--pe-ink); }
+.pe-appbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.pe-signin { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--pe-muted); text-decoration: none; }
+.pe-signin:hover { color: var(--pe-ink); }
+.pe-filepill {
+  display: inline-flex; align-items: center; gap: 8px;
+  max-width: 320px; padding: 6px 10px;
+  border: 1px solid var(--pe-border-strong); border-radius: 9px;
+  font-size: 13px; color: var(--pe-ink); background: var(--pe-bg);
+}
+.pe-filepill .pe-filename { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-iconbtn {
+  display: inline-grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 8px;
+  border: none; background: none; color: var(--pe-muted); cursor: pointer;
+}
+.pe-iconbtn:hover { background: var(--pe-fill); color: var(--pe-ink); }
+.pe-iconbtn.pe-active { background: var(--pe-violet-soft); color: var(--pe-violet); }
+.pe-lang { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--pe-muted); }
+.pe-usage {
+  font-size: 12px; color: var(--pe-muted);
+  padding: 5px 10px; border-radius: 999px; border: 1px solid var(--pe-border);
+}
+.pe-usage.pe-pro { color: var(--pe-violet); border-color: var(--pe-violet); }
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.pe-toolbar {
+  height: 46px; flex: 0 0 46px;
+  display: flex; align-items: center; gap: 3px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--pe-border);
+  background: var(--pe-bg);
+}
+.pe-tb-div { width: 1px; height: 22px; background: var(--pe-border); margin: 0 8px; }
+.pe-tb-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--pe-faint); padding: 5px 9px; border-radius: 7px;
+  background: none; border: none;
+}
+.pe-tb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.pe-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  padding: 8px 15px; border-radius: 9px; border: 1px solid transparent;
+}
+.pe-btn:disabled { opacity: 0.55; cursor: default; }
+.pe-btn-print { background: var(--pe-print); color: #fff; }
+.pe-btn-dl { background: var(--pe-violet); color: #fff; }
+.pe-btn-ghost { background: transparent; color: var(--pe-muted); }
+.pe-btn-ghost:hover { background: var(--pe-fill); color: var(--pe-ink); }
+
+/* ── Body split ──────────────────────────────────────────────────────────── */
+.pe-body { flex: 1; display: flex; min-height: 0; }
+.pe-side {
+  width: 344px; flex: 0 0 344px;
+  border-right: 1px solid var(--pe-border);
+  background: var(--pe-panel);
+  overflow-y: auto;
+  padding: 16px;
+}
+.pe-canvas-wrap {
+  flex: 1; min-width: 0; position: relative;
+  background: var(--pe-canvas);
+  overflow: auto;
+  padding: 26px;
+}
+
+/* ── Choose Operation grid ───────────────────────────────────────────────── */
+.pe-choose-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.pe-choose-title { font-size: 14px; font-weight: 700; }
+.pe-choose-views { display: flex; gap: 2px; }
+.pe-group-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.04em; color: var(--pe-faint);
+  margin: 16px 0 8px; font-weight: 600;
+}
+.pe-op-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pe-op {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 14px 6px 11px; border-radius: 11px;
+  border: 1px solid transparent; background: var(--pe-fill);
+  cursor: pointer; text-align: center; color: var(--pe-ink);
+}
+.pe-op:hover { border-color: var(--pe-border-strong); background: var(--pe-bg); }
+.pe-op-ic { color: var(--pe-ink); opacity: 0.85; }
+.pe-op-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px; letter-spacing: 0.02em; line-height: 1.25; color: var(--pe-muted);
+  text-transform: uppercase;
+}
+
+/* ── Tool panel ──────────────────────────────────────────────────────────── */
+.pe-panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.pe-panel-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
+.pe-panel-head-actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.pe-back { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--pe-muted); background: none; border: none; cursor: pointer; padding: 5px 8px; border-radius: 7px; }
+.pe-back:hover { background: var(--pe-fill); color: var(--pe-ink); }
+.pe-tip { display: flex; gap: 8px; font-size: 12.5px; color: var(--pe-muted); line-height: 1.45; margin-bottom: 14px; }
+.pe-section {
+  border: 1px solid var(--pe-border); border-radius: 12px;
+  padding: 14px; margin-bottom: 14px;
+}
+.pe-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.pe-section-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.06em; color: var(--pe-faint); font-weight: 600;
+}
+.pe-help { width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--pe-border-strong); color: var(--pe-faint); font-size: 10px; display: grid; place-items: center; cursor: help; }
+.pe-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.pe-row:last-child { margin-bottom: 0; }
+.pe-label { font-size: 13px; color: var(--pe-ink); }
+.pe-label-sm { font-size: 12px; color: var(--pe-muted); }
+.pe-input, .pe-select {
+  width: 100%; font-size: 13px; color: var(--pe-ink);
+  background: var(--pe-fill); border: 1px solid transparent; border-radius: 8px;
+  padding: 9px 11px; outline: none;
+}
+.pe-input:focus, .pe-select:focus { border-color: var(--pe-violet); background: var(--pe-bg); }
+.pe-select { appearance: none; background-image: none; cursor: pointer; }
+.pe-unit { width: 74px; flex: 0 0 74px; }
+.pe-num { text-align: left; }
+.pe-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pe-field-col { display: flex; flex-direction: column; gap: 5px; }
+.pe-preset-add {
+  width: 34px; height: 34px; flex: 0 0 34px; border-radius: 8px;
+  border: 1px solid var(--pe-violet); color: var(--pe-violet);
+  background: var(--pe-violet-soft); display: grid; place-items: center; cursor: pointer;
+}
+.pe-lock { width: 34px; flex: 0 0 34px; display: grid; place-items: center; color: var(--pe-muted); cursor: pointer; }
+
+/* checkbox */
+.pe-check { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; color: var(--pe-ink); margin-bottom: 10px; }
+.pe-check:last-child { margin-bottom: 0; }
+.pe-check input { position: absolute; opacity: 0; width: 0; height: 0; }
+.pe-box {
+  width: 18px; height: 18px; flex: 0 0 18px; border-radius: 5px;
+  border: 1.5px solid var(--pe-border-strong); display: grid; place-items: center;
+  color: #fff; background: var(--pe-bg);
+}
+.pe-check input:checked + .pe-box { background: var(--pe-violet); border-color: var(--pe-violet); }
+.pe-check-sub { font-size: 11.5px; color: var(--pe-muted); margin: -6px 0 10px 28px; }
+
+/* radio */
+.pe-radio { display: flex; gap: 11px; cursor: pointer; padding: 10px; border-radius: 9px; margin-bottom: 4px; align-items: flex-start; }
+.pe-radio.pe-on { background: var(--pe-violet-soft); }
+.pe-radio input { position: absolute; opacity: 0; }
+.pe-dot { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 1px; border-radius: 999px; border: 1.5px solid var(--pe-border-strong); display: grid; place-items: center; }
+.pe-radio.pe-on .pe-dot { border-color: var(--pe-violet); }
+.pe-dot i { width: 8px; height: 8px; border-radius: 999px; background: var(--pe-violet); display: none; }
+.pe-radio.pe-on .pe-dot i { display: block; }
+.pe-radio-main { font-size: 13px; font-weight: 500; }
+.pe-radio-sub { font-size: 11.5px; color: var(--pe-muted); margin-top: 2px; }
+
+/* selector cards (Z/S pattern, binding direction) */
+.pe-cards2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pe-selcard {
+  border: 1.5px solid var(--pe-border); border-radius: 10px;
+  padding: 14px 10px 9px; text-align: center; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  background: var(--pe-bg);
+}
+.pe-selcard.pe-on { border-color: var(--pe-violet); background: var(--pe-violet-soft); }
+.pe-selcard.pe-off { opacity: 0.55; }
+.pe-selcard-cap { font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.06em; color: var(--pe-muted); }
+.pe-flow { display: flex; align-items: center; gap: 6px; }
+.pe-flow b { width: 26px; height: 30px; border-radius: 5px; display: grid; place-items: center; font-size: 15px; font-weight: 800; background: var(--pe-fill); color: var(--pe-ink); }
+.pe-selcard.pe-on .pe-flow b { background: rgba(109, 92, 255, 0.18); }
+.pe-flow-arrow { color: #f59e0b; }
+.pe-note { font-size: 11.5px; color: var(--pe-muted); line-height: 1.45; margin-top: 10px; }
+.pe-note a { color: var(--pe-violet); text-decoration: none; }
+
+/* pipeline footer buttons */
+.pe-panel-foot { display: flex; gap: 10px; margin-top: 6px; }
+.pe-foot-btn { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; padding: 10px 14px; border-radius: 9px; cursor: pointer; border: 1px solid transparent; }
+.pe-foot-add { background: var(--pe-violet); color: #fff; }
+.pe-foot-save { background: var(--pe-print); color: #fff; }
+.pe-chipbtn { font-size: 12px; padding: 8px 11px; border-radius: 8px; border: 1px solid var(--pe-border); background: var(--pe-bg); color: var(--pe-ink); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.pe-chipbtn:hover { border-color: var(--pe-border-strong); background: var(--pe-fill); }
+
+/* ── Canvas ──────────────────────────────────────────────────────────────── */
+.pe-sheets { display: flex; flex-wrap: wrap; gap: 22px; align-content: flex-start; }
+.pe-sheet {
+  background: #fff; border-radius: 4px;
+  box-shadow: 0 4px 18px rgba(15, 18, 30, 0.14);
+  padding: 8px; display: flex; gap: 2px;
+}
+.pe-dark .pe-sheet { background: #fff; }
+.pe-page { position: relative; display: grid; place-items: center; overflow: hidden; }
+.pe-page-num { font-size: clamp(20px, 4vw, 54px); font-weight: 800; color: #fff; }
+.pe-page-blank { background: #fff !important; border: 1px solid #e2e8f0; }
+.pe-page img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pe-page-badge { position: absolute; top: 5px; right: 5px; font-size: 11px; font-weight: 700; color: #fff; background: rgba(17,17,24,0.72); padding: 1px 6px; border-radius: 5px; }
+
+.pe-drop {
+  height: 100%; min-height: 340px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px;
+  border: 2px dashed var(--pe-border-strong); border-radius: 16px;
+  color: var(--pe-muted); text-align: center; padding: 40px;
+}
+.pe-drop.pe-dragging { border-color: var(--pe-violet); background: var(--pe-violet-soft); }
+.pe-drop-btn { background: var(--pe-violet); color: #fff; border: none; padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+/* page pill + issue badge */
+.pe-pill {
+  position: absolute; right: 22px; bottom: 22px;
+  display: flex; align-items: center; gap: 10px;
+  background: #14151f; color: #e7e8ec; border-radius: 12px;
+  padding: 9px 13px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+}
+.pe-pill b { letter-spacing: 0.04em; font-weight: 700; color: #fff; }
+.pe-pill-badge { font-size: 10px; background: rgba(255,255,255,0.14); padding: 2px 6px; border-radius: 4px; letter-spacing: 0.04em; }
+.pe-pill .pe-violet-dot { color: var(--pe-violet); }
+.pe-issue {
+  position: absolute; left: 22px; bottom: 22px;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #e5484d; color: #fff; border-radius: 999px;
+  padding: 7px 12px 7px 7px; font-size: 12.5px; font-weight: 600;
+  box-shadow: 0 6px 18px rgba(229,72,77,0.4);
+}
+.pe-avatar { width: 26px; height: 26px; border-radius: 999px; background: #14151f; color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+.pe-issue .pe-avatar { background: rgba(0,0,0,0.28); }
+.pe-avatar-loose { position: absolute; left: 22px; bottom: 22px; }
+
+@media (max-width: 860px) {
+  .pe-side { width: 280px; flex-basis: 280px; }
+}

@@ -2,9 +2,22 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { AdminImpose } from '@/lib/imposition-toolkit/Impose';
-import '@/lib/imposition-toolkit/impose.css';
-import { Logo } from '@/components/Logo';
+import { PressEditor } from '@/components/app/press/PressEditor';
+
+// Maps a marketing tool slug's plugin id (?tool=<id>) to a PDF Press editor
+// operation. Unmapped tools open the Choose Operation picker.
+const PLUGIN_TO_PRESS_OP: Record<string, string> = {
+  booklet: 'booklet', comic: 'booklet', magazine: 'booklet', notebook: 'booklet',
+  catalog: 'booklet', program: 'booklet', zine: 'booklet', greeting: 'booklet', menu: 'booklet',
+  perfectbound: 'nupbook', nupbook: 'nupbook',
+  standardsizes: 'grid', expertgrid: 'grid', optimalfit: 'grid', gangsheet: 'grid',
+  contact: 'grid', photo: 'grid', flyer: 'grid', customgrid: 'grid', calendar: 'grid',
+  postcard: 'grid', labels: 'grid', flipbook: 'grid',
+  business: 'cards', trading: 'cards', stickers: 'cards', steprepeat: 'cards',
+  bookmark: 'cards', hangtag: 'cards', coasters: 'cards', complimentslip: 'cards',
+  cutstack: 'cutstack', shuffle: 'shuffle', rotate: 'rotate', flip: 'flip',
+  merge: 'merge', split: 'split',
+};
 
 interface Entitlement {
   authenticated: boolean;
@@ -110,39 +123,21 @@ export function AppWorkspace() {
   const isPro = ent?.plan === 'pro';
   const cdLeftH = cooldownUntil > Date.now() ? Math.ceil((cooldownUntil - Date.now()) / 3600000) : 0;
 
-  return (
-    <div className="app-shell">
-      <div className="app-bar">
-        <Logo size={24} />
-        <div className="app-bar-right">
-          {ent && (
-            isPro ? (
-              <span className="usage-pill pro">✦ Pro · unlimited downloads</span>
-            ) : (
-              <span className="usage-pill">
-                {remaining > 0
-                  ? `${remaining} free download${remaining === 1 ? '' : 's'} left`
-                  : 'Free downloads used'}
-                {cdLeftH > 0 && remaining > 0 ? ` · ~${cdLeftH}h cooldown` : ''}
-              </span>
-            )
-          )}
-          {!isPro && (
-            <Link href="/pricing" className="btn btn-primary btn-plain" style={{ padding: '8px 16px' }}>
-              Upgrade to Pro
-            </Link>
-          )}
-          {ent && !ent.authenticated && (
-            <Link href="/login" className="pp-signin">Sign in</Link>
-          )}
-        </div>
-      </div>
+  const initialOp = initialTool ? (PLUGIN_TO_PRESS_OP[initialTool] ?? null) : null;
 
-      <div className="app-plugin">
-        {/* key remounts the editor when the tile-selected tool changes so the
-            deep-linked tool opens even while /app is already mounted. */}
-        <AdminImpose key={initialTool ?? '__gallery__'} initialTool={initialTool} />
-      </div>
+  return (
+    <>
+      <PressEditor
+        key={initialTool ?? '__gallery__'}
+        initialOp={initialOp}
+        usage={ent ? { authenticated: ent.authenticated, isPro, remaining, limit: ent.limit } : undefined}
+        onUpgrade={!isPro ? (
+          <Link href="/pricing" className="pe-btn pe-btn-dl" style={{ padding: '6px 12px' }}>Upgrade to Pro</Link>
+        ) : undefined}
+        onSignIn={ent && !ent.authenticated ? (
+          <Link href="/login" className="pe-signin">Sign in</Link>
+        ) : undefined}
+      />
 
       {modal && (
         <div className="app-modal-backdrop" onClick={() => setModal(null)}>
@@ -165,6 +160,6 @@ export function AppWorkspace() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
