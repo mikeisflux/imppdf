@@ -25,6 +25,8 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
     case 'booklet':
     case 'saddle-stitch-magazine':
     case 'perfect-bound-book':
+    case 'graphic-novel':
+    case 'comic':
     case 'n-up-book':
     case 'greeting-card':
     case 'menu':
