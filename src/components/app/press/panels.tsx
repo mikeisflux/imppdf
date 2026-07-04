@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import { zineSheetLayout, zinePanels, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
 
@@ -159,12 +160,17 @@ function BleedsSection({ s, up, unit, onUnit }: PanelProps) {
 }
 
 // ── Per-step panels ──────────────────────────────────────────────────────────
+export interface LayerEntry { name: string; stepLabel: string; stepId: string; enabled: boolean; }
 export interface PanelProps {
   s: StepSettings;
   up: (patch: StepSettings) => void;
   unit: Unit;
   onUnit: (u: Unit) => void;
   pageCount?: number;
+  thumbs?: string[];
+  pageSizes?: { wPt: number; hPt: number }[];
+  layerEntries?: LayerEntry[];
+  onToggleLayer?: (stepId: string) => void;
 }
 
 function BookletPanel(p: PanelProps) {
@@ -476,6 +482,325 @@ function KeyMarkGrid({ slot, onSlot }: { slot: number; onSlot: (k: number) => vo
   );
 }
 
+// ── Zine (fold-and-cut single-sheet booklets) ────────────────────────────────
+function ZinePanel(p: PanelProps) {
+  const { s, up, pageCount = 0 } = p;
+  const fmt = s.format as ZineFormat;
+  const { perSheet } = zinePanels(fmt);
+  const M = Math.max(perSheet, Math.ceil(Math.max(1, pageCount) / perSheet) * perSheet);
+  const numSheets = M / perSheet;
+  const showSheet = Math.min(s.showSheet ?? 0, numSheets - 1);
+  const grid = zineSheetLayout(fmt, M, showSheet, !!s.flipBackCover);
+  const blanks = M - pageCount;
+  const setGuide = (k: string, v: boolean) => up({ guides: { ...s.guides, [k]: v } });
+  const setGw = (k: string, v: number) => up({ guideWeights: { ...s.guideWeights, [k]: v } });
+  return (
+    <>
+      <Section label="// FORMAT" help="How many panels fold out of each sheet.">
+        <Radio label={<span><b>Half (1/2)</b></span>} sub="2 panels per side — fold once" on={fmt === 'half'} onSelect={() => up({ format: 'half' })} />
+        <Radio label={<span><b>Quarter (1/4)</b></span>} sub="4 panels — fold twice" on={fmt === 'quarter'} onSelect={() => up({ format: 'quarter' })} />
+        <Radio label={<span><b>Mini (1/8)</b></span>} sub="8 panels — fold, slit, refold. No staples." on={fmt === 'mini'} onSelect={() => up({ format: 'mini' })} />
+        <div className="pe-note">{pageCount || '—'} pages → {numSheets} sheet{numSheets === 1 ? '' : 's'} in {fmt === 'mini' ? 'Mini (1/8)' : fmt === 'quarter' ? 'Quarter (1/4)' : 'Half (1/2)'}</div>
+      </Section>
+      <Section label="// OPTIONS" help="Back-cover flip and signature splitting.">
+        <Check label="Flip back cover" sub="Rotates the back cover 180° so a top-folded zine reads upright." checked={!!s.flipBackCover} onChange={(v) => up({ flipBackCover: v })} />
+        <Check label="Custom signature size" sub="Split long documents into stacked signatures instead of one nested booklet."
+          checked={(s.signatureSheets ?? 0) > 0} onChange={(v) => up({ signatureSheets: v ? 2 : 0 })} />
+        {(s.signatureSheets ?? 0) > 0 && (
+          <div className="pe-row"><span className="pe-label pe-w96">Sheets / sig</span><NumRaw value={s.signatureSheets} onValue={(v) => up({ signatureSheets: Math.max(1, Math.round(v)) })} w={70} min={1} /></div>
+        )}
+        <div className="pe-label-sm" style={{ margin: '8px 0 6px' }}>Cutting guides</div>
+        {([['margin', 'Margin guides'], ['center', 'Center guides'], ['fold', 'Fold guides']] as const).map(([k, label]) => (
+          <div key={k} className="pe-row" style={{ marginBottom: 6 }}>
+            <label className="pe-check" style={{ margin: 0, flex: 1 }}>
+              <input type="checkbox" checked={!!s.guides?.[k]} onChange={(e) => setGuide(k, e.target.checked)} />
+              <span className="pe-box">{s.guides?.[k] && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round"><path d="M5 12l5 5L19 6" /></svg>}</span>
+              {label}
+            </label>
+            <NumRaw value={s.guideWeights?.[k] ?? 1} onValue={(v) => setGw(k, v)} w={56} />
+            <span className="pe-label-sm">pt</span>
+            <span className="pe-zine-guide-swatch" style={{ background: k === 'fold' ? '#7b6cf6' : '#f59e0b' }} />
+          </div>
+        ))}
+      </Section>
+      <PaperSize {...p} />
+      <Section label="// SHEET PREVIEW" help="Where each PDF page lands on the printed sheet. Upside-down numbers are rotated 180°.">
+        {blanks > 0 && <div className="pe-note" style={{ marginTop: 0, marginBottom: 8 }}>Pages should be a multiple of {perSheet}; {blanks} blank page(s) will be added.</div>}
+        <div className="pe-zine-diagram" style={{ aspectRatio: `${s.sheetWIn} / ${s.sheetHIn}` }}>
+          {grid.map((row, r) => (
+            <div key={r} className="pe-zine-row" style={{ height: `${100 / grid.length}%` }}>
+              {row.map((cell, c) => (
+                <div key={c} className={`pe-zine-cell ${cell.page === 1 ? 'pe-zine-cover' : ''}`} style={{ width: `${100 / row.length}%` }}>
+                  {cell.page ? <span style={{ transform: cell.rot ? 'rotate(180deg)' : undefined }}>{cell.page > pageCount ? '·' : cell.page}</span> : ''}
+                  {cell.page === 1 && <i className="pe-zine-front">FRONT</i>}
+                </div>
+              ))}
+            </div>
+          ))}
+          {fmt === 'mini' && <span className="pe-zine-slit" />}
+        </div>
+        <div className="pe-zine-legend">
+          <span><i className="pe-zl-fold" /> Fold</span><span><i className="pe-zl-cut" /> Cut</span>
+          <span><i className="pe-zl-rot" /> Rotated 180°</span><span><i className="pe-zl-cover" /> Cover page</span>
+        </div>
+        {numSheets > 1 && (
+          <>
+            <div className="pe-label-sm" style={{ margin: '10px 0 5px' }}>Show printed sheet</div>
+            <div className="pe-chipwrap">
+              {Array.from({ length: numSheets }, (_, i) => (
+                <button key={i} className={`pe-chipbtn ${showSheet === i ? 'pe-chip-on' : ''}`} onClick={() => up({ showSheet: i })}>{i + 1}</button>
+              ))}
+            </div>
+          </>
+        )}
+        {fmt === 'mini' && (
+          <div className="pe-note" style={{ marginTop: 12 }}>
+            <div style={{ fontWeight: 700, color: 'var(--pe-violet)', marginBottom: 4 }}>How to fold</div>
+            <div style={{ color: '#e5484d', fontWeight: 600, marginBottom: 6 }}>Print at 100% / Actual Size — do not scale to fit.</div>
+            <ol style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 4 }}>
+              <li>Hold the page with the front cover at the bottom right.</li>
+              <li>Fold in half (hamburger style).</li>
+              <li>Cut along the top of the back cover to create a slit in the middle of the paper.</li>
+              <li>Unfold, then fold in half (hotdog style).</li>
+              <li>Push the two sides in, letting the middle pages split into a diamond.</li>
+              <li>Starting with the back cover, fold the pages together until the back faces the front.</li>
+            </ol>
+          </div>
+        )}
+      </Section>
+    </>
+  );
+}
+
+// ── Gang sheet (jobs with per-page quantities) ───────────────────────────────
+const WORK_STYLES = [
+  { id: 'sheetwise', label: 'Sheetwise', cap: 'Front and back printed separately' },
+  { id: 'workturn', label: 'Work and Turn', cap: 'Same plate; flip on the long edge' },
+  { id: 'worktumble', label: 'Work and Tumble', cap: 'Same plate; flip on the short edge' },
+  { id: 'perfecting', label: 'Perfecting', cap: 'Both sides in one pass' },
+];
+
+function GangSheetPanel(p: PanelProps) {
+  const { s, up, unit, onUnit, pageCount = 0, thumbs = [], pageSizes = [] } = p;
+  // Sync one job per source page whenever the loaded document changes.
+  useEffect(() => {
+    if (pageCount > 0 && s.docPages !== pageCount) {
+      up({
+        docPages: pageCount,
+        jobs: pageSizes.slice(0, pageCount).map((sz, i) => ({
+          srcIdx: 0, page: i + 1, qty: 1, padPt: 0, allowRotate: false, wPt: sz.wPt, hPt: sz.hPt,
+        })),
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageCount, pageSizes]);
+
+  const usableW = (s.sheetWIn - s.marginLeftIn - s.marginRightIn) * 72;
+  const usableH = (s.sheetHIn - s.marginTopIn - s.marginBottomIn) * 72;
+  const jobs = (s.jobs ?? []) as { srcIdx: number; page: number; qty: number; padPt: number; allowRotate: boolean; wPt?: number; hPt?: number }[];
+  const jobFits = (j: typeof jobs[number]) => {
+    if (!j.wPt || !j.hPt) return true;
+    const bw = j.wPt + 2 * (j.padPt || 0), bh = j.hPt + 2 * (j.padPt || 0);
+    return (bw <= usableW && bh <= usableH) || (j.allowRotate && bh <= usableW && bw <= usableH);
+  };
+  const patchJob = (i: number, patch: Record<string, unknown>) => up({ jobs: jobs.map((j, k) => (k === i ? { ...j, ...patch } : j)) });
+  return (
+    <>
+      <PaperSize {...p} />
+      <Section label="// OPTIONS" help="Press work style and planning allowances (recorded on the job; layout is unchanged).">
+        <span className="pe-label-sm">Work Style</span>
+        <div className="pe-cards2" style={{ marginTop: 6 }}>
+          {WORK_STYLES.map((w) => (
+            <SelCard key={w.id} on={s.workStyle === w.id} off={s.workStyle !== w.id} cap={w.label.toUpperCase()} onClick={() => up({ workStyle: w.id })}>
+              <Ic name="gangsheet" size={20} />
+            </SelCard>
+          ))}
+        </div>
+        <div className="pe-label-sm" style={{ margin: '6px 0 10px' }}>{WORK_STYLES.find((w) => w.id === s.workStyle)?.cap}</div>
+        <span className="pe-label-sm">Makeready sheet count</span>
+        <div className="pe-row" style={{ marginTop: 5 }}><NumRaw value={s.makeready} onValue={(v) => up({ makeready: Math.max(0, Math.round(v)) })} /></div>
+        <span className="pe-label-sm">Running spoilage</span>
+        <div className="pe-row" style={{ marginTop: 5, marginBottom: 0 }}><NumRaw value={s.spoilagePct} onValue={(v) => up({ spoilagePct: Math.max(0, v) })} /><span className="pe-label-sm">%</span></div>
+      </Section>
+      <Section label="// WHITE SPACE" help="Margins around the sheet plus the gutter between jobs.">
+        <div className="pe-row"><span className="pe-label">Margins</span><span style={{ flex: 1 }} /><UnitSel unit={unit} onChange={onUnit} /></div>
+        <div className="pe-gang-margins">
+          <div className="pe-field-col" style={{ gridArea: 'top' }}><span className="pe-label-sm">Top</span><NumIn valueIn={s.marginTopIn} unit={unit} onIn={(v) => up({ marginTopIn: v })} /></div>
+          <div className="pe-field-col" style={{ gridArea: 'left' }}><span className="pe-label-sm">Left</span><NumIn valueIn={s.marginLeftIn} unit={unit} onIn={(v) => up({ marginLeftIn: v })} /></div>
+          <div className="pe-field-col" style={{ gridArea: 'right' }}><span className="pe-label-sm">Right</span><NumIn valueIn={s.marginRightIn} unit={unit} onIn={(v) => up({ marginRightIn: v })} /></div>
+          <div className="pe-field-col" style={{ gridArea: 'bot' }}><span className="pe-label-sm">Bottom</span><NumIn valueIn={s.marginBottomIn} unit={unit} onIn={(v) => up({ marginBottomIn: v })} /></div>
+        </div>
+        <div className="pe-row" style={{ marginTop: 10 }}><span className="pe-label">Gutters</span></div>
+        <div className="pe-field-col"><span className="pe-label-sm">Between jobs</span><NumIn valueIn={s.gutterIn} unit={unit} onIn={(v) => up({ gutterIn: v })} /></div>
+      </Section>
+      <MarksSection {...p} />
+      <BleedsSection {...p} />
+      <Section label="// JOBS" help="Each source page is a job: set its run quantity, padding and rotation.">
+        {jobs.map((j, i) => (
+          <div key={`${j.srcIdx}-${j.page}-${i}`} className="pe-gang-job">
+            <div className="pe-row" style={{ marginBottom: 8 }}>
+              <span className="pe-gang-thumb">{j.srcIdx === 0 && thumbs[j.page - 1] ? <img src={thumbs[j.page - 1]} alt="" /> : <Ic name="file" size={16} />}</span>
+              <span className="pe-label" style={{ fontWeight: 600, flex: 1 }}>{j.srcIdx === 0 ? `Page ${j.page}` : `File ${j.srcIdx} · p${j.page}`}</span>
+              <button className="pe-iconbtn" onClick={() => up({ jobs: jobs.filter((_, k) => k !== i) })}><Ic name="trash" size={14} /></button>
+            </div>
+            <span className="pe-label-sm">Quantity</span>
+            <div className="pe-row" style={{ marginTop: 4 }}><NumRaw value={j.qty} onValue={(v) => patchJob(i, { qty: Math.max(0, Math.round(v)) })} min={0} /></div>
+            <span className="pe-label-sm">Padding</span>
+            <div className="pe-row" style={{ marginTop: 4 }}>
+              <NumRaw value={j.padPt} onValue={(v) => patchJob(i, { padPt: Math.max(0, v) })} />
+              <span className="pe-label-sm">pt</span>
+            </div>
+            <Check label="Allow rotation" checked={j.allowRotate} onChange={(v) => patchJob(i, { allowRotate: v })} />
+            {!jobFits(j) && <div className="pe-gang-warn">Sheet too small to fit all jobs. Increase paper size or reduce margins/gutters.</div>}
+          </div>
+        ))}
+        <div className="pe-gang-addfiles" onClick={() => {
+          const inp = document.createElement('input');
+          inp.type = 'file'; inp.accept = 'application/pdf'; inp.multiple = true;
+          inp.onchange = async () => {
+            const list = Array.from(inp.files ?? []);
+            const { getPageSizes } = await import('@/lib/imposition-toolkit/impose');
+            const files = [...(s.files ?? [])];
+            const newJobs = [...jobs];
+            for (const f of list) {
+              const bytes = new Uint8Array(await f.arrayBuffer());
+              const sizes = await getPageSizes(bytes);
+              files.push({ name: f.name, bytes });
+              sizes.forEach((sz, pi) => newJobs.push({ srcIdx: files.length, page: pi + 1, qty: 1, padPt: 0, allowRotate: false, wPt: sz.wPt, hPt: sz.hPt }));
+            }
+            up({ files, jobs: newJobs });
+          };
+          inp.click();
+        }}>
+          <Ic name="upload" size={20} />
+          <div>Drag and drop a file here or <span style={{ color: 'var(--pe-violet)' }}>browse</span> to add it to the gang sheet.</div>
+        </div>
+      </Section>
+    </>
+  );
+}
+
+// ── Custom impose (per-cell page + rotation) ─────────────────────────────────
+function fillCells(preset: string, cols: number, rows: number): { page: number; rot: 0 | 90 | 180 | 270 }[] {
+  const n = cols * rows;
+  if (preset === 'repeat') return Array.from({ length: n }, () => ({ page: 1, rot: 0 as const }));
+  if (preset === 'cutstack') return Array.from({ length: n }, (_, i) => ({ page: i + 1, rot: 0 as const }));   // sheet count applied downstream
+  if (preset === 'saddle' && n >= 4) {
+    // 4-up quarto-style: top row rotated 180.
+    const cells = Array.from({ length: n }, (_, i) => ({ page: i + 1, rot: (Math.floor(i / cols) === 0 ? 180 : 0) as 0 | 180 }));
+    return cells as { page: number; rot: 0 | 90 | 180 | 270 }[];
+  }
+  return Array.from({ length: n }, (_, i) => ({ page: i + 1, rot: 0 as const }));
+}
+
+function CustomImposePanel(p: PanelProps) {
+  const { s, up, pageCount = 0 } = p;
+  const cells = (s.cells ?? []) as { page: number; rot: 0 | 90 | 180 | 270 }[];
+  const [sel, setSel] = useState(0);
+  const setGrid = (cols: number, rows: number) => {
+    const next = Array.from({ length: cols * rows }, (_, i) => cells[i] ?? { page: i + 1, rot: 0 as const });
+    up({ cols, rows, cells: next });
+  };
+  const cell = cells[sel];
+  return (
+    <>
+      <div className="pe-note" style={{ marginBottom: 12 }}>
+        Custom Impose keeps pages at their original size ratio inside each cell. To change the page size first, chain a <b>Resize</b> step before this one.
+      </div>
+      <Section label="// GRID LAYOUT" help="Click a cell to select it, then set its page and rotation.">
+        <div className="pe-grid2" style={{ marginBottom: 10 }}>
+          <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 56 }}>Columns</span><NumRaw value={s.cols} onValue={(v) => setGrid(Math.max(1, Math.min(6, Math.round(v))), s.rows)} min={1} /></div>
+          <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 40 }}>Rows</span><NumRaw value={s.rows} onValue={(v) => setGrid(s.cols, Math.max(1, Math.min(6, Math.round(v))))} min={1} /></div>
+        </div>
+        <div className="pe-ci-grid" style={{ gridTemplateColumns: `repeat(${s.cols}, 1fr)`, aspectRatio: `${s.sheetWIn} / ${s.sheetHIn}` }}>
+          {cells.map((c, i) => (
+            <button key={i} className={`pe-ci-cell ${sel === i ? 'pe-on' : ''}`} onClick={() => setSel(i)}>
+              <span style={{ transform: c.rot ? `rotate(${c.rot}deg)` : undefined }}>{c.page || '—'}</span>
+            </button>
+          ))}
+        </div>
+        {cell && (
+          <div style={{ marginTop: 12 }}>
+            <div className="pe-row">
+              <span className="pe-label pe-w96">Cell {sel + 1} page</span>
+              <NumRaw value={cell.page} onValue={(v) => up({ cells: cells.map((c, i) => (i === sel ? { ...c, page: Math.max(0, Math.round(v)) } : c)) })} w={70} min={0} />
+              <span className="pe-label-sm">0 = blank</span>
+            </div>
+            <div className="pe-row" style={{ marginBottom: 0 }}>
+              <span className="pe-label pe-w96">Rotation</span>
+              {([0, 90, 180, 270] as const).map((r) => (
+                <button key={r} className={`pe-chipbtn ${cell.rot === r ? 'pe-chip-on' : ''}`} onClick={() => up({ cells: cells.map((c, i) => (i === sel ? { ...c, rot: r } : c)) })}>{r}°</button>
+              ))}
+            </div>
+          </div>
+        )}
+      </Section>
+      <Section label="// PRESETS" help="Fill strategies. You can edit cells afterwards.">
+        <div className="pe-cards2">
+          {[['sequential', 'Sequential'], ['repeat', 'Repeat'], ['saddle', 'Saddle Stitch'], ['cutstack', 'Cut and Stack']].map(([id, label]) => (
+            <SelCard key={id} on={s.preset === id} off={s.preset !== id} cap={label!.toUpperCase()}
+              onClick={() => up({ preset: id, cells: fillCells(id!, s.cols, s.rows) })}>
+              <Ic name={id === 'saddle' ? 'booklet' : id === 'cutstack' ? 'cutstack' : id === 'repeat' ? 'cards' : 'grid'} size={20} />
+            </SelCard>
+          ))}
+        </div>
+        <div className="pe-note">Pick a strategy to fill cells automatically, then fine-tune any cell by hand ({pageCount || '—'} source pages).</div>
+      </Section>
+      <PaperSize {...p} />
+      <Section label="// WHITE SPACE" help="Sheet margins and cell gutters.">
+        <div className="pe-grid2">
+          <div className="pe-field-col"><span className="pe-label-sm">Margin</span><NumIn valueIn={s.marginIn} unit={p.unit} onIn={(v) => up({ marginIn: v })} /></div>
+          <div className="pe-field-col"><span className="pe-label-sm">Gutter</span><NumIn valueIn={s.gutterIn} unit={p.unit} onIn={(v) => up({ gutterIn: v })} /></div>
+        </div>
+      </Section>
+      <MarksSection {...p} />
+    </>
+  );
+}
+
+// ── PDF Tools + Layers ───────────────────────────────────────────────────────
+function PdfToolsPanel({ s, up }: PanelProps) {
+  return (
+    <Section label="// OPERATION" help="Whole-file maintenance run in your browser.">
+      <div className="pe-chipwrap" style={{ marginBottom: 12 }}>
+        <button className={`pe-chipbtn ${s.op === 'optimize' ? 'pe-chip-on' : ''}`} onClick={() => up({ op: 'optimize' })}>⚡ Optimize</button>
+        <button className={`pe-chipbtn ${s.op === 'repair' ? 'pe-chip-on' : ''}`} onClick={() => up({ op: 'repair' })}>🛠 Repair</button>
+      </div>
+      {s.op === 'optimize' ? (
+        <>
+          <Check label="Generate object streams (smaller)" checked={s.useObjectStreams !== false} onChange={(v) => up({ useObjectStreams: v })} />
+          <div className="pe-note">Rebuilds the file with compressed object streams — often 10-40% smaller. Encryption and linearization are not available in-browser.</div>
+        </>
+      ) : (
+        <div className="pe-note">Loads and rewrites the file structure, discarding broken cross-reference tables. Fixes many &quot;file is damaged&quot; PDFs.</div>
+      )}
+    </Section>
+  );
+}
+
+function LayersPanel({ layerEntries = [], onToggleLayer }: PanelProps) {
+  return (
+    <Section label="// LAYERS" help="Named layers contributed by workflow steps. Toggling disables that step's output.">
+      {layerEntries.length === 0 ? (
+        <div className="pe-layers-empty">
+          <Ic name="layers" size={26} />
+          <div style={{ fontWeight: 600, marginTop: 8 }}>No layers detected</div>
+          <div className="pe-label-sm" style={{ marginTop: 4, lineHeight: 1.5 }}>
+            Add a Color Bar or Cutter Marks step with a layer name to create toggleable layers.
+          </div>
+        </div>
+      ) : layerEntries.map((l) => (
+        <div key={l.stepId} className="pe-row" style={{ marginBottom: 8 }}>
+          <Ic name="layers" size={15} />
+          <span className="pe-label" style={{ flex: 1 }}>{l.name} <span className="pe-label-sm">· {l.stepLabel}</span></span>
+          <button className={`pe-eye ${l.enabled ? '' : 'pe-eye-off'}`} style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+            onClick={() => onToggleLayer?.(l.stepId)}><Ic name={l.enabled ? 'eye' : 'eyeoff'} size={16} /></button>
+        </div>
+      ))}
+    </Section>
+  );
+}
+
 // ── Compact panels for the remaining tools ───────────────────────────────────
 function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { type: StepType }) {
   switch (type) {
@@ -589,15 +914,44 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
           </select>
         </Section>
       );
-    case 'distort':
+    case 'distort': {
+      const dia = s.cylinderDiaMm ?? 150, plate = s.plateThickMm ?? 1.7;
+      const circ = Math.PI * dia, printCirc = Math.PI * (dia + 2 * plate);
+      const cylFactor = (circ / printCirc) * 100;
       return (
-        <Section label="// DISTORTION" help="Flexo plate distortion compensation.">
-          <div className="pe-row"><span className="pe-label pe-w96">Factor</span><NumRaw value={s.factorPct} onValue={(v) => up({ factorPct: v })} w={90} /><span className="pe-label-sm">%</span></div>
-          <select className="pe-select" value={s.direction} onChange={(e) => up({ direction: e.target.value })}>
-            <option value="circ">Circumferential (height)</option><option value="cross">Cross-web (width)</option><option value="both">Both</option>
-          </select>
-        </Section>
+        <>
+          <Section label="// CALCULATION MODE" help="Compute the shrink factor from the cylinder, or type it directly.">
+            <div className="pe-chipwrap" style={{ marginBottom: 12 }}>
+              <button className={`pe-chipbtn ${s.calcMode !== 'custom' ? 'pe-chip-on' : ''}`} onClick={() => up({ calcMode: 'cylinder', factorPct: cylFactor })}>Cylinder</button>
+              <button className={`pe-chipbtn ${s.calcMode === 'custom' ? 'pe-chip-on' : ''}`} onClick={() => up({ calcMode: 'custom' })}>Custom</button>
+            </div>
+            {s.calcMode !== 'custom' ? (
+              <>
+                <span className="pe-label-sm">Cylinder Diameter</span>
+                <div className="pe-row" style={{ marginTop: 4 }}><NumRaw value={dia} onValue={(v) => up({ cylinderDiaMm: v, factorPct: (Math.PI * v / (Math.PI * (v + 2 * plate))) * 100 })} w={90} /><span className="pe-label-sm">mm</span></div>
+                <span className="pe-label-sm">Plate Thickness</span>
+                <div className="pe-row" style={{ marginTop: 4, marginBottom: 0 }}><NumRaw value={plate} onValue={(v) => up({ plateThickMm: v, factorPct: (Math.PI * dia / (Math.PI * (dia + 2 * v))) * 100 })} w={90} /><span className="pe-label-sm">mm</span></div>
+              </>
+            ) : (
+              <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Factor</span><NumRaw value={s.factorPct} onValue={(v) => up({ factorPct: v })} w={90} /><span className="pe-label-sm">%</span></div>
+            )}
+          </Section>
+          <Section label="// DIRECTION" help="Which axis pre-shrinks to cancel cylinder stretch.">
+            <select className="pe-select" value={s.direction} onChange={(e) => up({ direction: e.target.value })}>
+              <option value="circ">Circumferential (height only)</option><option value="cross">Cross-web (width)</option><option value="both">Both</option>
+            </select>
+            <div className="pe-name-preview" style={{ marginTop: 12 }}>
+              <div className="pe-label-sm">COMPUTED RESULT</div>
+              <div className="pe-mono" style={{ fontSize: 13, display: 'grid', gap: 3, marginTop: 6 }}>
+                <span>Scale factor&nbsp;&nbsp;{((s.factorPct ?? 100) / 100).toFixed(6)}</span>
+                <span>Percentage&nbsp;&nbsp;&nbsp;&nbsp;{(s.factorPct ?? 100).toFixed(3)}%</span>
+                {s.calcMode !== 'custom' && <><span>Base circumference&nbsp;&nbsp;{circ.toFixed(2)} mm</span><span>Print circumference&nbsp;{printCirc.toFixed(2)} mm</span></>}
+              </div>
+            </div>
+          </Section>
+        </>
       );
+    }
     case 'bleed':
       return (
         <Section label="// BLEED" help="Scales content outward to fabricate bleed; trim recorded in TrimBox.">
@@ -754,18 +1108,25 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
 
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
-  if (type === 'booklet' || type === 'zine') return <BookletPanel {...props} />;
+  if (type === 'booklet') return <BookletPanel {...props} />;
+  if (type === 'zine') return <ZinePanel {...props} />;
   if (type === 'cards' || type === 'grid' || type === 'cutstack') return <NUpPanel {...props} kind={type} />;
   if (type === 'nupbook') return <NUpBookPanel {...props} />;
   if (type === 'colorbar') return <ColorBarPanel {...props} />;
   if (type === 'cuttermarks') return <CutterMarksPanel {...props} />;
   if (type === 'regmarks') return <CutterMarksPanel {...props} lite />;
+  if (type === 'gangsheet') return <GangSheetPanel {...props} />;
+  if (type === 'customimpose') return <CustomImposePanel {...props} />;
+  if (type === 'pdftools') return <PdfToolsPanel {...props} />;
+  if (type === 'layers') return <LayersPanel {...props} />;
   return <SimplePanels {...props} type={type} />;
 }
 
 // ── Step card (collapsible, reorderable) ─────────────────────────────────────
-export function StepCard({ step, index, unit, onUnit, pageCount, onChange, onRemove, onMove, canUp, canDown }: {
+export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSizes, layerEntries, onToggleLayer, onChange, onRemove, onMove, canUp, canDown }: {
   step: WorkflowStep; index: number; unit: Unit; onUnit: (u: Unit) => void; pageCount?: number;
+  thumbs?: string[]; pageSizes?: { wPt: number; hPt: number }[];
+  layerEntries?: LayerEntry[]; onToggleLayer?: (stepId: string) => void;
   onChange: (next: WorkflowStep) => void; onRemove: () => void; onMove: (dir: -1 | 1) => void;
   canUp: boolean; canDown: boolean;
 }) {
@@ -792,7 +1153,8 @@ export function StepCard({ step, index, unit, onUnit, pageCount, onChange, onRem
       {!step.collapsed && (
         <>
           <div className="pe-tip"><Ic name="bulb" size={16} /> {op.tip}</div>
-          <StepPanelBody type={step.type} s={step.s} up={up} unit={unit} onUnit={onUnit} pageCount={pageCount} />
+          <StepPanelBody type={step.type} s={step.s} up={up} unit={unit} onUnit={onUnit} pageCount={pageCount}
+            thumbs={thumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={onToggleLayer} />
         </>
       )}
     </div>

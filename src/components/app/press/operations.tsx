@@ -106,11 +106,15 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'grid', label: 'Grid', icon: 'grid', tip: 'Use Grid to arrange pages in an N-up grid layout.' },
     { id: 'nupbook', label: 'N-up Book', icon: 'nupbook', tip: 'Use N-up Book for multi-up signature imposition (folio / quarto).' },
     { id: 'cutstack', label: 'Cut and Stack', icon: 'cutstack', tip: 'Use Cut & Stack so sequential pages fall into order after guillotining.' },
+    { id: 'datamerge', label: 'Variable Data', icon: 'pagenumbers', tip: 'Merge CSV records — names, numbers, QR codes — onto imposed cells.' },
   ] },
   { label: '// ADVANCED', ops: [
     { id: 'preflight', label: 'PDF Preflight', icon: 'preflight', tip: 'Inspect page geometry, boxes and warnings before you impose.' },
-    { id: 'gangsheet', label: 'Gang Sheet', icon: 'gangsheet', tip: 'Nest mixed-size artwork onto sheets or roll media with minimal waste.' },
+    { id: 'gangsheet', label: 'Gang Sheet', icon: 'gangsheet', tip: 'Use Gang Sheet for packs several different jobs onto one sheet to share press setup.' },
     { id: 'cuttermarks', label: 'Cutter Marks', icon: 'scissors', tip: 'Use Cutter Marks to add registration targets digital cutting tables read to find your cuts.' },
+    { id: 'layers', label: 'Layers', icon: 'layers', tip: 'Use Layers for turns the named layers inside your PDF on or off.' },
+    { id: 'customimpose', label: 'Custom Impose', icon: 'grid', tip: 'Use Custom Impose for build any imposition by hand, placing and rotating each page per cell.' },
+    { id: 'pdftools', label: 'PDF Tools', icon: 'settings', tip: 'Use PDF Tools for shrink, speed up or repair whole PDFs.' },
   ] },
   { label: '// TRANSFORM', ops: [
     { id: 'resize', label: 'Resize', icon: 'resize', tip: 'Scale or fit pages to a new size.' },

@@ -8,13 +8,13 @@ import {
   mergePdfs, splitPdf, cropPdf, resizePdf, overlayPdf, distortPdf, generateBleed,
   addHeaderFooter, addPressColorBar, addCutterMarks, addJobSlug, addFoldMarks,
   addCollatingMarks, addOmrMarks, addGatheringMarks, addLayMarks, addTextWatermark,
-  addPageNumbers, nestPdf,
+  addPageNumbers, imposeGangJobs, imposeFoldZine, imposeCustomGrid, getPdfInfo,
 } from '@/lib/imposition-toolkit/impose';
-import type { PdfJobInfo } from '@/lib/imposition-toolkit/impose';
+import type { PdfJobInfo, GangJob, CustomCell } from '@/lib/imposition-toolkit/impose';
 
 export type StepType =
-  | 'cards' | 'booklet' | 'zine' | 'shuffle' | 'grid' | 'nupbook' | 'cutstack'
-  | 'preflight' | 'gangsheet' | 'cuttermarks'
+  | 'cards' | 'booklet' | 'zine' | 'shuffle' | 'grid' | 'nupbook' | 'cutstack' | 'datamerge'
+  | 'preflight' | 'gangsheet' | 'cuttermarks' | 'layers' | 'customimpose' | 'pdftools'
   | 'resize' | 'rotate' | 'crop' | 'split' | 'flip' | 'merge' | 'overlay' | 'distort'
   | 'bleed' | 'headerfooter' | 'colorbar' | 'slugline' | 'foldmarks' | 'regmarks'
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers';
@@ -39,15 +39,41 @@ const MARKS = { addMarks: true, centerMarks: true, markLenIn: 0.43, markOffIn: 0
 
 export function defaultSettings(type: StepType): StepSettings {
   switch (type) {
-    case 'booklet':
     case 'zine':
+      return {
+        format: 'mini', sheetWIn: 11, sheetHIn: 8.5, flipBackCover: true,
+        signatureSheets: 0,
+        guides: { margin: false, center: true, fold: false },
+        guideWeights: { margin: 4.5, center: 2.25, fold: 1.5 },
+        showSheet: 0,
+      };
+    case 'customimpose':
+      return {
+        cols: 2, rows: 2, sheetWIn: 12.6, sheetHIn: 17.72, marginIn: 0.25, gutterIn: 0.125,
+        preset: 'sequential',
+        cells: [{ page: 1, rot: 0 }, { page: 2, rot: 0 }, { page: 3, rot: 0 }, { page: 4, rot: 0 }],
+        ...MARKS, addMarks: false,
+      };
+    case 'gangsheet':
+      return {
+        sheetWIn: 11, sheetHIn: 8.5,
+        workStyle: 'sheetwise', makeready: 0, spoilagePct: 0,
+        marginTopIn: 0.2, marginLeftIn: 0.2, marginRightIn: 0.2, marginBottomIn: 0.2,
+        gutterIn: 0.2, ...MARKS, addMarks: false, bleedMode: 'doc', bleedIn: 0.125,
+        jobs: [], files: [], docPages: 0,
+      };
+    case 'pdftools':
+      return { op: 'optimize', useObjectStreams: true };
+    case 'layers':
+      return {};
+    case 'booklet':
       return {
         sheetWIn: 16.54, sheetHIn: 11.69,           // A3 landscape
         landscape: true, autoscale: true, preserveAspect: true,
         rtl: false, signatureSheets: 0, fillLastSaddle: true,
         marginIn: 0.2, marginTopIn: 0.2, gutterIn: 0, creepIn: 0.007, creepOutward: true,
         centerOutput: false, ...MARKS,
-        bleedMode: 'doc', bleedIn: 0.125, rotatePages: type === 'zine',
+        bleedMode: 'doc', bleedIn: 0.125, rotatePages: false,
       };
     case 'cards':
     case 'grid':
@@ -61,8 +87,6 @@ export function defaultSettings(type: StepType): StepSettings {
       };
     case 'nupbook':
       return { nUp: 4, sheetWIn: 11, sheetHIn: 17, marginIn: 0.2, gutterIn: 0, creepIn: 0, rtl: false, signatureSheets: 4, ...MARKS };
-    case 'gangsheet':
-      return { sheetWIn: 12.6, sheetHIn: 17.72, marginIn: 0.25, paddingIn: 0.125, allowRotate: true, trueShape: false, fillSheet: false, roll: false, copies: 1 };
     case 'shuffle': return { pattern: 'all' };
     case 'rotate': return { angle: 90, pages: 'all' };
     case 'flip': return { dir: 'h', pages: 'all' };
@@ -101,7 +125,7 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'laymarks': return { markType: 'arrow', edges: 'both', gripperEdge: 'bottom', sideGuideSide: 'left', pages: 'all' };
     case 'watermark': return { text: 'PROOF', opacity: 0.16, angleDeg: 45, fontSizePt: 96 };
     case 'pagenumbers': return { position: 'bottom-center', startAt: 1, prefix: '', suffix: '', fontSizePt: 10, marginPt: 24 };
-    case 'preflight': return {};
+    case 'preflight': case 'datamerge': return {};
   }
 }
 
@@ -146,18 +170,52 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[]): Pro
     if (!step.enabled) continue;
     const s = step.s;
     switch (step.type) {
-      case 'booklet': case 'zine': b = await imposeBooklet(b, bookletOpts(s)); break;
+      case 'booklet': b = await imposeBooklet(b, bookletOpts(s)); break;
+      case 'zine': b = await imposeFoldZine(b, {
+        format: s.format, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn,
+        flipBackCover: !!s.flipBackCover, signatureSheets: s.signatureSheets || 0,
+        guides: s.guides ?? {}, guideWeights: s.guideWeights,
+      }); break;
+      case 'customimpose': {
+        const cells = (s.cells ?? []) as { page: number; rot: 0 | 90 | 180 | 270 }[];
+        const perSheet = Math.max(1, ...cells.map((c) => c.page || 0));
+        const info = await getPdfInfo(b);
+        const numSheets = Math.max(1, Math.ceil(info.count / perSheet));
+        const sheets: (CustomCell | null)[][] = Array.from({ length: numSheets }, (_, sh) =>
+          cells.map((c) => (c.page ? { page: sh * perSheet + c.page, rotation: c.rot } : null)));
+        b = await imposeCustomGrid(b, {
+          cols: s.cols, rows: s.rows, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn,
+          marginIn: s.marginIn, gutterIn: s.gutterIn, sheets, addMarks: !!s.addMarks,
+        });
+        break;
+      }
       case 'cards': case 'grid': case 'cutstack': b = await imposeNUp(b, nupOpts(s)); break;
       case 'nupbook': b = await imposeNUpBook(b, {
         nUp: s.nUp, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, marginIn: s.marginIn,
         gutterIn: s.gutterIn, creepIn: s.creepIn, rtl: !!s.rtl, signatureSheets: s.signatureSheets,
         addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,
       }); break;
-      case 'gangsheet': b = await nestPdf(b, {
-        sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, marginIn: s.marginIn, paddingIn: s.paddingIn,
-        allowRotate: !!s.allowRotate, trueShape: !!s.trueShape, fillSheet: !!s.fillSheet,
-        roll: !!s.roll, copies: s.copies ?? 1,
-      }); break;
+      case 'gangsheet': {
+        const files = (s.files ?? []) as { bytes: Uint8Array }[];
+        const jobs = ((s.jobs ?? []) as GangJob[]).filter((j) => j.qty > 0);
+        if (jobs.length) {
+          b = await imposeGangJobs([b, ...files.map((f) => f.bytes)], jobs, {
+            sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn,
+            marginTopIn: s.marginTopIn, marginLeftIn: s.marginLeftIn,
+            marginRightIn: s.marginRightIn, marginBottomIn: s.marginBottomIn,
+            gutterIn: s.gutterIn, addMarks: !!s.addMarks,
+            markLenIn: s.markLenIn, markOffIn: s.markOffIn,
+            centerMarks: !!s.centerMarks, markWeightPt: s.markWeightPt,
+          });
+        }
+        break;
+      }
+      case 'pdftools': {
+        const { PDFDocument } = await import('pdf-lib');
+        const doc = await PDFDocument.load(b, { ignoreEncryption: true });
+        b = await doc.save({ useObjectStreams: s.op === 'optimize' ? s.useObjectStreams !== false : false });
+        break;
+      }
       case 'shuffle': b = await shufflePages(b, s.pattern || 'all'); break;
       case 'rotate': b = await rotatePdf(b, s.angle, s.pages); break;
       case 'flip': b = await flipPdf(b, s.dir, s.pages); break;
@@ -187,7 +245,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[]): Pro
       case 'laymarks': b = await addLayMarks(b, { markType: s.markType, edges: s.edges, gripperEdge: s.gripperEdge, sideGuideSide: s.sideGuideSide, pages: s.pages }); break;
       case 'watermark': b = await addTextWatermark(b, { text: s.text, opacity: s.opacity, angleDeg: s.angleDeg, fontSizePt: s.fontSizePt }); break;
       case 'pagenumbers': b = await addPageNumbers(b, { position: s.position, startAt: s.startAt, prefix: s.prefix, suffix: s.suffix, fontSizePt: s.fontSizePt, marginPt: s.marginPt }); break;
-      case 'split': case 'preflight': break;
+      case 'split': case 'preflight': case 'layers': case 'datamerge': break;
     }
   }
   return b;

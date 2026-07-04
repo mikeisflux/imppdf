@@ -1,7 +1,7 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getPdfInfo, shufflePages, downloadPdf, downloadFile, makeZip, preflight, setPdfJobInfo } from '@/lib/imposition-toolkit/impose';
-import type { PdfPageInfo, PreflightReport } from '@/lib/imposition-toolkit/impose';
+import { getPdfInfo, getPageSizes, shufflePages, downloadPdf, downloadFile, makeZip, setPdfJobInfo } from '@/lib/imposition-toolkit/impose';
+import type { PdfPageInfo } from '@/lib/imposition-toolkit/impose';
 import { rasterizePdfThumbs, rasterizePdfSheets, type RenderedSheet } from '@/lib/imposition-toolkit/page-thumbs';
 import { findOp } from './operations';
 import {
@@ -12,9 +12,10 @@ import {
 import { Ic, ChooseOperation, StepCard, paperName, fmtIn, type Unit } from './panels';
 import {
   loadSettings, persistSettings, DEFAULT_SETTINGS, SettingsModal, JobInfoModal, PageManagerModal,
-  BatchModal, QualityMenu, PreflightModal, loadDefaultJob, EMPTY_JOB, useCountdown,
+  BatchModal, QualityMenu, loadDefaultJob, EMPTY_JOB, useCountdown,
   type AppSettings, type JobInfo, type PreviewQuality, type BatchFile,
 } from './modals';
+import { PreflightInspector, runPreflightChecks, VdpWizard, AskAIPanel, type PfReport } from './inspector-wizards';
 import { TemplatesModal } from './catalog-bridge';
 import './press.css';
 
@@ -49,12 +50,13 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   });
   const [file, setFile] = useState<LoadedFile | null>(null);
   const [srcThumbs, setSrcThumbs] = useState<string[]>([]);
+  const [pageSizes, setPageSizes] = useState<{ wPt: number; hPt: number }[]>([]);
   const [sheets, setSheets] = useState<RenderedSheet[]>([]);
   const [totalSheets, setTotalSheets] = useState(0);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState('');
   const [jobInfo, setJobInfo] = useState<JobInfo>(EMPTY_JOB);
-  const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null);
+  const [inspector, setInspector] = useState<{ open: boolean; running: boolean; report: PfReport | null }>({ open: false, running: false, report: null });
 
   // Viewer state
   const [zoom, setZoom] = useState(1);
@@ -64,8 +66,8 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   const [fillBg, setFillBg] = useState(true);
   const [drag, setDrag] = useState(false);
   const [currentSheet, setCurrentSheet] = useState(1);
-  const [modal, setModal] = useState<null | 'settings' | 'jobinfo' | 'pagemanager' | 'batch' | 'preflight' | 'templates'>(null);
-  const [menu, setMenu] = useState<null | 'quality' | 'file' | 'load'>(null);
+  const [modal, setModal] = useState<null | 'settings' | 'jobinfo' | 'pagemanager' | 'batch' | 'templates' | 'vdp'>(null);
+  const [menu, setMenu] = useState<null | 'quality' | 'file' | 'load' | 'askai'>(null);
   const [adding, setAdding] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -108,10 +110,19 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
 
   useEffect(() => {
     let cancelled = false;
-    if (!file) { setSrcThumbs([]); return; }
+    if (!file) { setSrcThumbs([]); setPageSizes([]); return; }
     rasterizePdfThumbs(file.bytes).then((t) => { if (!cancelled) setSrcThumbs(t); }).catch(() => {});
+    getPageSizes(file.bytes).then((s) => { if (!cancelled) setPageSizes(s); }).catch(() => {});
     return () => { cancelled = true; };
   }, [file]);
+
+  const openPreflight = useCallback((bytes: Uint8Array | null) => {
+    if (!bytes) { setInspector({ open: true, running: false, report: null }); return; }
+    setInspector({ open: true, running: true, report: null });
+    runPreflightChecks(bytes)
+      .then((report) => setInspector({ open: true, running: false, report }))
+      .catch(() => setInspector({ open: true, running: false, report: null }));
+  }, []);
 
   // ── Steps helpers ───────────────────────────────────────────────────────────
   const visibleHidden = useMemo(() => {
@@ -123,15 +134,15 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   }, [settings]);
 
   const addStep = (type: StepType) => {
-    if (type === 'preflight') {
-      if (file) preflight(file.bytes).then(setPreflightReport).catch(() => setPreflightReport(null));
-      setModal('preflight');
-      setAdding(false);
-      return;
-    }
-    setSteps((s) => [...s.map((st) => ({ ...st, collapsed: true })), makeStep(type)]);
     setAdding(false);
+    if (type === 'preflight') { openPreflight(file?.bytes ?? null); return; }
+    if (type === 'datamerge') { setModal('vdp'); return; }
+    setSteps((s) => [...s.map((st) => ({ ...st, collapsed: true })), makeStep(type)]);
   };
+  const layerEntries = useMemo(() => steps
+    .filter((st) => typeof st.s.layer === 'string' && st.s.layer.trim())
+    .map((st) => ({ name: st.s.layer as string, stepLabel: findOp(st.type)?.label ?? st.type, stepId: st.id, enabled: st.enabled })), [steps]);
+  const toggleLayer = (stepId: string) => setSteps((s) => s.map((st) => (st.id === stepId ? { ...st, enabled: !st.enabled } : st)));
   const changeStep = (i: number, next: WorkflowStep) => setSteps((s) => s.map((st, j) => (j === i ? next : st)));
   const removeStep = (i: number) => setSteps((s) => s.filter((_, j) => j !== i));
   const moveStep = (i: number, dir: -1 | 1) => setSteps((s) => {
@@ -390,7 +401,12 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
           <button className="pe-tb-chip pe-tb-chip-btn" disabled={!file || !steps.length} onClick={() => setModal('batch')}>
             <Ic name="batch" size={15} /> Batch {!usage?.isPro && <span className="pe-crown"><Ic name="crown" size={13} /></span>}
           </button>
-          <button className="pe-tb-chip pe-tb-chip-btn" disabled title="Ask AI — coming soon"><Ic name="sparkle" size={15} /> Ask AI</button>
+          <div style={{ position: 'relative' }}>
+            <button className="pe-tb-chip pe-tb-chip-btn" title="Ask AI — describe the job, get a workflow" onClick={() => setMenu(menu === 'askai' ? null : 'askai')}>
+              <Ic name="sparkle" size={15} /> Ask AI
+            </button>
+            {menu === 'askai' && <AskAIPanel onApply={(next) => setSteps(next)} onClose={() => setMenu(null)} />}
+          </div>
           <button className="pe-btn pe-btn-print" disabled={!file} onClick={doPrint}><Ic name="print" size={16} /> Print</button>
           <button className="pe-btn pe-btn-dl" disabled={!file || rendering} onClick={doDownload}>
             <Ic name="download" size={16} /> {rendering ? '…' : 'Download'}
@@ -428,6 +444,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
                   {i > 0 && <div className="pe-step-connector"><i /></div>}
                   <StepCard
                     step={st} index={i} unit={unit} onUnit={setUnit} pageCount={file?.info.count}
+                    thumbs={srcThumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={toggleLayer}
                     onChange={(next) => changeStep(i, next)}
                     onRemove={() => removeStep(i)}
                     onMove={(dir) => moveStep(i, dir)}
@@ -504,6 +521,10 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
             </div>
           )}
         </main>
+        {inspector.open && (
+          <PreflightInspector report={inspector.report} running={inspector.running}
+            onClose={() => setInspector((s) => ({ ...s, open: false }))} />
+        )}
       </div>
 
       <input ref={inputRef} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => onPick(e.target.files)} />
@@ -532,9 +553,16 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
         <BatchModal initial={file ? [{ name: file.name, bytes: file.bytes }] : []} isPro={!!usage?.isPro}
           onClose={() => setModal(null)} onRun={runBatch} />
       )}
-      {modal === 'preflight' && <PreflightModal report={preflightReport} onClose={() => setModal(null)} />}
       {modal === 'templates' && (
         <TemplatesModal onClose={() => setModal(null)} onApply={(next) => setSteps(next)} />
+      )}
+      {modal === 'vdp' && (
+        <VdpWizard onClose={() => setModal(null)} onDone={async (pdf, records) => {
+          try {
+            const info = await getPdfInfo(pdf);
+            setFile({ name: `data-merge-${records}-records.pdf`, bytes: pdf, info });
+          } catch { setError('Generated merge could not be loaded.'); }
+        }} />
       )}
     </div>
   );

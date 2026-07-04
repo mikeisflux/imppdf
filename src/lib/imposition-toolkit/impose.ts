@@ -3501,6 +3501,227 @@ export async function addCutterMarks(bytes: Uint8Array, opts: CutterMarksOptions
   return doc.save();
 }
 
+// ── Page geometry helper ─────────────────────────────────────────────────────
+
+export async function getPageSizes(bytes: Uint8Array): Promise<{ wPt: number; hPt: number }[]> {
+  const { PDFDocument } = await import('pdf-lib');
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  return doc.getPages().map((p) => { const { width, height } = p.getSize(); return { wPt: width, hPt: height }; });
+}
+
+// ── Gang sheet (per-job quantities, shelf packing) ──────────────────────────
+// Packs jobs — (source, page, quantity) triples — onto press sheets using
+// first-fit-decreasing shelf packing. Jobs that cannot fit even on an empty
+// sheet are skipped (the UI warns per job); if nothing fits at all we throw.
+
+export interface GangJob {
+  srcIdx: number;          // 0 = the working document, 1+ = extra files
+  page: number;            // 1-based page within that source
+  qty: number;
+  padPt?: number;          // keep-away padding around the item
+  allowRotate?: boolean;
+}
+
+export interface GangJobsOptions {
+  sheetWIn: number; sheetHIn: number;
+  marginTopIn: number; marginLeftIn: number; marginRightIn: number; marginBottomIn: number;
+  gutterIn: number;        // between jobs
+  addMarks: boolean; markLenIn: number; markOffIn: number;
+  centerMarks?: boolean; markWeightPt?: number;
+}
+
+const GANG_MAX_ITEMS = 3000;
+
+export async function imposeGangJobs(sources: Uint8Array[], jobs: GangJob[], opts: GangJobsOptions): Promise<Uint8Array> {
+  const { PDFDocument, rgb } = await import('pdf-lib');
+  const outDoc = await PDFDocument.create();
+  const srcDocs = await Promise.all(sources.map((b) => PDFDocument.load(b, { ignoreEncryption: true })));
+  // Embed each referenced page once, reuse the XObject for every copy.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const embedCache = new Map<string, { emb: any; w: number; h: number }>();
+  async function embedOf(srcIdx: number, page: number) {
+    const key = `${srcIdx}:${page}`;
+    let e = embedCache.get(key);
+    if (!e) {
+      const src = srcDocs[srcIdx];
+      if (!src || page < 1 || page > src.getPageCount()) return null;
+      const pg = src.getPage(page - 1);
+      const [emb] = await outDoc.embedPages([pg]);
+      const { width, height } = pg.getSize();
+      e = { emb, w: width, h: height };
+      embedCache.set(key, e);
+    }
+    return e;
+  }
+
+  const shW = opts.sheetWIn * PT, shH = opts.sheetHIn * PT;
+  const mT = opts.marginTopIn * PT, mL = opts.marginLeftIn * PT, mR = opts.marginRightIn * PT, mB = opts.marginBottomIn * PT;
+  const gap = opts.gutterIn * PT;
+  const usableW = shW - mL - mR, usableH = shH - mT - mB;
+  if (usableW <= 4 || usableH <= 4) throw new Error('The sheet is too small to fit all these jobs.');
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  interface Item { emb: any; w: number; h: number; pad: number; rotOk: boolean; }
+  const items: Item[] = [];
+  let total = 0;
+  for (const j of jobs) {
+    const e = await embedOf(j.srcIdx, j.page);
+    if (!e) continue;
+    const qty = Math.max(1, Math.round(j.qty || 1));
+    total += qty;
+    if (total > GANG_MAX_ITEMS) throw new Error(`Too many copies to gang at once (limit ${GANG_MAX_ITEMS}). Reduce quantities.`);
+    for (let q = 0; q < qty; q++) items.push({ emb: e.emb, w: e.w, h: e.h, pad: j.padPt ?? 0, rotOk: !!j.allowRotate });
+  }
+  // Drop items that can't fit an empty sheet in any allowed orientation.
+  const fits = (it: Item) => {
+    const bw = it.w + 2 * it.pad, bh = it.h + 2 * it.pad;
+    return (bw <= usableW && bh <= usableH) || (it.rotOk && bh <= usableW && bw <= usableH);
+  };
+  const packable = items.filter(fits);
+  if (!packable.length) throw new Error('The sheet is too small to fit all these jobs.');
+
+  packable.sort((a, b) => (b.h + 2 * b.pad) - (a.h + 2 * a.pad));
+  interface Placed { emb: Item['emb']; x: number; yTop: number; w: number; h: number; rot: boolean; pad: number; }
+  const sheets: Placed[][] = [];
+  let cur: Placed[] = [], shelfY = 0, shelfH = 0, cursorX = 0;
+  const newSheet = () => { if (cur.length) sheets.push(cur); cur = []; shelfY = 0; shelfH = 0; cursorX = 0; };
+  for (const it of packable) {
+    // Prefer the orientation whose height is smaller (flatter shelves).
+    const orients: { w: number; h: number; rot: boolean }[] = [{ w: it.w + 2 * it.pad, h: it.h + 2 * it.pad, rot: false }];
+    if (it.rotOk) orients.push({ w: it.h + 2 * it.pad, h: it.w + 2 * it.pad, rot: true });
+    orients.sort((a, b) => a.h - b.h);
+    let placed = false;
+    for (let attempt = 0; attempt < 2 && !placed; attempt++) {
+      for (const o of orients) {
+        if (o.w > usableW || o.h > usableH) continue;
+        if (cursorX + o.w > usableW + 1e-6) continue;              // no room on this shelf
+        if (shelfY + Math.max(shelfH, o.h) > usableH + 1e-6) continue;
+        cur.push({ emb: it.emb, x: cursorX, yTop: shelfY, w: o.w, h: o.h, rot: o.rot, pad: it.pad });
+        cursorX += o.w + gap;
+        shelfH = Math.max(shelfH, o.h);
+        placed = true; break;
+      }
+      if (!placed) {
+        // Close the shelf; if a fresh shelf doesn't help, start a new sheet.
+        if (shelfH > 0 && shelfY + shelfH + gap < usableH) { shelfY += shelfH + gap; shelfH = 0; cursorX = 0; }
+        else newSheet();
+      }
+    }
+  }
+  if (cur.length) sheets.push(cur);
+
+  const markStyle: MarkStyle = { center: !!opts.centerMarks, weight: opts.markWeightPt };
+  for (const sheet of sheets) {
+    const pg = outDoc.addPage([shW, shH]);
+    for (const p of sheet) {
+      const x = mL + p.x + p.pad, yTop = mT + p.yTop + p.pad;
+      const w = p.w - 2 * p.pad, h = p.h - 2 * p.pad;
+      const y = shH - yTop - h;
+      if (p.rot) pg.drawPage(p.emb, { x: x + w, y, width: h, height: w, rotate: (await import('pdf-lib')).degrees(90) });
+      else pg.drawPage(p.emb, { x, y, width: w, height: h });
+      if (opts.addMarks) drawCropMarks(pg, rgb, x, y, w, h, opts.markOffIn * PT, opts.markLenIn * PT, markStyle);
+    }
+  }
+  return outDoc.save();
+}
+
+// ── Fold-and-cut zine ────────────────────────────────────────────────────────
+// One-sheet zines: Half (1/2 · 2 panels), Quarter (1/4 · 4 panels) and the
+// classic Mini (1/8 · 8 panels, single-sided, cut a centre slit and fold).
+// Pages nest from both ends so one folded stack reads in order.
+
+export type ZineFormat = 'half' | 'quarter' | 'mini';
+export interface ZineCell { page: number; rot: boolean; }   // page 0 = blank
+
+export function zinePanels(format: ZineFormat): { cols: number; rows: number; perSheet: number } {
+  return format === 'mini' ? { cols: 4, rows: 2, perSheet: 8 }
+    : format === 'quarter' ? { cols: 2, rows: 2, perSheet: 4 }
+    : { cols: 2, rows: 1, perSheet: 2 };
+}
+
+// Layout for sheet `s` (0-based) of a document padded to `M` pages.
+// Rows are top-to-bottom, columns left-to-right; `rot` = printed upside-down.
+export function zineSheetLayout(format: ZineFormat, M: number, s: number, flipBackCover = false): ZineCell[][] {
+  const at = (n: number): number => (n >= 1 && n <= M ? n : 0);
+  if (format === 'mini') {
+    const a = 4 * s;                       // pages a+1..a+4 from the front
+    const top = [at(M - a - 3), at(a + 4), at(a + 3), at(a + 2)].map((p) => ({ page: p, rot: true }));
+    const bottom = [at(M - a - 2), at(M - a - 1), at(M - a), at(a + 1)].map((p) => ({ page: p, rot: false }));
+    if (flipBackCover && s === 0) top[0] = { ...top[0]!, rot: false };
+    return [top, bottom];
+  }
+  if (format === 'quarter') {
+    const a = 2 * s;
+    return [
+      [{ page: at(M - a - 1), rot: true }, { page: at(a + 2), rot: true }],
+      [{ page: at(M - a), rot: false }, { page: at(a + 1), rot: false }],
+    ];
+  }
+  // half: alternating booklet flats — sheet 2k = Side A, 2k+1 = Side B.
+  const k = Math.floor(s / 2), back = s % 2 === 1;
+  const L = back ? 2 * k + 2 : M - 2 * k, R = back ? M - 2 * k - 1 : 2 * k + 1;
+  return [[{ page: at(L), rot: false }, { page: at(R), rot: false }]];
+}
+
+export interface FoldZineOptions {
+  format: ZineFormat;
+  sheetWIn: number; sheetHIn: number;
+  flipBackCover?: boolean;
+  signatureSheets?: number;    // 0 = one nested booklet; N = stacked signatures
+  guides?: { margin?: boolean; center?: boolean; fold?: boolean };
+  guideWeights?: { margin?: number; center?: number; fold?: number };   // pt
+}
+
+export async function imposeFoldZine(bytes: Uint8Array, opts: FoldZineOptions): Promise<Uint8Array> {
+  const { PDFDocument, rgb, degrees } = await import('pdf-lib');
+  const srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const srcPages = srcDoc.getPages();
+  const N = srcPages.length;
+  const { cols, rows, perSheet } = zinePanels(opts.format);
+  const sigPages = opts.signatureSheets && opts.signatureSheets > 0 ? opts.signatureSheets * perSheet : Math.ceil(Math.max(1, N) / perSheet) * perSheet;
+  const outDoc = await PDFDocument.create();
+  const embeds = await outDoc.embedPages(srcPages);
+  const shW = opts.sheetWIn * PT, shH = opts.sheetHIn * PT;
+  const cellW = shW / cols, cellH = shH / rows;
+  const orange = rgb(0.96, 0.62, 0.09), violet = rgb(0.48, 0.42, 0.95);
+
+  for (let start = 1; start <= Math.max(1, N); start += sigPages) {
+    const M = sigPages;
+    const numSheets = Math.ceil(M / perSheet);
+    for (let s = 0; s < numSheets; s++) {
+      const grid = zineSheetLayout(opts.format, M, s, opts.flipBackCover);
+      const pg = outDoc.addPage([shW, shH]);
+      grid.forEach((row, r) => row.forEach((cell, c) => {
+        const gp = cell.page ? start - 1 + cell.page : 0;
+        if (!gp || gp > N) return;
+        const emb = embeds[gp - 1]!;
+        const { width: pw, height: ph } = srcPages[gp - 1]!.getSize();
+        const sc = Math.min(cellW / pw, cellH / ph);
+        const dw = pw * sc, dh = ph * sc;
+        const cx = c * cellW + (cellW - dw) / 2;
+        const cy = shH - (r + 1) * cellH + (cellH - dh) / 2;
+        if (cell.rot) pg.drawPage(emb, { x: cx + dw, y: cy + dh, width: dw, height: dh, rotate: degrees(180) });
+        else pg.drawPage(emb, { x: cx, y: cy, width: dw, height: dh });
+      }));
+      // Guides
+      const gw = opts.guideWeights ?? {};
+      if (opts.guides?.fold) {
+        for (let c = 1; c < cols; c++) pg.drawLine({ start: { x: c * cellW, y: 0 }, end: { x: c * cellW, y: shH }, thickness: gw.fold ?? 0.75, color: violet, dashArray: [5, 4] });
+        for (let r = 1; r < rows; r++) pg.drawLine({ start: { x: 0, y: r * cellH }, end: { x: shW, y: r * cellH }, thickness: gw.fold ?? 0.75, color: violet, dashArray: [5, 4] });
+      }
+      if (opts.guides?.center && opts.format === 'mini') {
+        // The cut slit: centre horizontal, spanning the middle two column pairs.
+        pg.drawLine({ start: { x: cellW, y: shH / 2 }, end: { x: shW - cellW, y: shH / 2 }, thickness: gw.center ?? 1.1, color: orange });
+      }
+      if (opts.guides?.margin) {
+        const m = 9;
+        pg.drawRectangle({ x: m, y: m, width: shW - 2 * m, height: shH - 2 * m, borderColor: orange, borderWidth: gw.margin ?? 0.5, borderDashArray: [2, 3] });
+      }
+    }
+  }
+  return outDoc.save();
+}
+
 // ── Job info → PDF document properties ──────────────────────────────────────
 
 export interface PdfJobInfo {
