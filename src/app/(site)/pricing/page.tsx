@@ -13,8 +13,8 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 const PRO_FEATURES = [
-  'Unlimited downloads — no cooldown', 'Every one of the 60+ tools & workflows',
-  'API access with your key', 'Priority updates as new tools ship',
+  'Unlimited downloads — no cooldown', 'Every one of the 90+ tools & workflows',
+  'Priority updates as new tools ship',
 ];
 
 const CATS: ToolCategory[] = ['imposition', 'make', 'marks', 'pages', 'advanced'];

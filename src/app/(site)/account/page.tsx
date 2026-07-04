@@ -4,7 +4,6 @@ import { getCurrentUser } from '@/lib/auth';
 import { getActiveSubscriptionForUser } from '@/lib/subscriptions';
 import { publicConfig } from '@/lib/settings';
 import { PlanPanel } from '@/components/account/PlanPanel';
-import { ApiKeysPanel } from '@/components/account/ApiKeysPanel';
 import { LogoutButton } from '@/components/account/LogoutButton';
 
 export const metadata = { title: 'My account' };
@@ -61,8 +60,6 @@ export default async function AccountPage() {
         } : null}
         cfg={billingCfg}
       />
-
-      <ApiKeysPanel />
     </div>
   );
 }

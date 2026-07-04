@@ -8,7 +8,7 @@ export default function TermsPage() {
 
       {[
         ['Service', 'ImpositionPDF provides browser-based PDF imposition and prepress tools. The tool arranges and transforms existing PDF pages; it does not edit document content.'],
-        ['Accounts', 'You are responsible for keeping your account credentials and API keys secure. You must provide accurate information when creating an account.'],
+        ['Accounts', 'You are responsible for keeping your account credentials secure. You must provide accurate information when creating an account.'],
         ['Free and Pro plans', 'The free tier includes a limited number of downloads with a cooldown between them. Pro subscriptions remove these limits. Plan details are shown on the Pricing page.'],
         ['Billing', 'Pro subscriptions are billed through PayPal on a recurring basis until cancelled. You can cancel at any time from your account page; access continues until the end of the current billing period.'],
         ['Refunds', 'If you are not satisfied, contact us within 14 days of a charge and we will review your request. Refunds are issued at our discretion for unused subscription periods.'],

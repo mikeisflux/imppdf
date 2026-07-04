@@ -10,7 +10,7 @@ export default function AdminSettingsPage() {
     <div>
       <h1>Settings</h1>
       <p className="admin-page-sub">
-        API keys and configuration. Changes are stored in the database and take effect
+        Configuration and credentials. Changes are stored in the database and take effect
         immediately — no rebuild needed. Secret fields show “configured” once set; leave them
         blank to keep the existing value.
       </p>

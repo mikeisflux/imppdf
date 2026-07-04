@@ -13,7 +13,6 @@ export interface HeaderUser {
 const NAV = [
   { label: 'Gallery', href: '/#gallery' },
   { label: 'Pricing', href: '/pricing' },
-  { label: 'API', href: '/api-docs' },
   { label: 'Guide', href: '/guide' },
 ];
 

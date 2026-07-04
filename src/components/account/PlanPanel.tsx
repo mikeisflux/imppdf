@@ -15,8 +15,7 @@ export interface BillingConfig {
 
 const PRO_FEATURES = [
   'Unlimited downloads — no cooldown',
-  'Every one of the 60+ tools & workflows',
-  'API access with your key',
+  'Every one of the 90+ tools & workflows',
   'Priority updates as new tools ship',
 ];
 

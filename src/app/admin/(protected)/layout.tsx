@@ -11,7 +11,6 @@ const NAV = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/users', label: 'Users' },
   { href: '/admin/subscriptions', label: 'Subscriptions' },
-  { href: '/admin/keys', label: 'API keys' },
   { href: '/admin/contacts', label: 'Contact inbox' },
   { href: '/admin/settings', label: 'Settings' },
 ];

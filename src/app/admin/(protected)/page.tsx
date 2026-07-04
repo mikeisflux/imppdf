@@ -3,7 +3,6 @@ import { listUsers } from '@/lib/users';
 import { listSubscriptions } from '@/lib/subscriptions';
 import { listContactMessages } from '@/lib/contact';
 import { usageTotals } from '@/lib/usage';
-import { listAllApiKeys } from '@/lib/apikeys';
 
 export const metadata = { title: 'Admin · Dashboard' };
 export const dynamic = 'force-dynamic';
@@ -12,7 +11,6 @@ export default function AdminDashboard() {
   const users = listUsers();
   const subs = listSubscriptions();
   const contacts = listContactMessages();
-  const keys = listAllApiKeys();
   const totals = usageTotals();
 
   const proUsers = users.filter((u) => u.plan === 'pro').length;
@@ -23,9 +21,7 @@ export default function AdminDashboard() {
     { n: users.length, l: 'Total users' },
     { n: proUsers, l: 'Pro users' },
     { n: activeSubs, l: 'Active subscriptions' },
-    { n: keys.filter((k) => k.status === 'active').length, l: 'Active API keys' },
     { n: totals.downloads, l: 'Downloads recorded' },
-    { n: totals.apiCalls, l: 'API imposes' },
     { n: newContacts, l: 'New messages' },
     { n: contacts.length, l: 'Total messages' },
   ];
