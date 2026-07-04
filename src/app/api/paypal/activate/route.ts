@@ -2,7 +2,7 @@ import { badRequest, json, unauthorized } from '@/lib/http';
 import { getCurrentUser } from '@/lib/auth';
 import { getSubscription, paypalConfigured } from '@/lib/paypal';
 import { upsertSubscription } from '@/lib/subscriptions';
-import { paypal as paypalCfg } from '@/lib/config';
+import { serverPaypal } from '@/lib/settings';
 
 // Called by the browser right after PayPal approves a subscription. We verify
 // the subscription with PayPal (never trust the client) and mark the user Pro.
@@ -23,8 +23,8 @@ export async function POST(req: Request) {
   }
 
   const cycle =
-    sub.plan_id && sub.plan_id === paypalCfg.planYearly ? 'yearly' :
-    sub.plan_id && sub.plan_id === paypalCfg.planMonthly ? 'monthly' : null;
+    sub.plan_id && sub.plan_id === serverPaypal().planYearly ? 'yearly' :
+    sub.plan_id && sub.plan_id === serverPaypal().planMonthly ? 'monthly' : null;
 
   const periodEnd = sub.billing_info?.next_billing_time
     ? Date.parse(sub.billing_info.next_billing_time)

@@ -1,5 +1,5 @@
 import 'server-only';
-import { serverEnv } from './config';
+import { serverRecaptcha } from './settings';
 
 // Verifies a reCAPTCHA token (works for both v2 checkbox and v3 score).
 // If no secret is configured we allow the request through (dev convenience) but
@@ -8,7 +8,7 @@ export async function verifyRecaptcha(
   token: string | undefined | null,
   remoteIp?: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const { recaptchaSecret, recaptchaV3MinScore } = serverEnv();
+  const { secret: recaptchaSecret, minScore: recaptchaV3MinScore } = serverRecaptcha();
 
   if (!recaptchaSecret) {
     if (process.env.NODE_ENV === 'production') {

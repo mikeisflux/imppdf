@@ -4,12 +4,22 @@ import { useEffect, useImperativeHandle, useRef, forwardRef, useState } from 're
 // Shared reCAPTCHA widget used by every form on the site.
 //  - v2: renders a visible checkbox; token comes from grecaptcha.getResponse().
 //  - v3: invisible; token is produced on demand via execute().
-// If NEXT_PUBLIC_RECAPTCHA_SITE_KEY is unset the widget renders nothing and
-// getToken() returns '' (the server treats an unconfigured secret as pass-through
-// so local development is not blocked).
+// The site key + version are fetched at runtime from /api/public-config so an
+// admin can configure reCAPTCHA in /admin/settings without a rebuild. If no site
+// key is configured the widget renders nothing and getToken() returns '' (the
+// server treats an unconfigured secret as pass-through).
 
-const SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
-const VERSION = (process.env.NEXT_PUBLIC_RECAPTCHA_VERSION || 'v2') as 'v2' | 'v3';
+let SITE_KEY = '';
+let VERSION: 'v2' | 'v3' = 'v2';
+let configPromise: Promise<void> | null = null;
+function loadConfig(): Promise<void> {
+  if (configPromise) return configPromise;
+  configPromise = fetch('/api/public-config')
+    .then((r) => r.json())
+    .then((c) => { SITE_KEY = c?.recaptcha?.siteKey || ''; VERSION = c?.recaptcha?.version || 'v2'; })
+    .catch(() => {});
+  return configPromise;
+}
 
 declare global {
   interface Window {
@@ -53,22 +63,28 @@ export const Recaptcha = forwardRef<RecaptchaHandle, { className?: string }>(
     const boxRef = useRef<HTMLDivElement>(null);
     const widgetId = useRef<number | null>(null);
     const [ready, setReady] = useState(false);
+    const [enabled, setEnabled] = useState(false);
 
     useEffect(() => {
       let cancelled = false;
-      loadScript().then(() => {
-        if (cancelled || !SITE_KEY) { setReady(true); return; }
-        window.grecaptcha?.ready(() => {
+      loadConfig().then(() => {
+        if (cancelled) return;
+        if (!SITE_KEY) { setReady(true); return; }
+        setEnabled(true);
+        loadScript().then(() => {
           if (cancelled) return;
-          if (VERSION === 'v2' && boxRef.current && widgetId.current === null) {
-            try {
-              widgetId.current = window.grecaptcha.render(boxRef.current, {
-                sitekey: SITE_KEY,
-                theme: 'dark',
-              });
-            } catch { /* already rendered */ }
-          }
-          setReady(true);
+          window.grecaptcha?.ready(() => {
+            if (cancelled) return;
+            if (VERSION === 'v2' && boxRef.current && widgetId.current === null) {
+              try {
+                widgetId.current = window.grecaptcha.render(boxRef.current, {
+                  sitekey: SITE_KEY,
+                  theme: 'dark',
+                });
+              } catch { /* already rendered */ }
+            }
+            setReady(true);
+          });
         });
       });
       return () => { cancelled = true; };
@@ -76,6 +92,7 @@ export const Recaptcha = forwardRef<RecaptchaHandle, { className?: string }>(
 
     useImperativeHandle(ref, () => ({
       async getToken() {
+        await loadConfig();
         if (!SITE_KEY || !window.grecaptcha) return '';
         if (VERSION === 'v3') {
           return window.grecaptcha.execute(SITE_KEY, { action: 'submit' });
@@ -89,7 +106,7 @@ export const Recaptcha = forwardRef<RecaptchaHandle, { className?: string }>(
       },
     }));
 
-    if (!SITE_KEY) return null;
+    if (!enabled) return null;
     return (
       <div className={className} style={{ minHeight: VERSION === 'v2' ? 78 : 0 }}>
         {VERSION === 'v2' && <div ref={boxRef} />}

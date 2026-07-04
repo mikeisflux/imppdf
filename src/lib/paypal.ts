@@ -1,19 +1,19 @@
 import 'server-only';
-import { serverEnv } from './config';
+import { serverPaypal } from './settings';
 
 function baseUrl() {
-  return serverEnv().paypalEnv === 'live'
+  return serverPaypal().env === 'live'
     ? 'https://api-m.paypal.com'
     : 'https://api-m.sandbox.paypal.com';
 }
 
 export function paypalConfigured() {
-  const { paypalClientId, paypalSecret } = serverEnv();
+  const { clientId: paypalClientId, secret: paypalSecret } = serverPaypal();
   return Boolean(paypalClientId && paypalSecret);
 }
 
 async function accessToken(): Promise<string> {
-  const { paypalClientId, paypalSecret } = serverEnv();
+  const { clientId: paypalClientId, secret: paypalSecret } = serverPaypal();
   const auth = Buffer.from(`${paypalClientId}:${paypalSecret}`).toString('base64');
   const res = await fetch(`${baseUrl()}/v1/oauth2/token`, {
     method: 'POST',
@@ -65,7 +65,7 @@ export async function verifyWebhookSignature(
   headers: Headers,
   rawBody: string,
 ): Promise<boolean> {
-  const { paypalWebhookId } = serverEnv();
+  const { webhookId: paypalWebhookId } = serverPaypal();
   if (!paypalWebhookId) {
     console.warn('[paypal] PAYPAL_WEBHOOK_ID not set — cannot verify webhook.');
     return false;

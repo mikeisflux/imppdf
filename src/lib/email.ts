@@ -1,21 +1,17 @@
 import 'server-only';
 import nodemailer from 'nodemailer';
-import { serverEnv } from './config';
+import { serverSmtp } from './settings';
 
-let transporter: nodemailer.Transporter | null = null;
-
+// Not cached — SMTP config can change at runtime via /admin/settings.
 function getTransporter(): nodemailer.Transporter | null {
-  const { smtp } = serverEnv();
+  const smtp = serverSmtp();
   if (!smtp.host || !smtp.user) return null;
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      secure: smtp.secure,
-      auth: { user: smtp.user, pass: smtp.pass },
-    });
-  }
-  return transporter;
+  return nodemailer.createTransport({
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.secure,
+    auth: { user: smtp.user, pass: smtp.pass },
+  });
 }
 
 export interface MailInput {
@@ -31,7 +27,7 @@ export interface MailInput {
 // false return is not fatal.
 export async function sendMail(input: MailInput): Promise<boolean> {
   const t = getTransporter();
-  const { smtp, contactTo } = serverEnv();
+  const smtp = serverSmtp();
   if (!t) {
     console.warn('[email] SMTP not configured — skipping send:', input.subject);
     return false;
@@ -39,7 +35,7 @@ export async function sendMail(input: MailInput): Promise<boolean> {
   try {
     await t.sendMail({
       from: smtp.from,
-      to: input.to || contactTo,
+      to: input.to || smtp.contactEmail,
       subject: input.subject,
       text: input.text,
       html: input.html,

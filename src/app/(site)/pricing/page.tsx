@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { getActiveSubscriptionForUser } from '@/lib/subscriptions';
 import { PlanPanel } from '@/components/account/PlanPanel';
-import { pricing } from '@/lib/config';
+import { publicConfig } from '@/lib/settings';
 import { CATEGORY_LABEL, toolsByCategory, ToolCategory } from '@/lib/tools';
 import { IconCheck, IconArrow } from '@/components/icons';
 
@@ -12,11 +12,6 @@ export const metadata = {
 };
 export const dynamic = 'force-dynamic';
 
-const FREE_FEATURES = [
-  'All tools and previews', 'Local, in-browser processing',
-  `${process.env.NEXT_PUBLIC_FREE_DOWNLOAD_LIMIT || '5'} free downloads total`,
-  `${process.env.NEXT_PUBLIC_FREE_COOLDOWN_HOURS || '8'}-hour cooldown while free downloads remain`,
-];
 const PRO_FEATURES = [
   'Unlimited downloads — no cooldown', 'Every one of the 60+ tools & workflows',
   'API access with your key', 'Priority updates as new tools ship',
@@ -27,6 +22,21 @@ const CATS: ToolCategory[] = ['imposition', 'make', 'marks', 'pages', 'advanced'
 export default async function PricingPage() {
   const user = await getCurrentUser();
   const sub = user ? getActiveSubscriptionForUser(user.id) : null;
+  const pc = publicConfig();
+  const pricing = pc.pricing;
+  const billingCfg = {
+    clientId: pc.paypal.clientId,
+    planMonthly: pc.paypal.planMonthly,
+    planYearly: pc.paypal.planYearly,
+    priceMonthly: pc.pricing.monthly,
+    priceYearly: pc.pricing.yearly,
+    currency: pc.pricing.currency,
+  };
+  const FREE_FEATURES = [
+    'All tools and previews', 'Local, in-browser processing',
+    `${pc.freeTier.downloadLimit} free downloads total`,
+    `${pc.freeTier.cooldownHours}-hour cooldown while free downloads remain`,
+  ];
 
   return (
     <div className="container" style={{ padding: '64px 24px 40px' }}>
@@ -69,7 +79,7 @@ export default async function PricingPage() {
       {/* Inline subscribe for signed-in free users */}
       {user && user.plan === 'free' && (
         <div style={{ maxWidth: 520, marginTop: 26 }}>
-          <PlanPanel plan="free" subscription={null} />
+          <PlanPanel plan="free" subscription={null} cfg={billingCfg} />
         </div>
       )}
 

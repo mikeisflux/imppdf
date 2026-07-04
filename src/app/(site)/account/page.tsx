@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { getActiveSubscriptionForUser } from '@/lib/subscriptions';
+import { publicConfig } from '@/lib/settings';
 import { PlanPanel } from '@/components/account/PlanPanel';
 import { ApiKeysPanel } from '@/components/account/ApiKeysPanel';
 import { LogoutButton } from '@/components/account/LogoutButton';
@@ -14,6 +15,15 @@ export default async function AccountPage() {
   if (!user) redirect('/login');
 
   const sub = getActiveSubscriptionForUser(user.id);
+  const pc = publicConfig();
+  const billingCfg = {
+    clientId: pc.paypal.clientId,
+    planMonthly: pc.paypal.planMonthly,
+    planYearly: pc.paypal.planYearly,
+    priceMonthly: pc.pricing.monthly,
+    priceYearly: pc.pricing.yearly,
+    currency: pc.pricing.currency,
+  };
 
   return (
     <div className="dash">
@@ -49,6 +59,7 @@ export default async function AccountPage() {
           billing_cycle: sub.billing_cycle,
           current_period_end: sub.current_period_end,
         } : null}
+        cfg={billingCfg}
       />
 
       <ApiKeysPanel />

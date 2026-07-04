@@ -1,15 +1,15 @@
 import { json } from '@/lib/http';
 import { getCurrentUser } from '@/lib/auth';
 import { downloadStats } from '@/lib/usage';
-import { freeTier } from '@/lib/config';
+import { freeTierConfig } from '@/lib/settings';
 
 // Returns the caller's download entitlement. Anonymous callers get the limits
 // only and enforce client-side via localStorage.
 export async function GET() {
   const user = await getCurrentUser();
   const base = {
-    limit: freeTier.downloadLimit,
-    cooldownHours: freeTier.cooldownHours,
+    limit: freeTierConfig().downloadLimit,
+    cooldownHours: freeTierConfig().cooldownHours,
   };
   if (!user) {
     return json({ authenticated: false, plan: 'free', ...base, count: 0, lastAt: null });

@@ -2,18 +2,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
-
 declare global { interface Window { paypal?: any; } }
 
 let sdkPromise: Promise<void> | null = null;
-function loadSdk(): Promise<void> {
-  if (!CLIENT_ID) return Promise.resolve();
+function loadSdk(clientId: string): Promise<void> {
+  if (!clientId) return Promise.resolve();
   if (window.paypal) return Promise.resolve();
   if (sdkPromise) return sdkPromise;
   sdkPromise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = `https://www.paypal.com/sdk/js?client-id=${CLIENT_ID}&vault=true&intent=subscription`;
+    s.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription`;
     s.async = true;
     s.onload = () => resolve();
     s.onerror = () => reject(new Error('Failed to load PayPal'));
@@ -22,16 +20,18 @@ function loadSdk(): Promise<void> {
   return sdkPromise;
 }
 
-export function PayPalSubscribe({ planId, cycle }: { planId: string; cycle: 'monthly' | 'yearly' }) {
+export function PayPalSubscribe(
+  { planId, cycle, clientId }: { planId: string; cycle: 'monthly' | 'yearly'; clientId: string },
+) {
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const [error, setError] = useState('');
   const [status, setStatus] = useState<'idle' | 'processing' | 'done'>('idle');
 
   useEffect(() => {
-    if (!CLIENT_ID || !planId) return;
+    if (!clientId || !planId) return;
     let cancelled = false;
-    loadSdk().then(() => {
+    loadSdk(clientId).then(() => {
       if (cancelled || !ref.current || !window.paypal) return;
       ref.current.innerHTML = '';
       window.paypal.Buttons({
@@ -62,10 +62,10 @@ export function PayPalSubscribe({ planId, cycle }: { planId: string; cycle: 'mon
       }).render(ref.current);
     }).catch(() => setError('Could not load PayPal.'));
     return () => { cancelled = true; };
-  }, [planId, cycle, router]);
+  }, [planId, cycle, clientId, router]);
 
-  if (!CLIENT_ID) {
-    return <div className="form-note">PayPal is not configured yet. Set NEXT_PUBLIC_PAYPAL_CLIENT_ID and the plan IDs.</div>;
+  if (!clientId) {
+    return <div className="form-note">PayPal is not configured yet. Add your PayPal keys in Admin → Settings.</div>;
   }
   if (!planId) {
     return <div className="form-note">The {cycle} plan id is not configured.</div>;

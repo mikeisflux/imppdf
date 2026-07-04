@@ -2,7 +2,7 @@ import { badRequest, clientIp, isValidEmail, json } from '@/lib/http';
 import { verifyRecaptcha } from '@/lib/recaptcha';
 import { saveContactMessage } from '@/lib/contact';
 import { sendMail } from '@/lib/email';
-import { serverEnv } from '@/lib/config';
+import { serverSmtp } from '@/lib/settings';
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   if (!email || !isValidEmail(email)) return badRequest('Please enter a valid email.');
   if (!message?.trim() || message.trim().length < 5) return badRequest('Please enter a message.');
 
-  const to = serverEnv().contactTo;
+  const to = serverSmtp().contactEmail;
   const topicLabel = topic || 'general';
   const subjLine = `[ImpositionPDF · ${topicLabel}] ${subject || 'New message'}`;
 

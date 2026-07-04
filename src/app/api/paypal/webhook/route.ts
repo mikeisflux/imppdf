@@ -3,7 +3,7 @@ import { getSubscription, verifyWebhookSignature } from '@/lib/paypal';
 import {
   findSubscriptionByPaypalId, upsertSubscription,
 } from '@/lib/subscriptions';
-import { paypal as paypalCfg } from '@/lib/config';
+import { serverPaypal } from '@/lib/settings';
 
 // PayPal subscription webhooks keep our records in sync with billing events
 // (renewals, cancellations, suspensions). Configure the endpoint URL and copy
@@ -47,8 +47,8 @@ export async function POST(req: Request) {
   }
 
   const cycle =
-    local.plan_id === paypalCfg.planYearly ? 'yearly' :
-    local.plan_id === paypalCfg.planMonthly ? 'monthly' : local.billing_cycle;
+    local.plan_id === serverPaypal().planYearly ? 'yearly' :
+    local.plan_id === serverPaypal().planMonthly ? 'monthly' : local.billing_cycle;
 
   upsertSubscription({
     userId: local.user_id,

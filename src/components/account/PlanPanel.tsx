@@ -4,11 +4,14 @@ import { useRouter } from 'next/navigation';
 import { PayPalSubscribe } from './PayPalSubscribe';
 import { IconCheck } from '@/components/icons';
 
-const PLAN_MONTHLY = process.env.NEXT_PUBLIC_PAYPAL_PLAN_MONTHLY || '';
-const PLAN_YEARLY = process.env.NEXT_PUBLIC_PAYPAL_PLAN_YEARLY || '';
-const PRICE_MONTHLY = process.env.NEXT_PUBLIC_PRICE_MONTHLY || '12';
-const PRICE_YEARLY = process.env.NEXT_PUBLIC_PRICE_YEARLY || '120';
-const CURRENCY = process.env.NEXT_PUBLIC_CURRENCY || 'USD';
+export interface BillingConfig {
+  clientId: string;
+  planMonthly: string;
+  planYearly: string;
+  priceMonthly: string;
+  priceYearly: string;
+  currency: string;
+}
 
 const PRO_FEATURES = [
   'Unlimited downloads — no cooldown',
@@ -18,10 +21,11 @@ const PRO_FEATURES = [
 ];
 
 export function PlanPanel({
-  plan, subscription,
+  plan, subscription, cfg,
 }: {
   plan: 'free' | 'pro';
   subscription: { status: string; billing_cycle: string | null; current_period_end: number | null } | null;
+  cfg: BillingConfig;
 }) {
   const router = useRouter();
   const [cycle, setCycle] = useState<'monthly' | 'yearly'>('yearly');
@@ -57,7 +61,7 @@ export function PlanPanel({
     );
   }
 
-  const planId = cycle === 'yearly' ? PLAN_YEARLY : PLAN_MONTHLY;
+  const planId = cycle === 'yearly' ? cfg.planYearly : cfg.planMonthly;
 
   return (
     <div className="card card-pad panel">
@@ -67,11 +71,11 @@ export function PlanPanel({
       <div className="row" style={{ gap: 10, marginBottom: 18 }}>
         <button className={`btn btn-plain ${cycle === 'monthly' ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => setCycle('monthly')}>
-          Monthly · {CURRENCY} {PRICE_MONTHLY}/mo
+          Monthly · {cfg.currency} {cfg.priceMonthly}/mo
         </button>
         <button className={`btn btn-plain ${cycle === 'yearly' ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => setCycle('yearly')}>
-          Yearly · {CURRENCY} {PRICE_YEARLY}/yr
+          Yearly · {cfg.currency} {cfg.priceYearly}/yr
         </button>
       </div>
 
@@ -81,7 +85,7 @@ export function PlanPanel({
         ))}
       </ul>
 
-      <PayPalSubscribe planId={planId} cycle={cycle} />
+      <PayPalSubscribe planId={planId} cycle={cycle} clientId={cfg.clientId} />
     </div>
   );
 }
