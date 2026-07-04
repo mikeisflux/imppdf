@@ -17,7 +17,7 @@ import {
 } from './modals';
 import { PreflightInspector, runPreflightChecks, VdpWizard, AskAIPanel, type PfReport } from './inspector-wizards';
 import { EditPdfModal } from './edit-pdf';
-import { TemplatesModal } from './catalog-bridge';
+import { TemplateLibrary } from './template-library';
 import './press.css';
 
 interface LoadedFile { name: string; bytes: Uint8Array; info: PdfPageInfo; }
@@ -216,8 +216,9 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   const outPaper = sheets.length ? paperName(sheets[0]!.wPt / 72, sheets[0]!.hPt / 72) : file ? paperName(file.info.widthIn, file.info.heightIn) : '';
 
   async function buildFinal(bytes?: Uint8Array): Promise<Uint8Array> {
-    let out = bytes ?? (outBytesRef.current && !paused ? outBytesRef.current : await runPipeline(file!.bytes, pipelineSteps));
-    if (Object.values(jobInfo).some((v) => v.trim())) out = await setPdfJobInfo(out, jobInfo);
+    const hasEncrypt = steps.some((st) => st.enabled && st.type === 'pdftools' && st.s.op === 'encrypt' && st.s.userPassword?.trim());
+    let out = bytes ?? await runPipeline(file!.bytes, pipelineSteps, true);
+    if (!hasEncrypt && Object.values(jobInfo).some((v) => v.trim())) out = await setPdfJobInfo(out, jobInfo);
     return out;
   }
   const namedOutput = () => resolveName(settings.nameTemplate, {
@@ -277,7 +278,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
     const outs: { name: string; data: Uint8Array }[] = [];
     for (let i = 0; i < files.length; i++) {
       progress(i, files.length);
-      const out = await runPipeline(files[i]!.bytes, pipelineSteps);
+      const out = await runPipeline(files[i]!.bytes, pipelineSteps, true);
       outs.push({ name: resolveName(settings.nameTemplate, { fileName: files[i]!.name, tool: toolLabel, pages: 0, paperSize: outPaper, custom: settings.customText }), data: out });
     }
     progress(files.length, files.length);
@@ -557,7 +558,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
           onClose={() => setModal(null)} onRun={runBatch} />
       )}
       {modal === 'templates' && (
-        <TemplatesModal onClose={() => setModal(null)} onApply={(next) => setSteps(next)} />
+        <TemplateLibrary onClose={() => setModal(null)} onApply={(next) => setSteps(next)} pageCount={file?.info.count ?? 30} />
       )}
       {modal === 'vdp' && (
         <VdpWizard onClose={() => setModal(null)} onDone={async (pdf, records) => {

@@ -756,3 +756,55 @@
   position: absolute; z-index: 3; font-size: 14px; padding: 2px 6px;
   border: 1.5px solid var(--pe-violet); border-radius: 4px; background: #fff; color: #111; outline: none;
 }
+
+/* ── Template Library (full-screen) ──────────────────────────────────────── */
+.pe-lib-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(5,5,10,0.7); display: grid; place-items: center; padding: 14px; }
+.pe-lib {
+  width: 100%; height: 100%; max-width: 1700px;
+  display: flex; flex-direction: column;
+  background: var(--pe-bg); color: var(--pe-ink);
+  border: 1px solid var(--pe-border-strong); border-radius: 14px; overflow: hidden;
+}
+.pe-lib-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--pe-border);
+  font-size: 14px;
+}
+.pe-lib-search {
+  display: flex; align-items: center; gap: 7px; flex: 0 0 300px;
+  border: 1px solid var(--pe-border-strong); border-radius: 9px; padding: 6px 10px;
+  color: var(--pe-muted); margin-left: 10px;
+}
+.pe-lib-search input { flex: 1; background: none; border: none; outline: none; color: var(--pe-ink); font-size: 12.5px; }
+.pe-lib-head .pe-segrow { margin-left: auto; }
+.pe-lib-filters {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  padding: 8px 14px; border-bottom: 1px solid var(--pe-border); color: var(--pe-faint);
+}
+.pe-lib-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  padding: 4px 9px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--pe-border-strong); background: none; color: var(--pe-muted);
+}
+.pe-lib-chip.pe-on { border-color: var(--pe-violet); color: var(--pe-violet); background: var(--pe-violet-soft); }
+.pe-lib-body { flex: 1; display: flex; min-height: 0; }
+.pe-lib-tree { width: 300px; flex: 0 0 300px; overflow-y: auto; border-right: 1px solid var(--pe-border); padding: 8px; }
+.pe-lib-group {
+  display: flex; align-items: center; gap: 7px; width: 100%; text-align: left;
+  padding: 8px 6px; border: none; background: none; cursor: pointer;
+  font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+  color: var(--pe-muted);
+}
+.pe-lib-group-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-lib-preview {
+  flex: 1; min-width: 0; overflow: auto; position: relative;
+  display: flex; align-items: center; justify-content: center; padding: 40px;
+  background: var(--pe-canvas);
+}
+.pe-lib-sheet { width: min(52vh, 480px); max-width: 92%; box-shadow: 0 10px 40px rgba(0,0,0,0.45); border-radius: 2px; }
+.pe-lib-preview-chips { position: absolute; top: 14px; right: 16px; display: flex; gap: 6px; }
+.pe-lib-foot {
+  display: flex; align-items: center; gap: 18px;
+  padding: 12px 18px; border-top: 1px solid var(--pe-border);
+}

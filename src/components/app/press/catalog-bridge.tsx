@@ -86,6 +86,8 @@ const TOOL_TO_TYPE: Record<string, StepType> = {
   cutstack: 'cutstack', shuffle: 'shuffle', rotate: 'rotate', pagenumbers: 'pagenumbers',
   overlay: 'watermark',
   poster: 'resize', rollerbanner: 'resize', banner: 'resize', featherflag: 'resize',
+  packaging: 'grid', boxcarton: 'grid', envelope: 'grid', calendar: 'calendar',
+  variable: 'datamerge', vdp: 'datamerge',
 };
 
 export function templateToSteps(t: TemplateDef): WorkflowStep[] | null {

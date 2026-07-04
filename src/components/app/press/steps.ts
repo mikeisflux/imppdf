@@ -224,12 +224,14 @@ function braillePos(pos: string): { xPt?: number; yPt?: number } {
 }
 
 // Runs every enabled step. `split` and `preflight` are pass-through here — the
-// export path handles split's multi-file output separately.
-export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[]): Promise<Uint8Array> {
+// export path handles split's multi-file output separately. Encryption only
+// applies on export (`forExport`) so the live preview can still rasterise.
+export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forExport = false): Promise<Uint8Array> {
   let b = bytes;
   for (const step of steps) {
     if (!step.enabled) continue;
     const s = step.s;
+    if (step.type === 'pdftools' && s.op === 'encrypt' && !forExport) continue;
     switch (step.type) {
       case 'booklet': b = await imposeBooklet(b, bookletOpts(s)); break;
       case 'zine': b = await imposeFoldZine(b, {
@@ -273,8 +275,14 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[]): Pro
       }
       case 'pdftools': {
         if (s.op === 'optimize') b = await optimizePdf(b, { objectStreams: s.useObjectStreams !== false, removeUnused: s.removeUnused !== false });
-        else if (s.op === 'decrypt') b = await decryptPdf(b);
-        else b = await repairPdf(b, { reserialize: true, stripMetadata: !!s.stripMetadata, removeAnnotations: !!s.removeAnnotations, removeJavaScript: !!s.removeJavaScript });
+        else if (s.op === 'linearize') b = await (await import('./wasm-engines')).linearizePdf(b);
+        else if (s.op === 'encrypt') {
+          if (s.userPassword?.trim()) b = await (await import('./wasm-engines')).encryptPdfAes(b, s.userPassword, s.ownerPassword);
+        } else if (s.op === 'decrypt') {
+          b = s.password?.trim()
+            ? await (await import('./wasm-engines')).decryptPdfWithPassword(b, s.password)
+            : await decryptPdf(b);
+        } else b = await repairPdf(b, { reserialize: true, stripMetadata: !!s.stripMetadata, removeAnnotations: !!s.removeAnnotations, removeJavaScript: !!s.removeJavaScript });
         break;
       }
       case 'layers': {
@@ -304,10 +312,21 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[]): Pro
         grayscale: s.grayscale, warmTone: s.warmTone, invert: s.invert,
         hueRotate: s.hueRotate, dpi: s.dpi, pages: s.pages,
       }); break;
-      case 'colormanage': b = await applyColorManagement(b, {
-        sourceProfile: s.sourceProfile, destProfile: s.destProfile, intent: s.intent,
-        dpi: s.dpi, convert: !!s.convert, gamutWarning: !!s.gamutWarning, pages: s.pages,
-      }); break;
+      case 'colormanage': {
+        if (s.icc && s.convert) {
+          // Real LittleCMS proofing transform through the uploaded ICC profile.
+          b = await (await import('./wasm-engines')).applyIccColorManagement(b, s.icc as Uint8Array, {
+            intent: s.intent, dpi: s.dpi, gamutWarning: !!s.gamutWarning,
+            blackPointComp: s.blackPointComp !== false, pages: s.pages,
+          });
+        } else {
+          b = await applyColorManagement(b, {
+            sourceProfile: s.sourceProfile, destProfile: s.destProfile, intent: s.intent,
+            dpi: s.dpi, convert: !!s.convert, gamutWarning: !!s.gamutWarning, pages: s.pages,
+          });
+        }
+        break;
+      }
       case 'barcode': b = await addBarcodeStamp(b, {
         text: s.text || ' ', symbology: s.symbology, scale: s.scale, quietZone: s.quietZone,
         barHeightMm: s.barHeightMm, position: s.position, marginPt: s.marginPt,

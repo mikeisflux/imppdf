@@ -8,11 +8,16 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     // The imposition plugin loads the pdf.js worker via a Vite-style `?url`
     // import (wrapped in try/catch). Teach webpack to emit that asset and return
     // its URL, matching Vite's behaviour.
     config.module.rules.push({ resourceQuery: /url/, type: 'asset/resource' });
+    // qpdf-wasm's emscripten glue probes Node builtins at runtime; in the
+    // browser bundle they must resolve to empty stubs.
+    if (!isServer) {
+      config.resolve.fallback = { ...config.resolve.fallback, fs: false, path: false, crypto: false, module: false };
+    }
     return config;
   },
 };

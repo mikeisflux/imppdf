@@ -762,18 +762,45 @@ function CustomImposePanel(p: PanelProps) {
 // ── PDF Tools + Layers ───────────────────────────────────────────────────────
 function PdfToolsPanel({ s, up }: PanelProps) {
   return (
-    <Section label="// OPERATION" help="Whole-file maintenance run in your browser.">
+    <Section label="// OPERATION" help="Whole-file maintenance. Encrypt, decrypt and linearize run on qpdf compiled to WebAssembly — still entirely in your browser.">
       <div className="pe-chipwrap" style={{ marginBottom: 12 }}>
-        <button className={`pe-chipbtn ${s.op === 'optimize' ? 'pe-chip-on' : ''}`} onClick={() => up({ op: 'optimize' })}>⚡ Optimize</button>
-        <button className={`pe-chipbtn ${s.op === 'repair' ? 'pe-chip-on' : ''}`} onClick={() => up({ op: 'repair' })}>🛠 Repair</button>
+        {([['optimize', '⚡ Optimize'], ['linearize', '🌐 Linearize'], ['encrypt', '🔒 Encrypt'], ['decrypt', '🔓 Decrypt'], ['repair', '🛠 Repair']] as const).map(([op, label]) => (
+          <button key={op} className={`pe-chipbtn ${s.op === op ? 'pe-chip-on' : ''}`} onClick={() => up({ op })}>{label}</button>
+        ))}
       </div>
-      {s.op === 'optimize' ? (
+      {s.op === 'optimize' && (
         <>
           <Check label="Generate object streams (smaller)" checked={s.useObjectStreams !== false} onChange={(v) => up({ useObjectStreams: v })} />
-          <div className="pe-note">Rebuilds the file with compressed object streams — often 10-40% smaller. Encryption and linearization are not available in-browser.</div>
+          <Check label="Remove unreferenced objects" checked={s.removeUnused !== false} onChange={(v) => up({ removeUnused: v })} />
+          <div className="pe-note">Rebuilds the file with compressed object streams — often 10-40% smaller.</div>
         </>
-      ) : (
-        <div className="pe-note">Loads and rewrites the file structure, discarding broken cross-reference tables. Fixes many &quot;file is damaged&quot; PDFs.</div>
+      )}
+      {s.op === 'linearize' && (
+        <div className="pe-note">Rewrites the file for fast web view (byte-serving) via qpdf — first page renders before the rest downloads.</div>
+      )}
+      {s.op === 'encrypt' && (
+        <>
+          <span className="pe-label-sm">User password (to open)</span>
+          <input className="pe-input" type="password" style={{ margin: '5px 0 10px' }} value={s.userPassword ?? ''} onChange={(e) => up({ userPassword: e.target.value })} />
+          <span className="pe-label-sm">Owner password (permissions — optional)</span>
+          <input className="pe-input" type="password" style={{ margin: '5px 0 10px' }} value={s.ownerPassword ?? ''} onChange={(e) => up({ ownerPassword: e.target.value })} />
+          <div className="pe-note">AES-256 encryption via qpdf. Applied at export; the live preview shows the unencrypted content.</div>
+        </>
+      )}
+      {s.op === 'decrypt' && (
+        <>
+          <span className="pe-label-sm">Password (leave blank for restriction-only files)</span>
+          <input className="pe-input" type="password" style={{ margin: '5px 0 10px' }} value={s.password ?? ''} onChange={(e) => up({ password: e.target.value })} />
+          <div className="pe-note">Removes encryption you are authorised to remove — with the password via qpdf, or directly for permission-flag-only files.</div>
+        </>
+      )}
+      {s.op === 'repair' && (
+        <>
+          <Check label="Re-serialize PDF (fix xref, streams)" checked onChange={() => {}} />
+          <Check label="Strip metadata (title, author, etc.)" checked={!!s.stripMetadata} onChange={(v) => up({ stripMetadata: v })} />
+          <Check label="Remove annotations" checked={!!s.removeAnnotations} onChange={(v) => up({ removeAnnotations: v })} />
+          <Check label="Remove JavaScript / actions" checked={s.removeJavaScript !== false} onChange={(v) => up({ removeJavaScript: v })} />
+        </>
       )}
     </Section>
   );
@@ -1304,21 +1331,42 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
     case 'colormanage':
       return (
         <>
-          <Section label="// COLOR TRANSFORM" help="Rasterises pages and maps RGB toward the CMYK gamut. ICC profiles are approximated — a press-side RIP still owns final separation.">
+          <Section label="// ICC PROFILE" help="Upload the destination profile (.icc/.icm). With a profile loaded, pixels go through a true LittleCMS proofing transform and the profile is embedded as the PDF OutputIntent.">
+            <button className="pe-chipbtn" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
+              const inp = document.createElement('input');
+              inp.type = 'file'; inp.accept = '.icc,.icm';
+              inp.onchange = async () => {
+                const f = inp.files?.[0]; if (!f) return;
+                const bytes = new Uint8Array(await f.arrayBuffer());
+                const { iccProfileInfo } = await import('./wasm-engines');
+                const info = await iccProfileInfo(bytes);
+                up({ icc: bytes, iccName: info?.name || f.name, destProfile: info?.name || f.name });
+              };
+              inp.click();
+            }}><Ic name="upload" size={14} /> {s.iccName ? `✓ ${s.iccName}` : 'UPLOAD ICC PROFILE'}</button>
+            {s.icc && <button className="pe-chipbtn" style={{ marginTop: 8 }} onClick={() => up({ icc: null, iccName: '', destProfile: '' })}><Ic name="trash" size={12} /> Remove profile</button>}
+            <div className="pe-note">Accepts .icc and .icm. CMYK profiles cannot be bundled due to licensing — upload your own (e.g. FOGRA39, GRACoL 2006, SWOP).</div>
+          </Section>
+          <Section label="// COLOR TRANSFORM" help={s.icc ? 'True ICC transform via LittleCMS (WASM), rendered per pixel with your chosen intent.' : 'No profile uploaded — falls back to a built-in CMYK gamut approximation.'}>
             <span className="pe-label-sm">Source Profile</span>
             <select className="pe-select" style={{ margin: '5px 0 10px' }} value={s.sourceProfile} onChange={(e) => up({ sourceProfile: e.target.value })}>
               <option>sRGB (built-in)</option><option>Display P3 (approx.)</option>
             </select>
             <span className="pe-label-sm">Destination Profile</span>
-            <select className="pe-select" style={{ margin: '5px 0 10px' }} value={s.destProfile} onChange={(e) => up({ destProfile: e.target.value })}>
-              <option value="">Select destination…</option><option>FOGRA39 (approx.)</option><option>GRACoL 2006 (approx.)</option><option>SWOP (approx.)</option>
-            </select>
+            {s.icc ? (
+              <input className="pe-input" style={{ margin: '5px 0 10px' }} disabled value={`${s.iccName} (LittleCMS)`} />
+            ) : (
+              <select className="pe-select" style={{ margin: '5px 0 10px' }} value={s.destProfile} onChange={(e) => up({ destProfile: e.target.value })}>
+                <option value="">Select destination…</option><option>FOGRA39 (approx.)</option><option>GRACoL 2006 (approx.)</option><option>SWOP (approx.)</option>
+              </select>
+            )}
             <span className="pe-label-sm">Rendering Intent</span>
             <select className="pe-select" style={{ margin: '5px 0 10px' }} value={s.intent} onChange={(e) => up({ intent: e.target.value })}>
               <option value="relative">Relative Colorimetric</option><option value="perceptual">Perceptual</option>
               <option value="saturation">Saturation</option><option value="absolute">Absolute Colorimetric</option>
             </select>
             <Check label="Convert colours (not just tag)" sub="Rewrite pixels toward the CMYK gamut instead of only tagging" checked={!!s.convert} onChange={(v) => up({ convert: v })} />
+            <Check label="Black-point compensation" checked={s.blackPointComp !== false} onChange={(v) => up({ blackPointComp: v })} />
             <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Rasterize DPI</span>
               <select className="pe-select" style={{ width: 110, flex: '0 0 110px' }} value={s.dpi} onChange={(e) => up({ dpi: +e.target.value })}>
                 <option value={150}>150</option><option value={300}>300</option><option value={600}>600</option>
@@ -1328,7 +1376,11 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
           <Section label="// GAMUT WARNING" help="Paints out-of-gamut pixels bright green in the output.">
             <Check label="Show out-of-gamut colors" checked={!!s.gamutWarning} onChange={(v) => up({ gamutWarning: v })} />
           </Section>
-          <div className="pe-note" style={{ marginBottom: 12 }}>ⓘ True ICC conversion needs a press-side color engine; this step approximates the gamut mapping in-browser and flags what will shift.</div>
+          <div className="pe-note" style={{ marginBottom: 12 }}>
+            ⓘ {s.icc
+              ? 'Color conversion rasterises each page, transforms pixels through your ICC profile with LittleCMS, re-embeds them and tags the output with the profile as its OutputIntent.'
+              : 'Without an uploaded ICC profile this step approximates the CMYK gamut in-browser. Upload a profile above for a true LittleCMS transform.'}
+          </div>
         </>
       );
     case 'barcode':
