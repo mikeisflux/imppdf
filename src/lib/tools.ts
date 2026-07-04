@@ -152,6 +152,46 @@ export function findTool(slug: string): Tool | undefined {
   return TOOLS.find((t) => t.slug === slug);
 }
 
+// Maps a marketing tool slug to the plugin editor's internal tool id so a tile
+// can deep-link straight into that tool's workspace (`/app?tool=<id>`) instead
+// of dropping the user on the bare gallery.
+export const SLUG_TO_PLUGIN_ID: Record<string, string> = {
+  'standard-sizes': 'standardsizes', 'n-up-book': 'nupbook', 'cut-and-stack': 'cutstack',
+  'expert-grid': 'expertgrid', 'optimal-fit': 'optimalfit', 'gang-sheet': 'gangsheet',
+  'index-print': 'contact', 'photo-prints': 'photo', 'flyers': 'flyer', 'custom-impose': 'customgrid',
+  'booklet': 'booklet', 'saddle-stitch-magazine': 'magazine', 'perfect-bound-book': 'perfectbound',
+  'zine': 'zine', 'event-program': 'program', 'catalog': 'catalog', 'comic': 'comic',
+  'graphic-novel': 'perfectbound', 'notebook': 'notebook', 'flip-book': 'flipbook',
+  'business-cards': 'business', 'trading-cards': 'trading', 'stickers': 'stickers',
+  'step-and-repeat': 'steprepeat', 'calendar': 'calendar', 'postcards': 'postcard', 'labels': 'labels',
+  'bookmarks': 'bookmark', 'hang-tags': 'hangtag', 'coasters': 'coasters', 'letterhead': 'letterhead',
+  'compliment-slips': 'complimentslip', 'ncr-pads': 'ncrpads', 'envelopes': 'envelope',
+  'trifold-brochure': 'trifold', 'folded-brochure': 'zfold', 'greeting-card': 'greeting', 'menu': 'menu',
+  'wedding-invitation': 'wedding', 'presentation-folder': 'presfolder', 'tiled-poster': 'poster',
+  'banner': 'banner', 'feather-flags': 'featherflag', 'roller-banner': 'rollerbanner',
+  'packaging-dieline': 'packaging', 'box-carton': 'boxcarton', 'bleed-crop-marks': 'bleedmarks',
+  'cutter-marks': 'cropmarks', 'color-bar-header': 'colorbar', 'page-numbering': 'pagenumbers',
+  'preflight': 'preflight', 'variable-data': 'tickets', 'registration-marks': 'registration',
+  'barcode-qr': 'qrstamp', 'watermark': 'watermark', 'backdrop': 'backdrop',
+  'color-management': 'colormanage', 'color-effects': 'coloreffects', 'header-footer': 'headerfooter',
+  'slugline': 'slug', 'collating-marks': 'collating', 'omr-marks': 'omr', 'gathering-marks': 'gathering',
+  'fold-marks': 'foldmarks', 'lay-marks': 'laymarks', 'die-lines': 'cutcontour',
+  'white-varnish': 'whitevarnish', 'braille': 'braille', 'dimensions': 'dimensions',
+  'background-fill': 'backdropfile', 'raffle-tickets': 'raffle', 'coupons': 'coupons',
+  'name-badges': 'namebadge', 'rotate': 'rotate', 'crop': 'crop', 'split': 'split', 'flip': 'flip',
+  'merge': 'merge', 'overlay': 'overlay', 'shuffle': 'shuffle', 'nudge': 'nudge', 'resize': 'resize',
+  'insert-pages': 'insertpages', 'mix': 'mix', 'edit-pdf': 'editpdf', 'distortion-comp': 'distort',
+  'layers': 'layers', 'pdf-tools': 'pdftools', 'pdf-repair': 'repair', 'jdf-export': 'jdf',
+  'nesting': 'nest', 'page-preview': 'dimensions',
+};
+
+// The editor URL a tile should link to. Deep-links into the specific tool's
+// workspace when we know its plugin id; otherwise opens the gallery.
+export function toolAppHref(slug: string): string {
+  const id = SLUG_TO_PLUGIN_ID[slug];
+  return id ? `/app?tool=${id}` : '/app';
+}
+
 // Layout chips shown in the hero "or start with a layout" strip.
 export const HERO_LAYOUT_CHIPS = [
   'Books', 'Brochures', 'Magazines', 'Newspapers', 'Zine', 'Cards', 'Postcards',

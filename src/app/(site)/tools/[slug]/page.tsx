@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { TOOLS, findTool, toolsByCategory, CATEGORY_LABEL } from '@/lib/tools';
+import { TOOLS, findTool, toolsByCategory, CATEGORY_LABEL, toolAppHref } from '@/lib/tools';
 import { ToolMockup } from '@/components/home/ToolMockup';
 import { IconArrow, IconCheck } from '@/components/icons';
 
@@ -55,7 +55,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
           </ul>
 
           <div className="row wrap">
-            <Link href="/app" className="btn btn-primary btn-plain">{tool.cta || 'Open the tool'} <IconArrow width={16} height={16} /></Link>
+            <Link href={toolAppHref(tool.slug)} className="btn btn-primary btn-plain">{tool.cta || 'Open the tool'} <IconArrow width={16} height={16} /></Link>
             <Link href="/pricing" className="btn btn-ghost btn-plain">See pricing</Link>
           </div>
         </div>
@@ -72,7 +72,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
           <h2 style={{ fontSize: 24, marginBottom: 22 }}>Related tools</h2>
           <div className="gallery-grid">
             {related.map((t) => (
-              <Link key={t.slug} href={`/tools/${t.slug}`} className="gallery-card card">
+              <Link key={t.slug} href={toolAppHref(t.slug)} className="gallery-card card">
                 <div className="gallery-thumb"><ToolMockup slug={t.slug} category={t.category} /></div>
                 <div className="gallery-meta">
                   <h4>{t.name}</h4>

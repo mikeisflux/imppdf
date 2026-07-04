@@ -6,7 +6,7 @@ import {
   IconUpload, IconArrow, IconBook, IconGrid, IconCards, IconSliders,
   IconFlag, IconScissors, IconFile, IconLayers, IconSparkle,
 } from '@/components/icons';
-import { HERO_LAYOUT_CHIPS } from '@/lib/tools';
+import { HERO_LAYOUT_CHIPS, toolAppHref } from '@/lib/tools';
 
 const FEATURES = [
   { label: 'Booklets', icon: IconBook }, { label: 'N-up', icon: IconGrid },
@@ -87,7 +87,7 @@ export function Hero() {
           <div className="hero-layouts-chips">
             {HERO_LAYOUT_CHIPS.map((c) => {
               const slug = CHIP_TO_SLUG[c];
-              const href = slug ? `/tools/${slug}` : '/app';
+              const href = slug ? toolAppHref(slug) : '/app';
               return (
                 <Link key={c} href={href} className="chip">
                   <IconLayers width={14} height={14} /> {c}

@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { AppWorkspace } from '@/components/app/AppWorkspace';
 
 export const metadata = {
@@ -7,6 +8,12 @@ export const metadata = {
 };
 
 // The imposition app is fully client-side; render the workspace shell.
+// Suspense boundary is required because AppWorkspace reads the ?tool= param
+// via useSearchParams to deep-link into a specific tool.
 export default function AppPage() {
-  return <AppWorkspace />;
+  return (
+    <Suspense fallback={null}>
+      <AppWorkspace />
+    </Suspense>
+  );
 }

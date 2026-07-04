@@ -6,7 +6,7 @@ import { Faq } from '@/components/home/Faq';
 import { ToolMockup } from '@/components/home/ToolMockup';
 import {
   WHY_CARDS, USE_CASES, GUIDES, CATEGORY_LABEL, COMPARE_LINKS,
-  POPULAR_GUIDE_LINKS, toolsByCategory, ToolCategory,
+  POPULAR_GUIDE_LINKS, toolsByCategory, ToolCategory, toolAppHref,
 } from '@/lib/tools';
 import { IconArrow, IconPrinter, IconGrid } from '@/components/icons';
 
@@ -28,7 +28,7 @@ function GallerySection({ cat }: { cat: ToolCategory }) {
       <h3 className="gallery-block-title">{CATEGORY_LABEL[cat]}</h3>
       <div className="gallery-grid">
         {tools.map((t) => (
-          <Link key={t.slug} href={`/tools/${t.slug}`} className="gallery-card card">
+          <Link key={t.slug} href={toolAppHref(t.slug)} className="gallery-card card">
             <div className="gallery-thumb">
               <ToolMockup slug={t.slug} category={t.category} />
               {!t.inPlugin && <span className="gallery-soon">Coming soon</span>}

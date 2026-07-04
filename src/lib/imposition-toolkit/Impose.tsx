@@ -4527,8 +4527,8 @@ const HOW_TO_STEPS: [string, string][] = [
   ['04', 'Preview live and export a print-ready PDF'],
 ];
 
-export function AdminImpose() {
-  const [activeTool, setActiveTool] = useState<string | null>(null);
+export function AdminImpose({ initialTool }: { initialTool?: string | null } = {}) {
+  const [activeTool, setActiveTool] = useState<string | null>(initialTool ?? null);
   const [activeTemplate, setActiveTemplate] = useState<TemplateDef | null>(null);
   const [activeWorkflow, setActiveWorkflow] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('All');

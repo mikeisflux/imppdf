@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AdminImpose } from '@/lib/imposition-toolkit/Impose';
 import '@/lib/imposition-toolkit/impose.css';
 import { Logo } from '@/components/Logo';
@@ -24,6 +25,8 @@ function writeLocalTimes(t: number[]) {
 }
 
 export function AppWorkspace() {
+  const searchParams = useSearchParams();
+  const initialTool = searchParams.get('tool');
   const [ent, setEnt] = useState<Entitlement | null>(null);
   const [remaining, setRemaining] = useState<number>(0);
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
@@ -136,7 +139,9 @@ export function AppWorkspace() {
       </div>
 
       <div className="app-plugin">
-        <AdminImpose />
+        {/* key remounts the editor when the tile-selected tool changes so the
+            deep-linked tool opens even while /app is already mounted. */}
+        <AdminImpose key={initialTool ?? '__gallery__'} initialTool={initialTool} />
       </div>
 
       {modal && (
