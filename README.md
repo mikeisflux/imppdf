@@ -30,6 +30,17 @@ Production:
 npm run build && npm start
 ```
 
+### Seed a superuser (admin + lifetime Pro)
+
+Creates or promotes an account to `role=admin` + `plan=pro` (no subscription, so
+it never expires). Credentials are passed on the command line so they stay out of
+the repo:
+
+```bash
+SUPERUSER_EMAIL="you@example.com" SUPERUSER_PASSWORD='your-password' npm run seed:superuser
+```
+Idempotent — re-running resets the password and re-grants admin/Pro.
+
 ## Environment
 
 Everything is configured through `.env.local` (see `.env.example` for the full list):

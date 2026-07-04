@@ -9,7 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:init": "node scripts/init-db.mjs"
+    "db:init": "node scripts/init-db.mjs",
+    "seed:superuser": "node scripts/seed-superuser.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
