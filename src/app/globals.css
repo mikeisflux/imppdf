@@ -393,6 +393,19 @@ p { margin: 0; }
 .admin-actions { display: flex; gap: 8px; align-items: center; }
 .admin-btn-sm { padding: 6px 12px; font-size: 12.5px; }
 
+/* Per-field settings rows (click to edit → click to save) */
+.setting-list { display: flex; flex-direction: column; }
+.setting-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border-soft); flex-wrap: wrap; }
+.setting-row:last-child { border-bottom: none; }
+.setting-label { flex: 0 0 220px; font-size: 14px; color: var(--ink-2); font-weight: 500; }
+.setting-control { flex: 1; min-width: 260px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.setting-control .input, .setting-control .select { max-width: 360px; }
+.setting-value { font-size: 14px; color: var(--ink); word-break: break-all; }
+.setting-flash { font-size: 12.5px; font-weight: 600; }
+.setting-flash.ok { color: #86efac; }
+.setting-flash.err { color: #fca5a5; }
+@media (max-width: 620px) { .setting-label { flex-basis: 100%; } }
+
 @media (max-width: 760px) {
   .admin-shell { flex-direction: column; }
   .admin-side { width: 100%; height: auto; position: static; flex-direction: row; flex-wrap: wrap; align-items: center; }

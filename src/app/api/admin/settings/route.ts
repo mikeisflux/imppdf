@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
   // Only accept known keys. Secret fields left blank are skipped so submitting
   // the form without re-typing a secret doesn't wipe it.
-  const SECRET = new Set(['recaptchaSecret', 'paypalSecret', 'smtpPass']);
+  const SECRET = new Set(['recaptchaSecret', 'paypalSecret', 'smtpPass', 'sendgridApiKey']);
   const updates: Record<string, string> = {};
   for (const key of SETTING_KEYS) {
     if (!(key in body)) continue;

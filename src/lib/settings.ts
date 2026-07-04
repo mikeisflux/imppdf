@@ -30,6 +30,8 @@ const ENV_FALLBACK: Record<string, string> = {
   smtpUser: 'SMTP_USER',
   smtpPass: 'SMTP_PASS',
   smtpFrom: 'SMTP_FROM',
+  emailProvider: 'EMAIL_PROVIDER',
+  sendgridApiKey: 'SENDGRID_API_KEY',
   freeDownloadLimit: 'NEXT_PUBLIC_FREE_DOWNLOAD_LIMIT',
   freeCooldownHours: 'NEXT_PUBLIC_FREE_COOLDOWN_HOURS',
 };
@@ -45,6 +47,7 @@ const DEFAULTS: Record<string, string> = {
   smtpPort: '587',
   smtpSecure: 'false',
   smtpFrom: 'ImpositionPDF <no-reply@impositionpdf.com>',
+  emailProvider: 'sendgrid',
   contactEmail: 'divinitycomicsinc@gmail.com',
   freeDownloadLimit: '5',
   freeCooldownHours: '8',
@@ -98,21 +101,23 @@ export const SETTING_GROUPS: { title: string; note?: string; keys: { key: string
     ],
   },
   {
-    title: 'SMTP (email)',
-    note: 'Delivers the contact form. For Gmail use an App Password.',
+    title: 'Email',
+    note: 'Delivers the contact form. SendGrid (API) is recommended; SMTP also works. The From address must be a verified sender/domain in your provider.',
     keys: [
-      { key: 'smtpHost', label: 'Host', placeholder: 'smtp.gmail.com' },
-      { key: 'smtpPort', label: 'Port', type: 'number' },
-      { key: 'smtpSecure', label: 'Use TLS (secure)', type: 'select', options: ['false', 'true'] },
-      { key: 'smtpUser', label: 'Username' },
-      { key: 'smtpPass', label: 'Password', type: 'password' },
-      { key: 'smtpFrom', label: 'From address' },
+      { key: 'emailProvider', label: 'Provider', type: 'select', options: ['sendgrid', 'smtp'] },
+      { key: 'smtpFrom', label: 'From address', placeholder: 'ImpositionPDF <no-reply@impositionpdf.com>' },
+      { key: 'sendgridApiKey', label: 'SendGrid API key', type: 'password' },
+      { key: 'smtpHost', label: 'SMTP host', placeholder: 'smtp.sendgrid.net' },
+      { key: 'smtpPort', label: 'SMTP port', type: 'number' },
+      { key: 'smtpSecure', label: 'SMTP use TLS', type: 'select', options: ['false', 'true'] },
+      { key: 'smtpUser', label: 'SMTP username' },
+      { key: 'smtpPass', label: 'SMTP password', type: 'password' },
     ],
   },
 ];
 
 export const SETTING_KEYS = Object.keys(ENV_FALLBACK);
-const SECRET_KEYS = new Set(['recaptchaSecret', 'paypalSecret', 'smtpPass']);
+const SECRET_KEYS = new Set(['recaptchaSecret', 'paypalSecret', 'smtpPass', 'sendgridApiKey']);
 
 function readAll(): Record<string, string> {
   const rows = getDb().prepare('SELECT key, value FROM settings').all() as
@@ -197,6 +202,23 @@ export function serverSmtp() {
     pass: get('smtpPass', db),
     from: get('smtpFrom', db),
     contactEmail: get('contactEmail', db),
+  };
+}
+
+export function serverEmail() {
+  const db = readAll();
+  return {
+    provider: (get('emailProvider', db) || 'smtp') as 'smtp' | 'sendgrid',
+    sendgridApiKey: get('sendgridApiKey', db),
+    from: get('smtpFrom', db),
+    contactEmail: get('contactEmail', db),
+    smtp: {
+      host: get('smtpHost', db),
+      port: Number(get('smtpPort', db) || '587'),
+      secure: get('smtpSecure', db) === 'true',
+      user: get('smtpUser', db),
+      pass: get('smtpPass', db),
+    },
   };
 }
 

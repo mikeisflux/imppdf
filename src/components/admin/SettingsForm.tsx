@@ -7,88 +7,110 @@ interface FieldDef {
   options?: string[]; placeholder?: string;
 }
 interface GroupDef { title: string; note?: string; keys: FieldDef[]; }
+type Meta = { value: string; isSecret: boolean; isSet: boolean };
+
+// A single setting with its own click-to-edit → click-to-save lifecycle, so each
+// value persists (and shows confirmation) independently.
+function SettingField({ f, meta }: { f: FieldDef; meta: Meta }) {
+  const isSecret = f.type === 'password';
+  const [current, setCurrent] = useState(meta.value); // persisted display value (non-secret)
+  const [configured, setConfigured] = useState(meta.isSet);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState<'saved' | 'error' | null>(null);
+
+  function startEdit() {
+    setDraft(isSecret ? '' : current);
+    setFlash(null);
+    setEditing(true);
+  }
+  function cancel() { setEditing(false); setDraft(''); }
+
+  async function save() {
+    setBusy(true); setFlash(null);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [f.key]: draft }),
+      });
+      setBusy(false);
+      if (!res.ok) { setFlash('error'); return; }
+      if (!isSecret) setCurrent(draft);
+      setConfigured(isSecret ? true : Boolean(draft));
+      setEditing(false);
+      setDraft('');
+      setFlash('saved');
+      setTimeout(() => setFlash((v) => (v === 'saved' ? null : v)), 2500);
+    } catch {
+      setBusy(false); setFlash('error');
+    }
+  }
+
+  return (
+    <div className="setting-row">
+      <div className="setting-label">{f.label}</div>
+      <div className="setting-control">
+        {editing ? (
+          <>
+            {f.type === 'select' ? (
+              <select className="select" value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus>
+                {f.options?.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            ) : (
+              <input
+                className="input" autoFocus
+                type={isSecret ? 'password' : f.type === 'number' ? 'number' : 'text'}
+                value={draft} placeholder={f.placeholder}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
+              />
+            )}
+            <button type="button" className="btn btn-primary btn-plain admin-btn-sm" onClick={save} disabled={busy}>
+              {busy ? 'Saving…' : 'Save'}
+            </button>
+            <button type="button" className="btn btn-ghost btn-plain admin-btn-sm" onClick={cancel} disabled={busy}>
+              Cancel
+            </button>
+            {flash === 'error' && <span className="setting-flash err">save failed</span>}
+          </>
+        ) : (
+          <>
+            <span className="setting-value">
+              {isSecret
+                ? (configured ? <span className="badge badge-green">configured</span> : <span className="muted">not set</span>)
+                : (current ? current : <span className="muted">not set</span>)}
+            </span>
+            {flash === 'saved' && <span className="setting-flash ok">✓ saved</span>}
+            <button type="button" className="btn btn-ghost btn-plain admin-btn-sm" onClick={startEdit}>
+              {configured || current ? 'Edit' : 'Set'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function SettingsForm({
   groups, view,
 }: {
   groups: GroupDef[];
-  view: Record<string, { value: string; isSecret: boolean; isSet: boolean }>;
+  view: Record<string, Meta>;
 }) {
-  const [values, setValues] = useState<Record<string, string>>(() => {
-    const v: Record<string, string> = {};
-    for (const g of groups) for (const f of g.keys) v[f.key] = view[f.key]?.value ?? '';
-    return v;
-  });
-  const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState('');
-
-  const upd = (k: string, val: string) => { setValues((s) => ({ ...s, [k]: val })); setSaved(false); };
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true); setError(''); setSaved(false);
-    try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      });
-      if (!res.ok) { setError((await res.json()).error || 'Save failed.'); setBusy(false); return; }
-      setSaved(true);
-      setBusy(false);
-      // Clear secret fields back to blank (they're stored now).
-      setValues((s) => {
-        const n = { ...s };
-        for (const g of groups) for (const f of g.keys) if (f.type === 'password') n[f.key] = '';
-        return n;
-      });
-    } catch {
-      setError('Network error.'); setBusy(false);
-    }
-  }
-
   return (
-    <form onSubmit={save}>
-      {error && <div className="form-error">{error}</div>}
-      {saved && <div className="form-success">Settings saved. Changes take effect immediately.</div>}
-
+    <div>
       {groups.map((g) => (
         <div key={g.title} className="card card-pad" style={{ marginBottom: 18 }}>
           <h2 style={{ fontSize: 18, marginBottom: g.note ? 4 : 14 }}>{g.title}</h2>
-          {g.note && <p className="muted" style={{ fontSize: 13.5, marginBottom: 16 }}>{g.note}</p>}
-          <div className="grid-2" style={{ gap: 16 }}>
-            {g.keys.map((f) => {
-              const meta = view[f.key];
-              return (
-                <div key={f.key} className="field">
-                  <label htmlFor={`s-${f.key}`}>
-                    {f.label}
-                    {f.type === 'password' && meta?.isSet && (
-                      <span className="badge badge-green" style={{ marginLeft: 8, fontSize: 11 }}>configured</span>
-                    )}
-                  </label>
-                  {f.type === 'select' ? (
-                    <select id={`s-${f.key}`} className="select" value={values[f.key] ?? ''}
-                      onChange={(e) => upd(f.key, e.target.value)}>
-                      {f.options?.map((o) => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  ) : (
-                    <input id={`s-${f.key}`} className="input"
-                      type={f.type === 'password' ? 'password' : f.type === 'number' ? 'number' : 'text'}
-                      value={values[f.key] ?? ''}
-                      placeholder={f.type === 'password' && meta?.isSet ? '•••••••• (leave blank to keep)' : f.placeholder}
-                      onChange={(e) => upd(f.key, e.target.value)} />
-                  )}
-                </div>
-              );
-            })}
+          {g.note && <p className="muted" style={{ fontSize: 13.5, marginBottom: 14 }}>{g.note}</p>}
+          <div className="setting-list">
+            {g.keys.map((f) => (
+              <SettingField key={f.key} f={f} meta={view[f.key] || { value: '', isSecret: false, isSet: false }} />
+            ))}
           </div>
         </div>
       ))}
-
-      <button className="btn btn-primary btn-plain" disabled={busy} type="submit">
-        {busy ? 'Saving…' : 'Save settings'}
-      </button>
-    </form>
+    </div>
   );
 }

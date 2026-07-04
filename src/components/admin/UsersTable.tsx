@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export interface AdminUser {
@@ -27,6 +27,11 @@ export function UsersTable({ users: initial }: { users: AdminUser[] }) {
   const router = useRouter();
   const [users, setUsers] = useState(initial);
   const [busy, setBusy] = useState<number | null>(null);
+
+  // Keep the table in sync when server data refreshes (e.g. after create /
+  // subscription change triggers router.refresh()). Without this the local
+  // useState list goes stale and new users don't appear.
+  useEffect(() => { setUsers(initial); }, [initial]);
 
   // Create-user form state
   const [showCreate, setShowCreate] = useState(false);
