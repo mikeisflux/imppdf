@@ -44,9 +44,6 @@ export function SiteFooter() {
             <Link href="/privacy">Privacy</Link>
             <span className="sep">/</span>
             <Link href="/terms">Terms</Link>
-            <span className="pp-footer-follow">Follow</span>
-            <a href="https://www.linkedin.com" target="_blank" rel="noreferrer">LinkedIn</a>
-            <a href="https://www.youtube.com" target="_blank" rel="noreferrer">YouTube</a>
           </div>
         </div>
       </div>
