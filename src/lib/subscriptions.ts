@@ -67,6 +67,46 @@ export function upsertSubscription(opts: {
   setUserPlan(opts.userId, active ? 'pro' : 'free');
 }
 
+// Admin-set (manual/comp) subscription. Uses a synthetic id so it never
+// collides with a real PayPal subscription, and syncs the user's plan.
+export function setManualSubscription(
+  userId: number,
+  status: string,
+  currentPeriodEnd?: number | null,
+) {
+  upsertSubscription({
+    userId,
+    paypalSubscriptionId: `manual-${userId}`,
+    planId: 'manual',
+    billingCycle: 'manual',
+    status,
+    currentPeriodEnd: currentPeriodEnd ?? null,
+  });
+}
+
+// Remove any manual subscription for a user and drop them to free (unless a
+// real PayPal subscription still keeps them active).
+export function clearManualSubscription(userId: number) {
+  getDb().prepare('DELETE FROM subscriptions WHERE paypal_subscription_id = ?').run(`manual-${userId}`);
+  const stillActive = getDb()
+    .prepare("SELECT 1 FROM subscriptions WHERE user_id = ? AND status = 'ACTIVE' LIMIT 1")
+    .get(userId);
+  setUserPlan(userId, stillActive ? 'pro' : 'free');
+}
+
+// Map of userId -> latest subscription status (for the admin users list).
+export function subscriptionStatusByUser(): Record<number, string> {
+  const rows = getDb()
+    .prepare(
+      `SELECT user_id, status FROM subscriptions
+       WHERE id IN (SELECT MAX(id) FROM subscriptions GROUP BY user_id)`,
+    )
+    .all() as { user_id: number; status: string }[];
+  const map: Record<number, string> = {};
+  for (const r of rows) map[r.user_id] = r.status;
+  return map;
+}
+
 export function getActiveSubscriptionForUser(userId: number): SubscriptionRow | undefined {
   return getDb()
     .prepare(

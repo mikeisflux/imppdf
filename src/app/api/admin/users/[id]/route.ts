@@ -1,6 +1,9 @@
 import { badRequest, json, unauthorized } from '@/lib/http';
 import { getCurrentAdmin } from '@/lib/auth';
 import { findUserById, setUserPlan, setUserRole, setUserStatus } from '@/lib/users';
+import { clearManualSubscription, setManualSubscription } from '@/lib/subscriptions';
+
+const SUB_STATUSES = ['ACTIVE', 'CANCELLED', 'SUSPENDED', 'EXPIRED'];
 
 export async function PATCH(
   req: Request,
@@ -23,6 +26,20 @@ export async function PATCH(
   if (body.plan === 'free' || body.plan === 'pro') setUserPlan(userId, body.plan);
   if (body.role === 'user' || body.role === 'admin') setUserRole(userId, body.role);
   if (body.status === 'active' || body.status === 'suspended') setUserStatus(userId, body.status);
+
+  // Subscription grant/edit. `subscription: 'none'` removes any manual grant;
+  // 'ACTIVE' with no endDate = lifetime (free-forever) comp; with endDate = a
+  // timed comp. Other statuses drop the user to free.
+  if (typeof body.subscription === 'string') {
+    if (body.subscription === 'none') {
+      clearManualSubscription(userId);
+    } else if (SUB_STATUSES.includes(body.subscription)) {
+      const end = body.subscriptionEndDate ? Date.parse(body.subscriptionEndDate) : null;
+      setManualSubscription(userId, body.subscription, Number.isNaN(end as number) ? null : end);
+    } else {
+      return badRequest('Invalid subscription status.');
+    }
+  }
 
   return json({ ok: true });
 }
