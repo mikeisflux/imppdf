@@ -25,6 +25,10 @@ import type {
 } from './impose';
 import { TEMPLATES, TEMPLATE_INDUSTRIES, RECIPES as RECIPE_DATA } from './catalog';
 import type { TemplateDef, TemplatePreset, RecipeDef } from './catalog';
+// Site glue: rasterises PDF pages to thumbnails so the preview shows real
+// artwork in each cell. Re-apply the ToolWorkspace/ImpositionCanvas/Cell hooks
+// below after a plugin upgrade (see docs/UPGRADING.md).
+import { rasterizePdfThumbs } from './page-thumbs';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -1484,9 +1488,30 @@ function fmtDim(inch: number, unit: 'in' | 'mm' | 'pt'): string {
   return unit === 'mm' ? (inch * MM_PER_IN).toFixed(1) : unit === 'pt' ? String(Math.round(inch * 72)) : inch.toFixed(2);
 }
 
-// A single numbered/coloured cell.
-function Cell({ x, y, w, h, n, blank }: { x: number; y: number; w: number; h: number; n: number; blank: boolean }) {
+// A single cell. Shows the real page artwork (`img`) when a rasterised
+// thumbnail is available, otherwise falls back to a numbered coloured block.
+function Cell({ x, y, w, h, n, blank, img, rotate }: { x: number; y: number; w: number; h: number; n: number; blank: boolean; img?: string; rotate?: boolean }) {
+  const clipId = React.useId();
   const fs = Math.min(w, h) * 0.42;
+  if (!blank && img) {
+    // Small page-number badge, sized relative to the cell.
+    const bw = Math.min(w, h) * 0.34, bh = bw * 0.66, bfs = bh * 0.62;
+    return (
+      <g>
+        <clipPath id={clipId}><rect x={x} y={y} width={w} height={h} /></clipPath>
+        <rect x={x} y={y} width={w} height={h} fill="#ffffff" stroke="#cbd5e1" strokeWidth={0.008} />
+        <image
+          href={img} x={x} y={y} width={w} height={h}
+          preserveAspectRatio="xMidYMid slice" clipPath={`url(#${clipId})`}
+          transform={rotate ? `rotate(180 ${x + w / 2} ${y + h / 2})` : undefined}
+        />
+        <g opacity={0.9}>
+          <rect x={x + w - bw - 0.04} y={y + 0.04} width={bw} height={bh} rx={bh * 0.24} fill="rgba(17,17,24,0.74)" />
+          <text x={x + w - bw / 2 - 0.04} y={y + 0.04 + bh / 2} fontSize={bfs} fontWeight={700} fill="#fff" textAnchor="middle" dominantBaseline="central" fontFamily="system-ui, sans-serif">{n}</text>
+        </g>
+      </g>
+    );
+  }
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} fill={blank ? '#ffffff' : CELL_COLORS[(n - 1) % CELL_COLORS.length]} stroke={blank ? '#e2e8f0' : 'none'} strokeWidth={blank ? 0.01 : 0} />
@@ -1512,10 +1537,10 @@ function CellMarks({ x, y, w, h, off, len, center }: { x: number; y: number; w: 
 
 // The imposition preview for a given engine + settings + current output sheet.
 function ImpositionCanvas({
-  engine, nupOpts, bookletOpts, nupBookOpts, posterOpts, ticketOpts, pageCount, unit, sheetLabel, sheetIndex, onSheetCount, zoom,
+  engine, nupOpts, bookletOpts, nupBookOpts, posterOpts, ticketOpts, pageCount, unit, sheetLabel, sheetIndex, onSheetCount, zoom, pageThumbs,
 }: {
   engine: ToolEngine; nupOpts: NUpOptions; bookletOpts: BookletOptions; nupBookOpts: NUpBookOptions; posterOpts: PosterOptions; ticketOpts: TicketOptions;
-  pageCount: number; unit: 'in' | 'mm' | 'pt'; sheetLabel: string; sheetIndex: number; onSheetCount: (n: number) => void; zoom: number;
+  pageCount: number; unit: 'in' | 'mm' | 'pt'; sheetLabel: string; sheetIndex: number; onSheetCount: (n: number) => void; zoom: number; pageThumbs?: string[];
 }) {
   // Build the geometry for the CURRENT output sheet.
   let shW = 8.5, shH = 11, cells: { x: number; y: number; w: number; h: number; n: number; blank: boolean }[] = [];
@@ -1628,7 +1653,7 @@ function ImpositionCanvas({
     <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--canvas-bg)', borderRadius: 12, overflow: 'auto', minHeight: 420 }}>
       <svg width={pxW} height={pxH} viewBox={`${-pad} ${-pad} ${vbW} ${vbH}`} style={{ display: 'block', filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.28))' }}>
         <rect x={0} y={0} width={shW} height={shH} fill="#ffffff" stroke="#cbd5e1" strokeWidth={0.012} />
-        {cells.map((c, i) => <Cell key={i} {...c} />)}
+        {cells.map((c, i) => <Cell key={i} {...c} img={c.blank ? undefined : pageThumbs?.[c.n - 1]} />)}
         {marks.map((m, i) => <CellMarks key={i} {...m} off={off} len={len} center={centerMarks} />)}
       </svg>
       <SheetStepper index={sheetIndex} count={sheetCount} label={sheetLabel} wIn={shW} hIn={shH} unit={unit} />
@@ -2532,6 +2557,18 @@ function ToolWorkspace({ tool, preset, file, onFile, onSelectTool, onBack }: { t
   const [unit, setUnit] = useState<'in' | 'mm' | 'pt'>('in');
   useEffect(() => { setSheetIndex(0); }, [tool.id]);
 
+  // Rasterise the loaded PDF's pages so the preview shows the real artwork in
+  // each cell (not just numbered blocks). Runs in the browser; degrades to the
+  // numbered fallback if rasterisation fails.
+  const [pageThumbs, setPageThumbs] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!file) { setPageThumbs([]); return; }
+    setPageThumbs([]);
+    rasterizePdfThumbs(file.bytes).then((t) => { if (!cancelled) setPageThumbs(t); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [file]);
+
   // Run the active engine and return the produced PDF (or 'multi' for Split which
   // downloads its own parts, or null if it bailed with an error).
   const generate = async (): Promise<{ bytes: Uint8Array; name: string } | 'multi' | null> => {
@@ -2843,6 +2880,7 @@ function ToolWorkspace({ tool, preset, file, onFile, onSelectTool, onBack }: { t
                   sheetLabel={tool.engine === 'nup' || tool.engine === 'tickets'
                     ? `${nupOpts.sheetWIn}×${nupOpts.sheetHIn}` : tool.engine === 'poster' ? `${posterOpts.sheetWIn}×${posterOpts.sheetHIn}` : tool.engine === 'nupbook' ? `${nupBookOpts.sheetWIn}×${nupBookOpts.sheetHIn}` : 'sheet'}
                   sheetIndex={sheetIndex} onSheetCount={setSheetCount} zoom={zoom}
+                  pageThumbs={pageThumbs}
                 />
               </main>
             </div>

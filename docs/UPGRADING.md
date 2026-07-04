@@ -30,6 +30,18 @@ with minimal changes. Everything the plugin touches is isolated behind three fil
      ```
      If the new plugin already accepts an initial-tool prop, use that instead and update
      `AppWorkspace.tsx`. If plugin tool ids change, update `SLUG_TO_PLUGIN_ID` in `tools.ts`.
+   - **Re-apply the real-artwork preview patch** so the imposition canvas shows the actual
+     PDF pages (not numbered colour blocks). `src/lib/imposition-toolkit/page-thumbs.ts` is
+     ours and survives upgrades; re-wire these three hooks in the new `Impose.tsx`:
+     1. `import { rasterizePdfThumbs } from './page-thumbs';` near the other imports.
+     2. In `ToolWorkspace`, add `const [pageThumbs, setPageThumbs] = useState<string[]>([]);`
+        plus a `useEffect` on `[file]` that calls `rasterizePdfThumbs(file.bytes)` and stores
+        the result, and pass `pageThumbs={pageThumbs}` into `<ImpositionCanvas/>`.
+     3. In `ImpositionCanvas`, accept `pageThumbs?: string[]` and render each cell with
+        `img={c.blank ? undefined : pageThumbs?.[c.n - 1]}`. In `Cell`, when `img` is set,
+        draw an `<image preserveAspectRatio="xMidYMid slice" clipPath=…>` with a small page
+        badge; otherwise keep the numbered-block fallback.
+     If a future plugin renders real thumbnails itself, drop this patch.
    - **Dependencies:** the plugin uses `pdf-lib` (required), `qrcode-generator` and
      `pdfjs-dist` (optional — rasterization/preview). `pdfjs-dist` is already installed,
      listed in `serverExternalPackages`, and `next.config.mjs` has a webpack rule so the
