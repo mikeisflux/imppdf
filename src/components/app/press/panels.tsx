@@ -171,6 +171,7 @@ export interface PanelProps {
   pageSizes?: { wPt: number; hPt: number }[];
   layerEntries?: LayerEntry[];
   onToggleLayer?: (stepId: string) => void;
+  sourceBytes?: Uint8Array | null;
 }
 
 function BookletPanel(p: PanelProps) {
@@ -778,10 +779,27 @@ function PdfToolsPanel({ s, up }: PanelProps) {
   );
 }
 
-function LayersPanel({ layerEntries = [], onToggleLayer }: PanelProps) {
+function LayersPanel({ s, up, layerEntries = [], onToggleLayer, sourceBytes }: PanelProps) {
+  const [pdfLayers, setPdfLayers] = useState<{ name: string }[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!sourceBytes) { setPdfLayers([]); return; }
+    import('@/lib/imposition-toolkit/impose').then(({ readLayers }) => readLayers(sourceBytes.slice()))
+      .then((ls) => { if (!cancelled) setPdfLayers(ls); })
+      .catch(() => { if (!cancelled) setPdfLayers([]); });
+    return () => { cancelled = true; };
+  }, [sourceBytes]);
+  const states = (s.states ?? []) as { name: string; state: 'on' | 'off' | 'default' }[];
+  const stateOf = (name: string) => states.find((x) => x.name === name)?.state ?? 'default';
+  const cycle = (name: string) => {
+    const cur = stateOf(name);
+    const next = cur === 'default' ? 'off' : cur === 'off' ? 'on' : 'default';
+    up({ states: [...states.filter((x) => x.name !== name), { name, state: next }] });
+  };
+  const empty = (!pdfLayers || pdfLayers.length === 0) && layerEntries.length === 0;
   return (
-    <Section label="// LAYERS" help="Named layers contributed by workflow steps. Toggling disables that step's output.">
-      {layerEntries.length === 0 ? (
+    <Section label="// LAYERS" help="Optional-content (OCG) layers in the PDF, plus layers contributed by workflow steps.">
+      {empty ? (
         <div className="pe-layers-empty">
           <Ic name="layers" size={26} />
           <div style={{ fontWeight: 600, marginTop: 8 }}>No layers detected</div>
@@ -789,14 +807,28 @@ function LayersPanel({ layerEntries = [], onToggleLayer }: PanelProps) {
             Add a Color Bar or Cutter Marks step with a layer name to create toggleable layers.
           </div>
         </div>
-      ) : layerEntries.map((l) => (
-        <div key={l.stepId} className="pe-row" style={{ marginBottom: 8 }}>
-          <Ic name="layers" size={15} />
-          <span className="pe-label" style={{ flex: 1 }}>{l.name} <span className="pe-label-sm">· {l.stepLabel}</span></span>
-          <button className={`pe-eye ${l.enabled ? '' : 'pe-eye-off'}`} style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-            onClick={() => onToggleLayer?.(l.stepId)}><Ic name={l.enabled ? 'eye' : 'eyeoff'} size={16} /></button>
-        </div>
-      ))}
+      ) : (
+        <>
+          {(pdfLayers ?? []).map((l) => {
+            const st = stateOf(l.name);
+            return (
+              <div key={l.name} className="pe-row" style={{ marginBottom: 8 }}>
+                <Ic name="layers" size={15} />
+                <span className="pe-label" style={{ flex: 1 }}>{l.name} <span className="pe-label-sm">· PDF layer</span></span>
+                <button className="pe-chipbtn" onClick={() => cycle(l.name)}>{st === 'default' ? 'Default' : st === 'on' ? 'Forced on' : 'Forced off'}</button>
+              </div>
+            );
+          })}
+          {layerEntries.map((l) => (
+            <div key={l.stepId} className="pe-row" style={{ marginBottom: 8 }}>
+              <Ic name="layers" size={15} />
+              <span className="pe-label" style={{ flex: 1 }}>{l.name} <span className="pe-label-sm">· {l.stepLabel}</span></span>
+              <button className={`pe-eye ${l.enabled ? '' : 'pe-eye-off'}`} style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                onClick={() => onToggleLayer?.(l.stepId)}><Ic name={l.enabled ? 'eye' : 'eyeoff'} size={16} /></button>
+            </div>
+          ))}
+        </>
+      )}
     </Section>
   );
 }
@@ -960,11 +992,17 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
       );
     case 'headerfooter':
       return (
-        <Section label="// TEXT BANDS" help="Running header and footer.">
+        <Section label="// TEXT BANDS" help="Running header and footer. Tokens fill in per page at export.">
           <span className="pe-label-sm">Header</span>
-          <input className="pe-input" style={{ margin: '5px 0 10px' }} value={s.header} onChange={(e) => up({ header: e.target.value })} />
+          <input className="pe-input" style={{ margin: '5px 0 6px' }} value={s.header} onChange={(e) => up({ header: e.target.value })} />
           <span className="pe-label-sm">Footer</span>
-          <input className="pe-input" style={{ margin: '5px 0 10px' }} value={s.footer} onChange={(e) => up({ footer: e.target.value })} />
+          <input className="pe-input" style={{ margin: '5px 0 6px' }} value={s.footer} onChange={(e) => up({ footer: e.target.value })} />
+          <div className="pe-label-sm" style={{ margin: '4px 0 5px' }}>Insert variable (into footer)</div>
+          <div className="pe-chipwrap" style={{ marginBottom: 10 }}>
+            {['[page]', '[pages]', '[file-name]', '[date]', '[time]'].map((t) => (
+              <button key={t} className="pe-chipbtn pe-mono" onClick={() => up({ footer: `${s.footer ?? ''}${s.footer ? ' ' : ''}${t}` })}>{t}</button>
+            ))}
+          </div>
           <div className="pe-row" style={{ marginBottom: 0 }}>
             <select className="pe-select" value={s.align} onChange={(e) => up({ align: e.target.value })}>
               <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
@@ -975,15 +1013,32 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
       );
     case 'slugline':
       return (
-        <Section label="// SLUG" help="Thin job-info strip. Tokens: [file-name] [date] [time] [page] [page-count]">
-          <input className="pe-input" value={s.text} onChange={(e) => up({ text: e.target.value })} />
-          <div className="pe-row" style={{ marginTop: 10, marginBottom: 0 }}>
-            <select className="pe-select" value={s.position} onChange={(e) => up({ position: e.target.value })}>
-              <option value="bottom">Bottom</option><option value="top">Top</option>
-            </select>
-            <NumRaw value={s.fontSizePt} onValue={(v) => up({ fontSizePt: v })} w={70} /><span className="pe-label-sm">pt</span>
-          </div>
-        </Section>
+        <>
+          <Section label="// PRESETS" help="Common slug templates.">
+            <div className="pe-chipwrap">
+              {([['Standard', '[file-name] · [date] · [page-count]pp'], ['Minimal', '[file-name]'], ['Full Job Info', '[file-name] · [date] [time] · page [page] of [page-count]'], ['Proof', 'PROOF · [file-name] · [date] · NOT FOR PRODUCTION']] as const).map(([label, tpl]) => (
+                <button key={label} className={`pe-chipbtn ${s.text === tpl ? 'pe-chip-on' : ''}`} onClick={() => up({ text: tpl })}>{label}</button>
+              ))}
+            </div>
+          </Section>
+          <Section label="// TEMPLATE" help="Click a token to insert it.">
+            <input className="pe-input pe-mono" value={s.text} onChange={(e) => up({ text: e.target.value })} />
+            <div className="pe-label-sm" style={{ margin: '8px 0 5px' }}>Insert token</div>
+            <div className="pe-chipwrap">
+              {['[file-name]', '[page]', '[page-count]', '[date]', '[time]'].map((t) => (
+                <button key={t} className="pe-chipbtn pe-mono" onClick={() => up({ text: `${s.text ?? ''}${s.text ? ' · ' : ''}${t}` })}>{t}</button>
+              ))}
+            </div>
+          </Section>
+          <Section label="// PLACEMENT" help="Edge + size.">
+            <div className="pe-row" style={{ marginBottom: 0 }}>
+              <select className="pe-select" value={s.position} onChange={(e) => up({ position: e.target.value })}>
+                <option value="bottom">Bottom</option><option value="top">Top</option>
+              </select>
+              <NumRaw value={s.fontSizePt} onValue={(v) => up({ fontSizePt: v })} w={70} /><span className="pe-label-sm">pt</span>
+            </div>
+          </Section>
+        </>
       );
     case 'foldmarks':
       return (
@@ -1059,11 +1114,26 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
       );
     case 'watermark':
       return (
-        <Section label="// WATERMARK" help="Diagonal text stamp across every page.">
-          <input className="pe-input" value={s.text} onChange={(e) => up({ text: e.target.value })} />
-          <div className="pe-row" style={{ marginTop: 10 }}><span className="pe-label pe-w96">Opacity</span><NumRaw value={Math.round(s.opacity * 100)} onValue={(v) => up({ opacity: Math.min(100, Math.max(1, v)) / 100 })} w={70} /><span className="pe-label-sm">%</span></div>
-          <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Angle</span><NumRaw value={s.angleDeg} onValue={(v) => up({ angleDeg: v })} w={70} /><span className="pe-label-sm">°</span><NumRaw value={s.fontSizePt} onValue={(v) => up({ fontSizePt: v })} w={70} /><span className="pe-label-sm">pt</span></div>
-        </Section>
+        <>
+          <Section label="// PRESETS" help="Common proof stamps.">
+            <div className="pe-chipwrap">
+              {['DRAFT', 'CONFIDENTIAL', 'PROOF', 'COPY', 'SAMPLE', 'DO NOT COPY'].map((t) => (
+                <button key={t} className={`pe-chipbtn ${s.text === t ? 'pe-chip-on' : ''}`} onClick={() => up({ text: t })}>{t}</button>
+              ))}
+            </div>
+          </Section>
+          <Section label="// TEXT" help="The stamped text.">
+            <input className="pe-input" value={s.text} onChange={(e) => up({ text: e.target.value })} />
+          </Section>
+          <Section label="// APPEARANCE" help="Size, opacity and angle.">
+            <div className="pe-row"><span className="pe-label pe-w96">Font Size</span><NumRaw value={s.fontSizePt} onValue={(v) => up({ fontSizePt: v })} w={70} /><span className="pe-label-sm">pt</span></div>
+            <div className="pe-row"><span className="pe-label pe-w96">Opacity</span><NumRaw value={Math.round(s.opacity * 100)} onValue={(v) => up({ opacity: Math.min(100, Math.max(1, v)) / 100 })} w={70} /><span className="pe-label-sm">%</span></div>
+            <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Angle</span><NumRaw value={s.angleDeg} onValue={(v) => up({ angleDeg: v })} w={70} /><span className="pe-label-sm">degrees</span></div>
+          </Section>
+          <Section label="// PREVIEW" help="How the stamp will sit on the page.">
+            <div className="pe-wm-preview"><span style={{ transform: `rotate(-${s.angleDeg}deg)`, opacity: Math.max(0.15, s.opacity * 2) }}>{s.text || 'DRAFT'}</span></div>
+          </Section>
+        </>
       );
     case 'pagenumbers':
       return (
@@ -1095,6 +1165,257 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
           </Section>
         </>
       );
+    case 'stickers':
+      return (
+        <>
+          <Section label="// MEDIA FORMAT" help="Stacked sheets or continuous roll.">
+            <div className="pe-cards2">
+              <SelCard on={!s.roll} off={!!s.roll} cap="STACKED SHEETS" onClick={() => up({ roll: false })}><Ic name="stickers" size={20} /></SelCard>
+              <SelCard on={!!s.roll} off={!s.roll} cap="ROLL OF STICKERS" onClick={() => up({ roll: true })}><Ic name="split" size={20} /></SelCard>
+            </div>
+          </Section>
+          <PaperSize {...{ s, up, unit, onUnit }} />
+          <Section label="// REPEAT" help="Fill each sheet, or produce an exact copy count.">
+            <Radio label="Fill sheet" on={!!s.fillSheet} onSelect={() => up({ fillSheet: true })} />
+            <div className="pe-row">
+              <Radio label="Copies" on={!s.fillSheet} onSelect={() => up({ fillSheet: false })} />
+              <NumRaw value={s.copies} onValue={(v) => up({ copies: Math.max(1, Math.round(v)), fillSheet: false })} w={70} min={1} />
+            </div>
+          </Section>
+          <Section label="// WHITESPACE" help="Padding between stickers and margins around the block.">
+            <div className="pe-row"><span className="pe-label pe-w96">Padding</span><NumIn valueIn={s.paddingIn} unit={unit} onIn={(v) => up({ paddingIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
+            <div className="pe-row"><span className="pe-label pe-w96">Margin</span><NumIn valueIn={s.marginTopIn} unit={unit} onIn={(v) => up({ marginTopIn: v, marginLeftIn: v, marginRightIn: v, marginBottomIn: v })} /></div>
+          </Section>
+          <Section label="// NESTING" help="Allow 90° rotation for tighter packing.">
+            <Check label="Allow rotations (0°, 90°)" checked={!!s.allowRotate} onChange={(v) => up({ allowRotate: v })} />
+          </Section>
+        </>
+      );
+    case 'calendar':
+      return (
+        <>
+          <Section label="// PAGE LAYOUT" help="Wall calendars flip the back page so the hung spread reads upright.">
+            <Radio label="Full Sheet" on={!s.halfSheet} onSelect={() => up({ halfSheet: false })} />
+            <Radio label="Half Sheet" on={!!s.halfSheet} onSelect={() => up({ halfSheet: true })} />
+            <Check label="Rotate back page 180°" sub="Wall-calendar back flip" checked={!!s.rotateBack} onChange={(v) => up({ rotateBack: v })} />
+          </Section>
+          <MarksSection {...{ s, up, unit, onUnit }} />
+        </>
+      );
+    case 'insertpages':
+      return (
+        <>
+          <Section label="// SOURCE FILE" help="The PDF whose pages get inserted.">
+            <button className="pe-chipbtn" onClick={() => pickPdf((bytes, name) => up({ file: bytes, fileName: name }))}>
+              <Ic name="upload" size={14} /> {s.fileName || 'Choose file'}
+            </button>
+          </Section>
+          <Section label="// POSITION" help="Where the inserted pages land.">
+            <div className="pe-row"><span className="pe-label pe-w96">Insert before page</span><NumRaw value={s.position} onValue={(v) => up({ position: Math.max(1, Math.round(v)), mode: 'at' })} w={70} min={1} /></div>
+            <Check label={<span>and after every <b>{s.everyN}</b> pages</span>} checked={s.mode === 'everyN'} onChange={(v) => up({ mode: v ? 'everyN' : 'at' })} />
+            {s.mode === 'everyN' && <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Every</span><NumRaw value={s.everyN} onValue={(v) => up({ everyN: Math.max(1, Math.round(v)) })} w={70} min={1} /><span className="pe-label-sm">pages</span></div>}
+          </Section>
+        </>
+      );
+    case 'mix':
+      return (
+        <>
+          <Section label="// SECOND DOCUMENT" help="Interleaved after each page of the working document.">
+            <button className="pe-chipbtn" onClick={() => pickPdf((bytes, name) => up({ second: bytes, secondName: name }))}>
+              <Ic name="upload" size={14} /> {s.secondName || 'Choose PDF'}
+            </button>
+            <div style={{ marginTop: 10 }}>
+              <Check label="Reverse second document" sub="For scanned backs collected in reverse order" checked={!!s.reverseB} onChange={(v) => up({ reverseB: v })} />
+            </div>
+          </Section>
+          <div className="pe-note" style={{ marginBottom: 12 }}>
+            Output order: Doc A page 1, Doc B page 1, Doc A page 2, Doc B page 2… Perfect for merging fronts and backs scanned separately.
+          </div>
+        </>
+      );
+    case 'nudge':
+      return (
+        <>
+          <Section label="// PAGES" help="Which pages shift.">
+            <input className="pe-input" value={s.pages} onChange={(e) => up({ pages: e.target.value })} />
+          </Section>
+          <Section label="// ROTATE" help="Tiny rotation correction.">
+            <div className="pe-row">
+              <button className="pe-chipbtn" onClick={() => up({ rotateDeg: s.rotateDeg - s.rotStepDeg })}>↺</button>
+              <button className="pe-chipbtn" onClick={() => up({ rotateDeg: s.rotateDeg + s.rotStepDeg })}>↻</button>
+              <span className="pe-label-sm" style={{ marginLeft: 'auto' }}>Current: {s.rotateDeg.toFixed(1)}°</span>
+            </div>
+            <div className="pe-row" style={{ marginBottom: 0 }}><NumRaw value={s.rotStepDeg} onValue={(v) => up({ rotStepDeg: v })} w={70} /><span className="pe-label-sm">degrees per step</span></div>
+          </Section>
+          <Section label="// MOVE" help="Cumulative content offset.">
+            <div className="pe-nudge-pad">
+              <button className="pe-chipbtn" style={{ gridArea: 'up' }} onClick={() => up({ dyIn: s.dyIn + s.stepIn })}>▲</button>
+              <button className="pe-chipbtn" style={{ gridArea: 'left' }} onClick={() => up({ dxIn: s.dxIn - s.stepIn })}>◀</button>
+              <button className="pe-chipbtn" style={{ gridArea: 'right' }} onClick={() => up({ dxIn: s.dxIn + s.stepIn })}>▶</button>
+              <button className="pe-chipbtn" style={{ gridArea: 'down' }} onClick={() => up({ dyIn: s.dyIn - s.stepIn })}>▼</button>
+            </div>
+            <div className="pe-label-sm" style={{ margin: '8px 0' }}>Cumulative offset: X {fmtIn(s.dxIn, unit)} · Y {fmtIn(s.dyIn, unit)} {unit}</div>
+            <div className="pe-row"><span className="pe-label pe-w96">Step</span><NumIn valueIn={s.stepIn} unit={unit} onIn={(v) => up({ stepIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
+            <button className="pe-chipbtn" onClick={() => up({ dxIn: 0, dyIn: 0, rotateDeg: 0 })}><Ic name="undo" size={13} /> RESET</button>
+          </Section>
+        </>
+      );
+    case 'backdrop':
+      return (
+        <>
+          <Section label="// BACKDROP FILE" help="Drawn behind your existing page content.">
+            <button className="pe-chipbtn" onClick={() => pickPdf((bytes, name) => up({ file: bytes, fileName: name }))}>
+              <Ic name="upload" size={14} /> {s.fileName || 'Choose File'}
+            </button>
+          </Section>
+          <Section label="// SETTINGS" help="Placement of the backdrop underneath each page.">
+            <Check label="Repeat across all pages" checked={s.repeat !== false} onChange={(v) => up({ repeat: v })} />
+            <div className="pe-grid2">
+              <div className="pe-field-col"><span className="pe-label-sm">Offset X (pt)</span><NumRaw value={s.offsetXPt} onValue={(v) => up({ offsetXPt: v })} /></div>
+              <div className="pe-field-col"><span className="pe-label-sm">Offset Y (pt)</span><NumRaw value={s.offsetYPt} onValue={(v) => up({ offsetYPt: v })} /></div>
+              <div className="pe-field-col"><span className="pe-label-sm">Scale (%)</span><NumRaw value={s.scalePct} onValue={(v) => up({ scalePct: v })} /></div>
+              <div className="pe-field-col"><span className="pe-label-sm">Opacity (%)</span><NumRaw value={s.opacity} onValue={(v) => up({ opacity: Math.min(100, Math.max(0, v)) })} /></div>
+            </div>
+          </Section>
+        </>
+      );
+    case 'coloreffects':
+      return (
+        <>
+          <Section label="// COLOR ADJUSTMENTS" help="Rasterises pages and applies the filter stack.">
+            {([['brightness', 'Brightness', 0, 200], ['contrast', 'Contrast', 0, 200], ['saturation', 'Saturation', 0, 200]] as const).map(([k, label, min, max]) => (
+              <Slider key={k} label={label} value={s[k]} min={min} max={max} suffix="" onChange={(v) => up({ [k]: v })} />
+            ))}
+          </Section>
+          <Section label="// EFFECTS" help="Grayscale, sepia, invert and hue rotation.">
+            {([['grayscale', 'Grayscale', 0, 100, '%'], ['warmTone', 'Warm Tone', 0, 100, '%'], ['invert', 'Invert', 0, 100, '%'], ['hueRotate', 'Hue Rotate', 0, 360, '°']] as const).map(([k, label, min, max, suf]) => (
+              <Slider key={k} label={label} value={s[k]} min={min} max={max} suffix={suf} onChange={(v) => up({ [k]: v })} />
+            ))}
+          </Section>
+          <Section label="// OUTPUT QUALITY" help="Pages become images at this resolution.">
+            <select className="pe-select" value={s.dpi} onChange={(e) => up({ dpi: +e.target.value })}>
+              <option value={150}>150 DPI</option><option value={300}>300 DPI</option><option value={600}>600 DPI</option>
+            </select>
+          </Section>
+          <button className="pe-chipbtn" style={{ width: '100%', justifyContent: 'center', marginBottom: 12 }}
+            onClick={() => up({ brightness: 100, contrast: 100, saturation: 100, grayscale: 0, warmTone: 0, invert: 0, hueRotate: 0 })}>RESET ALL</button>
+        </>
+      );
+    case 'colormanage':
+      return (
+        <>
+          <Section label="// COLOR TRANSFORM" help="Rasterises pages and maps RGB toward the CMYK gamut. ICC profiles are approximated — a press-side RIP still owns final separation.">
+            <span className="pe-label-sm">Source Profile</span>
+            <select className="pe-select" style={{ margin: '5px 0 10px' }} value={s.sourceProfile} onChange={(e) => up({ sourceProfile: e.target.value })}>
+              <option>sRGB (built-in)</option><option>Display P3 (approx.)</option>
+            </select>
+            <span className="pe-label-sm">Destination Profile</span>
+            <select className="pe-select" style={{ margin: '5px 0 10px' }} value={s.destProfile} onChange={(e) => up({ destProfile: e.target.value })}>
+              <option value="">Select destination…</option><option>FOGRA39 (approx.)</option><option>GRACoL 2006 (approx.)</option><option>SWOP (approx.)</option>
+            </select>
+            <span className="pe-label-sm">Rendering Intent</span>
+            <select className="pe-select" style={{ margin: '5px 0 10px' }} value={s.intent} onChange={(e) => up({ intent: e.target.value })}>
+              <option value="relative">Relative Colorimetric</option><option value="perceptual">Perceptual</option>
+              <option value="saturation">Saturation</option><option value="absolute">Absolute Colorimetric</option>
+            </select>
+            <Check label="Convert colours (not just tag)" sub="Rewrite pixels toward the CMYK gamut instead of only tagging" checked={!!s.convert} onChange={(v) => up({ convert: v })} />
+            <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Rasterize DPI</span>
+              <select className="pe-select" style={{ width: 110, flex: '0 0 110px' }} value={s.dpi} onChange={(e) => up({ dpi: +e.target.value })}>
+                <option value={150}>150</option><option value={300}>300</option><option value={600}>600</option>
+              </select>
+            </div>
+          </Section>
+          <Section label="// GAMUT WARNING" help="Paints out-of-gamut pixels bright green in the output.">
+            <Check label="Show out-of-gamut colors" checked={!!s.gamutWarning} onChange={(v) => up({ gamutWarning: v })} />
+          </Section>
+          <div className="pe-note" style={{ marginBottom: 12 }}>ⓘ True ICC conversion needs a press-side color engine; this step approximates the gamut mapping in-browser and flags what will shift.</div>
+        </>
+      );
+    case 'barcode':
+      return (
+        <>
+          <Section label="// DATA" help="Static text or URL encoded into the symbol.">
+            <input className="pe-input pe-mono" value={s.text} onChange={(e) => up({ text: e.target.value })} />
+          </Section>
+          <Section label="// SYMBOLOGY" help="QR fits URLs/text; Code 128 and EAN-13 are linear retail codes.">
+            <select className="pe-select" value={s.symbology} onChange={(e) => up({ symbology: e.target.value })}>
+              <option value="qr">QR Code</option><option value="code128">Code 128</option>
+              <option value="datamatrix">DataMatrix</option><option value="ean13">EAN-13</option>
+            </select>
+            <div className="pe-grid2" style={{ marginTop: 10 }}>
+              <div className="pe-field-col"><span className="pe-label-sm">Module size (pt)</span><NumRaw value={s.scale} onValue={(v) => up({ scale: Math.max(1, v) })} /></div>
+              <div className="pe-field-col"><span className="pe-label-sm">Quiet zone</span><NumRaw value={s.quietZone} onValue={(v) => up({ quietZone: Math.max(0, v) })} /></div>
+            </div>
+          </Section>
+          <Section label="// POSITION" help="Anchor + offsets, like the reference 9-point grid.">
+            <div className="pe-anchor-grid">
+              {(['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'] as const).map((p2) => (
+                <button key={p2} className={`pe-anchor ${s.position === p2 ? 'pe-on' : ''}`} onClick={() => up({ position: p2 })} />
+              ))}
+            </div>
+            <div className="pe-grid2" style={{ marginTop: 10 }}>
+              <div className="pe-field-col"><span className="pe-label-sm">X Offset (pt)</span><NumRaw value={s.xOffsetPt} onValue={(v) => up({ xOffsetPt: v })} /></div>
+              <div className="pe-field-col"><span className="pe-label-sm">Y Offset (pt)</span><NumRaw value={s.yOffsetPt} onValue={(v) => up({ yOffsetPt: v })} /></div>
+            </div>
+            <span className="pe-label-sm" style={{ display: 'block', margin: '10px 0 5px' }}>Rotation</span>
+            <div className="pe-chipwrap">
+              {[0, 90, 180, 270].map((r) => <button key={r} className={`pe-chipbtn ${s.rotationDeg === r ? 'pe-chip-on' : ''}`} onClick={() => up({ rotationDeg: r })}>{r}°</button>)}
+            </div>
+          </Section>
+          <Section label="// APPEARANCE" help="Background + human-readable text.">
+            <Check label="Transparent background" checked={!!s.transparent} onChange={(v) => up({ transparent: v })} />
+            <Check label="Human-readable text under linear codes" checked={!!s.showText} onChange={(v) => up({ showText: v })} />
+            <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Pages</span><input className="pe-input" value={s.pages} onChange={(e) => up({ pages: e.target.value })} /></div>
+          </Section>
+        </>
+      );
+    case 'dimensions':
+      return (
+        <Section label="// DIMENSIONS" help="Labels the exact page sizes with arrows in the margins.">
+          <div className="pe-note">Adds width/height dimension callouts (inches + points) to every page — handy on proofs so nobody guesses the trim.</div>
+        </Section>
+      );
+    case 'whitevarnish':
+      return (
+        <>
+          <Section label="// LAYER TYPE" help="White prints under the artwork as a base; varnish coats on top.">
+            <div className="pe-cards2">
+              <SelCard on={s.layerType === 'white'} off={s.layerType !== 'white'} cap="WHITE" onClick={() => up({ layerType: 'white', spotName: 'White' })}><Ic name="watermark" size={20} /></SelCard>
+              <SelCard on={s.layerType === 'varnish'} off={s.layerType !== 'varnish'} cap="VARNISH" onClick={() => up({ layerType: 'varnish', spotName: 'Varnish' })}><Ic name="layers" size={20} /></SelCard>
+            </div>
+          </Section>
+          <Section label="// APPEARANCE" help="Separation name sent to the RIP + coverage.">
+            <span className="pe-label-sm">Separation Name</span>
+            <input className="pe-input" style={{ margin: '5px 0 10px' }} value={s.spotName} onChange={(e) => up({ spotName: e.target.value })} />
+            <Slider label="Coverage" value={Math.round(s.tint * 100)} min={0} max={100} suffix="%" onChange={(v) => up({ tint: v / 100 })} />
+          </Section>
+          <Section label="// TARGET BOX" help="The area the layer floods.">
+            <div className="pe-chipwrap">
+              {(['trim', 'bleed', 'flood'] as const).map((c) => (
+                <button key={c} className={`pe-chipbtn ${s.coverage === c ? 'pe-chip-on' : ''}`} onClick={() => up({ coverage: c })}>{c === 'flood' ? 'Media' : c[0]!.toUpperCase() + c.slice(1)}</button>
+              ))}
+            </div>
+          </Section>
+        </>
+      );
+    case 'braille':
+      return (
+        <>
+          <Section label="// BRAILLE TEXT" help="Grade-1 (uncontracted) transcription — proof against a certified source before embossing.">
+            <input className="pe-input" placeholder="Type text to transcribe..." value={s.text} onChange={(e) => up({ text: e.target.value })} />
+          </Section>
+          <Section label="// POSITION" help="Corner anchor for the first cell.">
+            <div className="pe-chipwrap">
+              {([['bl', 'bottom-left'], ['tl', 'top-left']] as const).map(([v, label]) => (
+                <button key={v} className={`pe-chipbtn ${s.position === v ? 'pe-chip-on' : ''}`} onClick={() => up({ position: v })}>{label}</button>
+              ))}
+            </div>
+          </Section>
+          <Section label="// APPEARANCE" help="Dot diameter (1.5 mm standard).">
+            <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Dot size</span><NumRaw value={s.dotDiaPt} onValue={(v) => up({ dotDiaPt: Math.max(1, v) })} w={70} /><span className="pe-label-sm">pt</span></div>
+          </Section>
+        </>
+      );
     case 'preflight':
       return (
         <Section label="// PREFLIGHT" help="Non-destructive inspection of the current pipeline input.">
@@ -1104,6 +1425,24 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
     default:
       return null;
   }
+}
+
+function pickPdf(onLoaded: (bytes: Uint8Array, name: string) => void) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'application/pdf';
+  inp.onchange = async () => { const f = inp.files?.[0]; if (f) onLoaded(new Uint8Array(await f.arrayBuffer()), f.name); };
+  inp.click();
+}
+function Slider({ label, value, min, max, suffix, onChange }: { label: string; value: number; min: number; max: number; suffix: string; onChange: (v: number) => void }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div className="pe-row" style={{ marginBottom: 4 }}>
+        <span className="pe-label-sm" style={{ flex: 1 }}>{label}</span>
+        <span className="pe-label-sm pe-mono">{value}{suffix}</span>
+      </div>
+      <input type="range" className="pe-slider" min={min} max={max} value={value} onChange={(e) => onChange(+e.target.value)} />
+    </div>
+  );
 }
 
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
@@ -1123,10 +1462,10 @@ export function StepPanelBody(props: PanelProps & { type: StepType }) {
 }
 
 // ── Step card (collapsible, reorderable) ─────────────────────────────────────
-export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSizes, layerEntries, onToggleLayer, onChange, onRemove, onMove, canUp, canDown }: {
+export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSizes, layerEntries, onToggleLayer, sourceBytes, onChange, onRemove, onMove, canUp, canDown }: {
   step: WorkflowStep; index: number; unit: Unit; onUnit: (u: Unit) => void; pageCount?: number;
   thumbs?: string[]; pageSizes?: { wPt: number; hPt: number }[];
-  layerEntries?: LayerEntry[]; onToggleLayer?: (stepId: string) => void;
+  layerEntries?: LayerEntry[]; onToggleLayer?: (stepId: string) => void; sourceBytes?: Uint8Array | null;
   onChange: (next: WorkflowStep) => void; onRemove: () => void; onMove: (dir: -1 | 1) => void;
   canUp: boolean; canDown: boolean;
 }) {
@@ -1154,7 +1493,7 @@ export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSiz
         <>
           <div className="pe-tip"><Ic name="bulb" size={16} /> {op.tip}</div>
           <StepPanelBody type={step.type} s={step.s} up={up} unit={unit} onUnit={onUnit} pageCount={pageCount}
-            thumbs={thumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={onToggleLayer} />
+            thumbs={thumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={onToggleLayer} sourceBytes={sourceBytes} />
         </>
       )}
     </div>
@@ -1162,18 +1501,33 @@ export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSiz
 }
 
 // ── Choose Operation (tool catalog + customize) ──────────────────────────────
-export function ChooseOperation({ onSelect, hidden, onToggleHidden, title = 'Choose Operation' }: {
+export function ChooseOperation({ onSelect, hidden, onToggleHidden, title = 'Choose Operation', showTips }: {
   onSelect: (id: StepType) => void;
   hidden: string[];
   onToggleHidden: (id: string, hide: boolean) => void;
   title?: string;
+  showTips?: boolean;
 }) {
   const [q, setQ] = useState('');
   const [searching, setSearching] = useState(false);
   const [customize, setCustomize] = useState(false);
+  const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [tip, setTip] = useState(0);
   const match = (label: string) => !q || label.toLowerCase().includes(q.toLowerCase());
+  const TIPS = OP_GROUPS.flatMap((g) => g.ops).filter((o) => ['cuttermarks', 'booklet', 'gangsheet', 'colorbar'].includes(o.id));
   return (
     <>
+      {showTips && TIPS.length > 0 && (
+        <div className="pe-tipcarousel">
+          <div className="pe-tipcarousel-head">
+            <Ic name="bulb" size={14} /> <b>{TIPS[tip % TIPS.length]!.label}</b>
+            <span className="pe-label-sm pe-mono" style={{ marginLeft: 'auto' }}>{(tip % TIPS.length) + 1}/{TIPS.length}</span>
+            <button className="pe-iconbtn" onClick={() => setTip((t2) => (t2 + TIPS.length - 1) % TIPS.length)}><Ic name="back" size={12} /></button>
+            <button className="pe-iconbtn" style={{ transform: 'scaleX(-1)' }} onClick={() => setTip((t2) => (t2 + 1) % TIPS.length)}><Ic name="back" size={12} /></button>
+          </div>
+          <div className="pe-label-sm" style={{ lineHeight: 1.5 }}>{TIPS[tip % TIPS.length]!.tip}</div>
+        </div>
+      )}
       <div className="pe-choose-head">
         {searching ? (
           <input className="pe-input" autoFocus placeholder="Search tools…" value={q}
@@ -1183,7 +1537,8 @@ export function ChooseOperation({ onSelect, hidden, onToggleHidden, title = 'Cho
         )}
         <div className="pe-choose-views">
           <button className="pe-iconbtn" title="Search" onClick={() => setSearching((s) => !s)}><Ic name="search" size={16} /></button>
-          <button className="pe-iconbtn pe-active" title="Grid"><Ic name="gridview" size={16} /></button>
+          <button className={`pe-iconbtn ${view === 'list' ? 'pe-active' : ''}`} title="List view" onClick={() => setView('list')}><Ic name="list" size={16} /></button>
+          <button className={`pe-iconbtn ${view === 'grid' ? 'pe-active' : ''}`} title="Grid view" onClick={() => setView('grid')}><Ic name="gridview" size={16} /></button>
         </div>
       </div>
       {OP_GROUPS.map((g) => {
@@ -1192,14 +1547,28 @@ export function ChooseOperation({ onSelect, hidden, onToggleHidden, title = 'Cho
         return (
           <div key={g.label}>
             <div className="pe-group-label">{g.label}</div>
-            <div className="pe-op-grid">
-              {ops.map((o) => (
-                <button key={o.id} className="pe-op" onClick={() => onSelect(o.id)}>
-                  <span className="pe-op-ic"><Ic name={o.icon} size={22} /></span>
-                  <span className="pe-op-label">{o.label}</span>
-                </button>
-              ))}
-            </div>
+            {view === 'grid' ? (
+              <div className="pe-op-grid">
+                {ops.map((o) => (
+                  <button key={o.id} className="pe-op" onClick={() => onSelect(o.id)}>
+                    <span className="pe-op-ic"><Ic name={o.icon} size={22} /></span>
+                    <span className="pe-op-label">{o.label}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="pe-op-list">
+                {ops.map((o) => (
+                  <button key={o.id} className="pe-op-row" onClick={() => onSelect(o.id)}>
+                    <Ic name={o.icon} size={18} />
+                    <span>
+                      <span className="pe-op-row-name">{o.label}</span>
+                      <span className="pe-op-row-desc">{o.tip.replace(/^Use [^ ]+ (to|for) /, '').replace(/^./, (c) => c.toUpperCase())}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         );
       })}

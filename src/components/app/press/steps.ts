@@ -9,15 +9,21 @@ import {
   addHeaderFooter, addPressColorBar, addCutterMarks, addJobSlug, addFoldMarks,
   addCollatingMarks, addOmrMarks, addGatheringMarks, addLayMarks, addTextWatermark,
   addPageNumbers, imposeGangJobs, imposeFoldZine, imposeCustomGrid, getPdfInfo,
+  nestPdf, imposeCalendar, insertPages as insertPagesOp, mixPdfs, nudgePdf,
+  addBackdropFile, applyColorEffects, applyColorManagement, addBarcodeStamp,
+  addDimensions, addWhiteVarnish, addBraille, optimizePdf, repairPdf, decryptPdf, setLayers,
 } from '@/lib/imposition-toolkit/impose';
-import type { PdfJobInfo, GangJob, CustomCell } from '@/lib/imposition-toolkit/impose';
+import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/imposition-toolkit/impose';
 
 export type StepType =
   | 'cards' | 'booklet' | 'zine' | 'shuffle' | 'grid' | 'nupbook' | 'cutstack' | 'datamerge'
   | 'preflight' | 'gangsheet' | 'cuttermarks' | 'layers' | 'customimpose' | 'pdftools'
   | 'resize' | 'rotate' | 'crop' | 'split' | 'flip' | 'merge' | 'overlay' | 'distort'
   | 'bleed' | 'headerfooter' | 'colorbar' | 'slugline' | 'foldmarks' | 'regmarks'
-  | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers';
+  | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
+  | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
+  | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
+  | 'braille' | 'editpdf';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -63,8 +69,34 @@ export function defaultSettings(type: StepType): StepSettings {
         jobs: [], files: [], docPages: 0,
       };
     case 'pdftools':
-      return { op: 'optimize', useObjectStreams: true };
+      return { op: 'optimize', useObjectStreams: true, removeUnused: true, stripMetadata: false, removeAnnotations: false, removeJavaScript: true };
     case 'layers':
+      return { states: [] };
+    case 'stickers':
+      return { sheetWIn: 11, sheetHIn: 8.5, roll: false, fillSheet: true, copies: 20, paddingIn: 0, marginTopIn: 0.2, marginLeftIn: 0.2, marginRightIn: 0.2, marginBottomIn: 0.2, allowRotate: true };
+    case 'calendar':
+      return { halfSheet: false, rotateBack: true, ...MARKS, addMarks: false };
+    case 'insertpages':
+      return { file: null, fileName: '', mode: 'at', position: 1, everyN: 1, count: 1 };
+    case 'mix':
+      return { second: null, secondName: '', reverseB: false };
+    case 'nudge':
+      return { dxIn: 0, dyIn: 0, rotateDeg: 0, stepIn: 0.2, rotStepDeg: 2, pages: 'all' };
+    case 'backdrop':
+      return { file: null, fileName: '', repeat: true, offsetXPt: 0, offsetYPt: 0, scalePct: 100, opacity: 100, pages: 'all' };
+    case 'coloreffects':
+      return { brightness: 100, contrast: 100, saturation: 100, grayscale: 0, warmTone: 0, invert: 0, hueRotate: 0, dpi: 300, pages: 'all' };
+    case 'colormanage':
+      return { sourceProfile: 'sRGB (built-in)', destProfile: '', intent: 'relative', dpi: 300, convert: true, gamutWarning: false, pages: 'all' };
+    case 'barcode':
+      return { text: 'Hello World', symbology: 'qr', scale: 3, quietZone: 4, barHeightMm: 15, position: 'br', marginPt: 18, xOffsetPt: 18, yOffsetPt: 18, rotationDeg: 0, transparent: false, showText: true, pages: 'all' };
+    case 'dimensions':
+      return {};
+    case 'whitevarnish':
+      return { layerType: 'white', spotName: 'White', coverage: 'trim', tint: 1, pages: 'all' };
+    case 'braille':
+      return { text: '', position: 'bl', dotDiaPt: 4.25, pages: 'all' };
+    case 'editpdf':
       return {};
     case 'booklet':
       return {
@@ -162,6 +194,35 @@ function nupOpts(s: StepSettings) {
   };
 }
 
+// Insert file B into the pipeline document at a position (or every N pages).
+async function mergeInsert(a: Uint8Array, bFile: Uint8Array, s: StepSettings): Promise<Uint8Array> {
+  const { PDFDocument } = await import('pdf-lib');
+  const doc = await PDFDocument.load(a, { ignoreEncryption: true });
+  const ins = await PDFDocument.load(bFile.slice(), { ignoreEncryption: true });
+  const out = await PDFDocument.create();
+  const aPages = await out.copyPages(doc, doc.getPageIndices());
+  const bPages = await out.copyPages(ins, ins.getPageIndices());
+  const every = s.mode === 'everyN' ? Math.max(1, Math.round(s.everyN)) : 0;
+  const at = Math.max(1, Math.round(s.position));
+  const pushB = () => bPages.forEach((p) => out.addPage(p));
+  if (!every && at <= 1) pushB();
+  aPages.forEach((p, i) => {
+    if (!every && i + 1 === at && at > 1) pushB();
+    out.addPage(p);
+    if (every && (i + 1) % every === 0) pushB();
+  });
+  if (!every && at > aPages.length) pushB();
+  return out.save();
+}
+
+// Map the 4-corner braille position choice onto engine x/y (1" inset).
+function braillePos(pos: string): { xPt?: number; yPt?: number } {
+  // The engine anchors at top-left; corners other than tl need page size, which
+  // it resolves internally when x/y are omitted — bottom-left default there.
+  if (pos === 'tl') return { xPt: 72, yPt: 72 };
+  return {};
+}
+
 // Runs every enabled step. `split` and `preflight` are pass-through here — the
 // export path handles split's multi-file output separately.
 export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[]): Promise<Uint8Array> {
@@ -211,11 +272,57 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[]): Pro
         break;
       }
       case 'pdftools': {
-        const { PDFDocument } = await import('pdf-lib');
-        const doc = await PDFDocument.load(b, { ignoreEncryption: true });
-        b = await doc.save({ useObjectStreams: s.op === 'optimize' ? s.useObjectStreams !== false : false });
+        if (s.op === 'optimize') b = await optimizePdf(b, { objectStreams: s.useObjectStreams !== false, removeUnused: s.removeUnused !== false });
+        else if (s.op === 'decrypt') b = await decryptPdf(b);
+        else b = await repairPdf(b, { reserialize: true, stripMetadata: !!s.stripMetadata, removeAnnotations: !!s.removeAnnotations, removeJavaScript: !!s.removeJavaScript });
         break;
       }
+      case 'layers': {
+        const states = ((s.states ?? []) as LayerState[]).filter((st2) => st2.state !== 'default');
+        if (states.length) b = await setLayers(b, s.states as LayerState[]);
+        break;
+      }
+      case 'stickers': b = await nestPdf(b, {
+        sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, roll: !!s.roll, paddingIn: s.paddingIn,
+        marginIn: Math.max(s.marginTopIn, s.marginLeftIn, s.marginRightIn, s.marginBottomIn),
+        allowRotate: !!s.allowRotate, copies: s.copies ?? 1, fillSheet: !!s.fillSheet,
+      }); break;
+      case 'calendar': b = await imposeCalendar(b, {
+        halfSheet: !!s.halfSheet, rotateBack: !!s.rotateBack,
+        addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,
+        centerMarks: !!s.centerMarks, markWeightPt: s.markWeightPt,
+      }); break;
+      case 'insertpages': if (s.file) b = await mergeInsert(b, s.file, s); break;
+      case 'mix': if (s.second) b = await mixPdfs(b, s.second, !!s.reverseB); break;
+      case 'nudge': b = await nudgePdf(b, { dxIn: s.dxIn, dyIn: s.dyIn, rotateDeg: s.rotateDeg, pages: s.pages }); break;
+      case 'backdrop': if (s.file) b = await addBackdropFile(b, s.file, {
+        offsetXPt: s.offsetXPt, offsetYPt: s.offsetYPt, scalePct: s.scalePct,
+        opacity: (s.opacity ?? 100) / 100, repeat: s.repeat !== false, pages: s.pages,
+      }); break;
+      case 'coloreffects': b = await applyColorEffects(b, {
+        brightness: s.brightness, contrast: s.contrast, saturation: s.saturation,
+        grayscale: s.grayscale, warmTone: s.warmTone, invert: s.invert,
+        hueRotate: s.hueRotate, dpi: s.dpi, pages: s.pages,
+      }); break;
+      case 'colormanage': b = await applyColorManagement(b, {
+        sourceProfile: s.sourceProfile, destProfile: s.destProfile, intent: s.intent,
+        dpi: s.dpi, convert: !!s.convert, gamutWarning: !!s.gamutWarning, pages: s.pages,
+      }); break;
+      case 'barcode': b = await addBarcodeStamp(b, {
+        text: s.text || ' ', symbology: s.symbology, scale: s.scale, quietZone: s.quietZone,
+        barHeightMm: s.barHeightMm, position: s.position, marginPt: s.marginPt,
+        xOffsetPt: s.xOffsetPt, yOffsetPt: s.yOffsetPt, rotationDeg: s.rotationDeg,
+        transparent: !!s.transparent, showText: !!s.showText, pages: s.pages,
+      }); break;
+      case 'dimensions': b = await addDimensions(b); break;
+      case 'whitevarnish': b = await addWhiteVarnish(b, {
+        spotName: s.spotName || (s.layerType === 'varnish' ? 'Varnish' : 'White'),
+        coverage: s.coverage, tint: s.tint, under: s.layerType === 'white', pages: s.pages,
+      }); break;
+      case 'braille': if (s.text?.trim()) b = await addBraille(b, {
+        text: s.text, dotDiaPt: s.dotDiaPt, pages: s.pages,
+        ...(braillePos(s.position)),
+      }); break;
       case 'shuffle': b = await shufflePages(b, s.pattern || 'all'); break;
       case 'rotate': b = await rotatePdf(b, s.angle, s.pages); break;
       case 'flip': b = await flipPdf(b, s.dir, s.pages); break;

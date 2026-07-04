@@ -104,6 +104,76 @@ export function PreflightInspector({ report, running, onClose }: { report: PfRep
   );
 }
 
+// ── Minimal .xlsx reader (zip + deflate-raw via DecompressionStream) ─────────
+
+async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
+  const ds = new DecompressionStream('deflate-raw');
+  const stream = new Blob([data as BlobPart]).stream().pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function readZipEntries(bytes: Uint8Array): Promise<Map<string, Uint8Array>> {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 66000); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('Not a valid .xlsx (zip) file');
+  const count = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  const out = new Map<string, Uint8Array>();
+  for (let i = 0; i < count; i++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const method = dv.getUint16(off + 10, true);
+    const compSize = dv.getUint32(off + 20, true);
+    const nameLen = dv.getUint16(off + 28, true), extraLen = dv.getUint16(off + 30, true), cmtLen = dv.getUint16(off + 32, true);
+    const localOff = dv.getUint32(off + 42, true);
+    const name = new TextDecoder().decode(bytes.subarray(off + 46, off + 46 + nameLen));
+    // Local header: sizes of name/extra can differ from the central copy.
+    const lNameLen = dv.getUint16(localOff + 26, true), lExtraLen = dv.getUint16(localOff + 28, true);
+    const dataStart = localOff + 30 + lNameLen + lExtraLen;
+    const raw = bytes.subarray(dataStart, dataStart + compSize);
+    if (name.endsWith('.xml')) out.set(name, method === 8 ? await inflateRaw(raw) : raw.slice());
+    off += 46 + nameLen + extraLen + cmtLen;
+  }
+  return out;
+}
+
+const unesc = (t: string) => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+
+export async function xlsxToCsv(bytes: Uint8Array): Promise<string> {
+  const entries = await readZipEntries(bytes);
+  const dec = new TextDecoder();
+  const sharedXml = entries.get('xl/sharedStrings.xml');
+  const shared: string[] = [];
+  if (sharedXml) {
+    for (const m of dec.decode(sharedXml).matchAll(/<si>([\s\S]*?)<\/si>/g)) {
+      shared.push(unesc([...m[1]!.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((t) => t[1]!).join('')));
+    }
+  }
+  const sheetName = [...entries.keys()].find((k) => /^xl\/worksheets\/sheet1?\.xml$/.test(k)) ?? [...entries.keys()].find((k) => k.startsWith('xl/worksheets/'));
+  if (!sheetName) throw new Error('No worksheet found in the .xlsx');
+  const xml = dec.decode(entries.get(sheetName)!);
+  const rows: string[][] = [];
+  for (const rowM of xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)) {
+    const cells: string[] = [];
+    for (const cM of rowM[1]!.matchAll(/<c([^>]*)>([\s\S]*?)<\/c>/g)) {
+      const attrs = cM[1]!, body = cM[2]!;
+      const ref = /r="([A-Z]+)\d+"/.exec(attrs)?.[1] ?? '';
+      let col = 0;
+      for (const ch of ref) col = col * 26 + (ch.charCodeAt(0) - 64);
+      const idx = Math.max(0, col - 1);
+      const vRaw = /<v>([\s\S]*?)<\/v>/.exec(body)?.[1] ?? /<t[^>]*>([\s\S]*?)<\/t>/.exec(body)?.[1] ?? '';
+      const isShared = /t="s"/.test(attrs);
+      while (cells.length < idx) cells.push('');
+      cells[idx] = isShared ? (shared[+vRaw] ?? '') : unesc(vRaw);
+    }
+    rows.push(cells);
+  }
+  const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  return rows.map((r) => r.map(q).join(',')).join('\n');
+}
+
 // ── Variable Data wizard ─────────────────────────────────────────────────────
 
 const VDP_STEPS = ['Upload', 'Preview', 'Map fields', 'Images', 'Canvas'];
@@ -168,13 +238,22 @@ export function VdpWizard({ onClose, onDone }: { onClose: () => void; onDone: (p
       {step === 0 && (
         <div className="pe-vdp-drop" onClick={() => {
           const inp = document.createElement('input');
-          inp.type = 'file'; inp.accept = '.csv,text/csv,.txt';
-          inp.onchange = async () => { const f = inp.files?.[0]; if (f) { setCsv(await f.text()); setFileName(f.name); } };
+          inp.type = 'file'; inp.accept = '.csv,text/csv,.txt,.xlsx';
+          inp.onchange = async () => {
+            const f = inp.files?.[0]; if (!f) return;
+            setErr('');
+            try {
+              if (/\.xlsx$/i.test(f.name)) setCsv(await xlsxToCsv(new Uint8Array(await f.arrayBuffer())));
+              else if (/\.xls$/i.test(f.name)) { setErr('Legacy .xls is not supported — re-save as .xlsx or .csv.'); return; }
+              else setCsv(await f.text());
+              setFileName(f.name);
+            } catch (e) { setErr(e instanceof Error ? e.message : 'Could not read that file'); }
+          };
           inp.click();
         }}>
           <Ic name="upload" size={26} />
           <div>Drop your file here, or <span style={{ color: 'var(--pe-violet)' }}>click to browse</span></div>
-          <div className="pe-label-sm">Supports .csv (Excel files: save as CSV first)</div>
+          <div className="pe-label-sm">Supports .csv, .xlsx</div>
           {fileName && <div className="pe-label" style={{ fontWeight: 700, marginTop: 8 }}>✓ {fileName} — {head.columns.length} columns</div>}
         </div>
       )}

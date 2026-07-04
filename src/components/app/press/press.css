@@ -687,3 +687,72 @@
   display: grid; place-items: center; min-height: 40px;
 }
 .pe-ci-cell.pe-on { border-color: var(--pe-violet); background: var(--pe-violet-soft); color: var(--pe-violet); }
+
+/* ── Backlog tools ───────────────────────────────────────────────────────── */
+.pe-slider { width: 100%; accent-color: var(--pe-violet); }
+.pe-anchor-grid { display: grid; grid-template-columns: repeat(3, 30px); gap: 5px; }
+.pe-anchor { width: 30px; height: 30px; border-radius: 7px; border: 1.5px solid var(--pe-border-strong); background: var(--pe-fill); cursor: pointer; position: relative; }
+.pe-anchor.pe-on { border-color: var(--pe-violet); background: var(--pe-violet-soft); }
+.pe-anchor.pe-on::after { content: ''; position: absolute; inset: 9px; border-radius: 999px; background: var(--pe-violet); }
+.pe-nudge-pad {
+  display: grid; gap: 6px; justify-items: center;
+  grid-template-areas: ". up ." "left . right" ". down .";
+  grid-template-columns: 44px 44px 44px; width: max-content;
+}
+.pe-wm-preview {
+  height: 110px; border: 1.5px dashed var(--pe-border-strong); border-radius: 10px;
+  display: grid; place-items: center; overflow: hidden;
+}
+.pe-wm-preview span { font-size: 26px; font-weight: 800; letter-spacing: 0.08em; color: var(--pe-muted); white-space: nowrap; }
+.pe-op-list { display: flex; flex-direction: column; gap: 2px; }
+.pe-op-row {
+  display: flex; align-items: flex-start; gap: 11px; width: 100%; text-align: left;
+  padding: 9px 8px; border-radius: 9px; border: none; background: none; cursor: pointer; color: var(--pe-ink);
+}
+.pe-op-row:hover { background: var(--pe-fill); }
+.pe-op-row-name { display: block; font-size: 13px; font-weight: 700; }
+.pe-op-row-desc { display: block; font-size: 11.5px; color: var(--pe-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px; }
+.pe-tipcarousel { border: 1px solid var(--pe-border); border-radius: 11px; padding: 11px 12px; margin-bottom: 12px; background: var(--pe-fill); }
+.pe-tipcarousel-head { display: flex; align-items: center; gap: 7px; font-size: 13px; margin-bottom: 5px; }
+.pe-tipcarousel-head .pe-iconbtn { width: 22px; height: 22px; }
+
+/* template library */
+.pe-tpl-split { display: flex; gap: 16px; min-height: 380px; }
+.pe-tpl-list { width: 250px; flex: 0 0 250px; overflow-y: auto; max-height: 55vh; display: flex; flex-direction: column; gap: 1px; }
+.pe-tpl-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 7px 8px; border-radius: 8px; border: none; background: none; cursor: pointer;
+  color: var(--pe-ink); font-size: 12.5px;
+}
+.pe-tpl-item:hover { background: var(--pe-fill); }
+.pe-tpl-item.pe-on { background: var(--pe-violet-soft); color: var(--pe-violet); }
+.pe-tpl-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-tpl-badge { font-family: ui-monospace, monospace; font-size: 8.5px; font-weight: 800; letter-spacing: 0.05em; padding: 2px 5px; border-radius: 4px; color: #fff; flex: 0 0 auto; }
+.pe-tpl-badge-1 { background: #2f6f4f; } .pe-tpl-badge-2 { background: #34509b; }
+.pe-tpl-badge-3 { background: #6d5cff; } .pe-tpl-badge-4 { background: #b06a1f; }
+.pe-tpl-detail { flex: 1; min-width: 0; }
+.pe-tpl-schematic { width: 100%; max-width: 320px; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); display: block; }
+
+/* edit pdf */
+.pe-editpdf { width: 1000px; }
+.pe-editpdf-body { display: flex; gap: 18px; padding: 18px 20px 22px; }
+.pe-editpdf .pe-modal-body { display: none; }
+.pe-editpdf-side { width: 240px; flex: 0 0 240px; }
+.pe-editpdf-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pe-editpdf-stage-wrap { flex: 1; min-width: 0; }
+.pe-editpdf-stage {
+  position: relative; width: 100%; max-height: 62vh; margin: 0 auto;
+  background: #fff; border-radius: 3px; overflow: hidden; cursor: crosshair; user-select: none;
+}
+.pe-editpdf-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.pe-edit-obj { position: absolute; cursor: move; }
+.pe-edit-obj.pe-on { outline: 2px solid var(--pe-violet); outline-offset: 1px; }
+.pe-edit-cover { background: #fff; border: 1px dashed rgba(109,92,255,0.6); }
+.pe-edit-redact { background: #111; }
+.pe-edit-box { border: 2px solid #111; background: transparent; }
+.pe-edit-line .pe-edit-lineseg { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: #111; }
+.pe-edit-text .pe-edit-text, .pe-edit-obj .pe-edit-text { font-size: 14px; color: #111; white-space: nowrap; font-family: Helvetica, Arial, sans-serif; }
+.pe-edit-textinput {
+  position: absolute; z-index: 3; font-size: 14px; padding: 2px 6px;
+  border: 1.5px solid var(--pe-violet); border-radius: 4px; background: #fff; color: #111; outline: none;
+}

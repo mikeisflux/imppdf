@@ -16,6 +16,7 @@ import {
   type AppSettings, type JobInfo, type PreviewQuality, type BatchFile,
 } from './modals';
 import { PreflightInspector, runPreflightChecks, VdpWizard, AskAIPanel, type PfReport } from './inspector-wizards';
+import { EditPdfModal } from './edit-pdf';
 import { TemplatesModal } from './catalog-bridge';
 import './press.css';
 
@@ -28,7 +29,7 @@ const QUALITY_PX: Record<PreviewQuality, number> = { auto: 0, ultralow: 520, low
 const MAX_SHEETS = 32;
 
 const HIDE_BY_FEATURE: Record<string, string[]> = {
-  advancedTools: ['distort', 'slugline', 'foldmarks', 'regmarks', 'collating', 'omr', 'gathering', 'laymarks'],
+  advancedTools: ['distort', 'slugline', 'foldmarks', 'regmarks', 'collating', 'omr', 'gathering', 'laymarks', 'dimensions', 'whitevarnish', 'braille'],
   watermark: ['watermark'],
   bleedMaker: ['bleed'],
 };
@@ -66,7 +67,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   const [fillBg, setFillBg] = useState(true);
   const [drag, setDrag] = useState(false);
   const [currentSheet, setCurrentSheet] = useState(1);
-  const [modal, setModal] = useState<null | 'settings' | 'jobinfo' | 'pagemanager' | 'batch' | 'templates' | 'vdp'>(null);
+  const [modal, setModal] = useState<null | 'settings' | 'jobinfo' | 'pagemanager' | 'batch' | 'templates' | 'vdp' | 'editpdf'>(null);
   const [menu, setMenu] = useState<null | 'quality' | 'file' | 'load' | 'askai'>(null);
   const [adding, setAdding] = useState(false);
 
@@ -137,6 +138,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
     setAdding(false);
     if (type === 'preflight') { openPreflight(file?.bytes ?? null); return; }
     if (type === 'datamerge') { setModal('vdp'); return; }
+    if (type === 'editpdf') { if (file) setModal('editpdf'); return; }
     setSteps((s) => [...s.map((st) => ({ ...st, collapsed: true })), makeStep(type)]);
   };
   const layerEntries = useMemo(() => steps
@@ -428,7 +430,8 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
                 <span className="pe-label-sm" style={{ marginLeft: 'auto' }}>225 presets</span>
               </button>
               <ChooseOperation
-                title={adding ? 'Add Step' : 'Choose Operation'}
+                showTips={adding}
+                title={adding ? 'Choose Next Step' : 'Choose Operation'}
                 onSelect={addStep}
                 hidden={visibleHidden}
                 onToggleHidden={(id, hide) => updateSettings({
@@ -444,7 +447,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
                   {i > 0 && <div className="pe-step-connector"><i /></div>}
                   <StepCard
                     step={st} index={i} unit={unit} onUnit={setUnit} pageCount={file?.info.count}
-                    thumbs={srcThumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={toggleLayer}
+                    thumbs={srcThumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={toggleLayer} sourceBytes={file?.bytes ?? null}
                     onChange={(next) => changeStep(i, next)}
                     onRemove={() => removeStep(i)}
                     onMove={(dir) => moveStep(i, dir)}
@@ -563,6 +566,16 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
             setFile({ name: `data-merge-${records}-records.pdf`, bytes: pdf, info });
           } catch { setError('Generated merge could not be loaded.'); }
         }} />
+      )}
+      {modal === 'editpdf' && file && (
+        <EditPdfModal thumbs={srcThumbs} pageSizes={pageSizes} onClose={() => setModal(null)}
+          onApply={async (transform) => {
+            try {
+              const next = await transform(file.bytes);
+              const info = await getPdfInfo(next);
+              setFile({ ...file, bytes: next, info });
+            } catch (e) { setError(e instanceof Error ? e.message : 'Edit failed'); }
+          }} />
       )}
     </div>
   );

@@ -13,14 +13,18 @@ import { findOp } from './operations';
 // Recipe step kinds that only make sense in a color-managed / raster RIP and
 // have no engine backing yet. They're dropped from the chain (never silently —
 // the modal shows the full chain and greys out what's skipped).
-const UNSUPPORTED_KINDS = new Set(['passthrough', 'colormanage', 'optimize', 'repair', 'barcode', 'qrstamp', 'preflight']);
+const UNSUPPORTED_KINDS = new Set(['passthrough', 'preflight']);
 
 const KIND_TO_TYPE: Record<string, StepType> = {
   booklet: 'booklet', nup: 'grid', colorbar: 'colorbar', registration: 'regmarks',
-  cutcontour: 'cuttermarks', resize: 'resize', nest: 'gangsheet', foldmarks: 'foldmarks',
+  cutcontour: 'cuttermarks', resize: 'resize', nest: 'stickers', foldmarks: 'foldmarks',
   distort: 'distort', collating: 'collating', jobslug: 'slugline', gathering: 'gathering',
   watermark: 'watermark', shuffle: 'shuffle', headerfooter: 'headerfooter', bleed: 'bleed',
-  rotate: 'rotate', flip: 'flip',
+  rotate: 'rotate', flip: 'flip', colormanage: 'colormanage', optimize: 'pdftools',
+  repair: 'pdftools', barcode: 'barcode', qrstamp: 'barcode',
+};
+const KIND_PATCH: Record<string, Record<string, unknown>> = {
+  optimize: { op: 'optimize' }, repair: { op: 'repair' }, qrstamp: { symbology: 'qr' },
 };
 
 function mapNupSettings(opts: Record<string, unknown>): StepSettings {
@@ -60,6 +64,7 @@ export function recipeToSteps(r: RecipeDef): WorkflowStep[] {
       } else Object.assign(step.s, rs.opts);
     }
     if (type === 'cuttermarks') step.s.addDielines = true;
+    if (KIND_PATCH[rs.kind]) Object.assign(step.s, KIND_PATCH[rs.kind]);
     out.push(step);
   }
   if (out.length) out[0]!.collapsed = false;
@@ -104,6 +109,57 @@ export function templateToSteps(t: TemplateDef): WorkflowStep[] | null {
 }
 export function templateSupported(t: TemplateDef): boolean { return TOOL_TO_TYPE[t.toolId] !== undefined; }
 
+// ── Schematic sheet preview (SVG mock of the imposed layout) ─────────────────
+
+const MOCK = ['#4ade80', '#8b5cf6', '#f97316', '#22d3ee', '#e11d48', '#facc15'];
+
+export function TemplateSchematic({ steps }: { steps: WorkflowStep[] }) {
+  const impose = steps.find((st) => ['grid', 'cards', 'cutstack', 'booklet', 'zine', 'gangsheet', 'stickers', 'customimpose', 'nupbook'].includes(st.type));
+  const s = impose?.s ?? {};
+  const shW = s.sheetWIn ?? 8.5, shH = s.sheetHIn ?? 11;
+  const W = 300, H = (W * shH) / shW;
+  const hasBar = steps.some((st) => st.type === 'colorbar');
+  const hasCut = steps.some((st) => st.type === 'cuttermarks' || st.type === 'regmarks');
+  const cells: { x: number; y: number; w: number; h: number }[] = [];
+  if (impose && (impose.type === 'booklet' || impose.type === 'nupbook')) {
+    const m = 16;
+    cells.push({ x: m, y: m, w: W / 2 - m - 2, h: H - 2 * m }, { x: W / 2 + 2, y: m, w: W / 2 - m - 2, h: H - 2 * m });
+  } else if (impose) {
+    const cols = s.cellWIn ? Math.max(1, Math.floor((shW - 0.5) / s.cellWIn)) : (s.cols ?? 2);
+    const rows = s.cellHIn ? Math.max(1, Math.floor((shH - 0.5) / s.cellHIn)) : (s.rows ?? 2);
+    const m = 14, g = 4;
+    const cw = (W - 2 * m - g * (cols - 1)) / cols, ch = (H - 2 * m - g * (rows - 1)) / rows;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push({ x: m + c * (cw + g), y: m + r * (ch + g), w: cw, h: ch });
+  } else {
+    cells.push({ x: 30, y: 30, w: W - 60, h: H - 60 });
+  }
+  return (
+    <svg className="pe-tpl-schematic" viewBox={`0 0 ${W} ${H}`} style={{ aspectRatio: `${W} / ${H}` }}>
+      <rect x="0" y="0" width={W} height={H} fill="#fff" rx="2" />
+      {hasBar && Array.from({ length: 16 }, (_, i) => (
+        <rect key={i} x={14 + i * ((W - 28) / 16)} y={5} width={(W - 28) / 16 - 1} height={5}
+          fill={['#00b7d8', '#e52f8c', '#f5d90a', '#17181d'][i % 4]} />
+      ))}
+      {cells.map((c, i) => (
+        <g key={i}>
+          <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={MOCK[i % 2 === 0 ? 0 : 1]} opacity={0.85} rx={1} />
+          <rect x={c.x + c.w * 0.12} y={c.y + c.h * 0.16} width={c.w * 0.5} height={Math.min(6, c.h * 0.09)} fill="#fff" opacity={0.85} />
+          <rect x={c.x + c.w * 0.12} y={c.y + c.h * 0.32} width={c.w * 0.32} height={Math.min(3.5, c.h * 0.05)} fill="#fff" opacity={0.55} />
+          {/* crop ticks */}
+          <path d={`M${c.x - 8} ${c.y}h5M${c.x} ${c.y - 8}v5M${c.x + c.w + 3} ${c.y}h5M${c.x + c.w} ${c.y - 8}v5M${c.x - 8} ${c.y + c.h}h5M${c.x} ${c.y + c.h + 3}v5M${c.x + c.w + 3} ${c.y + c.h}h5M${c.x + c.w} ${c.y + c.h + 3}v5`}
+            stroke="#333" strokeWidth="0.8" />
+        </g>
+      ))}
+      {hasCut && (
+        <>
+          <circle cx={7} cy={7} r={3.4} fill="#111" /><circle cx={W - 7} cy={7} r={3.4} fill="#111" />
+          <circle cx={7} cy={H - 7} r={3.4} fill="#111" /><circle cx={W - 7} cy={H - 7} r={3.4} fill="#111" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 // ── Browser modal ────────────────────────────────────────────────────────────
 
 const RECIPE_CATS = [...new Set(RECIPES.map((r) => r.cat))];
@@ -115,6 +171,7 @@ export function TemplatesModal({ onClose, onApply }: {
   const [tab, setTab] = useState<'recipes' | 'templates'>('recipes');
   const [cat, setCat] = useState<string>('');
   const [q, setQ] = useState('');
+  const [selId, setSelId] = useState<string>('');
   const ql = q.toLowerCase();
 
   const recipes = useMemo(() => RECIPES.filter((r) =>
@@ -141,41 +198,62 @@ export function TemplatesModal({ onClose, onApply }: {
         {cats.map((c) => <button key={c} className={`pe-chipbtn ${cat === c ? 'pe-chip-on' : ''}`} onClick={() => setCat(c)}>{c}</button>)}
       </div>
 
-      {tab === 'recipes' ? recipes.map((r) => {
-        const steps = recipeToSteps(r);
-        return (
-          <div key={r.id} className="pe-cat-row">
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="pe-label" style={{ fontWeight: 700 }}>{r.name}</div>
-              <div className="pe-label-sm" style={{ marginTop: 2 }}>{r.desc}</div>
-              <div className="pe-cat-chain">
-                {steps.map((st, i) => (
-                  <React.Fragment key={st.id}>
-                    {i > 0 && <span className="pe-cat-arrow">→</span>}
-                    <span className="pe-cat-step"><Ic name={findOp(st.type)!.icon} size={12} /> {findOp(st.type)!.label}</span>
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
-            <button className="pe-btn pe-btn-dl" style={{ padding: '7px 13px', flex: '0 0 auto' }} onClick={() => { onApply(steps); onClose(); }}>Use</button>
-          </div>
-        );
-      }) : templates.map((t) => {
-        const steps = templateToSteps(t)!;
-        return (
-          <div key={t.id} className="pe-cat-row">
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="pe-label" style={{ fontWeight: 700 }}>{t.name} <span className="pe-cat-industry">{t.industry}</span></div>
-              <div className="pe-label-sm" style={{ marginTop: 2 }}>{t.specs}</div>
-              <div className="pe-cat-chain">
-                <span className="pe-cat-step"><Ic name={findOp(steps[0]!.type)!.icon} size={12} /> {findOp(steps[0]!.type)!.label}</span>
-              </div>
-            </div>
-            <button className="pe-btn pe-btn-dl" style={{ padding: '7px 13px', flex: '0 0 auto' }} onClick={() => { onApply(steps); onClose(); }}>Use</button>
-          </div>
-        );
-      })}
-      {(tab === 'recipes' ? recipes : templates).length === 0 && <div className="pe-note">Nothing matches that search.</div>}
+      <div className="pe-tpl-split">
+        <div className="pe-tpl-list">
+          {tab === 'recipes' ? recipes.map((r) => {
+            const steps = recipeToSteps(r);
+            const on = selId === r.id;
+            return (
+              <button key={r.id} className={`pe-tpl-item ${on ? 'pe-on' : ''}`} onClick={() => setSelId(r.id)}>
+                <Ic name={findOp(steps[0]?.type)?.icon ?? 'gridview'} size={15} />
+                <span className="pe-tpl-item-name">{r.name}</span>
+                <span className={`pe-tpl-badge pe-tpl-badge-${Math.min(steps.length, 4)}`}>{steps.length}-STEP</span>
+              </button>
+            );
+          }) : templates.map((t) => {
+            const on = selId === t.id;
+            return (
+              <button key={t.id} className={`pe-tpl-item ${on ? 'pe-on' : ''}`} onClick={() => setSelId(t.id)}>
+                <Ic name={findOp(templateToSteps(t)![0]!.type)!.icon} size={15} />
+                <span className="pe-tpl-item-name">{t.name}</span>
+                <span className="pe-tpl-badge pe-tpl-badge-1">1-STEP</span>
+              </button>
+            );
+          })}
+          {(tab === 'recipes' ? recipes : templates).length === 0 && <div className="pe-note" style={{ padding: 12 }}>Nothing matches that search.</div>}
+        </div>
+        <div className="pe-tpl-detail">
+          {(() => {
+            const r = tab === 'recipes' ? recipes.find((x) => x.id === selId) ?? recipes[0] : undefined;
+            const t = tab === 'templates' ? templates.find((x) => x.id === selId) ?? templates[0] : undefined;
+            const steps = r ? recipeToSteps(r) : t ? templateToSteps(t)! : [];
+            if (!steps.length) return <div className="pe-note">Select a preset.</div>;
+            const name = r?.name ?? t?.name ?? '';
+            const desc = r?.desc ?? t?.specs ?? '';
+            const impose = steps.find((st2) => st2.s.sheetWIn);
+            return (
+              <>
+                <TemplateSchematic steps={steps} />
+                <div className="pe-label" style={{ fontWeight: 800, marginTop: 12 }}>{name}
+                  <span className="pe-cat-industry" style={{ marginLeft: 8 }}>{steps.length > 1 ? 'MULTI' : 'SINGLE'}</span>
+                </div>
+                <div className="pe-label-sm" style={{ marginTop: 4, lineHeight: 1.5 }}>{desc}</div>
+                {impose && <div className="pe-label-sm pe-mono" style={{ marginTop: 6 }}>{impose.s.sheetWIn}″ × {impose.s.sheetHIn}″ sheet</div>}
+                <div className="pe-cat-chain" style={{ margin: '10px 0 14px' }}>
+                  {steps.map((st, i) => (
+                    <React.Fragment key={st.id}>
+                      {i > 0 && <span className="pe-cat-arrow">→</span>}
+                      <span className="pe-cat-step"><Ic name={findOp(st.type)!.icon} size={12} /> {findOp(st.type)!.label}</span>
+                    </React.Fragment>
+                  ))}
+                </div>
+                {r?.tip && <div className="pe-note" style={{ marginBottom: 12 }}>💡 {r.tip}</div>}
+                <button className="pe-btn pe-btn-dl" onClick={() => { onApply(steps); onClose(); }}>APPLY →</button>
+              </>
+            );
+          })()}
+        </div>
+      </div>
     </Modal>
   );
 }
