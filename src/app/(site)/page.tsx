@@ -21,7 +21,9 @@ const HOW_TO = [
 const GALLERY_SECTIONS: ToolCategory[] = ['imposition', 'make', 'marks', 'pages'];
 
 function GallerySection({ cat }: { cat: ToolCategory }) {
-  const tools = toolsByCategory(cat);
+  // Homepage shows the curated, art-backed subset; the footer + /tools pages
+  // cover the full catalog.
+  const tools = toolsByCategory(cat).filter((t) => t.featured);
   return (
     <div className="gallery-block">
       <h3 className="gallery-block-title">{CATEGORY_LABEL[cat]}</h3>

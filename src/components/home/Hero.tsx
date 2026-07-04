@@ -19,12 +19,12 @@ const FEATURES = [
 // Map a layout chip label to a tool slug where one exists.
 const CHIP_TO_SLUG: Record<string, string> = {
   Books: 'perfect-bound-book', Brochures: 'trifold-brochure', Magazines: 'saddle-stitch-magazine',
-  Newspapers: 'n-up-book', Zine: 'zine', Cards: 'business-cards', Postcards: 'business-cards',
-  Stickers: 'stickers', Calendar: 'calendar', Posters: 'tiled-poster', Flyers: 'standard-sizes',
-  'Photo Prints': 'index-print', Banners: 'tiled-poster', Packaging: 'packaging-dieline',
+  Newspapers: 'n-up-book', Zine: 'zine', Cards: 'business-cards', Postcards: 'postcards',
+  Stickers: 'stickers', Calendar: 'calendar', Posters: 'tiled-poster', Flyers: 'flyers',
+  'Photo Prints': 'photo-prints', Banners: 'banner', Packaging: 'packaging-dieline',
   'Cutter Marks': 'cutter-marks', 'Custom Impose': 'custom-impose', 'Folding Brochure': 'folded-brochure',
   Watermark: 'watermark', 'Color Convert': 'color-management', 'Merge PDF': 'merge',
-  'Split PDF': 'split', 'Compress PDF': 'compress', 'Repair PDF': 'pdf-repair',
+  'Split PDF': 'split', 'Compress PDF': 'pdf-tools', 'Repair PDF': 'pdf-repair',
 };
 
 export function Hero() {

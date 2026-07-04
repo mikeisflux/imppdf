@@ -25,6 +25,9 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
     case 'booklet':
     case 'saddle-stitch-magazine':
     case 'perfect-bound-book':
+    case 'n-up-book':
+    case 'greeting-card':
+    case 'menu':
       return (
         <Frame>
           <rect x="18" y="20" width="80" height="110" rx="4" fill={SHEET.fill} stroke={SHEET.stroke} />
@@ -351,7 +354,35 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
         </Frame>
       );
     default:
-      // Generic sheet fallback (used by page tools / advanced entries)
+      // Category-aware fallback so the many preset tools still read distinctly.
+      if (category === 'make') {
+        // Ganged product sheet.
+        return (
+          <Frame>
+            <rect x="30" y="18" width="140" height="114" rx="5" fill={SHEET.fill} stroke={SHEET.stroke} />
+            {[0, 1].map((r) =>
+              [0, 1, 2].map((c) => (
+                <rect key={`${r}-${c}`} x={42 + c * 42} y={30 + r * 52} width={34} height={40} rx={3} fill="#fff" stroke="#dcdce4" />
+              )),
+            )}
+          </Frame>
+        );
+      }
+      if (category === 'marks') {
+        return (
+          <Frame>
+            <rect x="46" y="20" width="108" height="110" rx="4" fill={SHEET.fill} stroke={SHEET.stroke} />
+            {[[46, 20], [154, 20], [46, 130], [154, 130]].map(([x, y], i) => (
+              <g key={i} stroke="#2a2a30" strokeWidth="1">
+                <line x1={x - 7} y1={y} x2={x + 7} y2={y} /><line x1={x} y1={y - 7} x2={x} y2={y + 7} />
+              </g>
+            ))}
+            {textLines(58, 36, 84, 6)}
+            <rect x="58" y="112" width="30" height="8" rx="2" fill={ACCENT} opacity="0.4" />
+          </Frame>
+        );
+      }
+      // imposition / pages / advanced — a clean sheet with a header band.
       return (
         <Frame>
           <rect x="52" y="20" width="96" height="110" rx="5" fill={SHEET.fill} stroke={SHEET.stroke} />

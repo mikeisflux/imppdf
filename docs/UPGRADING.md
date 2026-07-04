@@ -14,11 +14,18 @@ with minimal changes. Everything the plugin touches is isolated behind three fil
 
 ## Steps to upgrade
 
-1. **Replace the plugin folder.** Overwrite `impose.ts`, `Impose.tsx`, `impose.css`
-   in `src/lib/imposition-toolkit/` with the new version.
+1. **Replace the plugin folder.** Overwrite `impose.ts`, `Impose.tsx`, `impose.css`,
+   `catalog.ts` and `pdfjs-worker-url.d.ts` in `src/lib/imposition-toolkit/` with the
+   new version (copy every `src/*` file the plugin ships).
    - Re-add `'use client';` as the first line of `Impose.tsx` (Next.js App Router needs
      it because the component uses `useState`, `Blob`, `document`).
    - Keep the named export `AdminImpose` (or update the import in `AppWorkspace.tsx`).
+   - **Dependencies:** the plugin uses `pdf-lib` (required), `qrcode-generator` and
+     `pdfjs-dist` (optional — rasterization/preview). `pdfjs-dist` is already installed,
+     listed in `serverExternalPackages`, and `next.config.mjs` has a webpack rule so the
+     plugin's Vite-style `?url` pdf.js worker import resolves. If a future version adds
+     another optional peer dep, `npm install` it and add it to `serverExternalPackages`
+     if it is server-touching.
 
 2. **Wire up new engine operations for the API.** If the new engine exports new
    functions, add them to `OPERATIONS` and the `applyStep` switch in
