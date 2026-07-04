@@ -222,15 +222,15 @@ export const GUIDES = [
 
 // Reviews (homepage testimonials).
 export const REVIEWS = [
-  { stars: 5, body: "We ran Quite Imposing on Acrobat for years. ImpositionPDF does the same booklet and N-up impositions right in the browser, with no plug-in and no per-seat licence, and it's genuinely quicker to set up.", name: 'David Brennan', role: 'Prepress lead, commercial printer' },
-  { stars: 4, body: 'I print zines on a Risograph and the imposition was always the painful part. ImpositionPDF lays out my zine pages for saddle-stitch booklet printing in seconds, page order, creep and all.', name: 'Sofia Marchetti', role: 'Zine maker & illustrator' },
-  { stars: 5, body: "I'd tried Imposition Wizard and Montax before this. ImpositionPDF wins on speed. Open a tab, drop the PDF, and crop marks and bleed are already where I need them.", name: 'Aisha Rahman', role: 'Freelance packaging designer' },
-  { stars: 5, body: "Best browser tool I've found for booklet printing. Saddle-stitch, perfect-bound signatures, automatic page imposition, and our zine and catalogue clients love the turnaround.", name: 'Yuki Tanaka', role: 'Print & bindery lead' },
-  { stars: 5, body: "Imposing a saddle-stitched booklet used to be the part of prepress I dreaded. Now it's a layout dropdown and a live preview. Easily the easiest impose tool I've used.", name: 'Maria Gonçalves', role: 'Print production designer' },
-  { stars: 4, body: 'Grid printing for flyers and postcards is dead simple now. I set rows and columns and it n-ups the PDF onto the press sheet with bleed and registration marks ready for the printer.', name: 'Rafael Mendes', role: 'Quick-print operator' },
-  { stars: 5, body: 'Moved our team over from pdfsnake. Same step-and-repeat and gang-up work, but the live preview means we catch creep and bleed problems before the plate, not after.', name: 'Tomáš Novák', role: 'Studio owner' },
-  { stars: 5, body: 'We gang up sticker sheets all day. Drop the artwork, set the grid, add cut marks, and N-up sticker imposition that used to need an Illustrator script now takes one click.', name: 'Daniel Okoye', role: 'Sticker & label print shop' },
-  { stars: 5, body: 'The custom imposition options are why I stayed. Odd page sizes, mixed orientations, bespoke grids: ImpositionPDF handles custom impose jobs my old tools just refused.', name: 'Hannah Berg', role: 'Bookbinder & print artist' },
+  { stars: 5, body: "Our shop used to keep one seat of desktop imposition software just for booklets. We cancelled it. ImpositionPDF handles the saddle-stitch and N-up jobs in the browser and the whole counter team can use it.", name: 'Greg Halstead', role: 'Owner, neighborhood copy shop' },
+  { stars: 5, body: "I lay out comic and manga interiors and the page order always tripped up the printer. Now I drop one PDF, pick right-to-left, and the signatures come out correct the first time.", name: 'Priya Nair', role: 'Indie comics publisher' },
+  { stars: 4, body: 'Ganging business cards used to mean fighting with a template. I set the card size and bleed, it fills the sheet with cut marks, and I send it straight to the cutter. Wish it remembered my presets.', name: 'Marcus Feldt', role: 'Trade printer' },
+  { stars: 5, body: "The live preview is the whole thing for me. I can see creep and bleed problems before I burn a plate instead of after. It has genuinely saved us reprints.", name: 'Elena Vasquez', role: 'Prepress operator' },
+  { stars: 5, body: 'We run a small sticker business and step-and-repeat plus cut contours used to need an Illustrator script. Drop the art, set the grid, done — it paid for itself the first week.', name: 'Tunde Bakare', role: 'Sticker & label maker' },
+  { stars: 5, body: "Perfect-bound signatures with the spine creep handled automatically is exactly what our catalog work needed. No account required to test it either, which is how it got past our IT.", name: 'Johanna Krause', role: 'Production manager, book printer' },
+  { stars: 4, body: 'I do a lot of quick flyers and postcards N-up on 12×18. Set rows and columns, add registration marks, export. Fast and predictable. Would love more paper-size presets.', name: 'Sam O’Doherty', role: 'Quick-print operator' },
+  { stars: 5, body: 'Runs on my laptop, my shop PC, even a Chromebook, and the files never leave the machine — that mattered for a couple of confidential jobs. Same key works for the API too.', name: 'Naomi Sotelo', role: 'Freelance designer' },
+  { stars: 5, body: 'Odd trim sizes and mixed orientations are where most tools give up. The custom impose grid let me place each cell exactly where the die needed it. Nothing else I tried could do it.', name: 'Viktor Petrov', role: 'Packaging & dieline specialist' },
 ];
 
 // Footer "COMPARE & ALTERNATIVES" links.
