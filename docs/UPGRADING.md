@@ -20,6 +20,16 @@ with minimal changes. Everything the plugin touches is isolated behind three fil
    - Re-add `'use client';` as the first line of `Impose.tsx` (Next.js App Router needs
      it because the component uses `useState`, `Blob`, `document`).
    - Keep the named export `AdminImpose` (or update the import in `AppWorkspace.tsx`).
+   - **Re-apply the `initialTool` patch** so tool tiles can deep-link into a specific
+     tool's workspace. Change the `AdminImpose` signature and its first `useState`:
+     ```diff
+     -export function AdminImpose() {
+     -  const [activeTool, setActiveTool] = useState<string | null>(null);
+     +export function AdminImpose({ initialTool }: { initialTool?: string | null } = {}) {
+     +  const [activeTool, setActiveTool] = useState<string | null>(initialTool ?? null);
+     ```
+     If the new plugin already accepts an initial-tool prop, use that instead and update
+     `AppWorkspace.tsx`. If plugin tool ids change, update `SLUG_TO_PLUGIN_ID` in `tools.ts`.
    - **Dependencies:** the plugin uses `pdf-lib` (required), `qrcode-generator` and
      `pdfjs-dist` (optional — rasterization/preview). `pdfjs-dist` is already installed,
      listed in `serverExternalPackages`, and `next.config.mjs` has a webpack rule so the
