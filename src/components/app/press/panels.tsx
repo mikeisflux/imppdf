@@ -1568,20 +1568,47 @@ export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSiz
   );
 }
 
+// ── Choose Operation toolbar bar (lives in the top toolbar's left segment) ───
+export function ChooseOperationBar({ title = 'Choose Operation', view, onView, query, onQuery, searching, onSearching, onBrowseTemplates }: {
+  title?: string;
+  view: 'grid' | 'list';
+  onView: (v: 'grid' | 'list') => void;
+  query: string;
+  onQuery: (q: string) => void;
+  searching: boolean;
+  onSearching: (v: boolean) => void;
+  onBrowseTemplates?: () => void;
+}) {
+  return (
+    <div className="pe-choose-bar">
+      {searching ? (
+        <input className="pe-choose-search" autoFocus placeholder="Search tools…" value={query}
+          onChange={(e) => onQuery(e.target.value)} onBlur={() => { if (!query) onSearching(false); }} />
+      ) : (
+        <span className="pe-choose-title">{title}</span>
+      )}
+      <div className="pe-choose-views">
+        <button className={`pe-viewbtn ${searching ? 'pe-active' : ''}`} title="Search tools" onClick={() => onSearching(!searching)}><Ic name="search" size={16} /></button>
+        <button className={`pe-viewbtn ${view === 'list' ? 'pe-active' : ''}`} title="List view" onClick={() => onView('list')}><Ic name="list" size={16} /></button>
+        <button className={`pe-viewbtn ${view === 'grid' ? 'pe-active' : ''}`} title="Icon view" onClick={() => onView('grid')}><Ic name="gridview" size={16} /></button>
+        <button className="pe-viewbtn" title="Browse templates" onClick={() => onBrowseTemplates?.()}><Ic name="layers" size={16} /></button>
+      </div>
+    </div>
+  );
+}
+
 // ── Choose Operation (tool catalog + customize) ──────────────────────────────
-export function ChooseOperation({ onSelect, hidden, onToggleHidden, title = 'Choose Operation', showTips }: {
+export function ChooseOperation({ onSelect, hidden, onToggleHidden, showTips, view = 'grid', query = '' }: {
   onSelect: (id: StepType) => void;
   hidden: string[];
   onToggleHidden: (id: string, hide: boolean) => void;
-  title?: string;
   showTips?: boolean;
+  view?: 'grid' | 'list';
+  query?: string;
 }) {
-  const [q, setQ] = useState('');
-  const [searching, setSearching] = useState(false);
   const [customize, setCustomize] = useState(false);
-  const [view, setView] = useState<'grid' | 'list'>('grid');
   const [tip, setTip] = useState(0);
-  const match = (label: string) => !q || label.toLowerCase().includes(q.toLowerCase());
+  const match = (label: string) => !query || label.toLowerCase().includes(query.toLowerCase());
   const TIPS = OP_GROUPS.flatMap((g) => g.ops).filter((o) => ['cuttermarks', 'booklet', 'gangsheet', 'colorbar'].includes(o.id));
   return (
     <>
@@ -1596,19 +1623,6 @@ export function ChooseOperation({ onSelect, hidden, onToggleHidden, title = 'Cho
           <div className="pe-label-sm" style={{ lineHeight: 1.5 }}>{TIPS[tip % TIPS.length]!.tip}</div>
         </div>
       )}
-      <div className="pe-choose-head">
-        {searching ? (
-          <input className="pe-input" autoFocus placeholder="Search tools…" value={q}
-            onChange={(e) => setQ(e.target.value)} onBlur={() => { if (!q) setSearching(false); }} />
-        ) : (
-          <span className="pe-choose-title">{title}</span>
-        )}
-        <div className="pe-choose-views">
-          <button className="pe-iconbtn" title="Search" onClick={() => setSearching((s) => !s)}><Ic name="search" size={16} /></button>
-          <button className={`pe-iconbtn ${view === 'list' ? 'pe-active' : ''}`} title="List view" onClick={() => setView('list')}><Ic name="list" size={16} /></button>
-          <button className={`pe-iconbtn ${view === 'grid' ? 'pe-active' : ''}`} title="Grid view" onClick={() => setView('grid')}><Ic name="gridview" size={16} /></button>
-        </div>
-      </div>
       {OP_GROUPS.map((g) => {
         const ops = g.ops.filter((o) => match(o.label) && !hidden.includes(o.id));
         if (!ops.length) return null;

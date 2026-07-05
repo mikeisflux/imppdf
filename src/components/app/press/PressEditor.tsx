@@ -9,7 +9,7 @@ import {
   listWorkflows, saveWorkflow, deleteWorkflow, workflowToSteps,
   type StepType, type WorkflowStep,
 } from './steps';
-import { Ic, ChooseOperation, StepCard, paperName, fmtIn, type Unit } from './panels';
+import { Ic, ChooseOperation, ChooseOperationBar, StepCard, paperName, fmtIn, type Unit } from './panels';
 import {
   loadSettings, persistSettings, DEFAULT_SETTINGS, SettingsModal, JobInfoModal, PageManagerModal,
   BatchModal, QualityMenu, loadDefaultJob, EMPTY_JOB, useCountdown,
@@ -70,6 +70,10 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   const [modal, setModal] = useState<null | 'settings' | 'jobinfo' | 'pagemanager' | 'batch' | 'templates' | 'vdp' | 'editpdf'>(null);
   const [menu, setMenu] = useState<null | 'quality' | 'file' | 'load' | 'askai'>(null);
   const [adding, setAdding] = useState(false);
+  // Tool-picker view state (lives in the toolbar's Choose Operation segment)
+  const [toolView, setToolView] = useState<'grid' | 'list'>('grid');
+  const [toolQuery, setToolQuery] = useState('');
+  const [toolSearchOpen, setToolSearchOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -376,8 +380,18 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
         </div>
       </div>
 
-      {/* Preview toolbar */}
+      {/* Toolbar: Choose Operation segment (over the side panel) + preview tools */}
       <div className="pe-toolbar">
+        <div className="pe-toolbar-left">
+          <ChooseOperationBar
+            title={adding ? 'Choose Next Step' : 'Choose Operation'}
+            view={toolView} onView={(v) => { setToolView(v); if (steps.length && !adding) setAdding(true); }}
+            query={toolQuery} onQuery={setToolQuery}
+            searching={toolSearchOpen} onSearching={(v) => { setToolSearchOpen(v); if (v && steps.length && !adding) setAdding(true); }}
+            onBrowseTemplates={() => setModal('templates')}
+          />
+        </div>
+        <div className="pe-toolbar-main">
         <button className="pe-iconbtn" title="Fit to window" onClick={fitToWindow}><Ic name="fit" size={18} /></button>
         <button className="pe-iconbtn" title="Zoom in" onClick={() => setZoom((z) => Math.min(4, z + 0.15))}><Ic name="zoomin" size={18} /></button>
         <button className="pe-iconbtn" title="Zoom out" onClick={() => setZoom((z) => Math.max(0.2, z - 0.15))}><Ic name="zoomout" size={18} /></button>
@@ -416,6 +430,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
           </button>
           <button className="pe-iconbtn" title="Clear operations" disabled={!steps.length} onClick={() => setSteps([])}><Ic name="eraser" size={17} /></button>
         </div>
+        </div>
       </div>
 
       {/* Body */}
@@ -426,13 +441,10 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
               {adding && (
                 <button className="pe-back" style={{ marginBottom: 10 }} onClick={() => setAdding(false)}><Ic name="back" size={14} /> Back to workflow</button>
               )}
-              <button className="pe-templates-cta" onClick={() => setModal('templates')}>
-                <Ic name="save" size={16} /> Templates &amp; Recipes
-                <span className="pe-label-sm" style={{ marginLeft: 'auto' }}>225 presets</span>
-              </button>
               <ChooseOperation
                 showTips={adding}
-                title={adding ? 'Choose Next Step' : 'Choose Operation'}
+                view={toolView}
+                query={toolQuery}
                 onSelect={addStep}
                 hidden={visibleHidden}
                 onToggleHidden={(id, hide) => updateSettings({

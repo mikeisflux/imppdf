@@ -86,11 +86,36 @@
 /* ── Toolbar ─────────────────────────────────────────────────────────────── */
 .pe-toolbar {
   height: 46px; flex: 0 0 46px;
-  display: flex; align-items: center; gap: 3px;
-  padding: 0 12px;
+  display: flex; align-items: stretch; gap: 0;
   border-bottom: 1px solid var(--pe-border);
   background: var(--pe-bg);
 }
+/* Left segment sits over the side panel and hosts the Choose Operation bar */
+.pe-toolbar-left {
+  width: 344px; flex: 0 0 344px;
+  display: flex; align-items: center;
+  border-right: 1px solid var(--pe-border);
+}
+.pe-toolbar-main {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 3px;
+  padding: 0 12px; overflow-x: auto;
+}
+.pe-choose-bar { display: flex; align-items: center; width: 100%; height: 100%; padding: 0 8px 0 16px; gap: 8px; }
+.pe-choose-title { font-size: 14px; font-weight: 700; flex: 1; }
+.pe-choose-search {
+  flex: 1; min-width: 0; background: var(--pe-fill); border: 1px solid transparent;
+  border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--pe-ink); outline: none;
+}
+.pe-choose-search:focus { border-color: var(--pe-violet); background: var(--pe-bg); }
+.pe-choose-views { display: flex; gap: 2px; margin-left: auto; }
+.pe-viewbtn {
+  display: inline-grid; place-items: center; width: 30px; height: 30px;
+  border-radius: 999px; border: none; background: none; color: var(--pe-muted); cursor: pointer;
+}
+.pe-viewbtn:hover { background: var(--pe-fill); color: var(--pe-ink); }
+.pe-viewbtn.pe-active { background: var(--pe-violet); color: #fff; }
+@media (max-width: 860px) { .pe-toolbar-left { width: 280px; flex-basis: 280px; } }
 .pe-tb-div { width: 1px; height: 22px; background: var(--pe-border); margin: 0 8px; }
 .pe-tb-chip {
   display: inline-flex; align-items: center; gap: 6px;
