@@ -9,6 +9,7 @@ import {
   POPULAR_GUIDE_LINKS, toolsByCategory, ToolCategory, toolAppHref,
 } from '@/lib/tools';
 import { IconArrow, IconPrinter, IconGrid } from '@/components/icons';
+import { faqStructuredData } from '@/lib/seo';
 
 const HOW_TO = [
   { n: 1, title: 'Add your PDF', body: 'Open ImpositionPDF in your browser and add the PDF or images you want to impose.' },
@@ -48,6 +49,7 @@ function GallerySection({ cat }: { cat: ToolCategory }) {
 export default function HomePage() {
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqStructuredData()) }} />
       <Hero />
 
       {/* Animated emoji tagline */}

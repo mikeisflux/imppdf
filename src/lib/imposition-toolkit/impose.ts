@@ -322,6 +322,14 @@ export interface NUpOptions {
   snake?: boolean;
   // Right-to-left column order (RTL scripts / reversed strip stacking).
   rtl?: boolean;
+  // How each source page fits its cell. 'cover' (default) preserves aspect,
+  // scales to fill and crops overflow; 'contain' letterboxes; 'stretch' distorts.
+  fit?: 'cover' | 'contain' | 'stretch';
+  // Optional user adjustment from the crop/approve dialog: zoom multiplier and
+  // 0..1 anchor (0.5,0.5 = centred) controlling which part shows after cropping.
+  imageZoom?: number;
+  imageOffsetX?: number;
+  imageOffsetY?: number;
 }
 
 // Compute the effective grid for an N-Up layout (shared by engine + preview).
@@ -345,7 +353,7 @@ export function computeNUpGrid(opts: NUpOptions): NUpGrid {
 }
 
 export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Uint8Array> {
-  const { PDFDocument, rgb } = await import('pdf-lib');
+  const { PDFDocument, rgb, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } = await import('pdf-lib');
   const srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const srcPages = srcDoc.getPages();
   const N = srcPages.length;
@@ -378,7 +386,27 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
     if (opts.rtl) cc=cols-1-cc;                                   // right-to-left columns
     if (isBack) { if (shortEdge) rr=rows-1-rr; else cc=cols-1-cc; } // duplex flip mirror
     const x=leftGapPt+cc*(cellW+gxPt), y=shH-topGapPt-cellH-rr*(cellH+gyPt);
-    sheet.drawPage(emb, {x,y,width:cellW,height:cellH});
+    // Fit the source into the cell. 'cover' (default) preserves aspect, scales to
+    // fill and crops the overflow; 'contain' letterboxes; 'stretch' distorts.
+    const fit = opts.fit ?? 'cover';
+    const sw = emb.width, sh = emb.height;
+    if (fit === 'stretch' || !sw || !sh) {
+      sheet.drawPage(emb, { x, y, width: cellW, height: cellH });
+    } else {
+      const base = fit === 'contain' ? Math.min(cellW / sw, cellH / sh) : Math.max(cellW / sw, cellH / sh);
+      const s = base * (opts.imageZoom ?? 1);
+      const dw = sw * s, dh = sh * s;
+      const ox = opts.imageOffsetX ?? 0.5, oy = opts.imageOffsetY ?? 0.5; // 0..1 anchor
+      const dx = x + (cellW - dw) * ox, dy = y + (cellH - dh) * oy;
+      if (dw > cellW + 0.5 || dh > cellH + 0.5) {
+        // Clip to the cell so the cropped overflow can't bleed into neighbours.
+        sheet.pushOperators(pushGraphicsState(), rectangle(x, y, cellW, cellH), clip(), endPath());
+        sheet.drawPage(emb, { x: dx, y: dy, width: dw, height: dh });
+        sheet.pushOperators(popGraphicsState());
+      } else {
+        sheet.drawPage(emb, { x: dx, y: dy, width: dw, height: dh });
+      }
+    }
     if (opts.addMarks) drawCropMarks(sheet,rgb,x+bl,y+bl,cellW-2*bl,cellH-2*bl,off,len,markStyle);
   };
 

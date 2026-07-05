@@ -23,6 +23,26 @@ export const seoKeywords: string[] = [
   'Enfocus PitStop imposition', 'PDFsam imposition', 'ConTeXt imposition',
 ];
 
+// Common questions — rendered as FAQPage structured data on the home page so
+// Google can show an expandable FAQ rich result.
+export const faqs: { q: string; a: string }[] = [
+  { q: `Is ${siteName} free?`, a: `Yes. ${siteName} runs entirely in your browser and is free to use, with a Pro subscription for higher download limits and API access.` },
+  { q: 'Do my PDFs get uploaded?', a: 'No. Imposition happens locally in your browser — your files never leave your device.' },
+  { q: 'What imposition can it do?', a: 'Booklets and saddle-stitch, perfect-bound trade paperbacks, comics, N-up and step-and-repeat, gang sheets, cut-and-stack, business cards, postcards, labels, hang tags and more — with crop, bleed and registration marks.' },
+  { q: `Is ${siteName} an alternative to Imposition Wizard, Montax Imposer or Quite Imposing?`, a: `Yes — ${siteName} is a free, browser-based alternative that covers the same booklet, N-up, step-and-repeat and gang-sheet imposition workflows with no install.` },
+  { q: 'Can I add crop and registration marks?', a: 'Yes. Every layout tool can add crop marks, bleed and registration/cutter marks, and you can add a dedicated Cutter Marks step for die-cutting.' },
+];
+
+export function faqStructuredData() {
+  return {
+    '@context': 'https://schema.org', '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question', name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  };
+}
+
 // Schema.org SoftwareApplication — helps Google render a rich result.
 export function structuredData() {
   return {

@@ -292,6 +292,7 @@ function nupOpts(s: StepSettings) {
     duplex: !!s.duplex, addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,
     centerMarks: !!s.centerMarks, markWeightPt: s.markWeightPt,
     bleedIn: s.bleedMode === 'fixed' ? s.bleedIn : 0,
+    fit: s.fit ?? 'cover', imageZoom: s.imageZoom, imageOffsetX: s.imageOffsetX, imageOffsetY: s.imageOffsetY,
   };
 }
 

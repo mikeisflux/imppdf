@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { TOOLS, findTool, toolsByCategory, CATEGORY_LABEL, toolAppHref } from '@/lib/tools';
+import { siteUrl } from '@/lib/config';
+import { seoKeywords } from '@/lib/seo';
 import { ToolMockup } from '@/components/home/ToolMockup';
 import { IconArrow, IconCheck } from '@/components/icons';
 
@@ -15,9 +17,16 @@ export async function generateMetadata(
   const { slug } = await params;
   const tool = findTool(slug);
   if (!tool) return { title: 'Tool not found' };
+  const title = `${tool.name} — free online imposition`;
+  const description = `${tool.name}: ${tool.blurb} Runs entirely in your browser, nothing uploaded.`;
+  const url = `${siteUrl}/tools/${tool.slug}`;
   return {
-    title: `${tool.name} — impose in your browser`,
-    description: `${tool.name}: ${tool.blurb} Runs entirely in your browser, nothing uploaded.`,
+    title,
+    description,
+    keywords: [tool.name, `${tool.name} online`, `${tool.name} imposition`, `${tool.name} PDF`, ...seoKeywords.slice(0, 12)],
+    alternates: { canonical: `/tools/${tool.slug}` },
+    openGraph: { title, description, url, type: 'website' },
+    twitter: { card: 'summary_large_image', title, description },
   };
 }
 
@@ -28,8 +37,19 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
 
   const related = toolsByCategory(tool.category).filter((t) => t.slug !== tool.slug).slice(0, 6);
 
+  const breadcrumb = {
+    '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Tools', item: `${siteUrl}/#gallery` },
+      { '@type': 'ListItem', position: 3, name: CATEGORY_LABEL[tool.category], item: `${siteUrl}/#gallery` },
+      { '@type': 'ListItem', position: 4, name: tool.name, item: `${siteUrl}/tools/${tool.slug}` },
+    ],
+  };
+
   return (
     <div className="container" style={{ padding: '56px 24px 40px' }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
       <div className="muted" style={{ fontSize: 14, marginBottom: 20 }}>
         <Link href="/#gallery" style={{ color: 'var(--muted)' }}>Gallery</Link> ›{' '}
         <span>{CATEGORY_LABEL[tool.category]}</span>
