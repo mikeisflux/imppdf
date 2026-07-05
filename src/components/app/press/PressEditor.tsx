@@ -18,6 +18,7 @@ import {
 import { PreflightInspector, runPreflightChecks, VdpWizard, type PfReport } from './inspector-wizards';
 import { EditPdfModal } from './edit-pdf';
 import { TemplateLibrary } from './template-library';
+import { useHistory } from './use-history';
 import './press.css';
 
 interface LoadedFile { name: string; bytes: Uint8Array; info: PdfPageInfo; }
@@ -45,7 +46,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
 }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [steps, setSteps] = useState<WorkflowStep[]>(() => {
+  const [steps, setSteps, history] = useHistory<WorkflowStep[]>(() => {
     const op = findOp(initialOp ?? null);
     return op ? [makeStep(op.id)] : [];
   });
@@ -80,6 +81,22 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   const canvasRef = useRef<HTMLDivElement>(null);
   const outBytesRef = useRef<Uint8Array | null>(null);
   const renderSeq = useRef(0);
+
+  // ── Undo / redo keyboard shortcuts (Ctrl/⌘-Z, Ctrl/⌘-Shift-Z, Ctrl-Y) ──────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k !== 'z' && k !== 'y') return;
+      // Let text fields keep their own native undo.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); history.redo(); }
+      else if (k === 'z') { e.preventDefault(); history.undo(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [history.undo, history.redo]);
 
   // ── Settings persistence + session restore ─────────────────────────────────
   useEffect(() => {
@@ -398,6 +415,9 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
           />
         </div>
         <div className="pe-toolbar-main">
+        <button className="pe-iconbtn" title="Undo (Ctrl+Z)" onClick={history.undo} disabled={!history.canUndo} style={{ fontSize: 17 }}>↶</button>
+        <button className="pe-iconbtn" title="Redo (Ctrl+Shift+Z)" onClick={history.redo} disabled={!history.canRedo} style={{ fontSize: 17 }}>↷</button>
+        <span className="pe-tb-div" />
         <button className="pe-iconbtn" title="Fit to window" onClick={fitToWindow}><Ic name="fit" size={18} /></button>
         <button className="pe-iconbtn" title="Zoom in" onClick={() => setZoom((z) => Math.min(4, z + 0.15))}><Ic name="zoomin" size={18} /></button>
         <button className="pe-iconbtn" title="Zoom out" onClick={() => setZoom((z) => Math.max(0.2, z - 0.15))}><Ic name="zoomout" size={18} /></button>
