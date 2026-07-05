@@ -261,6 +261,11 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
   const thumb = (p.thumbs ?? [])[0] || '';
   const cw = s.cellWIn || (s.sheetWIn ?? 8.5) / (s.cols || 2);
   const ch = s.cellHIn || (s.sheetHIn ?? 11) / (s.rows || 2);
+  // Cropping happens when the source aspect doesn't match the cell and fit=cover.
+  const src = (p.pageSizes ?? [])[0];
+  const cellAspect = cw / ch, srcAspect = src && src.hPt ? src.wPt / src.hPt : cellAspect;
+  const willCrop = !!thumb && (s.fit ?? 'cover') === 'cover'
+    && s.imageOffsetX == null && Math.abs(cellAspect - srcAspect) / cellAspect > 0.04;
   return (
     <>
       <PaperSize {...p} />
@@ -273,6 +278,14 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
           </select>
           <button className="pe-btn" disabled={!thumb} title={thumb ? '' : 'Add a PDF/image first'} onClick={() => setFitOpen(true)}>Adjust &amp; crop…</button>
         </div>
+        {willCrop && (
+          <button className="pe-note" onClick={() => setFitOpen(true)}
+            style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', width: '100%', textAlign: 'left',
+              background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: 6,
+              color: '#f59e0b', cursor: 'pointer', padding: '8px 10px' }}>
+            <span>⚠</span><span style={{ flex: 1 }}>Image will be cropped to fit — click to adjust the framing.</span>
+          </button>
+        )}
         {(s.imageZoom || s.imageOffsetX != null) && s.fit !== 'stretch' && (
           <div className="pe-note" style={{ marginTop: 6 }}>Custom crop: {(s.imageZoom ?? 1).toFixed(2)}× · {(Math.round((s.imageOffsetX ?? 0.5) * 100))}%,{Math.round((s.imageOffsetY ?? 0.5) * 100)}%</div>
         )}
