@@ -207,6 +207,8 @@ export interface PanelProps {
   layerEntries?: LayerEntry[];
   onToggleLayer?: (stepId: string) => void;
   sourceBytes?: Uint8Array | null;
+  // Replace the loaded source PDF with a corrected copy (preflight auto-fix).
+  onApplyFix?: (bytes: Uint8Array, label: string) => void | Promise<void>;
 }
 
 function BookletPanel(p: PanelProps) {
@@ -1565,9 +1567,15 @@ function Slider({ label, value, min, max, suffix, onChange }: { label: string; v
 }
 
 // Live preflight report — runs standard prepress checks on the loaded PDF.
-function PreflightPanel({ sourceBytes, pageSizes = [], pageCount = 0 }: PanelProps) {
+function PreflightPanel({ sourceBytes, pageSizes = [], pageCount = 0, onApplyFix }: PanelProps) {
   const [findings, setFindings] = useState<import('@/lib/imposition-toolkit/preflight').PreflightFinding[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fixing, setFixing] = useState<string | null>(null);
+  // Fix definitions, loaded lazily so the (pdf-lib) code isn't pulled unless used.
+  const [fixes, setFixes] = useState<typeof import('@/lib/imposition-toolkit/preflight-fixes') | null>(null);
+  useEffect(() => {
+    if (onApplyFix && !fixes) import('@/lib/imposition-toolkit/preflight-fixes').then(setFixes).catch(() => {});
+  }, [onApplyFix, fixes]);
   useEffect(() => {
     if (!sourceBytes) { setFindings(null); return; }
     let cancelled = false; setLoading(true);
@@ -1584,8 +1592,16 @@ function PreflightPanel({ sourceBytes, pageSizes = [], pageCount = 0 }: PanelPro
   const dot = (lvl: string) => lvl === 'error' ? '#ef4444' : lvl === 'warning' ? '#f59e0b' : '#22c55e';
   const label = (lvl: string) => lvl === 'error' ? 'ERROR' : lvl === 'warning' ? 'WARN' : 'PASS';
 
+  async function applyFix(fixId: string, run: (b: Uint8Array) => Promise<Uint8Array>, name: string) {
+    if (!sourceBytes || !onApplyFix) return;
+    setFixing(fixId);
+    try { await onApplyFix(await run(sourceBytes.slice()), name); }
+    catch { /* surfaced by the editor's error state */ }
+    finally { setFixing(null); }
+  }
+
   return (
-    <Section label="// PREFLIGHT" help="Standard prepress checks. Non-destructive — never modifies the file.">
+    <Section label="// PREFLIGHT" help="Standard prepress checks. Fixes are opt-in — the file is only changed when you click a Fix button.">
       {!sourceBytes && <div className="pe-note">Add a PDF to run preflight.</div>}
       {sourceBytes && loading && <div className="pe-note">Running preflight checks…</div>}
       {findings && !loading && (
@@ -1595,17 +1611,31 @@ function PreflightPanel({ sourceBytes, pageSizes = [], pageCount = 0 }: PanelPro
             <span className="pe-label-sm pe-mono" style={{ color: warns ? '#f59e0b' : 'var(--muted)' }}>{warns} warnings</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {findings.map((f, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <span style={{ marginTop: 5, width: 8, height: 8, borderRadius: 4, background: dot(f.level), flex: '0 0 auto' }} />
-                <div style={{ minWidth: 0 }}>
-                  <div className="pe-label-sm" style={{ fontWeight: 700 }}>
-                    <span className="pe-mono" style={{ color: dot(f.level), marginRight: 6 }}>{label(f.level)}</span>{f.title}
+            {findings.map((f, i) => {
+              const fix = onApplyFix ? fixes?.fixFor(f.title) : undefined;
+              return (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <span style={{ marginTop: 5, width: 8, height: 8, borderRadius: 4, background: dot(f.level), flex: '0 0 auto' }} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className="pe-label-sm" style={{ fontWeight: 700 }}>
+                      <span className="pe-mono" style={{ color: dot(f.level), marginRight: 6 }}>{label(f.level)}</span>{f.title}
+                    </div>
+                    <div className="pe-label-sm" style={{ color: 'var(--muted)' }}>{f.detail}</div>
+                    {fix && (
+                      <button
+                        className="pe-btn"
+                        style={{ marginTop: 6, padding: '3px 10px', fontSize: 12 }}
+                        disabled={fixing !== null}
+                        title={fix.note}
+                        onClick={() => applyFix(fix.id, fix.run, fix.label)}
+                      >
+                        {fixing === fix.id ? 'Fixing…' : `Fix: ${fix.label}`}
+                      </button>
+                    )}
                   </div>
-                  <div className="pe-label-sm" style={{ color: 'var(--muted)' }}>{f.detail}</div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
@@ -1645,10 +1675,11 @@ export function StepPanelBody(props: PanelProps & { type: StepType }) {
 }
 
 // ── Step card (collapsible, reorderable) ─────────────────────────────────────
-export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSizes, layerEntries, onToggleLayer, sourceBytes, onChange, onRemove, onMove, onBack, canUp, canDown, single }: {
+export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSizes, layerEntries, onToggleLayer, sourceBytes, onApplyFix, onChange, onRemove, onMove, onBack, canUp, canDown, single }: {
   step: WorkflowStep; index: number; unit: Unit; onUnit: (u: Unit) => void; pageCount?: number;
   thumbs?: string[]; pageSizes?: { wPt: number; hPt: number }[];
   layerEntries?: LayerEntry[]; onToggleLayer?: (stepId: string) => void; sourceBytes?: Uint8Array | null;
+  onApplyFix?: (bytes: Uint8Array, label: string) => void | Promise<void>;
   onChange: (next: WorkflowStep) => void; onRemove: () => void; onMove: (dir: -1 | 1) => void; onBack?: () => void;
   canUp: boolean; canDown: boolean; single?: boolean;
 }) {
@@ -1683,7 +1714,7 @@ export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSiz
         <>
           <div className="pe-tip"><Ic name="bulb" size={16} /> {op.tip}</div>
           <StepPanelBody type={step.type} s={step.s} up={up} unit={unit} onUnit={onUnit} pageCount={pageCount}
-            thumbs={thumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={onToggleLayer} sourceBytes={sourceBytes} />
+            thumbs={thumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={onToggleLayer} sourceBytes={sourceBytes} onApplyFix={onApplyFix} />
         </>
       )}
     </div>

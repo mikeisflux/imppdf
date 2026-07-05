@@ -322,6 +322,20 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
     else downloadFile(makeZip(outs), 'batch-output.zip', 'application/zip');
   }
 
+  // Preflight auto-fix: replace the SOURCE document with a corrected copy.
+  async function applyPreflightFix(bytes: Uint8Array, label: string) {
+    if (!file) return;
+    try {
+      const info = await getPdfInfo(bytes);
+      setFile({ ...file, bytes, info });
+      setError('');
+      // Fixes edit the loaded file, not the workflow — but clear stale output.
+      setSheets([]); setTotalSheets(0);
+      // Re-run preflight on the corrected file so the report reflects the fix.
+      if (inspector.open) openPreflight(bytes);
+    } catch (e) { setError(e instanceof Error ? e.message : `${label} failed`); }
+  }
+
   // Page-manager apply: reorder/delete/duplicate the SOURCE document.
   async function applyPageOrder(order: number[]) {
     if (!file) return;
@@ -481,6 +495,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
                   <StepCard
                     step={st} index={i} unit={unit} onUnit={setUnit} pageCount={file?.info.count}
                     thumbs={srcThumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={toggleLayer} sourceBytes={file?.bytes ?? null}
+                    onApplyFix={applyPreflightFix}
                     onChange={(next) => changeStep(i, next)}
                     onRemove={() => removeStep(i)}
                     onMove={(dir) => moveStep(i, dir)}
@@ -561,6 +576,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
         </main>
         {inspector.open && (
           <PreflightInspector report={inspector.report} running={inspector.running}
+            sourceBytes={file?.bytes ?? null} onApplyFix={applyPreflightFix}
             onClose={() => setInspector((s) => ({ ...s, open: false }))} />
         )}
       </div>

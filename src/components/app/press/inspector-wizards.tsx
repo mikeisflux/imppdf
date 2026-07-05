@@ -16,11 +16,18 @@ export async function runPreflightChecks(bytes: Uint8Array): Promise<PfReport> {
   const doc = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const pages = doc.getPages();
   const findings: PfFinding[] = [];
-  // Document-level heuristics from a raw scan (cheap but effective).
-  const raw = new TextDecoder('latin1').decode(bytes.slice(0, Math.min(bytes.length, 24_000_000)));
-  if (raw.includes('/DeviceRGB') || raw.includes('/CalRGB')) findings.push({ level: 'info', text: 'RGB content present.', where: 'Document' });
-  if (raw.includes('/Encrypt')) findings.push({ level: 'warning', text: 'File carries encryption flags.', where: 'Document' });
-  if (raw.includes('/BaseFont') && !raw.includes('/FontFile')) findings.push({ level: 'warning', text: 'Fonts appear not to be embedded.', where: 'Document' });
+
+  // Document-level checks come from the shared deep engine (fonts, spot colours,
+  // transparency, RGB/CMYK, bleed, binding page count, DPI, PDF/X-1a readiness).
+  // Its finding.title is what the auto-fixer matches on, so keep it as `text`.
+  try {
+    const { runPreflight } = await import('@/lib/imposition-toolkit/preflight');
+    const deep = await runPreflight(bytes.slice());
+    for (const d of deep) {
+      if (d.level === 'pass') continue; // don't clutter the inspector with passes
+      findings.push({ level: d.level, text: d.title, where: d.detail });
+    }
+  } catch { /* deep engine is best-effort */ }
 
   const first = pages[0]?.getSize();
   pages.forEach((pg, i) => {
@@ -41,8 +48,24 @@ export async function runPreflightChecks(bytes: Uint8Array): Promise<PfReport> {
   return { findings, pages: pages.length, fail: findings.some((f) => f.level === 'error') };
 }
 
-export function PreflightInspector({ report, running, onClose }: { report: PfReport | null; running: boolean; onClose: () => void }) {
+export function PreflightInspector({ report, running, onClose, sourceBytes, onApplyFix }: {
+  report: PfReport | null; running: boolean; onClose: () => void;
+  sourceBytes?: Uint8Array | null;
+  onApplyFix?: (bytes: Uint8Array, label: string) => void | Promise<void>;
+}) {
   const [filter, setFilter] = useState<'all' | 'error' | 'warning'>('all');
+  const [fixing, setFixing] = useState<string | null>(null);
+  const [fixes, setFixes] = useState<typeof import('@/lib/imposition-toolkit/preflight-fixes') | null>(null);
+  React.useEffect(() => {
+    if (onApplyFix && !fixes) import('@/lib/imposition-toolkit/preflight-fixes').then(setFixes).catch(() => {});
+  }, [onApplyFix, fixes]);
+  async function applyFix(id: string, run: (b: Uint8Array) => Promise<Uint8Array>, name: string) {
+    if (!sourceBytes || !onApplyFix) return;
+    setFixing(id);
+    try { await onApplyFix(await run(sourceBytes.slice()), name); }
+    catch { /* surfaced by the editor */ }
+    finally { setFixing(null); }
+  }
   const counts = useMemo(() => ({
     error: report?.findings.filter((f) => f.level === 'error').length ?? 0,
     warning: report?.findings.filter((f) => f.level === 'warning').length ?? 0,
@@ -77,12 +100,25 @@ export function PreflightInspector({ report, running, onClose }: { report: PfRep
             ))}
           </div>
           <div className="pe-inspector-list">
-            {list.map((f, i) => (
-              <div key={i} className="pe-pf-row">
-                <i style={{ background: DOT[f.level] }} />
-                <div><div>{f.text}</div><div className="pe-label-sm">{f.where}</div></div>
-              </div>
-            ))}
+            {list.map((f, i) => {
+              const fix = onApplyFix ? fixes?.fixFor(f.text) : undefined;
+              return (
+                <div key={i} className="pe-pf-row">
+                  <i style={{ background: DOT[f.level] }} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div>{f.text}</div>
+                    <div className="pe-label-sm">{f.where}</div>
+                    {fix && (
+                      <button className="pe-btn" style={{ marginTop: 6, padding: '3px 10px', fontSize: 12 }}
+                        disabled={fixing !== null} title={fix.note}
+                        onClick={() => applyFix(fix.id, fix.run, fix.label)}>
+                        {fixing === fix.id ? 'Fixing…' : `Fix: ${fix.label}`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
             {!list.length && <div className="pe-note" style={{ padding: 14 }}>Nothing at this level — looks press-ready.</div>}
           </div>
           <div className="pe-inspector-foot">
