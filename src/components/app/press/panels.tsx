@@ -1456,6 +1456,60 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
           </div>
         </>
       );
+    case 'pdfx':
+      return (
+        <>
+          <Section label="// PDF/X STANDARD" help="Tags the file as PDF/X so colour-managed RIPs recognise it. X-4 is the modern default (allows transparency and layers); X-1a is the older CMYK-flattened standard.">
+            <div className="pe-cards2">
+              <SelCard on={s.standard !== 'x-1a'} cap="PDF/X-4" onClick={() => up({ standard: 'x-4' })}><Ic name="pdfxIc" size={22} /></SelCard>
+              <SelCard on={s.standard === 'x-1a'} off={s.standard !== 'x-1a'} cap="PDF/X-1a" onClick={() => up({ standard: 'x-1a' })}><Ic name="pdfxIc" size={22} /></SelCard>
+            </div>
+            <div className="pe-note" style={{ marginTop: 8 }}>
+              Adds an output intent, sets TrimBox/BleedBox, writes PDF/X identification metadata and a document ID.
+            </div>
+          </Section>
+          <Section label="// COLOUR" help="Whether to convert page colour to CMYK now, or leave it for your RIP.">
+            <Check icon="colormanageIc" label="Convert colours to CMYK"
+              sub="Leave OFF if your RIP or Fiery does colour conversion (recommended). Converting rasterises pages."
+              checked={!!s.convertCmyk} onChange={(v) => up({ convertCmyk: v })} />
+            {s.standard === 'x-1a' && !s.convertCmyk && (
+              <div className="pe-note" style={{ color: '#f59e0b' }}>
+                PDF/X-1a requires CMYK. If your artwork is RGB, either enable conversion here or supply CMYK artwork — otherwise the file won&apos;t be strictly X-1a conformant. Preflight will flag any RGB.
+              </div>
+            )}
+            {s.convertCmyk && (
+              <div className="pe-row" style={{ marginTop: 8, marginBottom: 0 }}><span className="pe-label pe-w96">Rasterize DPI</span>
+                <select className="pe-select" style={{ width: 110, flex: '0 0 110px' }} value={s.dpi} onChange={(e) => up({ dpi: +e.target.value })}>
+                  <option value={150}>150</option><option value={300}>300</option><option value={600}>600</option>
+                </select>
+              </div>
+            )}
+          </Section>
+          <Section label="// OUTPUT INTENT (ICC)" help="The CMYK profile embedded as the PDF/X output intent. A generic profile is built in; upload your press's profile for accurate colour.">
+            <div className="pe-cards2" style={{ marginBottom: 8 }}>
+              <SelCard on={s.iccSource !== 'upload'} cap="GENERIC CMYK" onClick={() => up({ iccSource: 'bundled' })}><Ic name="droplet" size={20} /></SelCard>
+              <SelCard on={s.iccSource === 'upload'} off={s.iccSource !== 'upload'} cap={s.iccName ? `✓ ${s.iccName}`.slice(0, 16) : 'UPLOAD ICC'} onClick={() => {
+                const inp = document.createElement('input');
+                inp.type = 'file'; inp.accept = '.icc,.icm';
+                inp.onchange = async () => {
+                  const f = inp.files?.[0]; if (!f) return;
+                  const bytes = new Uint8Array(await f.arrayBuffer());
+                  const { iccProfileInfo } = await import('./wasm-engines');
+                  const info = await iccProfileInfo(bytes);
+                  up({ icc: bytes, iccName: info?.name || f.name, iccSource: 'upload' });
+                };
+                inp.click();
+              }}><Ic name="upload" size={20} /></SelCard>
+            </div>
+            <div className="pe-note">
+              The bundled profile is a generic CMYK approximation (fine as a default). For colour-accurate work, upload the ICC profile your printer provides.
+            </div>
+          </Section>
+          <div className="pe-note" style={{ marginBottom: 12 }}>
+            ⓘ Not sending to a colour-managed RIP? You may not need PDF/X at all — a plain export works too. This step is entirely optional.
+          </div>
+        </>
+      );
     case 'barcode':
       return (
         <>

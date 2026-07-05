@@ -30,7 +30,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf';
+  | 'braille' | 'editpdf' | 'pdfx';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -121,6 +121,11 @@ export function defaultSettings(type: StepType): StepSettings {
       return { layerType: 'white', spotName: 'White', coverage: 'trim', tint: 1, pages: 'all' };
     case 'braille':
       return { text: '', position: 'bl', dotDiaPt: 4.25, pages: 'all' };
+    case 'pdfx':
+      // CMYK conversion is OFF by default: RIPs/Fiery do their own colour
+      // management, so converting here is usually wrong. The generic bundled
+      // profile is used unless you upload your press's ICC.
+      return { standard: 'x-4', convertCmyk: false, iccSource: 'bundled', intent: 'relative', dpi: 300, conditionName: 'Generic CMYK', icc: null, iccName: '' };
     case 'editpdf':
       return {};
     case 'booklet':
@@ -451,6 +456,21 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         spotName: s.spotName || (s.layerType === 'varnish' ? 'Varnish' : 'White'),
         coverage: s.coverage, tint: s.tint, under: s.layerType === 'white', pages: s.pages,
       }); break;
+      case 'pdfx': {
+        const { exportPdfX } = await import('@/lib/imposition-toolkit/pdfx');
+        // Use the uploaded profile if any, else the bundled generic CMYK one.
+        let icc = s.icc as Uint8Array | null;
+        if (!icc || s.iccSource !== 'upload') {
+          const res = await fetch('/icc/generic-cmyk.icc');
+          icc = new Uint8Array(await res.arrayBuffer());
+        }
+        b = await exportPdfX(b, {
+          standard: s.standard === 'x-1a' ? 'x-1a' : 'x-4',
+          icc, convertCmyk: !!s.convertCmyk, intent: s.intent, dpi: s.dpi,
+          conditionName: s.iccSource === 'upload' ? (s.iccName || 'Custom CMYK') : 'Generic CMYK',
+        });
+        break;
+      }
       case 'braille': if (s.text?.trim()) b = await addBraille(b, {
         text: s.text, dotDiaPt: s.dotDiaPt, pages: s.pages,
         ...(braillePos(s.position)),

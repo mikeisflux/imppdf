@@ -52,6 +52,7 @@ export const Icons = {
   backdropIc: (p = {}) => <S {...p}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 16l5-5 4 4 3-3 6 6" /><circle cx="9" cy="8" r="1.6" /></S>,
   coloreffectsIc: (p = {}) => <S {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.9 2.9M15.5 15.5l2.9 2.9M18.4 5.6l-2.9 2.9M8.5 15.5l-2.9 2.9" /></S>,
   colormanageIc: (p = {}) => <S {...p}><path d="m3 17 8-13 4 6-6 9H3Z" /><circle cx="17" cy="16" r="4" /></S>,
+  pdfxIc: (p = {}) => <S {...p}><rect x="4" y="3" width="16" height="18" rx="1.5" /><path d="M8 8h4M8 12h8M8 16h8" /><path d="M15 3v5h5" /></S>,
   barcodeIc: (p = {}) => <S {...p}><path d="M4 5v14M8 5v14M11 5v8M14 5v14M18 5v10M21 5v14" /></S>,
   brailleIc: (p = {}) => <S {...p}><circle cx="7" cy="6" r="1.6" /><circle cx="7" cy="12" r="1.6" /><circle cx="7" cy="18" r="1.6" /><circle cx="14" cy="6" r="1.6" /><circle cx="14" cy="18" r="1.6" /><circle cx="20" cy="12" r="1.6" /></S>,
   droplet: (p = {}) => <S {...p}><path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 1 1-12 0c0-3.4 3-6.5 6-11Z" /><path d="M9 14a3 3 0 0 0 3 3" /></S>,
@@ -208,6 +209,7 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'backdrop', label: 'Backdrop', icon: 'backdropIc', tip: 'Place a PDF behind your existing page content.' },
     { id: 'coloreffects', label: 'Color Effects', icon: 'coloreffectsIc', tip: 'Adjust brightness, contrast and color, or apply effects.' },
     { id: 'colormanage', label: 'Color Management', icon: 'colormanageIc', tip: 'Approximate CMYK gamut mapping and proof how colors will print.' },
+    { id: 'pdfx', label: 'PDF/X Export', icon: 'pdfxIc', tip: 'Tag the file as PDF/X-4 or PDF/X-1a with an output intent. CMYK conversion is optional (off for RIP/Fiery).' },
     { id: 'pagenumbers', label: 'Page Numbers', icon: 'pagenumbers', tip: 'Stamp folio numbers / Bates numbering.' },
   ] },
 ];
