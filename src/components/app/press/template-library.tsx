@@ -44,7 +44,7 @@ const PALETTES: [string, string][] = [
 function hash(s: string): number { let h = 5381; for (const c of s) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0; return h; }
 
 function layoutCells(steps: WorkflowStep[], W: number, H: number) {
-  const impose = steps.find((st) => ['grid', 'cards', 'cutstack', 'booklet', 'zine', 'gangsheet', 'stickers', 'customimpose', 'nupbook', 'calendar', 'resize'].includes(st.type));
+  const impose = steps.find((st) => ['grid', 'cards', 'cutstack', 'booklet', 'zine', 'gangsheet', 'stickers', 'customimpose', 'nupbook', 'calendar', 'resize', 'datamerge'].includes(st.type));
   const s = impose?.s ?? {};
   const cells: { x: number; y: number; w: number; h: number; rot?: boolean }[] = [];
   let cols = 1, rows = 1, duplex = !!s.duplex;
@@ -88,10 +88,10 @@ function layoutCells(steps: WorkflowStep[], W: number, H: number) {
 type PieceKind = 'card' | 'book' | 'label' | 'flyer' | 'poster';
 
 function pieceKind(entry: Entry): PieceKind {
-  const st = entry.steps.find((s) => ['grid', 'cards', 'cutstack', 'booklet', 'zine', 'gangsheet', 'stickers', 'nupbook', 'calendar'].includes(s.type));
+  const st = entry.steps.find((s) => ['grid', 'cards', 'cutstack', 'booklet', 'zine', 'gangsheet', 'stickers', 'nupbook', 'calendar', 'datamerge'].includes(s.type));
   if (!st) return 'flyer';
   if (st.type === 'booklet' || st.type === 'nupbook' || st.type === 'zine') return 'book';
-  if (st.type === 'stickers') return 'label';
+  if (st.type === 'stickers' || st.type === 'datamerge') return 'label';
   const cw = st.s.cellWIn as number | undefined, ch = st.s.cellHIn as number | undefined, sw = st.s.sheetWIn as number | undefined;
   if (cw && ch && cw <= 4.3 && ch <= 4.3) return 'card';
   if ((sw ?? 0) >= 20) return 'poster';
