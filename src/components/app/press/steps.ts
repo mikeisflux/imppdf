@@ -16,7 +16,7 @@ import {
 import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/imposition-toolkit/impose';
 
 export type StepType =
-  | 'cards' | 'booklet' | 'zine' | 'shuffle' | 'grid' | 'nupbook' | 'cutstack' | 'datamerge'
+  | 'cards' | 'booklet' | 'zine' | 'shuffle' | 'grid' | 'nupbook' | 'cutstack' | 'perfectbound' | 'datamerge'
   | 'preflight' | 'gangsheet' | 'cuttermarks' | 'layers' | 'customimpose' | 'pdftools'
   | 'resize' | 'rotate' | 'crop' | 'split' | 'flip' | 'merge' | 'overlay' | 'distort'
   | 'bleed' | 'headerfooter' | 'colorbar' | 'slugline' | 'foldmarks' | 'regmarks'
@@ -115,6 +115,15 @@ export function defaultSettings(type: StepType): StepSettings {
         marginIn: 0.25, gutterIn: 0.125, gutterYIn: 0.125,
         order: type === 'cards' ? 'repeat' : type === 'cutstack' ? 'cutstack' : 'sequential',
         duplex: false, autoscale: true, preserveAspect: true, ...MARKS,
+        bleedMode: 'doc', bleedIn: 0.125,
+      };
+    case 'perfectbound':
+      // Perfect-bound trade paperback: sequential 2-up, printed duplex and laid
+      // out cut-and-stack so leaves fall into reading order (page 2 backs page 1).
+      return {
+        sheetWIn: 17, sheetHIn: 11, cols: 2, rows: 1, cellWIn: 8.5, cellHIn: 11,
+        marginIn: 0, gutterIn: 0, gutterYIn: 0, order: 'cutstack', duplex: true,
+        duplexFlip: 'long', autoscale: true, preserveAspect: true, ...MARKS,
         bleedMode: 'doc', bleedIn: 0.125,
       };
     case 'nupbook':
@@ -252,7 +261,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         });
         break;
       }
-      case 'cards': case 'grid': case 'cutstack': b = await imposeNUp(b, nupOpts(s)); break;
+      case 'cards': case 'grid': case 'cutstack': case 'perfectbound': b = await imposeNUp(b, nupOpts(s)); break;
       case 'nupbook': b = await imposeNUpBook(b, {
         nUp: s.nUp, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, marginIn: s.marginIn,
         gutterIn: s.gutterIn, creepIn: s.creepIn, rtl: !!s.rtl, signatureSheets: s.signatureSheets,

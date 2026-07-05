@@ -42,7 +42,7 @@ function buildEntries(): Entry[] {
 // Used only for the stats readout; the visual comes from each template's own
 // preview() function, which lives in its template file.
 function layoutOf(steps: WorkflowStep[]) {
-  const impose = steps.find((st) => ['grid', 'cards', 'cutstack', 'booklet', 'zine', 'gangsheet', 'stickers', 'datamerge', 'customimpose', 'nupbook'].includes(st.type));
+  const impose = steps.find((st) => ['grid', 'cards', 'cutstack', 'perfectbound', 'booklet', 'zine', 'gangsheet', 'stickers', 'datamerge', 'customimpose', 'nupbook'].includes(st.type));
   const s = impose?.s ?? {};
   const duplex = !!s.duplex;
   if (!impose) return { cols: 1, rows: 1, duplex, kind: 'single' as const, s };

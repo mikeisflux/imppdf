@@ -254,7 +254,7 @@ function BookletPanel(p: PanelProps) {
   );
 }
 
-function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' }) {
+function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfectbound' }) {
   const { s, up, unit, onUnit, kind } = p;
   return (
     <>
@@ -1535,7 +1535,7 @@ export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
   if (type === 'booklet') return <BookletPanel {...props} />;
   if (type === 'zine') return <ZinePanel {...props} />;
-  if (type === 'cards' || type === 'grid' || type === 'cutstack') return <NUpPanel {...props} kind={type} />;
+  if (type === 'cards' || type === 'grid' || type === 'cutstack' || type === 'perfectbound') return <NUpPanel {...props} kind={type} />;
   if (type === 'nupbook') return <NUpBookPanel {...props} />;
   if (type === 'colorbar') return <ColorBarPanel {...props} />;
   if (type === 'cuttermarks') return <CutterMarksPanel {...props} />;

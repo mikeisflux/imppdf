@@ -121,6 +121,7 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'grid', label: 'Grid', icon: 'grid', tip: 'Use Grid to arrange pages in an N-up grid layout.' },
     { id: 'nupbook', label: 'N-up Book', icon: 'nupbook', tip: 'Use N-up Book for multi-up signature imposition (folio / quarto).' },
     { id: 'cutstack', label: 'Cut and Stack', icon: 'cutstack', tip: 'Use Cut & Stack so sequential pages fall into order after guillotining.' },
+    { id: 'perfectbound', label: 'Perfect Bound', icon: 'nupbook', tip: 'Use Perfect Bound for trade paperbacks: sequential 2-up, printed duplex and cut-and-stacked so page 2 backs page 1.' },
     { id: 'datamerge', label: 'Variable Data', icon: 'pagenumbers', tip: 'Merge CSV records — names, numbers, QR codes — onto imposed cells.' },
   ] },
   { label: '// ADVANCED', ops: [
