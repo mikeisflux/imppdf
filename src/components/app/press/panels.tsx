@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { zineSheetLayout, zinePanels, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
+import { ImageFitModal } from './image-fit-modal';
 
 // ── Units ────────────────────────────────────────────────────────────────────
 export type Unit = 'in' | 'mm' | 'pt';
@@ -256,9 +257,32 @@ function BookletPanel(p: PanelProps) {
 
 function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfectbound' }) {
   const { s, up, unit, onUnit, kind } = p;
+  const [fitOpen, setFitOpen] = useState(false);
+  const thumb = (p.thumbs ?? [])[0] || '';
+  const cw = s.cellWIn || (s.sheetWIn ?? 8.5) / (s.cols || 2);
+  const ch = s.cellHIn || (s.sheetHIn ?? 11) / (s.rows || 2);
   return (
     <>
       <PaperSize {...p} />
+      <Section label="// IMAGE FIT" help="How each page/image fills its cell. Cover preserves proportions and crops the overflow.">
+        <div className="pe-row" style={{ gap: 8 }}>
+          <select className="pe-select" value={s.fit ?? 'cover'} onChange={(e) => up({ fit: e.target.value })} style={{ flex: 1 }}>
+            <option value="cover">Cover — fill &amp; crop</option>
+            <option value="contain">Contain — fit inside</option>
+            <option value="stretch">Stretch — distort to fill</option>
+          </select>
+          <button className="pe-btn" disabled={!thumb} title={thumb ? '' : 'Add a PDF/image first'} onClick={() => setFitOpen(true)}>Adjust &amp; crop…</button>
+        </div>
+        {(s.imageZoom || s.imageOffsetX != null) && s.fit !== 'stretch' && (
+          <div className="pe-note" style={{ marginTop: 6 }}>Custom crop: {(s.imageZoom ?? 1).toFixed(2)}× · {(Math.round((s.imageOffsetX ?? 0.5) * 100))}%,{Math.round((s.imageOffsetY ?? 0.5) * 100)}%</div>
+        )}
+      </Section>
+      {fitOpen && thumb && (
+        <ImageFitModal thumb={thumb} cellWIn={+cw.toFixed(2)} cellHIn={+ch.toFixed(2)}
+          value={{ fit: s.fit ?? 'cover', zoom: s.imageZoom ?? 1, offsetX: s.imageOffsetX ?? 0.5, offsetY: s.imageOffsetY ?? 0.5 }}
+          onApply={(v) => { up({ fit: v.fit, imageZoom: v.zoom, imageOffsetX: v.offsetX, imageOffsetY: v.offsetY }); setFitOpen(false); }}
+          onClose={() => setFitOpen(false)} />
+      )}
       {kind === 'grid' && (
         <Section label="// PAGE ORDER" help="Reading direction and fill pattern.">
           <div className="pe-row">
