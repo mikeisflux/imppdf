@@ -3,6 +3,8 @@
 // are detectable in-browser: encryption, empty doc, page-box/bleed, mixed sizes,
 // trim-size sanity, binding page-count, and low-resolution (DPI) images.
 
+import { PDFArray, PDFDict, PDFName, PDFRawStream, PDFStream, type PDFDocument, type PDFObject } from 'pdf-lib';
+
 export type PreflightLevel = 'error' | 'warning' | 'pass';
 export interface PreflightFinding { level: PreflightLevel; title: string; detail: string; }
 
@@ -70,10 +72,84 @@ export async function runPreflight(
   if (n % 4 !== 0) out.push({ level: 'warning', title: `Page count ${n} not a multiple of 4`, detail: 'Saddle-stitch and perfect-bound booklets need the page count divisible by 4 — blank pages will be padded.' });
   else out.push({ level: 'pass', title: `Page count ${n} (÷4)`, detail: 'Ready for booklet/perfect-bound imposition.' });
 
-  // 7. Low-resolution images (DPI) — best-effort scan via pdf.js.
+  // 7. Fonts, spot colors and transparency — low-level object scan.
+  if (doc) checkFontsAndColor(doc, bytes, out);
+
+  // 8. Low-resolution images (DPI) — best-effort scan via pdf.js.
   await checkImageDpi(bytes, sizes, out);
 
   return out;
+}
+
+// Enumerate every indirect object (pdf-lib decodes object streams on load, so
+// this sees objects that a raw byte-scan would miss) and report on the checks a
+// prepress operator cares about: unembedded fonts, spot/separation inks, and
+// transparency. Also does a coarse RGB-vs-CMYK token scan of the raw bytes.
+function checkFontsAndColor(doc: PDFDocument, bytes: Uint8Array, out: PreflightFinding[]) {
+  try {
+    const nm = (s: string) => PDFName.of(s);
+    // PDFName stringifies with a leading slash (e.g. "/Font"); compare the tail.
+    const str = (v: unknown) => (v == null ? '' : String(v).replace(/^\//, ''));
+    const dictOf = (o: PDFObject): PDFDict | null => {
+      if (o instanceof PDFDict) return o;
+      if (o instanceof PDFStream || o instanceof PDFRawStream) return o.dict;
+      return null;
+    };
+
+    let unembedded = 0, standard14 = 0, embedded = 0;
+    let spot = 0, deviceN = 0, transparency = false;
+    const objs = doc.context.enumerateIndirectObjects();
+    for (const [, obj] of objs) {
+      // Spot / DeviceN colour spaces are arrays: [/Separation name alt tint] etc.
+      if (obj instanceof PDFArray) {
+        const head = str(obj.get(0));
+        if (head === 'Separation') spot++;
+        else if (head === 'DeviceN') deviceN++;
+        continue;
+      }
+      const d = dictOf(obj);
+      if (!d) continue;
+      const type = str(d.get(nm('Type')));
+      if (type === 'FontDescriptor') {
+        const has = ['FontFile', 'FontFile2', 'FontFile3'].some((k) => d.get(nm(k)) != null);
+        if (has) embedded++; else unembedded++;
+      } else if (type === 'Font') {
+        const sub = str(d.get(nm('Subtype')));
+        // Simple fonts with no descriptor are the base-14 standard fonts.
+        if (sub !== 'Type0' && d.get(nm('FontDescriptor')) == null) standard14++;
+      }
+      // Transparency group (page or form XObject) or a non-trivial soft mask.
+      if (str(d.get(nm('S'))) === 'Transparency') transparency = true;
+      const sm = d.get(nm('SMask'));
+      if (sm != null && str(sm) !== 'None') transparency = true;
+    }
+
+    if (unembedded > 0)
+      out.push({ level: 'error', title: `${unembedded} unembedded font${unembedded > 1 ? 's' : ''}`, detail: 'Fonts without embedded outlines can reflow or substitute on the RIP. Embed all fonts before printing.' });
+    else if (standard14 > 0)
+      out.push({ level: 'warning', title: 'Standard (base-14) fonts not embedded', detail: 'Base-14 fonts (Helvetica/Times/Courier…) rely on the RIP’s built-ins. For predictable output, embed them.' });
+    else if (embedded > 0)
+      out.push({ level: 'pass', title: 'Fonts embedded', detail: 'All detected fonts carry embedded outlines.' });
+
+    if (spot + deviceN > 0)
+      out.push({ level: 'warning', title: `${spot + deviceN} spot/separation colour${spot + deviceN > 1 ? 's' : ''}`, detail: 'Separation/DeviceN inks print on their own plates. Confirm the spot colours are intended, or convert to process (CMYK).' });
+
+    if (transparency)
+      out.push({ level: 'warning', title: 'Live transparency present', detail: 'Transparency/soft masks can render inconsistently on older RIPs. Flatten to PDF/X-1a if your printer requires it.' });
+
+    // Coarse colour-space hint from raw tokens (image XObject dicts are usually
+    // not inside object streams, so these tokens survive a byte-scan). Skipped
+    // for very large files to bound memory.
+    if (bytes.length < 40 * 1024 * 1024) {
+      const txt = new TextDecoder('latin1').decode(bytes);
+      const hasCMYK = txt.includes('/DeviceCMYK');
+      const hasRGB = txt.includes('/DeviceRGB');
+      if (hasRGB && !hasCMYK)
+        out.push({ level: 'warning', title: 'RGB colour detected', detail: 'The file appears to use RGB. Most offset/digital presses expect CMYK — colours may shift on conversion. Supply CMYK artwork for accurate colour.' });
+      else if (hasCMYK && !hasRGB)
+        out.push({ level: 'pass', title: 'CMYK colour', detail: 'File uses process (CMYK) colour — press-ready.' });
+    }
+  } catch { /* low-level scan is best-effort */ }
 }
 
 async function checkImageDpi(bytes: Uint8Array, sizes: { wPt: number; hPt: number }[], out: PreflightFinding[]) {

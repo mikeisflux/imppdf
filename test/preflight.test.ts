@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { runPreflight } from '../src/lib/imposition-toolkit/preflight.ts';
 
 const PT = 72;
@@ -47,4 +47,14 @@ test('page count not divisible by 4 is flagged for binding', async () => {
   const findings = await runPreflight(bytes, pageSizes);
   assert.ok(findings.some((f) => /4|binding|multiple/i.test(f.title + f.detail)),
     'warns about page-count divisibility');
+});
+
+test('a standard (base-14) font that is not embedded is flagged', async () => {
+  const d = await PDFDocument.create();
+  const p = d.addPage([8.5 * PT, 11 * PT]);
+  const font = await d.embedFont(StandardFonts.Helvetica); // base-14, not embedded
+  p.drawText('Hello', { x: 20, y: 20, size: 12, font });
+  const bytes = await d.save();
+  const findings = await runPreflight(bytes, [{ wPt: 8.5 * PT, hPt: 11 * PT }]);
+  assert.ok(findings.some((f) => /font/i.test(f.title)), 'reports on fonts');
 });
