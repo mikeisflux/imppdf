@@ -252,6 +252,32 @@ export function gridLayout(cols: number, rows: number, W: number, H: number): Ce
 
 export interface MarkOpts {
   crop?: boolean; reg?: boolean; cut?: boolean; colorbar?: boolean; watermark?: string;
+  /** Stamp "No. 1, No. 2, …" on each piece (numbered tickets / raffle). */
+  numbered?: boolean;
+  /** Draw pieces as circles with a die contour (round coasters / labels). */
+  round?: boolean;
+}
+
+/** Sequential "No. N" stamps in each piece's corner. */
+function NumberStamps({ cells }: { cells: Cell[] }) {
+  return <>{cells.map((c, i) => (
+    <text key={i} x={c.x + c.w - c.w * 0.06} y={c.y + c.h - c.h * 0.08} textAnchor="end"
+      fontFamily="ui-monospace" fontWeight={700} fontSize={Math.min(11, c.h / 3.2)} fill="#ffffffdd">No. {i + 1}</text>
+  ))}</>;
+}
+
+/** Circular pieces (mock clipped to a circle) with a dashed die contour. */
+function RoundPieces({ cells, mode, id }: { cells: Cell[]; mode: 'diagram' | 'example'; id: string }) {
+  return <>{cells.map((c, i) => {
+    const cx = c.x + c.w / 2, cy = c.y + c.h / 2, r = Math.min(c.w, c.h) / 2;
+    const clip = `clip-${id}-${i}`;
+    return <g key={i}>
+      <clipPath id={clip}><circle cx={cx} cy={cy} r={r} /></clipPath>
+      {mode === 'example' && <g clipPath={`url(#${clip})`}><MockPiece cell={{ x: cx - r, y: cy - r, w: 2 * r, h: 2 * r }} id={id} /></g>}
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#7b6cf6" strokeWidth={1} strokeDasharray="4 3" />
+      {mode === 'diagram' && <text x={cx} y={cy + 5} textAnchor="middle" fontFamily="ui-monospace" fontSize={Math.min(15, r / 1.6)} fill="#4c4a85" fontWeight={700}>{i + 1}</text>}
+    </g>;
+  })}</>;
 }
 
 function Marks({ cells, W, H, id, o }: { cells: Cell[]; W: number; H: number; id: string; o: MarkOpts }) {
@@ -415,8 +441,9 @@ export function sizedGrid(id: string, g: SizedGeom, o: MarkOpts = {}) {
     for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++)
       cells.push({ x: x0 + c * (cw + gx), y: y0 + r * (ch + gy), w: cw, h: ch });
     return <Sheet W={W} H={H}>
-      <Pieces cells={cells} mode={mode} id={id} />
+      {o.round ? <RoundPieces cells={cells} mode={mode} id={id} /> : <Pieces cells={cells} mode={mode} id={id} />}
       <FoldLines cells={cells} v={g.foldV} h={g.foldH} />
+      {o.numbered && mode === 'example' && <NumberStamps cells={cells} />}
       <Marks cells={cells} W={W} H={H} id={id} o={o} />
     </Sheet>;
   };
