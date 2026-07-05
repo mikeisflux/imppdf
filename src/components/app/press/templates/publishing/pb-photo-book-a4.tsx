@@ -5,8 +5,8 @@ export default template({
   name: "Photo Book (Landscape A4)",
   desc: 'Landscape A4 photo book with perfect binding. Full-bleed photo spreads.',
   category: 'Publishing',
-  sheetWIn: 16.54,
-  sheetHIn: 11.69,
+  sheetWIn: 11.69,
+  sheetHIn: 16.54,
   steps: [
     { type: 'booklet', s: { sheetWIn: 16.54, sheetHIn: 11.69 } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },

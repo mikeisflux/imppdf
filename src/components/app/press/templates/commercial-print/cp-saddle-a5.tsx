@@ -5,8 +5,8 @@ export default template({
   name: "Saddle-Stitch A5 Booklet",
   desc: 'Creates print-ready A5 saddle-stitched booklets from A5 source pages on A4 landscape sheets.',
   category: 'Commercial Print',
-  sheetWIn: 11.69,
-  sheetHIn: 8.27,
+  sheetWIn: 8.27,
+  sheetHIn: 11.69,
   steps: [
     { type: 'booklet', s: { sheetWIn: 11.69, sheetHIn: 8.27, addMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },

@@ -5,8 +5,8 @@ export default template({
   name: "Saddle-Stitch A4 Magazine",
   desc: '32-page A4 magazine signatures on A3 landscape sheets for commercial offset.',
   category: 'Commercial Print',
-  sheetWIn: 16.54,
-  sheetHIn: 11.69,
+  sheetWIn: 11.69,
+  sheetHIn: 16.54,
   steps: [
     { type: 'booklet', s: { signatureSheets: 4, sheetWIn: 16.54, sheetHIn: 11.69, addMarks: true } },
     { type: 'colorbar' },

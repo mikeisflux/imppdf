@@ -5,8 +5,8 @@ export default template({
   name: "A5 Pocket Book",
   desc: 'A5 (148×210mm) pocket paperback using saddle-stitch binding on A4 landscape.',
   category: 'Publishing',
-  sheetWIn: 11.69,
-  sheetHIn: 8.27,
+  sheetWIn: 8.27,
+  sheetHIn: 11.69,
   steps: [
     { type: 'booklet', s: { sheetWIn: 11.69, sheetHIn: 8.27 } },
   ],

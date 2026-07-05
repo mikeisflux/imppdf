@@ -5,8 +5,8 @@ export default template({
   name: "Hymnal / Songbook (A5)",
   desc: 'A5 hymnal or songbook with perfect binding on A4 stock. For churches and choirs.',
   category: 'Publishing',
-  sheetWIn: 11.69,
-  sheetHIn: 8.27,
+  sheetWIn: 8.27,
+  sheetHIn: 11.69,
   steps: [
     { type: 'booklet', s: { sheetWIn: 11.69, sheetHIn: 8.27 } },
   ],

@@ -5,8 +5,8 @@ export default template({
   name: "Coloring Book (Letter)",
   desc: 'US Letter coloring book with saddle-stitch binding. Single-sided interior (back pages blank).',
   category: 'Publishing',
-  sheetWIn: 11,
-  sheetHIn: 8.5,
+  sheetWIn: 8.5,
+  sheetHIn: 11,
   steps: [
     { type: 'booklet', s: { sheetWIn: 11, sheetHIn: 8.5 } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },

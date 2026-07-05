@@ -142,6 +142,68 @@ export function MockPiece({ cell, id }: { cell: Cell; id: string }) {
   );
 }
 
+// ── Realistic book/magazine page content (for booklets & signatures) ──────────
+function lighten(hex: string, amt: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const m = (v: number) => Math.round(v + (255 - v) * amt);
+  return `#${((1 << 24) + (m(r) << 16) + (m(g) << 8) + m(b)).toString(16).slice(1)}`;
+}
+function darken(hex: string, amt: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const m = (v: number) => Math.round(v * (1 - amt));
+  return `#${((1 << 24) + (m(r) << 16) + (m(g) << 8) + m(b)).toString(16).slice(1)}`;
+}
+
+export type PageKind = 'cover' | 'text' | 'image' | 'dark';
+/** A realistic document page: background, header, body text lines, an image
+ *  block, optional cover branding and a page number. Rotated 180° for the top
+ *  row of a signature, matching how imposed pages sit on the sheet. */
+export function DocPage({ cell, id, kind, brand, tagline, palette, pageNum, rot }: {
+  cell: Cell; id: string; kind: PageKind; brand: string; tagline: string; palette: [string, string]; pageNum?: number; rot?: boolean;
+}) {
+  const c = cell;
+  const [c1, c2] = palette;
+  const h = hash(id);
+  const bg = kind === 'dark' ? darken(c2, 0.7) : kind === 'cover' ? c1 : kind === 'image' ? lighten(c1, 0.55) : lighten(c2, 0.72);
+  const ink = kind === 'dark' ? '#ffffff' : darken(bg, 0.55);
+  const pad = c.w * 0.09;
+  const lineW = c.w - 2 * pad;
+  // Body text lines (deterministic widths).
+  const lines = Array.from({ length: 5 }, (_, i) => 0.55 + (((h >> (i * 2)) & 7) / 7) * 0.42);
+  return (
+    <g transform={rot ? `rotate(180 ${c.x + c.w / 2} ${c.y + c.h / 2})` : undefined}>
+      <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={bg} />
+      {kind === 'cover' ? (
+        <>
+          <text x={c.x + pad} y={c.y + c.h * 0.5} fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={Math.min(26, c.w / 5.5)} fill={ink}>{brand}</text>
+          <text x={c.x + pad} y={c.y + c.h * 0.5 + Math.min(16, c.w / 10)} fontFamily="Inter, ui-sans-serif" fontSize={Math.min(9, c.w / 16)} fill={ink} opacity={0.7}>{tagline}</text>
+          <line x1={c.x + pad} y1={c.y + c.h * 0.5 + 6} x2={c.x + pad} y2={c.y + c.h * 0.62} stroke={ink} strokeWidth={1} opacity={0.5} />
+        </>
+      ) : (
+        <>
+          {lines.slice(0, kind === 'image' ? 2 : 5).map((w, i) => (
+            <rect key={i} x={c.x + pad} y={c.y + pad + i * (c.h * 0.055)} width={lineW * w} height={c.h * 0.02} rx={1} fill={ink} opacity={0.32} />
+          ))}
+          {(kind === 'image' || (h & 1)) && (
+            <g>
+              <rect x={c.x + c.w * 0.42} y={c.y + c.h * 0.4} width={c.w * 0.48} height={c.h * 0.34} fill={ink} opacity={0.16} stroke={ink} strokeOpacity={0.4} strokeWidth={0.7} />
+              <circle cx={c.x + c.w * 0.66} cy={c.y + c.h * 0.57} r={c.w * 0.09} fill={ink} opacity={0.16} />
+            </g>
+          )}
+          {kind !== 'image' && lines.map((w, i) => (
+            <rect key={`b${i}`} x={c.x + pad} y={c.y + c.h * 0.78 + i * (c.h * 0.04)} width={lineW * w * 0.8} height={c.h * 0.016} rx={1} fill={ink} opacity={0.28} />
+          ))}
+        </>
+      )}
+      {pageNum != null && (
+        <text x={c.x + c.w - pad * 0.5} y={c.y + c.h - pad * 0.4} textAnchor="end" fontFamily="ui-monospace" fontSize={Math.min(9, c.w / 18)} fill={ink} opacity={0.55}>{pageNum}</text>
+      )}
+    </g>
+  );
+}
+
 /** Dashed numbered placeholder (DIAGRAM mode). */
 export function DiagramPiece({ cell, n }: { cell: Cell; n: number }) {
   const c = cell;
@@ -229,25 +291,54 @@ export function single(id: string, o: MarkOpts = {}) {
   };
 }
 
-/** Saddle-stitch / signature spread: two facing pages + staples on the spine. */
-export function booklet(id: string, o: MarkOpts & { saddle?: boolean } = {}) {
+const PAGE_CYCLE: PageKind[] = ['cover', 'image', 'text', 'dark'];
+/** Book/magazine signature: cols×rows realistic pages with page numbers, a
+ *  colorbar and marks, top row imposed upside-down. Matches the reference's
+ *  saddle-stitch / signature previews. */
+export function signature(id: string, o: MarkOpts & { cols?: number; rows?: number; saddle?: boolean } = {}) {
+  const cols = o.cols ?? 2, rows = o.rows ?? 2;
   return ({ mode, W, H }: PreviewProps) => {
-    const m = W * 0.055, g = 6;
-    const cw = (W - 2 * m - g) / 2, ch = H - 2 * m;
-    const cells: Cell[] = [{ x: m, y: m, w: cw, h: ch }, { x: m + cw + g, y: m, w: cw, h: ch }];
+    const { brand, tagline, palette } = brandOf(id);
+    const m = W * 0.04, g = W * 0.012;
+    const top = o.colorbar ? 12 : m;
+    const cw = (W - 2 * m - g * (cols - 1)) / cols;
+    const ch = (H - top - m - g * (rows - 1)) / rows;
+    const cells: Cell[] = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
+      cells.push({ x: m + c * (cw + g), y: top + r * (ch + g), w: cw, h: ch });
     return <Sheet W={W} H={H}>
-      <Pieces cells={cells} mode={mode} id={id} />
-      <Marks cells={cells} W={W} H={H} id={id} o={o} />
+      {o.colorbar && <ColorBar W={W} seed={hash(id)} />}
+      {mode === 'example'
+        ? cells.map((c, i) => (
+          <DocPage key={i} cell={c} id={`${id}-${i}`} kind={i === 0 ? 'cover' : PAGE_CYCLE[i % PAGE_CYCLE.length]!}
+            brand={brand} tagline={tagline} palette={palette} pageNum={i === 0 ? undefined : i * 4} />
+        ))
+        : cells.map((c, i) => <DiagramPiece key={i} cell={c} n={i + 1} />)}
+      <CropTicks cells={cells} />
+      {o.reg && <RegTargets cells={cells} />}
+      {o.cut && <CutDots W={W} H={H} top={o.colorbar ? 13 : 7} />}
       {o.saddle !== false && <Staples W={W} H={H} />}
     </Sheet>;
   };
+}
+
+/** Saddle-stitch / signature spread: two facing pages + staples on the spine. */
+export function booklet(id: string, o: MarkOpts & { saddle?: boolean } = {}) {
+  return signature(id, { ...o, cols: 2, rows: 2 });
 }
 
 /** True-scale gang: pieces are drawn at their real cellWIn×cellHIn dimensions
  *  relative to the sheet (uniform px-per-inch), packed cols×rows and centred, so
  *  the imposed pieces show at their correct size with the sheet margin visible.
  *  Use this for cards/postcards/labels where the piece size must read correctly. */
-export interface SizedGeom { cols: number; rows: number; cellWIn: number; cellHIn: number; sheetWIn: number; sheetHIn: number; gutterIn?: number }
+export interface SizedGeom {
+  cols: number; rows: number; cellWIn: number; cellHIn: number; sheetWIn: number; sheetHIn: number;
+  gutterIn?: number;
+  /** Draw fold-score lines dividing each piece into N vertical panels (tri-fold=3, gate/z-fold=3, bi-fold=2). */
+  foldV?: number;
+  /** Draw fold-score lines dividing each piece into N horizontal panels. */
+  foldH?: number;
+}
 export function sizedGrid(id: string, g: SizedGeom, o: MarkOpts = {}) {
   return ({ mode, W, H }: PreviewProps) => {
     const ppi = W / g.sheetWIn;
@@ -264,8 +355,29 @@ export function sizedGrid(id: string, g: SizedGeom, o: MarkOpts = {}) {
     const cells: Cell[] = [];
     for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++)
       cells.push({ x: x0 + c * (cw + gx), y: y0 + r * (ch + gy), w: cw, h: ch });
-    return <Sheet W={W} H={H}><Pieces cells={cells} mode={mode} id={id} /><Marks cells={cells} W={W} H={H} id={id} o={o} /></Sheet>;
+    return <Sheet W={W} H={H}>
+      <Pieces cells={cells} mode={mode} id={id} />
+      <FoldLines cells={cells} v={g.foldV} h={g.foldH} />
+      <Marks cells={cells} W={W} H={H} id={id} o={o} />
+    </Sheet>;
   };
+}
+
+/** Dashed fold-score lines splitting each piece into equal panels. */
+export function FoldLines({ cells, v, h }: { cells: Cell[]; v?: number; h?: number }) {
+  if (!v && !h) return null;
+  return <>{cells.map((c, i) => (
+    <g key={i} stroke="#ffffff" strokeWidth={0.8} strokeDasharray="3 3" strokeOpacity={0.85}>
+      {v ? Array.from({ length: v - 1 }, (_, k) => {
+        const x = c.x + (c.w * (k + 1)) / v;
+        return <line key={`v${k}`} x1={x} y1={c.y} x2={x} y2={c.y + c.h} />;
+      }) : null}
+      {h ? Array.from({ length: h - 1 }, (_, k) => {
+        const y = c.y + (c.h * (k + 1)) / h;
+        return <line key={`h${k}`} x1={c.x} y1={y} x2={c.x + c.w} y2={y} />;
+      }) : null}
+    </g>
+  ))}</>;
 }
 
 /** One-sheet fold-and-cut zine: 4×2 imposition, top row rotated 180°. */
