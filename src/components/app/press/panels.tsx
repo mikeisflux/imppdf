@@ -1503,11 +1503,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
         </>
       );
     case 'preflight':
-      return (
-        <Section label="// PREFLIGHT" help="Non-destructive inspection of the current pipeline input.">
-          <div className="pe-note">The report opens in the Job Info panel once a PDF is loaded. This step never modifies the file.</div>
-        </Section>
-      );
+      return null; // handled in StepPanelBody (needs sourceBytes/pageSizes)
     default:
       return null;
   }
@@ -1531,6 +1527,55 @@ function Slider({ label, value, min, max, suffix, onChange }: { label: string; v
   );
 }
 
+// Live preflight report — runs standard prepress checks on the loaded PDF.
+function PreflightPanel({ sourceBytes, pageSizes = [], pageCount = 0 }: PanelProps) {
+  const [findings, setFindings] = useState<import('@/lib/imposition-toolkit/preflight').PreflightFinding[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!sourceBytes) { setFindings(null); return; }
+    let cancelled = false; setLoading(true);
+    import('@/lib/imposition-toolkit/preflight')
+      .then(({ runPreflight }) => runPreflight(sourceBytes.slice(), pageSizes, pageCount))
+      .then((f) => { if (!cancelled) { setFindings(f); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setFindings([]); setLoading(false); } });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceBytes, pageCount]);
+
+  const errors = findings?.filter((f) => f.level === 'error').length ?? 0;
+  const warns = findings?.filter((f) => f.level === 'warning').length ?? 0;
+  const dot = (lvl: string) => lvl === 'error' ? '#ef4444' : lvl === 'warning' ? '#f59e0b' : '#22c55e';
+  const label = (lvl: string) => lvl === 'error' ? 'ERROR' : lvl === 'warning' ? 'WARN' : 'PASS';
+
+  return (
+    <Section label="// PREFLIGHT" help="Standard prepress checks. Non-destructive — never modifies the file.">
+      {!sourceBytes && <div className="pe-note">Add a PDF to run preflight.</div>}
+      {sourceBytes && loading && <div className="pe-note">Running preflight checks…</div>}
+      {findings && !loading && (
+        <>
+          <div className="pe-row" style={{ gap: 8, marginBottom: 10 }}>
+            <span className="pe-label-sm pe-mono" style={{ color: errors ? '#ef4444' : '#22c55e' }}>{errors} errors</span>
+            <span className="pe-label-sm pe-mono" style={{ color: warns ? '#f59e0b' : 'var(--muted)' }}>{warns} warnings</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {findings.map((f, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ marginTop: 5, width: 8, height: 8, borderRadius: 4, background: dot(f.level), flex: '0 0 auto' }} />
+                <div style={{ minWidth: 0 }}>
+                  <div className="pe-label-sm" style={{ fontWeight: 700 }}>
+                    <span className="pe-mono" style={{ color: dot(f.level), marginRight: 6 }}>{label(f.level)}</span>{f.title}
+                  </div>
+                  <div className="pe-label-sm" style={{ color: 'var(--muted)' }}>{f.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
 // N-Up-driven layout tools (generic + domain presets) all use the N-Up panel.
 const NUP_TOOLS = new Set<StepType>([
   'cards', 'grid', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer',
@@ -1543,6 +1588,7 @@ const NUP_TOOLS = new Set<StepType>([
 
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
+  if (type === 'preflight') return <PreflightPanel {...props} />;
   if (type === 'booklet' || type === 'comic' || type === 'magazine' || type === 'catalog'
     || type === 'program' || type === 'notebook' || type === 'hymnal') return <BookletPanel {...props} />;
   if (type === 'zine') return <ZinePanel {...props} />;

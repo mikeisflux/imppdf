@@ -38,7 +38,10 @@ export async function rasterizePdfSheets(
   opts: { maxPx?: number; maxPages?: number; fillWhite?: boolean } = {},
 ): Promise<{ sheets: RenderedSheet[]; total: number }> {
   if (typeof document === 'undefined') return { sheets: [], total: 0 };
-  const maxPx = opts.maxPx ?? 1000;
+  // Render at the display's pixel density so the on-screen preview stays crisp
+  // on HiDPI/Retina screens instead of being upscaled from a 1× raster.
+  const dpr = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
+  const maxPx = (opts.maxPx ?? 1200) * dpr;
   const fillWhite = opts.fillWhite !== false;
   polyfillMapUpsert();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,17 +56,18 @@ export async function rasterizePdfSheets(
   for (let i = 1; i <= n; i++) {
     const page = await doc.getPage(i);
     const base = page.getViewport({ scale: 1 });
-    const scale = Math.min(maxPx / Math.max(base.width, base.height), 3);
+    const scale = Math.min(maxPx / Math.max(base.width, base.height), 4);
     const vp = page.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.ceil(vp.width));
     canvas.height = Math.max(1, Math.ceil(vp.height));
     const ctx = canvas.getContext('2d');
     if (!ctx) continue;
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     if (fillWhite) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
     await page.render({ canvasContext: ctx, viewport: vp }).promise;
     sheets.push({
-      url: fillWhite ? canvas.toDataURL('image/jpeg', 0.8) : canvas.toDataURL('image/png'),
+      url: fillWhite ? canvas.toDataURL('image/jpeg', 0.92) : canvas.toDataURL('image/png'),
       wPt: base.width, hPt: base.height,
     });
   }
@@ -87,17 +91,19 @@ export async function rasterizePdfThumbs(bytes: Uint8Array, maxPx = 340): Promis
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i);
       const base = page.getViewport({ scale: 1 });
-      const scale = Math.min(maxPx / Math.max(base.width, base.height), 2);
+      const dpr = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
+      const scale = Math.min((maxPx * dpr) / Math.max(base.width, base.height), 3);
       const vp = page.getViewport({ scale });
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.ceil(vp.width));
       canvas.height = Math.max(1, Math.ceil(vp.height));
       const ctx = canvas.getContext('2d');
       if (!ctx) { out.push(''); continue; }
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       await page.render({ canvasContext: ctx, viewport: vp }).promise;
-      out.push(canvas.toDataURL('image/jpeg', 0.72));
+      out.push(canvas.toDataURL('image/jpeg', 0.85));
     }
     try { doc.cleanup?.(); doc.destroy?.(); } catch { /* best effort */ }
     thumbCache.set(bytes, out);
