@@ -5,20 +5,24 @@
 import React, { useMemo, useState } from 'react';
 import { Ic, paperName } from './panels';
 import { findOp } from './operations';
-import { LIBRARY } from './library-catalog';
+import { LIBRARY } from './templates/registry';
+import type { TemplateSpec, PreviewProps } from './templates/kit';
 import { makeStep, type WorkflowStep } from './steps';
 
 interface Entry {
   id: string; name: string; desc: string; group: string;
-  steps: WorkflowStep[]; prod: boolean; vdp: boolean; tip?: string;
+  steps: WorkflowStep[]; prod: boolean; vdp: boolean;
+  sheetWIn: number; sheetHIn: number;
+  preview: (p: PreviewProps) => React.ReactNode;
 }
 
-// Every category/entry/badge is authored in library-catalog.ts to match the
-// product reference exactly; the badge equals the length of the step chain.
+// Each template is a self-contained module under templates/<category>/; the
+// registry groups them. The badge equals the length of the step chain, and each
+// template renders through its OWN preview() so any one can be tuned in isolation.
 function buildEntries(): Entry[] {
   const out: Entry[] = [];
   for (const cat of LIBRARY) {
-    for (const le of cat.entries) {
+    for (const le of cat.entries as TemplateSpec[]) {
       const steps = le.steps.map((ls) => {
         const st = makeStep(ls.type);
         if (ls.s) Object.assign(st.s, ls.s);
@@ -27,154 +31,35 @@ function buildEntries(): Entry[] {
       out.push({
         id: le.id, name: le.name, desc: le.desc, group: cat.name,
         steps, prod: steps.length > 1, vdp: cat.name === 'Variable Data',
+        sheetWIn: le.sheetWIn, sheetHIn: le.sheetHIn, preview: le.preview,
       });
     }
   }
   return out;
 }
 
-// Deterministic mock branding per preset (matches the reference's generated examples).
-const BRANDS = ['AURORA', 'NOVA', 'PRISM', 'ZENITH', 'VIVID', 'EMBER', 'ONYX', 'VERTEX', 'APEX', 'PULSE', 'ECHO', 'FLUX', 'BLOOM', 'SURGE', 'METRO', 'CRAFT', 'PURE', 'SOLAR', 'LUNAR', 'NEON', 'FLORA', 'URBAN', 'ARCTIC', 'STELLAR'];
-const TAGLINES = ['Creative Works', 'Design Studio', 'Print House', 'Ink & Type', 'Visual Arts', 'Brand Studio', 'Premium Brand', 'Art Direction', 'Creative Agency', 'Press Co', 'Atelier', 'Typography'];
-const PALETTES: [string, string][] = [
-  ['#86efac', '#7c3aed'], ['#4ade80', '#a21caf'], ['#fb923c', '#a78bfa'], ['#67e8f9', '#ec4899'],
-  ['#a3e635', '#7f1d1d'], ['#f5d90a', '#38bdf8'], ['#f472b6', '#16a34a'], ['#b91c1c', '#5eead4'],
-  ['#facc15', '#4338ca'], ['#34d399', '#1e3a8a'], ['#e879f9', '#365314'], ['#93c5fd', '#c2410c'],
-];
-function hash(s: string): number { let h = 5381; for (const c of s) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0; return h; }
-
-function layoutCells(steps: WorkflowStep[], W: number, H: number) {
-  const impose = steps.find((st) => ['grid', 'cards', 'cutstack', 'booklet', 'zine', 'gangsheet', 'stickers', 'customimpose', 'nupbook', 'calendar', 'resize'].includes(st.type));
+// Derive the imposition grid (cols×rows, duplex) from a template's step chain.
+// Used only for the stats readout; the visual comes from each template's own
+// preview() function, which lives in its template file.
+function layoutOf(steps: WorkflowStep[]) {
+  const impose = steps.find((st) => ['grid', 'cards', 'cutstack', 'booklet', 'zine', 'gangsheet', 'stickers', 'datamerge', 'customimpose', 'nupbook'].includes(st.type));
   const s = impose?.s ?? {};
-  const cells: { x: number; y: number; w: number; h: number; rot?: boolean }[] = [];
-  let cols = 1, rows = 1, duplex = !!s.duplex;
-  if (!impose || impose.type === 'resize' || impose.type === 'calendar') {
-    cells.push({ x: W * 0.12, y: H * 0.1, w: W * 0.76, h: H * 0.8 });
-  } else if (impose.type === 'booklet' || impose.type === 'nupbook' || impose.type === 'zine') {
-    const m = W * 0.055;
-    cols = 2; rows = 1; duplex = true;
-    if (impose.type === 'zine') { cols = 4; rows = 2; }
-    const g = 3, cw = (W - 2 * m - g * (cols - 1)) / cols, ch = (H - 2 * m - g * (rows - 1)) / rows;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
-      cells.push({ x: m + c * (cw + g), y: m + r * (ch + g), w: cw, h: ch, rot: impose.type === 'zine' && r === 0 });
-  } else {
-    const shW = s.sheetWIn ?? 8.5, shH = s.sheetHIn ?? 11;
-    cols = s.cols ?? (s.cellWIn ? Math.max(1, Math.floor((shW - 0.5) / (s.cellWIn + (s.gutterIn ?? 0)))) : 2);
-    rows = s.rows ?? (s.cellHIn ? Math.max(1, Math.floor((shH - 0.5) / (s.cellHIn + (s.gutterYIn ?? s.gutterIn ?? 0)))) : 2);
-    cols = Math.max(1, Math.min(cols, 12)); rows = Math.max(1, Math.min(rows, 16));
-    const m = W * 0.06, g = 3;
-    const cw = (W - 2 * m - g * (cols - 1)) / cols, ch = (H - 2 * m - g * (rows - 1)) / rows;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push({ x: m + c * (cw + g), y: m + r * (ch + g), w: cw, h: ch });
-  }
-  return { cells, cols, rows, duplex, s };
+  const duplex = !!s.duplex;
+  if (!impose) return { cols: 1, rows: 1, duplex, kind: 'single' as const, s };
+  if (impose.type === 'booklet' || impose.type === 'nupbook') return { cols: 2, rows: 1, duplex: true, kind: 'booklet' as const, s };
+  if (impose.type === 'zine') return { cols: 4, rows: 2, duplex: true, kind: 'zine' as const, s };
+  const shW = s.sheetWIn ?? 8.5, shH = s.sheetHIn ?? 11;
+  let cols = s.cols ?? (s.cellWIn ? Math.max(1, Math.floor((shW - 0.5) / (s.cellWIn + (s.gutterIn ?? 0)))) : 2);
+  let rows = s.rows ?? (s.cellHIn ? Math.max(1, Math.floor((shH - 0.5) / (s.cellHIn + (s.gutterYIn ?? s.gutterIn ?? 0)))) : 2);
+  cols = Math.max(1, Math.min(cols, 12)); rows = Math.max(1, Math.min(rows, 16));
+  return { cols, rows, duplex, kind: 'grid' as const, s };
 }
 
+// Thin wrapper: size the sheet from the template's own dimensions, then hand off
+// to the template's own preview() — all drawing lives in the template file.
 function SheetPreview({ entry, mode }: { entry: Entry; mode: 'diagram' | 'example' }) {
-  const impose = entry.steps.find((st) => st.s.sheetWIn);
-  const shW = impose?.s.sheetWIn ?? 8.5, shH = impose?.s.sheetHIn ?? 11;
-  const W = 340, H = Math.max(160, Math.min(480, (340 * shH) / shW));
-  const { cells } = layoutCells(entry.steps, W, H);
-  const h = hash(entry.id);
-  const brand = BRANDS[h % BRANDS.length]!, tagline = TAGLINES[(h >>> 3) % TAGLINES.length]!;
-  const [c1, c2] = PALETTES[(h >>> 5) % PALETTES.length]!;
-  const variant = (h >>> 8) % 3;
-  // Bounding box of the imposed pieces — registration marks hang off its edges.
-  const minX = Math.min(...cells.map((c) => c.x)), minY = Math.min(...cells.map((c) => c.y));
-  const maxX = Math.max(...cells.map((c) => c.x + c.w)), maxY = Math.max(...cells.map((c) => c.y + c.h));
-  const hasBar = entry.steps.some((st) => st.type === 'colorbar');
-  const hasCut = entry.steps.some((st) => st.type === 'cuttermarks');
-  // Saddle-stitched work (booklet/nupbook without perfect-bound signatures)
-  // gets staple marks drawn on the spine fold.
-  const isSaddle = entry.steps.some((st) => (st.type === 'booklet' || st.type === 'nupbook') && !st.s.signatureSheets);
-  const hasReg = entry.steps.some((st) => st.type === 'regmarks' || (st.type === 'cuttermarks' && st.s.cornersAndEdges));
-  const marks = entry.steps.some((st) => st.s.addMarks);
-  const wm = entry.steps.find((st) => st.type === 'watermark');
-  return (
-    <svg className="pe-lib-sheet" viewBox={`0 0 ${W} ${H}`} style={{ aspectRatio: `${W} / ${H}` }}>
-      <defs>
-        <pattern id="pe-diag" width="6.5" height="6.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="6.5" stroke="#ffffff" strokeWidth="2.4" strokeOpacity="0.13" />
-        </pattern>
-        <pattern id="pe-check" width="20" height="20" patternUnits="userSpaceOnUse">
-          <rect width="10" height="10" fill="#ffffff" fillOpacity="0.1" />
-          <rect x="10" y="10" width="10" height="10" fill="#ffffff" fillOpacity="0.1" />
-        </pattern>
-      </defs>
-      <rect width={W} height={H} fill="#fff" rx="1.5" />
-      {hasBar && Array.from({ length: 22 }, (_, i) => (
-        <rect key={i} x={10 + i * ((W - 20) / 22)} y={3.5} width={(W - 20) / 22 - 0.8} height={4.5}
-          fill={['#00b7d8', '#e52f8c', '#f5d90a', '#17181d', '#8a8f98'][(i + (h % 3)) % 5]} />
-      ))}
-      {cells.map((c, i) => (
-        <g key={i} transform={c.rot ? `rotate(180 ${c.x + c.w / 2} ${c.y + c.h / 2})` : undefined}>
-          {mode === 'example' ? (
-            <>
-              <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={c1} />
-              {variant === 0 && <>
-                {/* top / bottom split with a diagonal-stripe accent, title on top */}
-                <rect x={c.x} y={c.y + c.h * 0.54} width={c.w} height={c.h * 0.46} fill={c2} />
-                <rect x={c.x} y={c.y + c.h * 0.54} width={c.w} height={c.h * 0.46} fill="url(#pe-diag)" />
-              </>}
-              {variant === 1 && <>
-                {/* left / right split with a checkerboard accent, title on the left */}
-                <rect x={c.x + c.w * 0.5} y={c.y} width={c.w * 0.5} height={c.h} fill={c2} />
-                <rect x={c.x + c.w * 0.5} y={c.y} width={c.w * 0.5} height={c.h} fill="url(#pe-check)" />
-              </>}
-              {variant === 2 && <>
-                {/* poster: concentric outlines + soft circle on top, solid caption band below */}
-                <rect x={c.x} y={c.y + c.h * 0.58} width={c.w} height={c.h * 0.42} fill={c2} />
-                {Array.from({ length: 6 }, (_, k) => {
-                  const inset = (k + 1) * Math.min(c.w, c.h * 0.58) * 0.06;
-                  return <rect key={k} x={c.x + inset} y={c.y + inset} width={c.w - 2 * inset} height={c.h * 0.58 - inset} fill="none" stroke="#ffffff" strokeWidth={0.5} strokeOpacity={0.35} />;
-                })}
-                <circle cx={c.x + c.w * 0.74} cy={c.y + c.h * 0.34} r={Math.min(c.w, c.h) * 0.2} fill="#ffffff" opacity={0.14} />
-              </>}
-              {c.w > 46 && (() => {
-                const cx = variant === 1 ? c.x + c.w * 0.27 : c.x + c.w / 2;
-                const cy = variant === 0 ? c.y + c.h * 0.3 : variant === 2 ? c.y + c.h * 0.78 : c.y + c.h * 0.46;
-                const ink = variant === 2 ? '#17181d' : '#fff', sub = variant === 2 ? '#17181d99' : '#ffffffcc';
-                return <>
-                  <text x={cx} y={cy} textAnchor="middle" fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={Math.min(16, c.w / 6.2)} fill={ink}>{brand}</text>
-                  <text x={cx} y={cy + Math.min(14, c.w / 7)} textAnchor="middle" fontFamily="Inter, ui-sans-serif" fontSize={Math.min(6.5, c.w / 14)} fill={sub}>{tagline}</text>
-                </>;
-              })()}
-            </>
-          ) : (
-            <>
-              <rect x={c.x} y={c.y} width={c.w} height={c.h} fill="none" stroke="#7b6cf6" strokeWidth={1} strokeDasharray="4 3" />
-              <text x={c.x + c.w / 2} y={c.y + c.h / 2 + 5} textAnchor="middle" fontFamily="ui-monospace" fontSize={Math.min(15, c.h / 3)} fill="#4c4a85" fontWeight={700}>{i + 1}</text>
-            </>
-          )}
-          {marks && (
-            <path d={`M${c.x - 7} ${c.y}h4.5M${c.x} ${c.y - 7}v4.5M${c.x + c.w + 2.5} ${c.y}h4.5M${c.x + c.w} ${c.y - 7}v4.5M${c.x - 7} ${c.y + c.h}h4.5M${c.x} ${c.y + c.h + 2.5}v4.5M${c.x + c.w + 2.5} ${c.y + c.h}h4.5M${c.x + c.w} ${c.y + c.h + 2.5}v4.5`}
-              stroke="#222" strokeWidth={0.7} />
-          )}
-        </g>
-      ))}
-      {wm && mode === 'example' && (
-        <text x={W / 2} y={H / 2} textAnchor="middle" fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={26}
-          fill="#00000030" transform={`rotate(-${wm.s.angleDeg ?? 45} ${W / 2} ${H / 2})`}>{wm.s.text || 'PROOF'}</text>
-      )}
-      {hasReg && ([
-        [(minX + maxX) / 2, minY - 8], [(minX + maxX) / 2, maxY + 8],
-        [minX - 8, (minY + maxY) / 2], [maxX + 8, (minY + maxY) / 2],
-      ] as [number, number][]).map(([x, y], k) => (
-        <g key={`reg${k}`} transform={`translate(${x} ${y})`} stroke="#111" strokeWidth={0.7} fill="none">
-          <circle r={3.2} /><path d="M-5 0h10M0 -5v10" />
-        </g>
-      ))}
-      {hasCut && ([[7, hasBar ? 13 : 7], [W - 7, hasBar ? 13 : 7], [7, H - 7], [W - 7, H - 7]] as [number, number][]).map(([x, y], k) => (
-        <circle key={`dot${k}`} cx={x} cy={y} r={2.6} fill="#111" />
-      ))}
-      {isSaddle && [0.32, 0.68].map((fy, i) => (
-        <g key={`staple${i}`} transform={`translate(${W / 2} ${H * fy})`} fill="#111">
-          <rect x={-1} y={-5.5} width={2} height={11} rx={0.8} />
-          <rect x={-4} y={-5.5} width={8} height={1.8} rx={0.8} />
-          <rect x={-4} y={3.7} width={8} height={1.8} rx={0.8} />
-        </g>
-      ))}
-    </svg>
-  );
+  const W = 340, H = Math.max(160, Math.min(480, (340 * entry.sheetHIn) / entry.sheetWIn));
+  return <>{entry.preview({ mode, W, H })}</>;
 }
 
 const PAPER_CHIPS = ['LETTER', 'LEGAL', 'TABLOID', 'A3', 'A4', 'A5', 'SRA3'];
@@ -202,16 +87,15 @@ function matchesFlags(e: Entry, active: Set<string>): boolean {
 }
 
 function stats(e: Entry, pageCount: number) {
-  const { cells, cols, rows, duplex, s } = layoutCells(e.steps, 100, 100 as number);
-  const impose = e.steps.find((st) => ['grid', 'cards', 'cutstack', 'booklet', 'zine', 'gangsheet', 'stickers', 'nupbook'].includes(st.type));
+  const { cols, rows, duplex, kind, s } = layoutOf(e.steps);
   let perSheet = Math.max(1, cols * rows) * (duplex ? 2 : 1);
-  if (impose?.type === 'booklet' || impose?.type === 'nupbook') perSheet = 4;
-  if (impose?.type === 'zine') perSheet = 8;
-  if (impose?.s.order === 'repeat') perSheet = Math.max(1, pageCount);   // step & repeat: 1 sheet per design run
+  if (kind === 'booklet') perSheet = 4;
+  if (kind === 'zine') perSheet = 8;
+  if (s.order === 'repeat') perSheet = Math.max(1, pageCount);   // step & repeat: 1 sheet per design run
   const sheets = Math.max(1, Math.ceil(pageCount / perSheet));
-  const sheetArea = (s.sheetWIn ?? 8.5) * (s.sheetHIn ?? 11);
-  const usedPct = Math.min(99, Math.round((cells.reduce((a, c) => a + c.w * c.h, 0) / (100 * (100 as number))) * 100));
-  void sheetArea;
+  const usedPct = (s.cellWIn && s.cellHIn)
+    ? Math.min(99, Math.round((s.cellWIn * s.cellHIn * cols * rows) / ((s.sheetWIn ?? 8.5) * (s.sheetHIn ?? 11)) * 100))
+    : 82;
   return { sheets, dupLabel: `${cols}×${rows}${duplex ? ' duplex' : ''}`, usedPct };
 }
 
