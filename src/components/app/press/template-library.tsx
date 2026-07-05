@@ -95,6 +95,9 @@ function SheetPreview({ entry, mode }: { entry: Entry; mode: 'diagram' | 'exampl
   const variant = (h >>> 8) % 3;
   const hasBar = entry.steps.some((st) => st.type === 'colorbar');
   const hasCut = entry.steps.some((st) => st.type === 'cuttermarks');
+  // Saddle-stitched work (booklet/nupbook without perfect-bound signatures)
+  // gets staple marks drawn on the spine fold.
+  const isSaddle = entry.steps.some((st) => (st.type === 'booklet' || st.type === 'nupbook') && !st.s.signatureSheets);
   const hasReg = entry.steps.some((st) => st.type === 'regmarks' || (st.type === 'cuttermarks' && st.s.cornersAndEdges));
   const marks = entry.steps.some((st) => st.s.addMarks);
   const wm = entry.steps.find((st) => st.type === 'watermark');
@@ -147,6 +150,13 @@ function SheetPreview({ entry, mode }: { entry: Entry; mode: 'diagram' | 'exampl
       {hasReg && ['M', 'E'].map((_, i) => (
         <g key={i} transform={`translate(${i === 0 ? 8 : W - 8} ${H / 2})`} stroke="#111" strokeWidth={0.7} fill="none">
           <circle r={3.2} /><path d="M-5 0h10M0 -5v10" />
+        </g>
+      ))}
+      {isSaddle && [0.32, 0.68].map((fy, i) => (
+        <g key={`staple${i}`} transform={`translate(${W / 2} ${H * fy})`} fill="#111">
+          <rect x={-1} y={-5.5} width={2} height={11} rx={0.8} />
+          <rect x={-4} y={-5.5} width={8} height={1.8} rx={0.8} />
+          <rect x={-4} y={3.7} width={8} height={1.8} rx={0.8} />
         </g>
       ))}
     </svg>
