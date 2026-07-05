@@ -3,27 +3,32 @@
 // step-count badges, filter chips, and a generated Example/Diagram preview of
 // each preset's imposed sheet.
 import React, { useMemo, useState } from 'react';
-import { TEMPLATES, TEMPLATE_INDUSTRIES, RECIPES } from '@/lib/imposition-toolkit/catalog';
 import { Ic, paperName } from './panels';
 import { findOp } from './operations';
-import { recipeToSteps, recipeSupported, templateToSteps, templateSupported } from './catalog-bridge';
-import type { WorkflowStep } from './steps';
+import { LIBRARY } from './library-catalog';
+import { makeStep, type WorkflowStep } from './steps';
 
 interface Entry {
   id: string; name: string; desc: string; group: string;
   steps: WorkflowStep[]; prod: boolean; vdp: boolean; tip?: string;
 }
 
+// Every category/entry/badge is authored in library-catalog.ts to match the
+// product reference exactly; the badge equals the length of the step chain.
 function buildEntries(): Entry[] {
   const out: Entry[] = [];
-  for (const t of TEMPLATES) {
-    if (!templateSupported(t)) continue;
-    const steps = templateToSteps(t)!;
-    out.push({ id: t.id, name: t.name, desc: t.specs, group: t.industry, steps, prod: false, vdp: t.industry === 'Variable Data' });
-  }
-  for (const r of RECIPES) {
-    if (!recipeSupported(r)) continue;
-    out.push({ id: r.id, name: r.name, desc: r.desc, group: r.cat, steps: recipeToSteps(r), prod: true, vdp: false, tip: r.tip });
+  for (const cat of LIBRARY) {
+    for (const le of cat.entries) {
+      const steps = le.steps.map((ls) => {
+        const st = makeStep(ls.type);
+        if (ls.s) Object.assign(st.s, ls.s);
+        return st;
+      });
+      out.push({
+        id: le.id, name: le.name, desc: le.desc, group: cat.name,
+        steps, prod: steps.length > 1, vdp: cat.name === 'Variable Data',
+      });
+    }
   }
   return out;
 }
@@ -177,10 +182,7 @@ export function TemplateLibrary({ onClose, onApply, pageCount = 30 }: {
   pageCount?: number;
 }) {
   const entries = useMemo(buildEntries, []);
-  const groups = useMemo(() => {
-    const gs = [...TEMPLATE_INDUSTRIES, ...new Set(RECIPES.map((r) => r.cat))];
-    return gs.filter((g) => entries.some((e) => e.group === g));
-  }, [entries]);
+  const groups = useMemo(() => LIBRARY.map((c) => c.name).filter((g) => entries.some((e) => e.group === g)), [entries]);
   const [q, setQ] = useState('');
   const [flags, setFlags] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<'diagram' | 'example'>('example');
