@@ -150,6 +150,8 @@ export function defaultSettings(type: StepType): StepSettings {
         marginIn: 0, gutterIn: 0, gutterYIn: 0, order: 'cutstack', duplex: true,
         duplexFlip: 'long', autoscale: true, preserveAspect: true, ...MARKS,
         bleedMode: 'doc', bleedIn: 0.125,
+        // Book pages must never be cropped — fit inside the cell, don't cover-crop.
+        fit: 'contain',
       };
     case 'comic':
       // Single-issue comic: saddle-stitch booklet on tabloid, pages centered on

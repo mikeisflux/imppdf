@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:init": "node scripts/init-db.mjs",
-    "seed:superuser": "node scripts/seed-superuser.mjs"
+    "seed:superuser": "node scripts/seed-superuser.mjs",
+    "test": "node --experimental-strip-types --test 'test/**/*.test.ts'"
   },
   "dependencies": {
     "@neslinesli93/qpdf-wasm": "^0.3.0",
