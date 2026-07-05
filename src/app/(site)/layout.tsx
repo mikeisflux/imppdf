@@ -6,10 +6,11 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const user = await getCurrentUser();
   return (
     <>
+      <a href="#main" className="skip-link">Skip to content</a>
       <SiteHeader
         user={user ? { name: user.name, email: user.email, plan: user.plan } : null}
       />
-      <main>{children}</main>
+      <main id="main">{children}</main>
       <SiteFooter />
     </>
   );
