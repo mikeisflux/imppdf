@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { siteName, siteUrl } from '@/lib/config';
 import { seoDescription, seoKeywords, structuredData } from '@/lib/seo';
+import { Analytics } from '@/components/Analytics';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>{children}</body>
+      <Analytics />
     </html>
   );
 }
