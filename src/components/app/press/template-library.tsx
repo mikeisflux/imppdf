@@ -65,19 +65,16 @@ function layoutCells(steps: WorkflowStep[], W: number, H: number) {
     const sx = W / shW, sy = H / shH;               // px per inch
     const gutIn = s.gutterIn ?? 0.125, marginIn = s.marginIn ?? 0.25;
     let pieceWIn: number, pieceHIn: number;
+    // Count comes from the template's explicit cols×rows; piece size from the
+    // real product dimensions (cellWIn/cellHIn) when given, else it fills the cell.
+    cols = Math.max(1, Math.min(s.cols ?? 2, 16));
+    rows = Math.max(1, Math.min(s.rows ?? 2, 24));
     if (s.cellWIn && s.cellHIn) {
-      // Known product size: derive the up-count from how many actually fit on
-      // the sheet (cols/rows in settings may just be defaults, so ignore them).
       pieceWIn = s.cellWIn; pieceHIn = s.cellHIn;
-      cols = Math.max(1, Math.floor((shW - 2 * marginIn + gutIn) / (pieceWIn + gutIn)));
-      rows = Math.max(1, Math.floor((shH - 2 * marginIn + gutIn) / (pieceHIn + gutIn)));
     } else {
-      // Only a cols×rows count is given: the piece fills the available cell.
-      cols = s.cols ?? 2; rows = s.rows ?? 2;
       pieceWIn = (shW - 2 * marginIn - gutIn * (cols - 1)) / cols;
       pieceHIn = (shH - 2 * marginIn - gutIn * (rows - 1)) / rows;
     }
-    cols = Math.max(1, Math.min(cols, 12)); rows = Math.max(1, Math.min(rows, 16));
     const pw = pieceWIn * sx, ph = pieceHIn * sy, gx = gutIn * sx, gy = gutIn * sy;
     const gridW = cols * pw + (cols - 1) * gx, gridH = rows * ph + (rows - 1) * gy;
     const ox = (W - gridW) / 2, oy = (H - gridH) / 2;   // centre the imposition on the sheet
