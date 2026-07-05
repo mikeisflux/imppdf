@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Logo } from './Logo';
+import { ShareButton } from './ShareButton';
 import { IconUpload, IconMenu } from './icons';
 
 export interface HeaderUser {
@@ -34,6 +35,7 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
         </nav>
 
         <div className="pp-header-right">
+          <ShareButton />
           <Link href="/app" className="btn btn-primary pp-upload-btn">
             <IconUpload width={16} height={16} /> Upload a File
           </Link>
