@@ -39,6 +39,8 @@ export function SiteFooter() {
             <span className="sep">/</span>
             <Link href="/pricing">Pricing</Link>
             <span className="sep">/</span>
+            <Link href="/compare">Compare</Link>
+            <span className="sep">/</span>
             <Link href="/contact">Contact</Link>
             <span className="sep">/</span>
             <Link href="/privacy">Privacy</Link>
