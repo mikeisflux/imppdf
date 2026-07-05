@@ -887,3 +887,20 @@
 .pe-menu-sep { height: 1px; background: var(--pe-border); margin: 5px 8px; }
 .pe-menu-danger { color: #e5484d; }
 .pe-menu-danger svg { color: #e5484d; }
+
+/* Load Workflow modal */
+.pe-wf-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.pe-wf-row { display: flex; align-items: stretch; gap: 6px; }
+.pe-wf-load {
+  flex: 1; display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 10px 12px; border-radius: 8px; border: 1px solid var(--pe-border);
+  background: var(--pe-fill); color: var(--pe-text); cursor: pointer;
+}
+.pe-wf-load:hover { border-color: var(--pe-violet); background: var(--pe-violet-soft); }
+.pe-wf-load svg { color: var(--pe-violet); flex: 0 0 auto; }
+.pe-wf-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-wf-del {
+  width: 38px; flex: 0 0 38px; display: grid; place-items: center; cursor: pointer;
+  border-radius: 8px; border: 1px solid var(--pe-border); background: var(--pe-fill); color: var(--pe-muted);
+}
+.pe-wf-del:hover { border-color: #e5484d; color: #e5484d; }

@@ -1,18 +1,18 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getPdfInfo, getPageSizes, shufflePages, downloadPdf, downloadFile, makeZip, setPdfJobInfo } from '@/lib/imposition-toolkit/impose';
+import { getPdfInfo, getPageSizes, shufflePages, downloadPdf, downloadFile, makeZip, setPdfJobInfo, mergePdfs } from '@/lib/imposition-toolkit/impose';
 import type { PdfPageInfo } from '@/lib/imposition-toolkit/impose';
 import { rasterizePdfThumbs, rasterizePdfSheets, type RenderedSheet } from '@/lib/imposition-toolkit/page-thumbs';
 import { findOp } from './operations';
 import {
   makeStep, runPipeline, splitStep, runSplit, buildJdf, resolveName,
   listWorkflows, saveWorkflow, deleteWorkflow, workflowToSteps,
-  type StepType, type WorkflowStep,
+  type StepType, type WorkflowStep, type SavedWorkflow,
 } from './steps';
 import { Ic, ChooseOperation, ChooseOperationBar, StepCard, paperName, fmtIn, type Unit } from './panels';
 import {
   loadSettings, persistSettings, DEFAULT_SETTINGS, SettingsModal, JobInfoModal, PageManagerModal,
-  BatchModal, QualityMenu, loadDefaultJob, EMPTY_JOB, useCountdown,
+  BatchModal, QualityMenu, loadDefaultJob, EMPTY_JOB, useCountdown, Modal,
   type AppSettings, type JobInfo, type PreviewQuality, type BatchFile,
 } from './modals';
 import { PreflightInspector, runPreflightChecks, VdpWizard, AskAIPanel, type PfReport } from './inspector-wizards';
@@ -67,7 +67,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   const [fillBg, setFillBg] = useState(true);
   const [drag, setDrag] = useState(false);
   const [currentSheet, setCurrentSheet] = useState(1);
-  const [modal, setModal] = useState<null | 'settings' | 'jobinfo' | 'pagemanager' | 'batch' | 'templates' | 'vdp' | 'editpdf'>(null);
+  const [modal, setModal] = useState<null | 'settings' | 'jobinfo' | 'pagemanager' | 'batch' | 'templates' | 'vdp' | 'editpdf' | 'loadworkflow'>(null);
   const [menu, setMenu] = useState<null | 'quality' | 'file' | 'load' | 'askai'>(null);
   const [adding, setAdding] = useState(false);
   // Tool-picker view state (lives in the toolbar's Choose Operation segment)
@@ -112,7 +112,21 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
       setFile({ name: f.name, bytes, info });
     } catch { setError('Could not read that PDF.'); }
   }, []);
-  const onPick = (files: FileList | null) => { const f = files?.[0]; if (f) void loadFile(f); };
+  // Add Files accepts multiple PDFs: merge the picked files (appending to the
+  // document already loaded, if any) into one working document.
+  const onPick = async (files: FileList | null) => {
+    const list = files ? Array.from(files) : [];
+    if (!list.length) return;
+    setError('');
+    try {
+      const picked = await Promise.all(list.map(async (f) => new Uint8Array(await f.arrayBuffer())));
+      const parts = file ? [file.bytes, ...picked] : picked;
+      const bytes = parts.length > 1 ? await mergePdfs(parts) : parts[0]!;
+      const info = await getPdfInfo(bytes);
+      const name = parts.length > 1 ? 'combined.pdf' : list[0]!.name;
+      setFile({ name, bytes, info });
+    } catch { setError('Could not read those PDFs.'); }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -338,6 +352,9 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
               <button className="pe-menu-row" onClick={() => { setModal('templates'); setMenu(null); }}>
                 <Ic name="booklet" size={16} /> Templates…
               </button>
+              <button className="pe-menu-row" onClick={() => { setModal('loadworkflow'); setMenu(null); }}>
+                <Ic name="save" size={16} /> Load Workflow…
+              </button>
               <div className="pe-menu-sep" />
               <a className="pe-menu-row" href="/guide" target="_blank" rel="noreferrer" onClick={() => setMenu(null)}>
                 <Ic name="booklet" size={16} /> Guide
@@ -534,7 +551,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
         )}
       </div>
 
-      <input ref={inputRef} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => onPick(e.target.files)} />
+      <input ref={inputRef} type="file" accept="application/pdf,.pdf" multiple hidden onChange={(e) => { const el = e.target; void onPick(el.files); el.value = ''; }} />
       <input ref={folderRef} type="file" hidden {...{ webkitdirectory: '', directory: '', mozdirectory: '' }}
         onChange={(e) => {
           const pdfs = Array.from(e.target.files ?? []).filter((f) => /\.pdf$/i.test(f.name)).sort((a, b) => a.name.localeCompare(b.name));
@@ -568,6 +585,9 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
       {modal === 'templates' && (
         <TemplateLibrary onClose={() => setModal(null)} onApply={(next) => setSteps(next)} pageCount={file?.info.count ?? 30} />
       )}
+      {modal === 'loadworkflow' && (
+        <LoadWorkflowModal onClose={() => setModal(null)} onLoad={(w) => { setSteps(workflowToSteps(w)); setModal(null); }} />
+      )}
       {modal === 'vdp' && (
         <VdpWizard onClose={() => setModal(null)} onDone={async (pdf, records) => {
           try {
@@ -587,5 +607,34 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
           }} />
       )}
     </div>
+  );
+}
+
+// Load / delete workflows saved with SAVE WORKFLOW (stored in localStorage).
+function LoadWorkflowModal({ onClose, onLoad }: { onClose: () => void; onLoad: (w: SavedWorkflow) => void }) {
+  const [wfs, setWfs] = useState<SavedWorkflow[]>(() => listWorkflows());
+  return (
+    <Modal title="Load Workflow" icon={<Ic name="save" size={17} />} onClose={onClose}
+      sub="Your saved step chains. Loading one replaces the current workflow.">
+      {wfs.length === 0 ? (
+        <div className="pe-note" style={{ padding: 14 }}>No saved workflows yet — build a chain and hit SAVE WORKFLOW.</div>
+      ) : (
+        <div className="pe-wf-list">
+          {wfs.map((w) => (
+            <div key={w.name} className="pe-wf-row">
+              <button className="pe-wf-load" onClick={() => onLoad(w)}>
+                <Ic name="save" size={14} />
+                <span className="pe-wf-name">{w.name}</span>
+                <span className="pe-label-sm pe-mono">{w.steps.length} step{w.steps.length === 1 ? '' : 's'}</span>
+              </button>
+              <button className="pe-wf-del" title="Delete workflow"
+                onClick={() => { deleteWorkflow(w.name); setWfs(listWorkflows()); }}>
+                <Ic name="close" size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
   );
 }
