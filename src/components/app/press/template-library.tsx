@@ -84,6 +84,99 @@ function layoutCells(steps: WorkflowStep[], W: number, H: number) {
   return { cells, cols, rows, duplex, s };
 }
 
+// ── Realistic content mock for a single imposed piece ────────────────────────
+type PieceKind = 'card' | 'book' | 'label' | 'flyer' | 'poster';
+
+function pieceKind(entry: Entry): PieceKind {
+  const st = entry.steps.find((s) => ['grid', 'cards', 'cutstack', 'booklet', 'zine', 'gangsheet', 'stickers', 'nupbook', 'calendar'].includes(s.type));
+  if (!st) return 'flyer';
+  if (st.type === 'booklet' || st.type === 'nupbook' || st.type === 'zine') return 'book';
+  if (st.type === 'stickers') return 'label';
+  const cw = st.s.cellWIn as number | undefined, ch = st.s.cellHIn as number | undefined, sw = st.s.sheetWIn as number | undefined;
+  if (cw && ch && cw <= 4.3 && ch <= 4.3) return 'card';
+  if ((sw ?? 0) >= 20) return 'poster';
+  return 'flyer';
+}
+
+// Paragraph-style text lines (ragged widths from the seed).
+function TextLines({ x, y, w, rows, gap, color, seed }: { x: number; y: number; w: number; rows: number; gap: number; color: string; seed: number }) {
+  return (<>{Array.from({ length: rows }, (_, r) => {
+    const lw = w * (0.55 + ((seed * (r + 3)) % 42) / 100);
+    return <rect key={r} x={x} y={y + r * gap} width={Math.min(w, lw)} height={Math.max(0.8, gap * 0.3)} rx={0.6} fill={color} />;
+  })}</>);
+}
+
+function Piece({ x, y, w, h, kind, idx, c1, c2, brand, tagline, seed }:
+  { x: number; y: number; w: number; h: number; kind: PieceKind; idx: number; c1: string; c2: string; brand: string; tagline: string; seed: number }) {
+  const pad = Math.max(2.5, Math.min(w, h) * 0.09);
+  const ink = '#dcdce2', inkC = '#c7c7cf';
+  const small = w < 64;
+
+  if (kind === 'book') {
+    const layout = idx === 0 ? 'cover' : (idx % 2 === 1 ? 'text' : 'image');
+    if (layout === 'cover') return (
+      <g>
+        <rect x={x} y={y} width={w} height={h} fill={c1} />
+        <circle cx={x + w * 0.8} cy={y + h * 0.82} r={Math.min(w, h) * 0.16} fill="#fff" opacity={0.14} />
+        {w > 40 && <>
+          <text x={x + pad} y={y + h * 0.42} fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={Math.min(20, w / 5)} fill="#fff">{brand}</text>
+          <rect x={x + pad} y={y + h * 0.46} width={w * 0.3} height={1.4} fill="#ffffffaa" />
+          <text x={x + pad} y={y + h * 0.56} fontFamily="Inter, ui-sans-serif" fontSize={Math.min(8, w / 12)} fill="#ffffffcc">{tagline}</text>
+        </>}
+      </g>
+    );
+    if (layout === 'image') return (
+      <g>
+        <rect x={x} y={y} width={w} height={h} fill="#fff" />
+        <rect x={x + pad} y={y + pad} width={w - 2 * pad} height={h * 0.5} rx={2} fill={c2} opacity={0.9} />
+        <circle cx={x + w * 0.5} cy={y + pad + h * 0.25} r={h * 0.11} fill="#fff" opacity={0.25} />
+        <TextLines x={x + pad} y={y + h * 0.64} w={w - 2 * pad} rows={small ? 2 : 3} gap={Math.max(3, h * 0.07)} color={ink} seed={seed + idx} />
+      </g>
+    );
+    return (
+      <g>
+        <rect x={x} y={y} width={w} height={h} fill="#fff" />
+        <rect x={x + pad} y={y + pad} width={w * 0.42} height={2} fill={c1} />
+        <TextLines x={x + pad} y={y + pad + 6} w={w - 2 * pad} rows={small ? 3 : 5} gap={Math.max(3, h * 0.06)} color={ink} seed={seed + idx} />
+        <rect x={x + pad} y={y + h * 0.58} width={(w - 2.4 * pad) * 0.46} height={h * 0.26} rx={2} fill={c2} opacity={0.5} />
+        <TextLines x={x + w * 0.52} y={y + h * 0.6} w={(w - 2.4 * pad) * 0.46} rows={small ? 2 : 4} gap={Math.max(3, h * 0.055)} color={inkC} seed={seed + idx + 5} />
+      </g>
+    );
+  }
+
+  if (kind === 'card') return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill="#fff" />
+      <rect x={x} y={y} width={w} height={Math.max(3, h * 0.16)} fill={c1} />
+      <rect x={x + pad} y={y + h * 0.34} width={h * 0.26} height={h * 0.26} rx={1.5} fill={c1} />
+      {w > 42 && <>
+        <text x={x + pad + h * 0.34} y={y + h * 0.47} fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={Math.min(11, w / 8)} fill="#3a3a42">{brand}</text>
+        <rect x={x + pad + h * 0.34} y={y + h * 0.53} width={w * 0.4} height={1.2} fill={c2} />
+      </>}
+      <TextLines x={x + pad} y={y + h * 0.72} w={w * 0.6} rows={2} gap={Math.max(2.5, h * 0.11)} color={inkC} seed={seed} />
+    </g>
+  );
+
+  if (kind === 'label') return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} rx={Math.min(w, h) * 0.12} fill={c1} />
+      <circle cx={x + w / 2} cy={y + h * 0.4} r={Math.min(w, h) * 0.18} fill="#fff" opacity={0.2} />
+      {w > 40 && <text x={x + w / 2} y={y + h * 0.63} textAnchor="middle" fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={Math.min(12, w / 6)} fill="#fff">{brand}</text>}
+    </g>
+  );
+
+  const big = kind === 'poster';
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill="#fff" />
+      <rect x={x + pad} y={y + pad} width={w - 2 * pad} height={h * (big ? 0.5 : 0.46)} rx={2} fill={c1} />
+      <circle cx={x + w * 0.72} cy={y + pad + h * 0.22} r={Math.min(w, h) * 0.14} fill={c2} opacity={0.85} />
+      {w > 44 && <text x={x + pad} y={y + h * 0.66} fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={Math.min(16, w / 7)} fill="#3a3a42">{brand}</text>}
+      <TextLines x={x + pad} y={y + h * 0.74} w={w - 2 * pad} rows={small ? 2 : 3} gap={Math.max(3, h * 0.06)} color={inkC} seed={seed} />
+    </g>
+  );
+}
+
 function SheetPreview({ entry, mode }: { entry: Entry; mode: 'diagram' | 'example' }) {
   const impose = entry.steps.find((st) => st.s.sheetWIn);
   const shW = impose?.s.sheetWIn ?? 8.5, shH = impose?.s.sheetHIn ?? 11;
@@ -92,7 +185,7 @@ function SheetPreview({ entry, mode }: { entry: Entry; mode: 'diagram' | 'exampl
   const h = hash(entry.id);
   const brand = BRANDS[h % BRANDS.length]!, tagline = TAGLINES[(h >>> 3) % TAGLINES.length]!;
   const [c1, c2] = PALETTES[(h >>> 5) % PALETTES.length]!;
-  const variant = (h >>> 8) % 3;
+  const kind = pieceKind(entry);
   const hasBar = entry.steps.some((st) => st.type === 'colorbar');
   const hasCut = entry.steps.some((st) => st.type === 'cuttermarks');
   // Saddle-stitched work (booklet/nupbook without perfect-bound signatures)
@@ -112,17 +205,9 @@ function SheetPreview({ entry, mode }: { entry: Entry; mode: 'diagram' | 'exampl
         <g key={i} transform={c.rot ? `rotate(180 ${c.x + c.w / 2} ${c.y + c.h / 2})` : undefined}>
           {mode === 'example' ? (
             <>
-              <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={i % 2 === 0 ? c1 : c2} />
-              {variant === 0 && <rect x={c.x} y={c.y + c.h * 0.55} width={c.w} height={c.h * 0.45} fill={i % 2 === 0 ? c2 : c1} opacity={0.9} />}
-              {variant === 1 && <rect x={c.x + c.w * 0.45} y={c.y} width={c.w * 0.55} height={c.h} fill={i % 2 === 0 ? c2 : c1} opacity={0.9} />}
-              {variant === 2 && <circle cx={c.x + c.w * 0.78} cy={c.y + c.h * 0.72} r={Math.min(c.w, c.h) * 0.2} fill="#ffffff" opacity={0.2} />}
-              {c.w > 46 && (
-                <>
-                  <text x={c.x + c.w / 2} y={c.y + c.h * (variant === 0 ? 0.32 : 0.46)} textAnchor="middle"
-                    fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={Math.min(16, c.w / 6.2)} fill="#fff">{brand}</text>
-                  <text x={c.x + c.w / 2} y={c.y + c.h * (variant === 0 ? 0.32 : 0.46) + Math.min(16, c.w / 6.2)} textAnchor="middle"
-                    fontFamily="Inter, ui-sans-serif" fontSize={Math.min(6.5, c.w / 14)} fill="#ffffffcc">{tagline}</text>
-                </>
+              <Piece x={c.x} y={c.y} w={c.w} h={c.h} kind={kind} idx={i} c1={c1} c2={c2} brand={brand} tagline={tagline} seed={h} />
+              {kind === 'book' && c.w > 26 && (
+                <text x={c.x + c.w - 4} y={c.y + c.h - 3.5} textAnchor="end" fontFamily="ui-monospace" fontSize={5} fill="#9a9aa2">{i + 1}</text>
               )}
             </>
           ) : (
