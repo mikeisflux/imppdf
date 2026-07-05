@@ -10,7 +10,7 @@ export default template({
   sheetWIn: 17,
   sheetHIn: 11,
   steps: [
-    { type: 'booklet', s: { sheetWIn: 17, sheetHIn: 11 } },
+    { type: 'comic', s: { sheetWIn: 17, sheetHIn: 11, centerOutput: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
   preview: bookSheet('pb-comic-magazine', { trimWIn: 8, trimHIn: 10.5, sheetWIn: 17, sheetHIn: 11 }, { saddle: true, crop: true, reg: true, cut: true }),

@@ -18,6 +18,8 @@ import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/impositi
 export type StepType =
   | 'cards' | 'booklet' | 'zine' | 'shuffle' | 'grid' | 'nupbook' | 'cutstack' | 'perfectbound' | 'datamerge'
   | 'trading' | 'bookmark' | 'flyer'
+  | 'business' | 'postcard' | 'rackcard' | 'hangtag' | 'label' | 'namebadge' | 'ticket' | 'coupon' | 'placecard' | 'greeting'
+  | 'comic'
   | 'preflight' | 'gangsheet' | 'cuttermarks' | 'layers' | 'customimpose' | 'pdftools'
   | 'resize' | 'rotate' | 'crop' | 'split' | 'flip' | 'merge' | 'overlay' | 'distort'
   | 'bleed' | 'headerfooter' | 'colorbar' | 'slugline' | 'foldmarks' | 'regmarks'
@@ -43,6 +45,14 @@ export function makeStepId(): string { return `st${Date.now().toString(36)}${(ne
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
 const MARKS = { addMarks: true, centerMarks: true, markLenIn: 0.43, markOffIn: 0.125, markWeightPt: 0.25, fourColorBlack: true, knockout: false };
+
+// Base N-Up settings for the domain "preset" layout tools (business cards,
+// postcards, hang tags…). Each tool just overrides size/count.
+const nupPreset = (o: StepSettings): StepSettings => ({
+  sheetWIn: 8.5, sheetHIn: 11, cols: 2, rows: 2, cellWIn: 3.5, cellHIn: 2,
+  marginIn: 0.25, gutterIn: 0.125, gutterYIn: 0.125, order: 'sequential', duplex: false,
+  autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125, ...o,
+});
 
 export function defaultSettings(type: StepType): StepSettings {
   switch (type) {
@@ -127,6 +137,15 @@ export function defaultSettings(type: StepType): StepSettings {
         duplexFlip: 'long', autoscale: true, preserveAspect: true, ...MARKS,
         bleedMode: 'doc', bleedIn: 0.125,
       };
+    case 'comic':
+      // Single-issue comic: saddle-stitch booklet on tabloid, pages centered on
+      // the sheet so duplex fronts/backs register. 2-up per side.
+      return {
+        sheetWIn: 17, sheetHIn: 11, landscape: true, autoscale: true, preserveAspect: true,
+        rtl: false, signatureSheets: 0, fillLastSaddle: true,
+        marginIn: 0.2, marginTopIn: 0.2, gutterIn: 0, creepIn: 0.007, creepOutward: true,
+        centerOutput: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125, rotatePages: false,
+      };
     case 'trading':
       // Standard trading/sports cards (2.5×3.5"), 9-up (3×3) on Letter, sequential.
       return {
@@ -148,6 +167,17 @@ export function defaultSettings(type: StepType): StepSettings {
         marginIn: 0, gutterIn: 0, gutterYIn: 0, order: 'sequential', duplex: false,
         autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125,
       };
+    // ── Domain N-Up preset tools ────────────────────────────────────────────
+    case 'business':  return nupPreset({ cols: 2, rows: 5, cellWIn: 3.5, cellHIn: 2 });                 // 10-up business cards, Letter
+    case 'postcard':  return nupPreset({ cols: 1, rows: 2, cellWIn: 6, cellHIn: 4, duplex: true, duplexFlip: 'long' }); // 2-up 6×4, duplex
+    case 'rackcard':  return nupPreset({ sheetWIn: 11, sheetHIn: 17, cols: 2, rows: 1, cellWIn: 4, cellHIn: 9 });       // 2-up 4×9 on tabloid
+    case 'hangtag':   return nupPreset({ sheetWIn: 11, sheetHIn: 17, cols: 2, rows: 4, cellWIn: 2.5, cellHIn: 4 });     // 8-up tags on tabloid
+    case 'label':     return nupPreset({ cols: 2, rows: 3, cellWIn: 4, cellHIn: 3.33 });                 // 6-up labels, Letter
+    case 'namebadge': return nupPreset({ cols: 2, rows: 4, cellWIn: 3.5, cellHIn: 2.25 });               // 8-up name badges
+    case 'ticket':    return nupPreset({ cols: 2, rows: 4, cellWIn: 4, cellHIn: 2.5 });                  // 8-up event tickets
+    case 'coupon':    return nupPreset({ cols: 2, rows: 5, cellWIn: 3.5, cellHIn: 2 });                  // 10-up coupons
+    case 'placecard': return nupPreset({ cols: 2, rows: 4, cellWIn: 3.5, cellHIn: 2 });                  // 8-up place cards
+    case 'greeting':  return nupPreset({ cols: 1, rows: 1, cellWIn: 5, cellHIn: 7 });                    // single-fold 5×7 greeting
     case 'nupbook':
       return { nUp: 4, sheetWIn: 11, sheetHIn: 17, marginIn: 0.2, gutterIn: 0, creepIn: 0, rtl: false, signatureSheets: 4, ...MARKS };
     case 'shuffle': return { pattern: 'all' };
@@ -264,7 +294,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
     const s = step.s;
     if (step.type === 'pdftools' && s.op === 'encrypt' && !forExport) continue;
     switch (step.type) {
-      case 'booklet': b = await imposeBooklet(b, bookletOpts(s)); break;
+      case 'booklet': case 'comic': b = await imposeBooklet(b, bookletOpts(s)); break;
       case 'zine': b = await imposeFoldZine(b, {
         format: s.format, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn,
         flipBackCover: !!s.flipBackCover, signatureSheets: s.signatureSheets || 0,
@@ -284,7 +314,10 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         break;
       }
       case 'cards': case 'grid': case 'cutstack': case 'perfectbound':
-      case 'trading': case 'bookmark': case 'flyer': b = await imposeNUp(b, nupOpts(s)); break;
+      case 'trading': case 'bookmark': case 'flyer':
+      case 'business': case 'postcard': case 'rackcard': case 'hangtag': case 'label':
+      case 'namebadge': case 'ticket': case 'coupon': case 'placecard': case 'greeting':
+        b = await imposeNUp(b, nupOpts(s)); break;
       case 'nupbook': b = await imposeNUpBook(b, {
         nUp: s.nUp, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, marginIn: s.marginIn,
         gutterIn: s.gutterIn, creepIn: s.creepIn, rtl: !!s.rtl, signatureSheets: s.signatureSheets,

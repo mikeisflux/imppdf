@@ -254,7 +254,7 @@ function BookletPanel(p: PanelProps) {
   );
 }
 
-function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfectbound' | 'trading' | 'bookmark' | 'flyer' }) {
+function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfectbound' }) {
   const { s, up, unit, onUnit, kind } = p;
   return (
     <>
@@ -1531,12 +1531,20 @@ function Slider({ label, value, min, max, suffix, onChange }: { label: string; v
   );
 }
 
+// N-Up-driven layout tools (generic + domain presets) all use the N-Up panel.
+const NUP_TOOLS = new Set<StepType>([
+  'cards', 'grid', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer',
+  'business', 'postcard', 'rackcard', 'hangtag', 'label', 'namebadge', 'ticket', 'coupon', 'placecard', 'greeting',
+]);
+
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
-  if (type === 'booklet') return <BookletPanel {...props} />;
+  if (type === 'booklet' || type === 'comic') return <BookletPanel {...props} />;
   if (type === 'zine') return <ZinePanel {...props} />;
-  if (type === 'cards' || type === 'grid' || type === 'cutstack' || type === 'perfectbound'
-    || type === 'trading' || type === 'bookmark' || type === 'flyer') return <NUpPanel {...props} kind={type} />;
+  if (NUP_TOOLS.has(type)) {
+    const kind = type === 'cards' ? 'cards' : type === 'cutstack' ? 'cutstack' : type === 'perfectbound' ? 'perfectbound' : 'grid';
+    return <NUpPanel {...props} kind={kind} />;
+  }
   if (type === 'nupbook') return <NUpBookPanel {...props} />;
   if (type === 'colorbar') return <ColorBarPanel {...props} />;
   if (type === 'cuttermarks') return <CutterMarksPanel {...props} />;

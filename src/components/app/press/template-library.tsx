@@ -42,11 +42,11 @@ function buildEntries(): Entry[] {
 // Used only for the stats readout; the visual comes from each template's own
 // preview() function, which lives in its template file.
 function layoutOf(steps: WorkflowStep[]) {
-  const impose = steps.find((st) => ['grid', 'cards', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer', 'booklet', 'zine', 'gangsheet', 'stickers', 'datamerge', 'customimpose', 'nupbook'].includes(st.type));
+  const impose = steps.find((st) => ['grid', 'cards', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer', 'business', 'postcard', 'rackcard', 'hangtag', 'label', 'namebadge', 'ticket', 'coupon', 'placecard', 'greeting', 'booklet', 'comic', 'zine', 'gangsheet', 'stickers', 'datamerge', 'customimpose', 'nupbook'].includes(st.type));
   const s = impose?.s ?? {};
   const duplex = !!s.duplex;
   if (!impose) return { cols: 1, rows: 1, duplex, kind: 'single' as const, s };
-  if (impose.type === 'booklet' || impose.type === 'nupbook') return { cols: 2, rows: 1, duplex: true, kind: 'booklet' as const, s };
+  if (impose.type === 'booklet' || impose.type === 'comic' || impose.type === 'nupbook') return { cols: 2, rows: 1, duplex: true, kind: 'booklet' as const, s };
   if (impose.type === 'zine') return { cols: 4, rows: 2, duplex: true, kind: 'zine' as const, s };
   const shW = s.sheetWIn ?? 8.5, shH = s.sheetHIn ?? 11;
   let cols = s.cols ?? (s.cellWIn ? Math.max(1, Math.floor((shW - 0.5) / (s.cellWIn + (s.gutterIn ?? 0)))) : 2);
