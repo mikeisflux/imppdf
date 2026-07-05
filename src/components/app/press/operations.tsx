@@ -4,8 +4,10 @@ import type { StepType } from './steps';
 
 // ── Line icons (stroke-based, match the reference screenshots) ───────────────
 const S = (p: React.SVGProps<SVGSVGElement> & { children: React.ReactNode }) => (
+  // Decorative — the button/label around it carries the accessible name.
   <svg width={p.width ?? 20} height={p.height ?? 20} viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" {...p}>
+    stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"
+    aria-hidden="true" focusable="false" {...p}>
     {p.children}
   </svg>
 );

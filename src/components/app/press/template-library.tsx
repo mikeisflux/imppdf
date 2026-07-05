@@ -3,6 +3,7 @@
 // step-count badges, filter chips, and a generated Example/Diagram preview of
 // each preset's imposed sheet.
 import React, { useMemo, useState } from 'react';
+import { useFocusTrap } from './use-focus-trap';
 import { Ic, paperName } from './panels';
 import { findOp } from './operations';
 import { LIBRARY } from './templates/registry';
@@ -111,6 +112,7 @@ export function TemplateLibrary({ onClose, onApply, pageCount = 30 }: {
   const [mode, setMode] = useState<'diagram' | 'example'>('example');
   const [open, setOpen] = useState<Set<string>>(new Set([groups[0]!]));
   const [selId, setSelId] = useState<string>('');
+  const trap = useFocusTrap<HTMLDivElement>(onClose);
 
   const ql = q.toLowerCase();
   const visible = entries.filter((e) =>
@@ -127,7 +129,7 @@ export function TemplateLibrary({ onClose, onApply, pageCount = 30 }: {
 
   return (
     <div className="pe-lib-backdrop">
-      <div className="pe-lib">
+      <div ref={trap} className="pe-lib" role="dialog" aria-modal="true" aria-label="Template Library">
         <div className="pe-lib-head">
           <Ic name="layers" size={17} />
           <b>Template Library</b>
@@ -137,7 +139,7 @@ export function TemplateLibrary({ onClose, onApply, pageCount = 30 }: {
             <button className={mode === 'diagram' ? 'pe-on' : ''} onClick={() => setMode('diagram')}><Ic name="rules" size={12} /> DIAGRAM</button>
             <button className={mode === 'example' ? 'pe-on' : ''} onClick={() => setMode('example')}><Ic name="eye" size={12} /> EXAMPLE</button>
           </div>
-          <button className="pe-iconbtn" style={{ marginLeft: 8 }} onClick={onClose}><Ic name="close" size={17} /></button>
+          <button className="pe-iconbtn" aria-label="Close dialog" title="Close" style={{ marginLeft: 8 }} onClick={onClose}><Ic name="close" size={17} /></button>
         </div>
         <div className="pe-lib-filters">
           <Ic name="settings" size={13} />

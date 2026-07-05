@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Ic, type Unit } from './panels';
 import { resolveName } from './steps';
+import { useFocusTrap } from './use-focus-trap';
 
 // ── App settings ─────────────────────────────────────────────────────────────
 
@@ -48,9 +49,10 @@ export function Modal({ title, sub, icon, onClose, children, wide, onReset }: {
   title: string; sub?: string; icon?: React.ReactNode; onClose: () => void;
   children: React.ReactNode; wide?: boolean; onReset?: () => void;
 }) {
+  const trap = useFocusTrap<HTMLDivElement>(onClose);
   return (
     <div className="pe-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={`pe-modal ${wide ? 'pe-modal-wide' : ''}`}>
+      <div ref={trap} className={`pe-modal ${wide ? 'pe-modal-wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="pe-modal-head">
           {icon && <span className="pe-modal-ic">{icon}</span>}
           <div>
@@ -59,7 +61,7 @@ export function Modal({ title, sub, icon, onClose, children, wide, onReset }: {
           </div>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
             {onReset && <button className="pe-chipbtn" onClick={onReset}><Ic name="undo" size={13} /> RESET</button>}
-            <button className="pe-iconbtn" onClick={onClose}><Ic name="close" size={17} /></button>
+            <button className="pe-iconbtn" aria-label="Close dialog" title="Close" onClick={onClose}><Ic name="close" size={17} /></button>
           </span>
         </div>
         <div className="pe-modal-body">{children}</div>
@@ -379,7 +381,7 @@ export function BatchModal({ initial, isPro, onClose, onRun }: {
         <div key={i} className="pe-row" style={{ marginBottom: 8 }}>
           <Ic name="file" size={15} />
           <span className="pe-label" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-          <button className="pe-iconbtn" disabled={running} onClick={() => setFiles((s) => s.filter((_, j) => j !== i))}><Ic name="close" size={14} /></button>
+          <button className="pe-iconbtn" aria-label={`Remove ${f.name}`} title="Remove file" disabled={running} onClick={() => setFiles((s) => s.filter((_, j) => j !== i))}><Ic name="close" size={14} /></button>
         </div>
       ))}
       <button className="pe-chipbtn" disabled={running} onClick={() => {

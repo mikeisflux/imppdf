@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { editPdf, type EditOp } from '@/lib/imposition-toolkit/impose';
 import { Ic } from './panels';
+import { useFocusTrap } from './use-focus-trap';
 
 type Tool = 'select' | 'text' | 'cover' | 'redact' | 'box' | 'line';
 
@@ -29,6 +30,7 @@ export function EditPdfModal({ thumbs, pageSizes, onClose, onApply }: {
   const [draft, setDraft] = useState<{ x: number; y: number; x2: number; y2: number } | null>(null);
   const [textDraft, setTextDraft] = useState<{ x: number; y: number; value: string } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const trap = useFocusTrap<HTMLDivElement>(onClose);
   const drag = useRef<{ id: number; dx: number; dy: number } | null>(null);
   const idRef = useRef(1);
 
@@ -108,14 +110,14 @@ export function EditPdfModal({ thumbs, pageSizes, onClose, onApply }: {
 
   return (
     <div className="pe-modal-backdrop">
-      <div className="pe-modal pe-modal-wide pe-editpdf">
+      <div ref={trap} className="pe-modal pe-modal-wide pe-editpdf" role="dialog" aria-modal="true" aria-label="Edit PDF">
         <div className="pe-modal-head">
           <span className="pe-modal-ic"><Ic name="editpdf" size={18} /></span>
           <div>
             <div className="pe-modal-title">Edit PDF</div>
             <div className="pe-modal-sub">Text: click to place · Drag to draw boxes · Select: move · Delete removes selection. Applies to the source PDF.</div>
           </div>
-          <button className="pe-iconbtn" style={{ marginLeft: 'auto' }} onClick={onClose}><Ic name="close" size={17} /></button>
+          <button className="pe-iconbtn" aria-label="Close dialog" title="Close" style={{ marginLeft: 'auto' }} onClick={onClose}><Ic name="close" size={17} /></button>
         </div>
         <div className="pe-editpdf-body">
           <div className="pe-editpdf-side">
@@ -171,7 +173,7 @@ export function EditPdfModal({ thumbs, pageSizes, onClose, onApply }: {
                 <input autoFocus className="pe-edit-textinput" style={{ left: `${textDraft.x * 100}%`, top: `${textDraft.y * 100}%` }}
                   value={textDraft.value}
                   onChange={(e) => setTextDraft({ ...textDraft, value: e.target.value })}
-                  onKeyDown={(e) => { if (e.key === 'Enter') commitText(); if (e.key === 'Escape') setTextDraft(null); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitText(); if (e.key === 'Escape') { e.stopPropagation(); setTextDraft(null); } }}
                   onBlur={commitText} />
               )}
             </div>

@@ -4,6 +4,7 @@
 // approve — writing imageZoom / imageOffsetX / imageOffsetY back to the step so
 // the imposition engine crops exactly as previewed.
 import { useEffect, useRef, useState } from 'react';
+import { useFocusTrap } from './use-focus-trap';
 
 export interface ImageFit { fit: 'cover' | 'contain' | 'stretch'; zoom: number; offsetX: number; offsetY: number; }
 
@@ -20,6 +21,7 @@ export function ImageFitModal({ thumb, cellWIn, cellHIn, value, onApply, onClose
   const [oy, setOy] = useState(value.offsetY ?? 0.5);
   const [img, setImg] = useState<{ w: number; h: number } | null>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const trap = useFocusTrap<HTMLDivElement>(onClose);
 
   // Frame sized to the cell's aspect ratio.
   const FRAME_W = 320;
@@ -58,7 +60,7 @@ export function ImageFitModal({ thumb, cellWIn, cellHIn, value, onApply, onClose
 
   return (
     <div className="pe-lib-backdrop" style={{ zIndex: 200 }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="pe-modal" style={{ maxWidth: 420, padding: 20 }}>
+      <div ref={trap} className="pe-modal" role="dialog" aria-modal="true" aria-label="Adjust image fit" style={{ maxWidth: 420, padding: 20 }}>
         <div className="pe-row" style={{ marginBottom: 12 }}>
           <b style={{ flex: 1 }}>Adjust image fit</b>
           <div className="pe-segrow">

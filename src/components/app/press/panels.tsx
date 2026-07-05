@@ -715,7 +715,7 @@ function GangSheetPanel(p: PanelProps) {
             <div className="pe-row" style={{ marginBottom: 8 }}>
               <span className="pe-gang-thumb">{j.srcIdx === 0 && thumbs[j.page - 1] ? <img src={thumbs[j.page - 1]} alt="" /> : <Ic name="file" size={16} />}</span>
               <span className="pe-label" style={{ fontWeight: 600, flex: 1 }}>{j.srcIdx === 0 ? `Page ${j.page}` : `File ${j.srcIdx} · p${j.page}`}</span>
-              <button className="pe-iconbtn" onClick={() => up({ jobs: jobs.filter((_, k) => k !== i) })}><Ic name="trash" size={14} /></button>
+              <button className="pe-iconbtn" aria-label="Remove job" title="Remove job" onClick={() => up({ jobs: jobs.filter((_, k) => k !== i) })}><Ic name="trash" size={14} /></button>
             </div>
             <span className="pe-label-sm">Quantity</span>
             <div className="pe-row" style={{ marginTop: 4 }}><NumRaw value={j.qty} onValue={(v) => patchJob(i, { qty: Math.max(0, Math.round(v)) })} min={0} /></div>
@@ -1016,7 +1016,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
           {(s.files as { name: string }[]).map((m, i) => (
             <div key={i} className="pe-row" style={{ marginBottom: 6 }}>
               <span className="pe-label-sm" style={{ flex: 1 }}>+ {m.name}</span>
-              <button className="pe-iconbtn" onClick={() => up({ files: (s.files as unknown[]).filter((_, j) => j !== i) })}><Ic name="close" size={14} /></button>
+              <button className="pe-iconbtn" aria-label="Remove file" title="Remove file" onClick={() => up({ files: (s.files as unknown[]).filter((_, j) => j !== i) })}><Ic name="close" size={14} /></button>
             </div>
           ))}
           <button className="pe-chipbtn" onClick={() => {
@@ -1770,8 +1770,8 @@ export function ChooseOperation({ onSelect, hidden, onToggleHidden, showTips, vi
           <div className="pe-tipcarousel-head">
             <Ic name="bulb" size={14} /> <b>{TIPS[tip % TIPS.length]!.label}</b>
             <span className="pe-label-sm pe-mono" style={{ marginLeft: 'auto' }}>{(tip % TIPS.length) + 1}/{TIPS.length}</span>
-            <button className="pe-iconbtn" onClick={() => setTip((t2) => (t2 + TIPS.length - 1) % TIPS.length)}><Ic name="back" size={12} /></button>
-            <button className="pe-iconbtn" style={{ transform: 'scaleX(-1)' }} onClick={() => setTip((t2) => (t2 + 1) % TIPS.length)}><Ic name="back" size={12} /></button>
+            <button className="pe-iconbtn" aria-label="Previous tip" title="Previous tip" onClick={() => setTip((t2) => (t2 + TIPS.length - 1) % TIPS.length)}><Ic name="back" size={12} /></button>
+            <button className="pe-iconbtn" aria-label="Next tip" title="Next tip" style={{ transform: 'scaleX(-1)' }} onClick={() => setTip((t2) => (t2 + 1) % TIPS.length)}><Ic name="back" size={12} /></button>
           </div>
           <div className="pe-label-sm" style={{ lineHeight: 1.5 }}>{TIPS[tip % TIPS.length]!.tip}</div>
         </div>
