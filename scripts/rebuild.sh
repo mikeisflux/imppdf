@@ -81,7 +81,7 @@ if [ "$NO_SERVICE" -eq 0 ] && command -v systemctl >/dev/null 2>&1 && systemctl 
   $SUDO systemctl restart "$SERVICE"
   sleep 1
   if systemctl is-active --quiet "$SERVICE"; then
-    say "'$SERVICE' is live on http://localhost:${PORT}/app   (logs: journalctl -u $SERVICE -f)"
+    say "'$SERVICE' is live — https://impositionpdf.com/app   (logs: journalctl -u $SERVICE -f)"
   else
     echo "  '$SERVICE' did not come up — check: journalctl -u $SERVICE -n 50" >&2
     exit 1

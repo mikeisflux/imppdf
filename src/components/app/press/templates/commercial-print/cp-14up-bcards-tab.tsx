@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 7, cellWIn: 3.5, cellHIn: 2, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
   ],
-  preview: sizedGrid('cp-14up-bcards-tab', { cols: 2, rows: 7, cellWIn: 3.5, cellHIn: 2, sheetWIn: 11, sheetHIn: 17 }, { crop: true }),
+  preview: sizedGrid('cp-14up-bcards-tab', { cols: 2, rows: 7, cellWIn: 3.5, cellHIn: 2, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true }),
 });
