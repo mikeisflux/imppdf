@@ -78,6 +78,18 @@ export async function runPreflight(
   // 8. Low-resolution images (DPI) — best-effort scan via pdf.js.
   await checkImageDpi(bytes, sizes, out);
 
+  // 9. PDF/X-1a readiness summary — aggregate the print-critical checks into a
+  // single verdict. PDF/X-1a requires all fonts embedded, CMYK/spot only (no
+  // RGB), and no live transparency.
+  const blockers: string[] = [];
+  if (out.some((f) => /unembedded font/i.test(f.title))) blockers.push('embed all fonts');
+  if (out.some((f) => /RGB colour detected/i.test(f.title))) blockers.push('convert RGB to CMYK');
+  if (out.some((f) => /transparency/i.test(f.title))) blockers.push('flatten transparency');
+  if (blockers.length)
+    out.push({ level: 'warning', title: 'Not yet PDF/X-1a ready', detail: `For strict PDF/X-1a output you still need to: ${blockers.join(', ')}.` });
+  else
+    out.push({ level: 'pass', title: 'Meets PDF/X-1a essentials', detail: 'Fonts embedded, no RGB or live transparency detected — the core PDF/X-1a requirements are satisfied.' });
+
   return out;
 }
 
