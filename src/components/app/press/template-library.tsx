@@ -78,6 +78,9 @@ function SheetPreview({ entry, mode }: { entry: Entry; mode: 'diagram' | 'exampl
   const brand = BRANDS[h % BRANDS.length]!, tagline = TAGLINES[(h >>> 3) % TAGLINES.length]!;
   const [c1, c2] = PALETTES[(h >>> 5) % PALETTES.length]!;
   const variant = (h >>> 8) % 3;
+  // Bounding box of the imposed pieces — registration marks hang off its edges.
+  const minX = Math.min(...cells.map((c) => c.x)), minY = Math.min(...cells.map((c) => c.y));
+  const maxX = Math.max(...cells.map((c) => c.x + c.w)), maxY = Math.max(...cells.map((c) => c.y + c.h));
   const hasBar = entry.steps.some((st) => st.type === 'colorbar');
   const hasCut = entry.steps.some((st) => st.type === 'cuttermarks');
   // Saddle-stitched work (booklet/nupbook without perfect-bound signatures)
@@ -88,6 +91,15 @@ function SheetPreview({ entry, mode }: { entry: Entry; mode: 'diagram' | 'exampl
   const wm = entry.steps.find((st) => st.type === 'watermark');
   return (
     <svg className="pe-lib-sheet" viewBox={`0 0 ${W} ${H}`} style={{ aspectRatio: `${W} / ${H}` }}>
+      <defs>
+        <pattern id="pe-diag" width="6.5" height="6.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="6.5" stroke="#ffffff" strokeWidth="2.4" strokeOpacity="0.13" />
+        </pattern>
+        <pattern id="pe-check" width="20" height="20" patternUnits="userSpaceOnUse">
+          <rect width="10" height="10" fill="#ffffff" fillOpacity="0.1" />
+          <rect x="10" y="10" width="10" height="10" fill="#ffffff" fillOpacity="0.1" />
+        </pattern>
+      </defs>
       <rect width={W} height={H} fill="#fff" rx="1.5" />
       {hasBar && Array.from({ length: 22 }, (_, i) => (
         <rect key={i} x={10 + i * ((W - 20) / 22)} y={3.5} width={(W - 20) / 22 - 0.8} height={4.5}
@@ -97,18 +109,35 @@ function SheetPreview({ entry, mode }: { entry: Entry; mode: 'diagram' | 'exampl
         <g key={i} transform={c.rot ? `rotate(180 ${c.x + c.w / 2} ${c.y + c.h / 2})` : undefined}>
           {mode === 'example' ? (
             <>
-              <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={i % 2 === 0 ? c1 : c2} />
-              {variant === 0 && <rect x={c.x} y={c.y + c.h * 0.55} width={c.w} height={c.h * 0.45} fill={i % 2 === 0 ? c2 : c1} opacity={0.9} />}
-              {variant === 1 && <rect x={c.x + c.w * 0.45} y={c.y} width={c.w * 0.55} height={c.h} fill={i % 2 === 0 ? c2 : c1} opacity={0.9} />}
-              {variant === 2 && <circle cx={c.x + c.w * 0.78} cy={c.y + c.h * 0.72} r={Math.min(c.w, c.h) * 0.2} fill="#ffffff" opacity={0.2} />}
-              {c.w > 46 && (
-                <>
-                  <text x={c.x + c.w / 2} y={c.y + c.h * (variant === 0 ? 0.32 : 0.46)} textAnchor="middle"
-                    fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={Math.min(16, c.w / 6.2)} fill="#fff">{brand}</text>
-                  <text x={c.x + c.w / 2} y={c.y + c.h * (variant === 0 ? 0.32 : 0.46) + Math.min(16, c.w / 6.2)} textAnchor="middle"
-                    fontFamily="Inter, ui-sans-serif" fontSize={Math.min(6.5, c.w / 14)} fill="#ffffffcc">{tagline}</text>
-                </>
-              )}
+              <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={c1} />
+              {variant === 0 && <>
+                {/* top / bottom split with a diagonal-stripe accent, title on top */}
+                <rect x={c.x} y={c.y + c.h * 0.54} width={c.w} height={c.h * 0.46} fill={c2} />
+                <rect x={c.x} y={c.y + c.h * 0.54} width={c.w} height={c.h * 0.46} fill="url(#pe-diag)" />
+              </>}
+              {variant === 1 && <>
+                {/* left / right split with a checkerboard accent, title on the left */}
+                <rect x={c.x + c.w * 0.5} y={c.y} width={c.w * 0.5} height={c.h} fill={c2} />
+                <rect x={c.x + c.w * 0.5} y={c.y} width={c.w * 0.5} height={c.h} fill="url(#pe-check)" />
+              </>}
+              {variant === 2 && <>
+                {/* poster: concentric outlines + soft circle on top, solid caption band below */}
+                <rect x={c.x} y={c.y + c.h * 0.58} width={c.w} height={c.h * 0.42} fill={c2} />
+                {Array.from({ length: 6 }, (_, k) => {
+                  const inset = (k + 1) * Math.min(c.w, c.h * 0.58) * 0.06;
+                  return <rect key={k} x={c.x + inset} y={c.y + inset} width={c.w - 2 * inset} height={c.h * 0.58 - inset} fill="none" stroke="#ffffff" strokeWidth={0.5} strokeOpacity={0.35} />;
+                })}
+                <circle cx={c.x + c.w * 0.74} cy={c.y + c.h * 0.34} r={Math.min(c.w, c.h) * 0.2} fill="#ffffff" opacity={0.14} />
+              </>}
+              {c.w > 46 && (() => {
+                const cx = variant === 1 ? c.x + c.w * 0.27 : c.x + c.w / 2;
+                const cy = variant === 0 ? c.y + c.h * 0.3 : variant === 2 ? c.y + c.h * 0.78 : c.y + c.h * 0.46;
+                const ink = variant === 2 ? '#17181d' : '#fff', sub = variant === 2 ? '#17181d99' : '#ffffffcc';
+                return <>
+                  <text x={cx} y={cy} textAnchor="middle" fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={Math.min(16, c.w / 6.2)} fill={ink}>{brand}</text>
+                  <text x={cx} y={cy + Math.min(14, c.w / 7)} textAnchor="middle" fontFamily="Inter, ui-sans-serif" fontSize={Math.min(6.5, c.w / 14)} fill={sub}>{tagline}</text>
+                </>;
+              })()}
             </>
           ) : (
             <>
@@ -126,16 +155,16 @@ function SheetPreview({ entry, mode }: { entry: Entry; mode: 'diagram' | 'exampl
         <text x={W / 2} y={H / 2} textAnchor="middle" fontFamily="Inter, ui-sans-serif" fontWeight={800} fontSize={26}
           fill="#00000030" transform={`rotate(-${wm.s.angleDeg ?? 45} ${W / 2} ${H / 2})`}>{wm.s.text || 'PROOF'}</text>
       )}
-      {hasCut && (
-        <>
-          <circle cx={6.5} cy={hasBar ? 13 : 6.5} r={3} fill="#111" /><circle cx={W - 6.5} cy={hasBar ? 13 : 6.5} r={3} fill="#111" />
-          <circle cx={6.5} cy={H - 6.5} r={3} fill="#111" /><circle cx={W - 6.5} cy={H - 6.5} r={3} fill="#111" />
-        </>
-      )}
-      {hasReg && ['M', 'E'].map((_, i) => (
-        <g key={i} transform={`translate(${i === 0 ? 8 : W - 8} ${H / 2})`} stroke="#111" strokeWidth={0.7} fill="none">
+      {hasReg && ([
+        [(minX + maxX) / 2, minY - 8], [(minX + maxX) / 2, maxY + 8],
+        [minX - 8, (minY + maxY) / 2], [maxX + 8, (minY + maxY) / 2],
+      ] as [number, number][]).map(([x, y], k) => (
+        <g key={`reg${k}`} transform={`translate(${x} ${y})`} stroke="#111" strokeWidth={0.7} fill="none">
           <circle r={3.2} /><path d="M-5 0h10M0 -5v10" />
         </g>
+      ))}
+      {hasCut && ([[7, hasBar ? 13 : 7], [W - 7, hasBar ? 13 : 7], [7, H - 7], [W - 7, H - 7]] as [number, number][]).map(([x, y], k) => (
+        <circle key={`dot${k}`} cx={x} cy={y} r={2.6} fill="#111" />
       ))}
       {isSaddle && [0.32, 0.68].map((fy, i) => (
         <g key={`staple${i}`} transform={`translate(${W / 2} ${H * fy})`} fill="#111">
