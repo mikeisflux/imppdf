@@ -1,0 +1,14 @@
+[Unit]
+Description=ImpositionPDF SQLite backup (rotating)
+After=network.target
+
+[Service]
+Type=oneshot
+# Adjust paths if your checkout/data live elsewhere.
+WorkingDirectory=/opt/pdfpress/app
+Environment=DATABASE_PATH=/opt/pdfpress/app/data/impositionpdf.db
+Environment=BACKUP_DIR=/opt/pdfpress/backups
+Environment=BACKUP_KEEP=14
+ExecStart=/usr/bin/node /opt/pdfpress/app/scripts/backup-db.mjs
+StandardOutput=append:/var/log/impositionpdf-backup.log
+StandardError=append:/var/log/impositionpdf-backup.log
