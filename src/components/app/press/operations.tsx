@@ -122,6 +122,9 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'nupbook', label: 'N-up Book', icon: 'nupbook', tip: 'Use N-up Book for multi-up signature imposition (folio / quarto).' },
     { id: 'cutstack', label: 'Cut and Stack', icon: 'cutstack', tip: 'Use Cut & Stack so sequential pages fall into order after guillotining.' },
     { id: 'perfectbound', label: 'Perfect Bound', icon: 'nupbook', tip: 'Use Perfect Bound for trade paperbacks: sequential 2-up, printed duplex and cut-and-stacked so page 2 backs page 1.' },
+    { id: 'trading', label: 'Trading Cards', icon: 'cards', tip: 'Gang trading/sports cards (2.5×3.5") on a sheet with bleed and cut marks.' },
+    { id: 'bookmark', label: 'Bookmarks', icon: 'columns', tip: 'Gang tall bookmarks (2×6") across a sheet with cut marks.' },
+    { id: 'flyer', label: 'Flyer', icon: 'file', tip: 'Prep a full-bleed flyer (8.5×11") with crop marks, or gang several up.' },
     { id: 'datamerge', label: 'Variable Data', icon: 'pagenumbers', tip: 'Merge CSV records — names, numbers, QR codes — onto imposed cells.' },
   ] },
   { label: '// ADVANCED', ops: [

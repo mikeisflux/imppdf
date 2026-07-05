@@ -17,6 +17,7 @@ import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/impositi
 
 export type StepType =
   | 'cards' | 'booklet' | 'zine' | 'shuffle' | 'grid' | 'nupbook' | 'cutstack' | 'perfectbound' | 'datamerge'
+  | 'trading' | 'bookmark' | 'flyer'
   | 'preflight' | 'gangsheet' | 'cuttermarks' | 'layers' | 'customimpose' | 'pdftools'
   | 'resize' | 'rotate' | 'crop' | 'split' | 'flip' | 'merge' | 'overlay' | 'distort'
   | 'bleed' | 'headerfooter' | 'colorbar' | 'slugline' | 'foldmarks' | 'regmarks'
@@ -125,6 +126,27 @@ export function defaultSettings(type: StepType): StepSettings {
         marginIn: 0, gutterIn: 0, gutterYIn: 0, order: 'cutstack', duplex: true,
         duplexFlip: 'long', autoscale: true, preserveAspect: true, ...MARKS,
         bleedMode: 'doc', bleedIn: 0.125,
+      };
+    case 'trading':
+      // Standard trading/sports cards (2.5×3.5"), 9-up (3×3) on Letter, sequential.
+      return {
+        sheetWIn: 8.5, sheetHIn: 11, cols: 3, rows: 3, cellWIn: 2.5, cellHIn: 3.5,
+        marginIn: 0.25, gutterIn: 0.1, gutterYIn: 0.1, order: 'sequential', duplex: false,
+        autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125,
+      };
+    case 'bookmark':
+      // Bookmarks (2×6"), 4-up across on Letter, sequential.
+      return {
+        sheetWIn: 8.5, sheetHIn: 11, cols: 4, rows: 1, cellWIn: 2, cellHIn: 6,
+        marginIn: 0.25, gutterIn: 0.125, gutterYIn: 0.125, order: 'sequential', duplex: false,
+        autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125,
+      };
+    case 'flyer':
+      // Full-bleed flyer prep (8.5×11"), 1-up with crop marks.
+      return {
+        sheetWIn: 8.5, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 8.5, cellHIn: 11,
+        marginIn: 0, gutterIn: 0, gutterYIn: 0, order: 'sequential', duplex: false,
+        autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125,
       };
     case 'nupbook':
       return { nUp: 4, sheetWIn: 11, sheetHIn: 17, marginIn: 0.2, gutterIn: 0, creepIn: 0, rtl: false, signatureSheets: 4, ...MARKS };
@@ -261,7 +283,8 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         });
         break;
       }
-      case 'cards': case 'grid': case 'cutstack': case 'perfectbound': b = await imposeNUp(b, nupOpts(s)); break;
+      case 'cards': case 'grid': case 'cutstack': case 'perfectbound':
+      case 'trading': case 'bookmark': case 'flyer': b = await imposeNUp(b, nupOpts(s)); break;
       case 'nupbook': b = await imposeNUpBook(b, {
         nUp: s.nUp, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, marginIn: s.marginIn,
         gutterIn: s.gutterIn, creepIn: s.creepIn, rtl: !!s.rtl, signatureSheets: s.signatureSheets,
