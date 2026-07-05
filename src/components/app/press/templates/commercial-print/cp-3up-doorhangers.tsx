@@ -8,7 +8,7 @@ export default template({
   sheetWIn: 11,
   sheetHIn: 17,
   steps: [
-    { type: 'grid', s: { cols: 1, rows: 3, cellWIn: 3.5, cellHIn: 8.5, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
+    { type: 'grid', s: { cols: 3, rows: 1, cellWIn: 3.5, cellHIn: 8.5, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
   ],
   preview: sizedGrid('cp-3up-doorhangers', { cols: 3, rows: 1, cellWIn: 3.5, cellHIn: 8.5, sheetWIn: 11, sheetHIn: 17 }, { crop: true }),
 });

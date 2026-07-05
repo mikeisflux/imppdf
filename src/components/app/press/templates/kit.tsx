@@ -327,6 +327,65 @@ export function booklet(id: string, o: MarkOpts & { saddle?: boolean } = {}) {
   return signature(id, { ...o, cols: 2, rows: 2 });
 }
 
+/** One printed sheet SIDE of a book imposition: exactly two trim-size pages
+ *  side by side (a reading spread) at true scale on the landscape press sheet,
+ *  with a page number, spine staples for saddle-stitch, and marks. This is how
+ *  many pages actually fit — two, not four. */
+export interface BookGeom { trimWIn: number; trimHIn: number; sheetWIn: number; sheetHIn: number }
+/** How many trim pages actually fit on the sheet (with a small binding/trim
+ *  allowance), trying both page orientations and taking the better fit. */
+export function pagesPerSheet(trimWIn: number, trimHIn: number, sheetWIn: number, sheetHIn: number) {
+  // Count the exact number of pages that fit — book pages meet at the spine, so
+  // a 2-up that fills the sheet exactly (e.g. two 8.5×11 on 11×17) is valid.
+  const EPS = 0.02;
+  const fit = (pw: number, ph: number) => ({
+    cols: Math.max(0, Math.floor((sheetWIn + EPS) / pw)),
+    rows: Math.max(0, Math.floor((sheetHIn + EPS) / ph)),
+  });
+  const a = fit(trimWIn, trimHIn), b = fit(trimHIn, trimWIn); // portrait vs rotated
+  const na = a.cols * a.rows, nb = b.cols * b.rows;
+  return nb > na ? { cols: b.cols, rows: b.rows, rot: true, n: nb } : { cols: a.cols, rows: a.rows, rot: false, n: na };
+}
+export function bookSheet(id: string, g: BookGeom, o: MarkOpts & { saddle?: boolean } = {}) {
+  return ({ mode, W, H }: PreviewProps) => {
+    const { brand, tagline, palette } = brandOf(id);
+    const fit = pagesPerSheet(g.trimWIn, g.trimHIn, g.sheetWIn, g.sheetHIn);
+    const cols = Math.max(1, fit.cols), rows = Math.max(1, fit.rows);
+    const pw = fit.rot ? g.trimHIn : g.trimWIn, ph = fit.rot ? g.trimWIn : g.trimHIn;
+    const ppi = W / g.sheetWIn;
+    let cw = pw * ppi, ch = ph * ppi, gx = 0.1 * ppi, gy = 0.1 * ppi;
+    const margin = W * 0.035;
+    const blockW = cols * cw + (cols - 1) * gx, blockH = rows * ch + (rows - 1) * gy;
+    const scale = Math.min(1, (W - 2 * margin) / blockW, (H - 2 * margin) / blockH);
+    cw *= scale; ch *= scale; gx *= scale; gy *= scale;
+    const bW = cols * cw + (cols - 1) * gx, bH = rows * ch + (rows - 1) * gy;
+    const x0 = (W - bW) / 2, y0 = (H - bH) / 2;
+    const cells: Cell[] = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
+      cells.push({ x: x0 + c * (cw + gx), y: y0 + r * (ch + gy), w: cw, h: ch });
+    const kinds: PageKind[] = ['cover', 'image', 'text', 'dark'];
+    return <Sheet W={W} H={H}>
+      {o.colorbar && <ColorBar W={W} seed={hash(id)} />}
+      {mode === 'example'
+        ? cells.map((c, i) => <DocPage key={i} cell={c} id={`${id}-${i}`} kind={i === 0 ? 'cover' : kinds[i % kinds.length]!}
+            brand={brand} tagline={tagline} palette={palette} pageNum={i === 0 ? undefined : i * 4} />)
+        : cells.map((c, i) => <DiagramPiece key={i} cell={c} n={i + 1} />)}
+      <CropTicks cells={cells} />
+      {o.reg && <RegTargets cells={cells} />}
+      {o.cut && <CutDots W={W} H={H} top={o.colorbar ? 13 : 7} />}
+      {o.saddle && cells.slice(0, cols - 1).map((c, i) => {
+        const sx = c.x + c.w + gx / 2;
+        return <g key={`st${i}`}>{[0.32, 0.68].map((fy, k) => (
+          <g key={k} transform={`translate(${sx} ${y0 + bH * fy})`} fill="#111">
+            <rect x={-1} y={-5.5} width={2} height={11} rx={0.8} />
+            <rect x={-4} y={-5.5} width={8} height={1.8} rx={0.8} />
+            <rect x={-4} y={3.7} width={8} height={1.8} rx={0.8} />
+          </g>))}</g>;
+      })}
+    </Sheet>;
+  };
+}
+
 /** True-scale gang: pieces are drawn at their real cellWIn×cellHIn dimensions
  *  relative to the sheet (uniform px-per-inch), packed cols×rows and centred, so
  *  the imposed pieces show at their correct size with the sheet margin visible.

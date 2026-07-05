@@ -8,9 +8,9 @@ export default template({
   sheetWIn: 11,
   sheetHIn: 17,
   steps: [
-    { type: 'grid', s: { cols: 2, rows: 2, cellWIn: 9.5, cellHIn: 4.125, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
+    { type: 'grid', s: { cols: 1, rows: 4, cellWIn: 9.5, cellHIn: 4.125, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
     { type: 'foldmarks', s: { scheme: 'custom' } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: sizedGrid('pk-envelope-flats', { cols: 2, rows: 2, cellWIn: 9.5, cellHIn: 4.125, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-envelope-flats', { cols: 1, rows: 4, cellWIn: 9.5, cellHIn: 4.125, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true, cut: true }),
 });
