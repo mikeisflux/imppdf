@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "b=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ -n \"$b\" ] && [ \"$b\" != \"HEAD\" ] && [ -f scripts/rebuild.sh ]; then sed -i 's|^DEFAULT_BRANCH=.*|DEFAULT_BRANCH=\"'\"$b\"'\"|' scripts/rebuild.sh; fi",
+            "statusMessage": "Stamping rebuild.sh with current branch"
+          }
+        ]
+      }
+    ]
+  }
+}
