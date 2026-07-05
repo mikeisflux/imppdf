@@ -19,7 +19,11 @@ export type StepType =
   | 'cards' | 'booklet' | 'zine' | 'shuffle' | 'grid' | 'nupbook' | 'cutstack' | 'perfectbound' | 'datamerge'
   | 'trading' | 'bookmark' | 'flyer'
   | 'business' | 'postcard' | 'rackcard' | 'hangtag' | 'label' | 'namebadge' | 'ticket' | 'coupon' | 'placecard' | 'greeting'
-  | 'comic'
+  | 'comic' | 'magazine' | 'catalog' | 'program' | 'notebook' | 'hymnal'
+  | 'trifold' | 'zfold' | 'gatefold' | 'menu'
+  | 'doorhanger' | 'envelope' | 'coaster' | 'contact' | 'compslip'
+  | 'poster' | 'banner' | 'rollbanner' | 'featherflag' | 'yardsign'
+  | 'boxcarton' | 'presfolder'
   | 'preflight' | 'gangsheet' | 'cuttermarks' | 'layers' | 'customimpose' | 'pdftools'
   | 'resize' | 'rotate' | 'crop' | 'split' | 'flip' | 'merge' | 'overlay' | 'distort'
   | 'bleed' | 'headerfooter' | 'colorbar' | 'slugline' | 'foldmarks' | 'regmarks'
@@ -53,6 +57,16 @@ const nupPreset = (o: StepSettings): StepSettings => ({
   marginIn: 0.25, gutterIn: 0.125, gutterYIn: 0.125, order: 'sequential', duplex: false,
   autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125, ...o,
 });
+// Base Booklet settings for book/magazine "preset" tools. Each overrides trim/sheet.
+const bookletPreset = (o: StepSettings): StepSettings => ({
+  sheetWIn: 16.54, sheetHIn: 11.69, landscape: true, autoscale: true, preserveAspect: true,
+  rtl: false, signatureSheets: 0, fillLastSaddle: true, marginIn: 0.2, marginTopIn: 0.2,
+  gutterIn: 0, creepIn: 0.007, creepOutward: true, centerOutput: true, ...MARKS,
+  bleedMode: 'doc', bleedIn: 0.125, rotatePages: false, ...o,
+});
+// Large-format single-piece (no crop marks on wide-format signage).
+const signPreset = (o: StepSettings): StepSettings =>
+  nupPreset({ cols: 1, rows: 1, marginIn: 0, gutterIn: 0, gutterYIn: 0, ...o, addMarks: false });
 
 export function defaultSettings(type: StepType): StepSettings {
   switch (type) {
@@ -178,6 +192,32 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'coupon':    return nupPreset({ cols: 2, rows: 5, cellWIn: 3.5, cellHIn: 2 });                  // 10-up coupons
     case 'placecard': return nupPreset({ cols: 2, rows: 4, cellWIn: 3.5, cellHIn: 2 });                  // 8-up place cards
     case 'greeting':  return nupPreset({ cols: 1, rows: 1, cellWIn: 5, cellHIn: 7 });                    // single-fold 5×7 greeting
+    // ── Flat extras ─────────────────────────────────────────────────────────
+    case 'doorhanger': return nupPreset({ cols: 2, rows: 1, cellWIn: 3.875, cellHIn: 8.75 });            // 2-up door hangers, Letter
+    case 'envelope':   return nupPreset({ sheetWIn: 11, sheetHIn: 17, cols: 1, rows: 4, cellWIn: 9.5, cellHIn: 4.125 }); // #10 flats 4-up
+    case 'coaster':    return nupPreset({ sheetWIn: 11, sheetHIn: 17, cols: 2, rows: 3, cellWIn: 4, cellHIn: 4 });       // round coasters 6-up
+    case 'contact':    return nupPreset({ cols: 2, rows: 4, cellWIn: 3.75, cellHIn: 2.4 });              // 8-up photo contact sheet
+    case 'compslip':   return nupPreset({ sheetWIn: 8.86, sheetHIn: 12.6, cols: 1, rows: 3, cellWIn: 8.27, cellHIn: 3.9 }); // DL comp slips 3-up
+    // ── Folds (impose the flat; add fold marks as a step) ───────────────────
+    case 'trifold':   return nupPreset({ sheetWIn: 11, sheetHIn: 8.5, cols: 1, rows: 1, cellWIn: 11, cellHIn: 8.5 });
+    case 'zfold':     return nupPreset({ sheetWIn: 17, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 17, cellHIn: 11 });
+    case 'gatefold':  return nupPreset({ sheetWIn: 11, sheetHIn: 8.5, cols: 1, rows: 1, cellWIn: 11, cellHIn: 8.5 });
+    case 'menu':      return nupPreset({ sheetWIn: 17, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 17, cellHIn: 11 });
+    // ── Large format (single piece, no marks) ───────────────────────────────
+    case 'poster':      return signPreset({ sheetWIn: 24, sheetHIn: 36, cellWIn: 24, cellHIn: 36 });
+    case 'banner':      return signPreset({ sheetWIn: 24, sheetHIn: 72, cellWIn: 24, cellHIn: 72 });
+    case 'rollbanner':  return signPreset({ sheetWIn: 33, sheetHIn: 80, cellWIn: 33, cellHIn: 80 });
+    case 'featherflag': return signPreset({ sheetWIn: 30, sheetHIn: 100, cellWIn: 30, cellHIn: 100 });
+    case 'yardsign':    return signPreset({ sheetWIn: 24, sheetHIn: 18, cellWIn: 24, cellHIn: 18 });
+    // ── Packaging (die flats) ───────────────────────────────────────────────
+    case 'boxcarton':  return nupPreset({ sheetWIn: 11, sheetHIn: 17, cols: 1, rows: 1, cellWIn: 9, cellHIn: 14 });
+    case 'presfolder': return nupPreset({ sheetWIn: 11, sheetHIn: 17, cols: 1, rows: 1, cellWIn: 9, cellHIn: 12 });
+    // ── Books / magazines (saddle or perfect-bound signatures) ──────────────
+    case 'magazine': return bookletPreset({ sheetWIn: 16.54, sheetHIn: 11.69, signatureSheets: 4 });
+    case 'catalog':  return bookletPreset({ sheetWIn: 16, sheetHIn: 8 });
+    case 'program':  return bookletPreset({ sheetWIn: 11.69, sheetHIn: 8.27 });
+    case 'notebook': return bookletPreset({ sheetWIn: 11.69, sheetHIn: 8.27 });
+    case 'hymnal':   return bookletPreset({ sheetWIn: 11.69, sheetHIn: 8.27, signatureSheets: 4 });
     case 'nupbook':
       return { nUp: 4, sheetWIn: 11, sheetHIn: 17, marginIn: 0.2, gutterIn: 0, creepIn: 0, rtl: false, signatureSheets: 4, ...MARKS };
     case 'shuffle': return { pattern: 'all' };
@@ -294,7 +334,8 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
     const s = step.s;
     if (step.type === 'pdftools' && s.op === 'encrypt' && !forExport) continue;
     switch (step.type) {
-      case 'booklet': case 'comic': b = await imposeBooklet(b, bookletOpts(s)); break;
+      case 'booklet': case 'comic': case 'magazine': case 'catalog': case 'program': case 'notebook': case 'hymnal':
+        b = await imposeBooklet(b, bookletOpts(s)); break;
       case 'zine': b = await imposeFoldZine(b, {
         format: s.format, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn,
         flipBackCover: !!s.flipBackCover, signatureSheets: s.signatureSheets || 0,
@@ -317,6 +358,10 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       case 'trading': case 'bookmark': case 'flyer':
       case 'business': case 'postcard': case 'rackcard': case 'hangtag': case 'label':
       case 'namebadge': case 'ticket': case 'coupon': case 'placecard': case 'greeting':
+      case 'doorhanger': case 'envelope': case 'coaster': case 'contact': case 'compslip':
+      case 'trifold': case 'zfold': case 'gatefold': case 'menu':
+      case 'poster': case 'banner': case 'rollbanner': case 'featherflag': case 'yardsign':
+      case 'boxcarton': case 'presfolder':
         b = await imposeNUp(b, nupOpts(s)); break;
       case 'nupbook': b = await imposeNUpBook(b, {
         nUp: s.nUp, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, marginIn: s.marginIn,

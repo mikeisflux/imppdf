@@ -1535,11 +1535,16 @@ function Slider({ label, value, min, max, suffix, onChange }: { label: string; v
 const NUP_TOOLS = new Set<StepType>([
   'cards', 'grid', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer',
   'business', 'postcard', 'rackcard', 'hangtag', 'label', 'namebadge', 'ticket', 'coupon', 'placecard', 'greeting',
+  'doorhanger', 'envelope', 'coaster', 'contact', 'compslip',
+  'trifold', 'zfold', 'gatefold', 'menu',
+  'poster', 'banner', 'rollbanner', 'featherflag', 'yardsign',
+  'boxcarton', 'presfolder',
 ]);
 
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
-  if (type === 'booklet' || type === 'comic') return <BookletPanel {...props} />;
+  if (type === 'booklet' || type === 'comic' || type === 'magazine' || type === 'catalog'
+    || type === 'program' || type === 'notebook' || type === 'hymnal') return <BookletPanel {...props} />;
   if (type === 'zine') return <ZinePanel {...props} />;
   if (NUP_TOOLS.has(type)) {
     const kind = type === 'cards' ? 'cards' : type === 'cutstack' ? 'cutstack' : type === 'perfectbound' ? 'perfectbound' : 'grid';
