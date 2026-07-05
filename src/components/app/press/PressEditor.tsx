@@ -335,7 +335,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
     <div className={`pe ${theme === 'dark' ? 'pe-dark' : ''}`}>
       {/* App bar */}
       <div className="pe-appbar">
-        <div className="pe-brand"><span className="pe-brand-mark"><Ic name="gridview" size={15} /></span>ImpositionPDF</div>
+        <a className="pe-brand" href="/" title="Back to home" style={{ textDecoration: 'none', color: 'inherit' }}><span className="pe-brand-mark"><Ic name="gridview" size={15} /></span>ImpositionPDF</a>
         <div style={{ position: 'relative' }}>
           <button className="pe-filemenu" onClick={() => setMenu(menu === 'file' ? null : 'file')}>File <Ic name="chevron" size={14} /></button>
           {menu === 'file' && (

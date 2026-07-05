@@ -4,6 +4,7 @@ import 'server-only';
 // better-sqlite3 layer. An IP that trips the suspicious-activity threshold is
 // blocked for 24h. Search-engine and social crawlers are never recorded as
 // suspicious (see isSearchEngine / middleware.ts), so SEO crawling is unaffected.
+import { appendFileSync } from 'node:fs';
 import { getDb } from './db';
 import { isSearchEngine } from './bot-ua';
 export { isSearchEngine, isMaliciousBot } from './bot-ua';
@@ -11,6 +12,9 @@ export { isSearchEngine, isMaliciousBot } from './bot-ua';
 const BOT_BLOCK_THRESHOLD = 3;
 const SUSPICIOUS_WINDOW_MS = 60 * 60 * 1000;   // 1 hour
 const BLOCK_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+// When an IP is blocked we append it here; the host-side botblock-watcher
+// service turns it into an iptables DROP rule within seconds (see scripts/).
+const PENDING_FILE = process.env.BOTBLOCK_PENDING_FILE ?? '/tmp/botblock-pending';
 
 const blockedCache = new Map<string, number>(); // ip -> expiresAt (ms)
 
@@ -66,6 +70,8 @@ export function blockIP(ip: string, reason: string, meta?: { path?: string; user
         last_user_agent=excluded.last_user_agent, last_path=excluded.last_path, expires_at=excluded.expires_at
     `).run(ip, reason, meta?.userAgent ?? null, meta?.path ?? null, now, expiresAt);
     blockedCache.set(ip, expiresAt);
+    // Hand the IP to the firewall watcher for an OS-level iptables DROP.
+    try { appendFileSync(PENDING_FILE, `${ip}\n`); } catch { /* watcher optional */ }
     console.info(`[bot-blocker] BLOCKED ${ip} — ${reason}`);
     return true;
   } catch (err) {

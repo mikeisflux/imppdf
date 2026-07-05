@@ -1,0 +1,18 @@
+[Unit]
+Description=ImpositionPDF BotBlock Watcher — maps app IP blocks to iptables DROP
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+# Adjust the path if your checkout lives elsewhere.
+ExecStart=/bin/bash /opt/pdfpress/app/scripts/botblock-watcher.sh
+EnvironmentFile=-/etc/default/botblock-watcher
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=0
+StandardOutput=append:/var/log/botblock-watcher.log
+StandardError=append:/var/log/botblock-watcher.log
+
+[Install]
+WantedBy=multi-user.target
