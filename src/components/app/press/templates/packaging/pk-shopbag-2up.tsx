@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-shopbag-2up',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 10, cellHIn: 7, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
     { type: 'foldmarks', s: { scheme: 'custom' } },
   ],
-  preview: grid('pk-shopbag-2up', 1, 2, { crop: true }),
+  preview: sizedGrid('pk-shopbag-2up', { cols: 1, rows: 2, cellWIn: 10, cellHIn: 7, sheetWIn: 11, sheetHIn: 17 }, { crop: true }),
 });

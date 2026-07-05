@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-cd-jewel-wrap',
@@ -12,5 +12,5 @@ export default template({
     { type: 'foldmarks', s: { scheme: 'custom' } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-cd-jewel-wrap', 1, 2, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-cd-jewel-wrap', { cols: 1, rows: 2, cellWIn: 9.5, cellHIn: 4.75, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true, cut: true }),
 });

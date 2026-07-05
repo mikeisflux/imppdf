@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-tent-2up',
@@ -12,5 +12,5 @@ export default template({
     { type: 'foldmarks', s: { scheme: 'half' } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('cp-tent-2up', 1, 2, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('cp-tent-2up', { cols: 1, rows: 2, cellWIn: 8, cellHIn: 3.5, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true, reg: true, cut: true }),
 });

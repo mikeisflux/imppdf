@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-shingled-3up',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'cutstack', s: { cols: 1, rows: 3, cellWIn: 8, cellHIn: 3.5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('cp-shingled-3up', 1, 3, { crop: true }),
+  preview: sizedGrid('cp-shingled-3up', { cols: 1, rows: 3, cellWIn: 8, cellHIn: 3.5, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

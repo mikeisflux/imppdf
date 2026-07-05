@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'vd-asset-dm',
@@ -11,5 +11,5 @@ export default template({
     { type: 'datamerge', s: { cols: 3, rows: 8, cellWIn: 2, cellHIn: 1, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'barcode', s: { symbology: 'datamatrix' } },
   ],
-  preview: grid('vd-asset-dm', 3, 8, { crop: true }),
+  preview: sizedGrid('vd-asset-dm', { cols: 3, rows: 8, cellWIn: 2, cellHIn: 1, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

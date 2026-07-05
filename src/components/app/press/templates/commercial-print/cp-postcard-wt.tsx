@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-postcard-wt',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 6, cellHIn: 4, duplex: true, duplexFlip: 'long', sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('cp-postcard-wt', 1, 2, { crop: true }),
+  preview: sizedGrid('cp-postcard-wt', { cols: 1, rows: 2, cellWIn: 6, cellHIn: 4, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

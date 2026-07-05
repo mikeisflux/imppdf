@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-soapbar-4up',
@@ -12,5 +12,5 @@ export default template({
     { type: 'foldmarks', s: { scheme: 'custom' } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-soapbar-4up', 2, 2, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-soapbar-4up', { cols: 2, rows: 2, cellWIn: 3, cellHIn: 5, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true, reg: true, cut: true }),
 });

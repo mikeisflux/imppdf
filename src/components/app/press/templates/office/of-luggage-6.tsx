@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'of-luggage-6',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 3, cellWIn: 2, cellHIn: 4, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('of-luggage-6', 2, 3, { crop: true }),
+  preview: sizedGrid('of-luggage-6', { cols: 2, rows: 3, cellWIn: 2, cellHIn: 4, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

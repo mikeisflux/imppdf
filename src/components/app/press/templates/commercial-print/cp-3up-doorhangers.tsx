@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-3up-doorhangers',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 3, cellWIn: 3.5, cellHIn: 8.5, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('cp-3up-doorhangers', 1, 3, { crop: true }),
+  preview: sizedGrid('cp-3up-doorhangers', { cols: 3, rows: 1, cellWIn: 3.5, cellHIn: 8.5, sheetWIn: 11, sheetHIn: 17 }, { crop: true }),
 });

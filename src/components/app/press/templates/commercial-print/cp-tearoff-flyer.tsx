@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-tearoff-flyer',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 1, cellWIn: 8.5, cellHIn: 11, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('cp-tearoff-flyer', 1, 1, { crop: true }),
+  preview: sizedGrid('cp-tearoff-flyer', { cols: 1, rows: 1, cellWIn: 8.5, cellHIn: 11, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

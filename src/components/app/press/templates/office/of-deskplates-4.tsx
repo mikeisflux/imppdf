@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'of-deskplates-4',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 4, cellWIn: 8, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('of-deskplates-4', 1, 4, { crop: true }),
+  preview: sizedGrid('of-deskplates-4', { cols: 1, rows: 4, cellWIn: 8, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

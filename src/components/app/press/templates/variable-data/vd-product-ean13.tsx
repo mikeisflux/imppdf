@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'vd-product-ean13',
@@ -11,5 +11,5 @@ export default template({
     { type: 'datamerge', s: { cols: 2, rows: 5, cellWIn: 3, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'barcode', s: { symbology: 'ean13' } },
   ],
-  preview: grid('vd-product-ean13', 2, 5, { crop: true }),
+  preview: sizedGrid('vd-product-ean13', { cols: 2, rows: 5, cellWIn: 3, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

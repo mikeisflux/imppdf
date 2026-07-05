@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-envelope-flats',
@@ -12,5 +12,5 @@ export default template({
     { type: 'foldmarks', s: { scheme: 'custom' } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-envelope-flats', 2, 2, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-envelope-flats', { cols: 2, rows: 2, cellWIn: 9.5, cellHIn: 4.125, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true, cut: true }),
 });

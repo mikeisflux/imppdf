@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-photo-contact-8',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 4, cellWIn: 3.75, cellHIn: 2.4, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('cp-photo-contact-8', 2, 4, { crop: true }),
+  preview: sizedGrid('cp-photo-contact-8', { cols: 2, rows: 4, cellWIn: 3.75, cellHIn: 2.4, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

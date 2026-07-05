@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'vd-wristbands-qr',
@@ -11,5 +11,5 @@ export default template({
     { type: 'datamerge', s: { cols: 1, rows: 8, cellWIn: 10, cellHIn: 1, sheetWIn: 11, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'barcode', s: { symbology: 'qr' } },
   ],
-  preview: grid('vd-wristbands-qr', 1, 8, { crop: true }),
+  preview: sizedGrid('vd-wristbands-qr', { cols: 1, rows: 8, cellWIn: 10, cellHIn: 1, sheetWIn: 11, sheetHIn: 11 }, { crop: true }),
 });

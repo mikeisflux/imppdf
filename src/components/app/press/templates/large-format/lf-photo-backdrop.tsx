@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'lf-photo-backdrop',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 2, cellWIn: 48, cellHIn: 60, sheetWIn: 96, sheetHIn: 120, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('lf-photo-backdrop', 2, 2, { crop: true }),
+  preview: sizedGrid('lf-photo-backdrop', { cols: 2, rows: 2, cellWIn: 48, cellHIn: 60, sheetWIn: 96, sheetHIn: 120 }, { crop: true }),
 });

@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-comp-slips',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 3, cellWIn: 8.27, cellHIn: 3.9, sheetWIn: 8.86, sheetHIn: 12.6, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('cp-comp-slips', 1, 3, { crop: true }),
+  preview: sizedGrid('cp-comp-slips', { cols: 1, rows: 3, cellWIn: 8.27, cellHIn: 3.9, sheetWIn: 8.86, sheetHIn: 12.6 }, { crop: true }),
 });

@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-candy-wrappers',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 3, cellWIn: 6, cellHIn: 2.5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('pk-candy-wrappers', 1, 3, { crop: true }),
+  preview: sizedGrid('pk-candy-wrappers', { cols: 1, rows: 3, cellWIn: 6, cellHIn: 2.5, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

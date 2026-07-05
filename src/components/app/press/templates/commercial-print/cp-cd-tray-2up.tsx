@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-cd-tray-2up',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 5.9, cellHIn: 4.6, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('cp-cd-tray-2up', 1, 2, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('cp-cd-tray-2up', { cols: 1, rows: 2, cellWIn: 5.9, cellHIn: 4.6, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true, reg: true, cut: true }),
 });

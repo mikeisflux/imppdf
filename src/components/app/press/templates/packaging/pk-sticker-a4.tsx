@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-sticker-a4',
@@ -11,5 +11,5 @@ export default template({
     { type: 'stickers', s: { cols: 3, rows: 4, cellWIn: 2, cellHIn: 2.5, sheetWIn: 8.27, sheetHIn: 11.69, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-sticker-a4', 3, 4, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-sticker-a4', { cols: 3, rows: 4, cellWIn: 2, cellHIn: 2.5, sheetWIn: 8.27, sheetHIn: 11.69 }, { crop: true, reg: true, cut: true }),
 });

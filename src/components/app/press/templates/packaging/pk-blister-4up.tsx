@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-blister-4up',
@@ -12,5 +12,5 @@ export default template({
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
     { type: 'regmarks' },
   ],
-  preview: grid('pk-blister-4up', 2, 2, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-blister-4up', { cols: 2, rows: 2, cellWIn: 5, cellHIn: 7, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true, cut: true }),
 });

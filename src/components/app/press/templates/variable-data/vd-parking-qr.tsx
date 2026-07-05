@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'vd-parking-qr',
@@ -11,5 +11,5 @@ export default template({
     { type: 'datamerge', s: { cols: 2, rows: 2, cellWIn: 4, cellHIn: 5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'barcode', s: { symbology: 'qr' } },
   ],
-  preview: grid('vd-parking-qr', 2, 2, { crop: true }),
+  preview: sizedGrid('vd-parking-qr', { cols: 2, rows: 2, cellWIn: 4, cellHIn: 5, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'of-bookmarks-6',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 6, rows: 1, cellWIn: 1.75, cellHIn: 7.5, sheetWIn: 11, sheetHIn: 8.5, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('of-bookmarks-6', 6, 1, { crop: true }),
+  preview: sizedGrid('of-bookmarks-6', { cols: 6, rows: 1, cellWIn: 1.75, cellHIn: 7.5, sheetWIn: 11, sheetHIn: 8.5 }, { crop: true }),
 });

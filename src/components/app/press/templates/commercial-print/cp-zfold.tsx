@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-zfold',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 1, cellWIn: 11, cellHIn: 17, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
     { type: 'foldmarks', s: { scheme: 'zfold' } },
   ],
-  preview: grid('cp-zfold', 1, 1, { crop: true }),
+  preview: sizedGrid('cp-zfold', { cols: 1, rows: 1, cellWIn: 11, cellHIn: 17, sheetWIn: 11, sheetHIn: 17 }, { crop: true }),
 });

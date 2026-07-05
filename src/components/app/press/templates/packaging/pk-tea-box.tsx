@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-tea-box',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 1, cellWIn: 7, cellHIn: 9, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-tea-box', 1, 1, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-tea-box', { cols: 1, rows: 1, cellWIn: 7, cellHIn: 9, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true, reg: true, cut: true }),
 });

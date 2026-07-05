@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-seed-packets',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 3, cellWIn: 3, cellHIn: 4.5, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('pk-seed-packets', 2, 3, { crop: true }),
+  preview: sizedGrid('pk-seed-packets', { cols: 2, rows: 3, cellWIn: 3, cellHIn: 4.5, sheetWIn: 11, sheetHIn: 17 }, { crop: true }),
 });

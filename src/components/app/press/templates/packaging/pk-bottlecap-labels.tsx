@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-bottlecap-labels',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'stickers', s: { cols: 5, rows: 7, cellWIn: 1.2, cellHIn: 1.2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('pk-bottlecap-labels', 5, 7, { crop: true }),
+  preview: sizedGrid('pk-bottlecap-labels', { cols: 5, rows: 7, cellWIn: 1.2, cellHIn: 1.2, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

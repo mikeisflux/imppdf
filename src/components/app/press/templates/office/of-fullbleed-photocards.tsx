@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'of-fullbleed-photocards',
@@ -11,5 +11,5 @@ export default template({
     { type: 'bleed', s: { bleedIn: 0.125 } },
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 6, cellHIn: 4, sheetWIn: 8.5, sheetHIn: 11, bleedMode: 'fixed', bleedIn: 0.125, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('of-fullbleed-photocards', 1, 2, { crop: true }),
+  preview: sizedGrid('of-fullbleed-photocards', { cols: 1, rows: 2, cellWIn: 6, cellHIn: 4, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

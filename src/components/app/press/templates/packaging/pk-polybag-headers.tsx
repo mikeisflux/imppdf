@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-polybag-headers',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 2, rows: 3, cellWIn: 4, cellHIn: 3, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-polybag-headers', 2, 3, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-polybag-headers', { cols: 2, rows: 3, cellWIn: 4, cellHIn: 3, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true, reg: true, cut: true }),
 });

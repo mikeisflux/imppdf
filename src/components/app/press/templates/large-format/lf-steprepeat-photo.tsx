@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'lf-steprepeat-photo',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 3, cellWIn: 5, cellHIn: 7, order: 'repeat', sheetWIn: 13, sheetHIn: 24, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('lf-steprepeat-photo', 2, 3, { crop: true }),
+  preview: sizedGrid('lf-steprepeat-photo', { cols: 2, rows: 3, cellWIn: 5, cellHIn: 7, sheetWIn: 13, sheetHIn: 24 }, { crop: true }),
 });

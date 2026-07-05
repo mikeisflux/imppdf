@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-2up-doorhangers',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 3.875, cellHIn: 8.75, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('cp-2up-doorhangers', 1, 2, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('cp-2up-doorhangers', { cols: 2, rows: 1, cellWIn: 3.875, cellHIn: 8.75, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true, reg: true, cut: true }),
 });

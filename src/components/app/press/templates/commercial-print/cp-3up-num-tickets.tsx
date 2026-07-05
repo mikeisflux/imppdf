@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-3up-num-tickets',
@@ -13,5 +13,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 3, cellWIn: 8, cellHIn: 3.5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('cp-3up-num-tickets', 2, 2, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('cp-3up-num-tickets', { cols: 1, rows: 3, cellWIn: 8, cellHIn: 3.5, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true, reg: true, cut: true }),
 });

@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-product-bleed-bc',
@@ -13,5 +13,5 @@ export default template({
     { type: 'barcode' },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-product-bleed-bc', 2, 2, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-product-bleed-bc', { cols: 2, rows: 2, cellWIn: 3, cellHIn: 4, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true, reg: true, cut: true }),
 });

@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-folder-insert',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 1, cellWIn: 9, cellHIn: 12, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('cp-folder-insert', 1, 1, { crop: true }),
+  preview: sizedGrid('cp-folder-insert', { cols: 1, rows: 1, cellWIn: 9, cellHIn: 12, sheetWIn: 11, sheetHIn: 17 }, { crop: true }),
 });

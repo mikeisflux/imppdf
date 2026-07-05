@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-eddm-postcard',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 2, rows: 1, cellWIn: 6.25, cellHIn: 9, sheetWIn: 13, sheetHIn: 19, addMarks: true, centerMarks: true } },
     { type: 'barcode' },
   ],
-  preview: grid('cp-eddm-postcard', 2, 1, { crop: true }),
+  preview: sizedGrid('cp-eddm-postcard', { cols: 2, rows: 1, cellWIn: 6.25, cellHIn: 9, sheetWIn: 13, sheetHIn: 19 }, { crop: true }),
 });

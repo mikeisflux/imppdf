@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-2up-giftcert',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 7, cellHIn: 5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('cp-2up-giftcert', 1, 2, { crop: true }),
+  preview: sizedGrid('cp-2up-giftcert', { cols: 1, rows: 2, cellWIn: 7, cellHIn: 5, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

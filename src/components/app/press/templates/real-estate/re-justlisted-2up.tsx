@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 're-justlisted-2up',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 8.5, cellHIn: 5.5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('re-justlisted-2up', 1, 2, { crop: true }),
+  preview: sizedGrid('re-justlisted-2up', { cols: 1, rows: 2, cellWIn: 8.5, cellHIn: 5.5, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

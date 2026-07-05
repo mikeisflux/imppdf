@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-pouch-2up',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 1, cellWIn: 5, cellHIn: 8, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('pk-pouch-2up', 2, 1, { crop: true }),
+  preview: sizedGrid('pk-pouch-2up', { cols: 2, rows: 1, cellWIn: 5, cellHIn: 8, sheetWIn: 11, sheetHIn: 17 }, { crop: true }),
 });

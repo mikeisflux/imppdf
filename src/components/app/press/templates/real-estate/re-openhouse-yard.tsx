@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 're-openhouse-yard',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 18, cellHIn: 24, sheetWIn: 18, sheetHIn: 48, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('re-openhouse-yard', 1, 2, { crop: true }),
+  preview: sizedGrid('re-openhouse-yard', { cols: 1, rows: 2, cellWIn: 18, cellHIn: 24, sheetWIn: 18, sheetHIn: 48 }, { crop: true }),
 });

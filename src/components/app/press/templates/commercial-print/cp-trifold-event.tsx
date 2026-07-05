@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-trifold-event',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 1, cellWIn: 11, cellHIn: 8.5, sheetWIn: 11, sheetHIn: 8.5, addMarks: true, centerMarks: true } },
     { type: 'foldmarks', s: { scheme: 'trifold' } },
   ],
-  preview: grid('cp-trifold-event', 1, 1, { crop: true }),
+  preview: sizedGrid('cp-trifold-event', { cols: 1, rows: 1, cellWIn: 11, cellHIn: 8.5, sheetWIn: 11, sheetHIn: 8.5 }, { crop: true }),
 });

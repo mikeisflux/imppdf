@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'lf-billboard-4',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 2, cellWIn: 24, cellHIn: 12, sheetWIn: 48, sheetHIn: 24, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('lf-billboard-4', 2, 2, { crop: true }),
+  preview: sizedGrid('lf-billboard-4', { cols: 2, rows: 2, cellWIn: 24, cellHIn: 12, sheetWIn: 48, sheetHIn: 24 }, { crop: true }),
 });

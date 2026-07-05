@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-presfolder-a4',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 1, cellWIn: 8, cellHIn: 11, sheetWIn: 8.27, sheetHIn: 11.69, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-presfolder-a4', 1, 1, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-presfolder-a4', { cols: 1, rows: 1, cellWIn: 8, cellHIn: 11, sheetWIn: 8.27, sheetHIn: 11.69 }, { crop: true, reg: true, cut: true }),
 });

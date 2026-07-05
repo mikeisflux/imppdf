@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'lf-4up-18x24',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 2, cellWIn: 18, cellHIn: 24, sheetWIn: 36, sheetHIn: 48, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('lf-4up-18x24', 2, 2, { crop: true }),
+  preview: sizedGrid('lf-4up-18x24', { cols: 2, rows: 2, cellWIn: 18, cellHIn: 24, sheetWIn: 36, sheetHIn: 48 }, { crop: true }),
 });

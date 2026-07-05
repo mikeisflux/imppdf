@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-printcut-decals',
@@ -11,5 +11,5 @@ export default template({
     { type: 'stickers', s: { cols: 3, rows: 4, cellWIn: 2.2, cellHIn: 2.2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-printcut-decals', 3, 4, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-printcut-decals', { cols: 3, rows: 4, cellWIn: 2.2, cellHIn: 2.2, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true, reg: true, cut: true }),
 });

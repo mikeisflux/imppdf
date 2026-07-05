@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-4up-rackcards',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 2, cellWIn: 3.5, cellHIn: 7, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('cp-4up-rackcards', 2, 2, { crop: true }),
+  preview: sizedGrid('cp-4up-rackcards', { cols: 2, rows: 2, cellWIn: 3.5, cellHIn: 7, sheetWIn: 11, sheetHIn: 17 }, { crop: true }),
 });

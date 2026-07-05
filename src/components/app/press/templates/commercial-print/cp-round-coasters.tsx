@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-round-coasters',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 2, rows: 3, cellWIn: 4, cellHIn: 4, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { shape: 'ellipse', cornersAndEdges: true } },
   ],
-  preview: grid('cp-round-coasters', 2, 3, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('cp-round-coasters', { cols: 2, rows: 3, cellWIn: 4, cellHIn: 4, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true, cut: true }),
 });

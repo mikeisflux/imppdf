@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-playingcards-16',
@@ -12,5 +12,5 @@ export default template({
     { type: 'regmarks' },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('cp-playingcards-16', 4, 4, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('cp-playingcards-16', { cols: 4, rows: 4, cellWIn: 2.5, cellHIn: 3.5, sheetWIn: 13, sheetHIn: 19 }, { crop: true, reg: true, cut: true }),
 });

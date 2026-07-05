@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-label-roll',
@@ -11,5 +11,5 @@ export default template({
     { type: 'stickers', s: { cols: 1, rows: 5, cellWIn: 3, cellHIn: 2, sheetWIn: 4, sheetHIn: 12, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-label-roll', 1, 5, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-label-roll', { cols: 1, rows: 5, cellWIn: 3, cellHIn: 2, sheetWIn: 4, sheetHIn: 12 }, { crop: true, reg: true, cut: true }),
 });

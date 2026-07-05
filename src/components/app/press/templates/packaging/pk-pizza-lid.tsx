@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-pizza-lid',
@@ -12,5 +12,5 @@ export default template({
     { type: 'foldmarks', s: { scheme: 'custom' } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-pizza-lid', 1, 1, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-pizza-lid', { cols: 1, rows: 1, cellWIn: 12, cellHIn: 18, sheetWIn: 13, sheetHIn: 19 }, { crop: true, reg: true, cut: true }),
 });

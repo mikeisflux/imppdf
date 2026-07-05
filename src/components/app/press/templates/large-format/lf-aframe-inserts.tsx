@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'lf-aframe-inserts',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 24, cellHIn: 18, sheetWIn: 24, sheetHIn: 36, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('lf-aframe-inserts', 1, 2, { crop: true }),
+  preview: sizedGrid('lf-aframe-inserts', { cols: 1, rows: 2, cellWIn: 24, cellHIn: 18, sheetWIn: 24, sheetHIn: 36 }, { crop: true }),
 });

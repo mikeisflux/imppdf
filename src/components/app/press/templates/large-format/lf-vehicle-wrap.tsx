@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'lf-vehicle-wrap',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 3, rows: 2, cellWIn: 20, cellHIn: 30, sheetWIn: 60, sheetHIn: 60, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('lf-vehicle-wrap', 3, 2, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('lf-vehicle-wrap', { cols: 3, rows: 2, cellWIn: 20, cellHIn: 30, sheetWIn: 60, sheetHIn: 60 }, { crop: true, reg: true, cut: true }),
 });

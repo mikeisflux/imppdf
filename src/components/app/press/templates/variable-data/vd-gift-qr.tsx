@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'vd-gift-qr',
@@ -11,5 +11,5 @@ export default template({
     { type: 'datamerge', s: { cols: 2, rows: 4, cellWIn: 4, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'barcode', s: { symbology: 'qr' } },
   ],
-  preview: grid('vd-gift-qr', 2, 4, { crop: true }),
+  preview: sizedGrid('vd-gift-qr', { cols: 2, rows: 4, cellWIn: 4, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-proof-sheet-wm',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 11, cellHIn: 8.5, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
     { type: 'watermark', s: { text: 'PROOF' } },
   ],
-  preview: grid('cp-proof-sheet-wm', 1, 2, { crop: true, watermark: 'PROOF' }),
+  preview: sizedGrid('cp-proof-sheet-wm', { cols: 1, rows: 2, cellWIn: 11, cellHIn: 8.5, sheetWIn: 11, sheetHIn: 17 }, { crop: true, watermark: 'PROOF' }),
 });

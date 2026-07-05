@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-letterhead-gang',
@@ -12,5 +12,5 @@ export default template({
     { type: 'colorbar' },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('cp-letterhead-gang', 1, 2, { crop: true, reg: true, cut: true, colorbar: true }),
+  preview: sizedGrid('cp-letterhead-gang', { cols: 1, rows: 2, cellWIn: 11, cellHIn: 8.5, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true, cut: true, colorbar: true }),
 });

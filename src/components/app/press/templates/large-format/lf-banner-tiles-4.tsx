@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'lf-banner-tiles-4',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 2, rows: 2, cellWIn: 12, cellHIn: 18, sheetWIn: 24, sheetHIn: 36, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('lf-banner-tiles-4', 2, 2, { crop: true }),
+  preview: sizedGrid('lf-banner-tiles-4', { cols: 2, rows: 2, cellWIn: 12, cellHIn: 18, sheetWIn: 24, sheetHIn: 36 }, { crop: true }),
 });

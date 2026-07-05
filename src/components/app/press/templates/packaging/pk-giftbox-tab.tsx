@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-giftbox-tab',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 1, cellWIn: 10, cellHIn: 16, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-giftbox-tab', 1, 1, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-giftbox-tab', { cols: 1, rows: 1, cellWIn: 10, cellHIn: 16, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true, cut: true }),
 });

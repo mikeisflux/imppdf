@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'lf-canvas-wrap',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 1, cellWIn: 20, cellHIn: 20, sheetWIn: 24, sheetHIn: 24, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('lf-canvas-wrap', 1, 1, { crop: true }),
+  preview: sizedGrid('lf-canvas-wrap', { cols: 1, rows: 1, cellWIn: 20, cellHIn: 20, sheetWIn: 24, sheetHIn: 24 }, { crop: true }),
 });

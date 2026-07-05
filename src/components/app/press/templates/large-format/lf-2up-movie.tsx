@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'lf-2up-movie',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 27, cellHIn: 40, sheetWIn: 27, sheetHIn: 80, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('lf-2up-movie', 1, 2, { crop: true }),
+  preview: sizedGrid('lf-2up-movie', { cols: 1, rows: 2, cellWIn: 27, cellHIn: 40, sheetWIn: 27, sheetHIn: 80 }, { crop: true }),
 });

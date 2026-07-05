@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'lf-roll-vinyl-24',
@@ -11,5 +11,5 @@ export default template({
     { type: 'stickers', s: { cols: 4, rows: 5, cellWIn: 5, cellHIn: 5, sheetWIn: 24, sheetHIn: 36, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('lf-roll-vinyl-24', 4, 5, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('lf-roll-vinyl-24', { cols: 4, rows: 5, cellWIn: 5, cellHIn: 5, sheetWIn: 24, sheetHIn: 36 }, { crop: true, reg: true, cut: true }),
 });

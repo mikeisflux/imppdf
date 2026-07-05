@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-tube-wrap-4up',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 4, cellWIn: 6, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'distort' },
   ],
-  preview: grid('pk-tube-wrap-4up', 1, 4, { crop: true }),
+  preview: sizedGrid('pk-tube-wrap-4up', { cols: 1, rows: 4, cellWIn: 6, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

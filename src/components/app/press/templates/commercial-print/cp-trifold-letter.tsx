@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-trifold-letter',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 1, rows: 1, cellWIn: 8.5, cellHIn: 11, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'foldmarks', s: { scheme: 'trifold' } },
   ],
-  preview: grid('cp-trifold-letter', 1, 1, { crop: true }),
+  preview: sizedGrid('cp-trifold-letter', { cols: 1, rows: 1, cellWIn: 8.5, cellHIn: 11, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

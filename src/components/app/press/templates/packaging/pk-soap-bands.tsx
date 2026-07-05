@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-soap-bands',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 8, cellWIn: 7, cellHIn: 1.2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('pk-soap-bands', 1, 8, { crop: true }),
+  preview: sizedGrid('pk-soap-bands', { cols: 1, rows: 8, cellWIn: 7, cellHIn: 1.2, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

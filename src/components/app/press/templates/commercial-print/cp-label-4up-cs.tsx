@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'cp-label-4up-cs',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'cutstack', s: { cols: 2, rows: 2, cellWIn: 4, cellHIn: 5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('cp-label-4up-cs', 2, 2, { crop: true }),
+  preview: sizedGrid('cp-label-4up-cs', { cols: 2, rows: 2, cellWIn: 4, cellHIn: 5, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true }),
 });

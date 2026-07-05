@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-bottleneck-6up',
@@ -11,5 +11,5 @@ export default template({
     { type: 'grid', s: { cols: 2, rows: 3, cellWIn: 3, cellHIn: 4, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-bottleneck-6up', 2, 3, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-bottleneck-6up', { cols: 2, rows: 3, cellWIn: 3, cellHIn: 4, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true, cut: true }),
 });

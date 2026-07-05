@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-bakery-liner',
@@ -10,5 +10,5 @@ export default template({
   steps: [
     { type: 'grid', s: { cols: 1, rows: 2, cellWIn: 10, cellHIn: 7, sheetWIn: 11, sheetHIn: 17, addMarks: true, centerMarks: true } },
   ],
-  preview: grid('pk-bakery-liner', 1, 2, { crop: true }),
+  preview: sizedGrid('pk-bakery-liner', { cols: 1, rows: 2, cellWIn: 10, cellHIn: 7, sheetWIn: 11, sheetHIn: 17 }, { crop: true }),
 });

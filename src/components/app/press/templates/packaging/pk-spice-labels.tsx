@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-spice-labels',
@@ -11,5 +11,5 @@ export default template({
     { type: 'stickers', s: { cols: 3, rows: 5, cellWIn: 2, cellHIn: 1.5, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true } },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-spice-labels', 3, 5, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-spice-labels', { cols: 3, rows: 5, cellWIn: 2, cellHIn: 1.5, sheetWIn: 8.5, sheetHIn: 11 }, { crop: true, reg: true, cut: true }),
 });

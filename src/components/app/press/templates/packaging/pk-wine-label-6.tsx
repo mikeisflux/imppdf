@@ -1,4 +1,4 @@
-import { template, grid } from '../kit';
+import { template, sizedGrid } from '../kit';
 
 export default template({
   id: 'pk-wine-label-6',
@@ -12,5 +12,5 @@ export default template({
     { type: 'distort' },
     { type: 'cuttermarks', s: { cornersAndEdges: true } },
   ],
-  preview: grid('pk-wine-label-6', 2, 3, { crop: true, reg: true, cut: true }),
+  preview: sizedGrid('pk-wine-label-6', { cols: 2, rows: 3, cellWIn: 3.5, cellHIn: 4, sheetWIn: 11, sheetHIn: 17 }, { crop: true, reg: true, cut: true }),
 });
