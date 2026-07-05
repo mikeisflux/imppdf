@@ -152,9 +152,6 @@
 }
 
 /* ── Choose Operation grid ───────────────────────────────────────────────── */
-.pe-choose-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.pe-choose-title { font-size: 14px; font-weight: 700; }
-.pe-choose-views { display: flex; gap: 2px; }
 .pe-group-label {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px; letter-spacing: 0.04em; color: var(--pe-faint);
@@ -876,3 +873,17 @@
   display: flex; align-items: center; gap: 18px;
   padding: 12px 18px; border-top: 1px solid var(--pe-border);
 }
+
+/* ── File dropdown menu ──────────────────────────────────────────────────── */
+.pe-filemenu-dd { width: 236px; padding: 6px; }
+.pe-menu-row {
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  padding: 9px 11px; border: none; background: none; border-radius: 8px; cursor: pointer;
+  color: var(--pe-ink); font-size: 13.5px; text-decoration: none;
+}
+.pe-menu-row:hover { background: var(--pe-fill); }
+.pe-menu-row:disabled { opacity: 0.4; cursor: default; }
+.pe-menu-row svg { color: var(--pe-muted); flex: 0 0 auto; }
+.pe-menu-sep { height: 1px; background: var(--pe-border); margin: 5px 8px; }
+.pe-menu-danger { color: #e5484d; }
+.pe-menu-danger svg { color: #e5484d; }

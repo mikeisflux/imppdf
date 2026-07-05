@@ -76,6 +76,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   const [toolSearchOpen, setToolSearchOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const outBytesRef = useRef<Uint8Array | null>(null);
   const renderSeq = useRef(0);
@@ -324,48 +325,36 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
         <div style={{ position: 'relative' }}>
           <button className="pe-filemenu" onClick={() => setMenu(menu === 'file' ? null : 'file')}>File <Ic name="chevron" size={14} /></button>
           {menu === 'file' && (
-            <div className="pe-menu pe-menu-left" onMouseLeave={() => setMenu(null)}>
-              <button className="pe-menu-item" onClick={() => { inputRef.current?.click(); setMenu(null); }}><span className="pe-menu-main">Open PDF…</span></button>
-              <button className="pe-menu-item" disabled={!steps.length} onClick={() => {
-                const name = window.prompt('Workflow name', 'My workflow');
-                if (name) saveWorkflow(name, steps);
-                setMenu(null);
-              }}><span className="pe-menu-main">Save Workflow</span></button>
-              <button className="pe-menu-item" onClick={() => setMenu('load')}><span className="pe-menu-main">Load Workflow ▸</span></button>
-              <button className="pe-menu-item" disabled={!steps.length} onClick={() => {
-                const blob = new Blob([JSON.stringify(steps.map((st) => ({ type: st.type, s: st.s })), null, 2)], { type: 'application/json' });
-                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'workflow.json'; a.click();
-                setMenu(null);
-              }}><span className="pe-menu-main">Export Workflow JSON</span></button>
-              <button className="pe-menu-item" onClick={() => {
-                const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json';
-                inp.onchange = async () => {
-                  try {
-                    const f = inp.files?.[0]; if (!f) return;
-                    const data = JSON.parse(await f.text());
-                    if (Array.isArray(data)) setSteps(workflowToSteps({ name: '', savedAt: 0, steps: data }));
-                  } catch { /* invalid */ }
-                };
-                inp.click(); setMenu(null);
-              }}><span className="pe-menu-main">Import Workflow JSON</span></button>
-              <button className="pe-menu-item" disabled={!file} onClick={() => { setFile(null); setSheets([]); setTotalSheets(0); setMenu(null); }}>
-                <span className="pe-menu-main">Close File</span>
+            <div className="pe-menu pe-menu-left pe-filemenu-dd" onMouseLeave={() => setMenu(null)}>
+              <button className="pe-menu-row" onClick={() => { inputRef.current?.click(); setMenu(null); }}>
+                <Ic name="addfiles" size={16} /> Add Files…
               </button>
-            </div>
-          )}
-          {menu === 'load' && (
-            <div className="pe-menu pe-menu-left" onMouseLeave={() => setMenu(null)}>
-              <div className="pe-menu-label">SAVED WORKFLOWS</div>
-              {listWorkflows().length === 0 && <div className="pe-menu-foot">Nothing saved yet.</div>}
-              {listWorkflows().map((w) => (
-                <div key={w.name} className="pe-menu-item" style={{ display: 'flex', alignItems: 'center' }}>
-                  <button style={{ all: 'unset', cursor: 'pointer', flex: 1 }} onClick={() => { setSteps(workflowToSteps(w)); setMenu(null); }}>
-                    <span className="pe-menu-main">{w.name}</span>
-                    <span className="pe-menu-sub">{w.steps.map((s2) => findOp(s2.type)?.label).filter(Boolean).join(' → ')}</span>
-                  </button>
-                  <button className="pe-iconbtn" onClick={() => { deleteWorkflow(w.name); setMenu(null); }}><Ic name="trash" size={13} /></button>
-                </div>
-              ))}
+              <button className="pe-menu-row" onClick={() => { folderRef.current?.click(); setMenu(null); }}>
+                <Ic name="folder" size={16} /> Add Folder…
+              </button>
+              <button className="pe-menu-row" disabled={!file || !steps.length} onClick={() => { setModal('batch'); setMenu(null); }}>
+                <Ic name="batch" size={16} /> Batch Process…
+              </button>
+              <button className="pe-menu-row" onClick={() => { setModal('templates'); setMenu(null); }}>
+                <Ic name="booklet" size={16} /> Templates…
+              </button>
+              <div className="pe-menu-sep" />
+              <a className="pe-menu-row" href="/guide" target="_blank" rel="noreferrer" onClick={() => setMenu(null)}>
+                <Ic name="booklet" size={16} /> Guide
+              </a>
+              <div className="pe-menu-sep" />
+              <a className="pe-menu-row" href="/account" target="_blank" rel="noreferrer" onClick={() => setMenu(null)}>
+                <Ic name="settings" size={16} /> My Account
+              </a>
+              <a className="pe-menu-row" href="/contact" target="_blank" rel="noreferrer" onClick={() => setMenu(null)}>
+                <Ic name="help" size={16} /> Contact Support
+              </a>
+              <div className="pe-menu-sep" />
+              <button className="pe-menu-row pe-menu-danger" onClick={() => {
+                setSteps([]); setFile(null); setSheets([]); setTotalSheets(0); setInspector((s) => ({ ...s, open: false })); setMenu(null);
+              }}>
+                <Ic name="trash" size={16} /> Clear All
+              </button>
             </div>
           )}
         </div>
@@ -546,6 +535,11 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
       </div>
 
       <input ref={inputRef} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => onPick(e.target.files)} />
+      <input ref={folderRef} type="file" hidden {...{ webkitdirectory: '', directory: '', mozdirectory: '' }}
+        onChange={(e) => {
+          const pdfs = Array.from(e.target.files ?? []).filter((f) => /\.pdf$/i.test(f.name)).sort((a, b) => a.name.localeCompare(b.name));
+          if (pdfs[0]) void loadFile(pdfs[0]);
+        }} />
 
       {/* Modals */}
       {modal === 'settings' && (
