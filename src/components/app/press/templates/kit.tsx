@@ -243,6 +243,31 @@ export function booklet(id: string, o: MarkOpts & { saddle?: boolean } = {}) {
   };
 }
 
+/** True-scale gang: pieces are drawn at their real cellWIn×cellHIn dimensions
+ *  relative to the sheet (uniform px-per-inch), packed cols×rows and centred, so
+ *  the imposed pieces show at their correct size with the sheet margin visible.
+ *  Use this for cards/postcards/labels where the piece size must read correctly. */
+export interface SizedGeom { cols: number; rows: number; cellWIn: number; cellHIn: number; sheetWIn: number; sheetHIn: number; gutterIn?: number }
+export function sizedGrid(id: string, g: SizedGeom, o: MarkOpts = {}) {
+  return ({ mode, W, H }: PreviewProps) => {
+    const ppi = W / g.sheetWIn;
+    const gut = (g.gutterIn ?? 0.15) * ppi;
+    let cw = g.cellWIn * ppi, ch = g.cellHIn * ppi;
+    let gx = gut, gy = gut;
+    // Fit within the sheet (minus a small visual margin) without distorting aspect.
+    const margin = W * 0.05;
+    const blockW = g.cols * cw + (g.cols - 1) * gx, blockH = g.rows * ch + (g.rows - 1) * gy;
+    const scale = Math.min(1, (W - 2 * margin) / blockW, (H - 2 * margin) / blockH);
+    cw *= scale; ch *= scale; gx *= scale; gy *= scale;
+    const bW = g.cols * cw + (g.cols - 1) * gx, bH = g.rows * ch + (g.rows - 1) * gy;
+    const x0 = (W - bW) / 2, y0 = (H - bH) / 2;
+    const cells: Cell[] = [];
+    for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++)
+      cells.push({ x: x0 + c * (cw + gx), y: y0 + r * (ch + gy), w: cw, h: ch });
+    return <Sheet W={W} H={H}><Pieces cells={cells} mode={mode} id={id} /><Marks cells={cells} W={W} H={H} id={id} o={o} /></Sheet>;
+  };
+}
+
 /** One-sheet fold-and-cut zine: 4×2 imposition, top row rotated 180°. */
 export function zine(id: string, o: MarkOpts = {}) {
   return ({ mode, W, H }: PreviewProps) => {
