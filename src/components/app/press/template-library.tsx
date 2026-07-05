@@ -58,13 +58,31 @@ function layoutCells(steps: WorkflowStep[], W: number, H: number) {
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
       cells.push({ x: m + c * (cw + g), y: m + r * (ch + g), w: cw, h: ch, rot: impose.type === 'zine' && r === 0 });
   } else {
+    // Draw each imposed piece at its TRUE size on the sheet — real card/label
+    // dimensions with proper gutters and margins — instead of stretching a
+    // piece to fill an equal grid cell.
     const shW = s.sheetWIn ?? 8.5, shH = s.sheetHIn ?? 11;
-    cols = s.cellWIn ? Math.max(1, Math.floor((shW - 0.5) / (s.cellWIn + (s.gutterIn ?? 0)))) : (s.cols ?? 2);
-    rows = s.cellHIn ? Math.max(1, Math.floor((shH - 0.5) / (s.cellHIn + (s.gutterYIn ?? s.gutterIn ?? 0)))) : (s.rows ?? 2);
-    cols = Math.min(cols, 8); rows = Math.min(rows, 10);
-    const m = W * 0.06, g = 3;
-    const cw = (W - 2 * m - g * (cols - 1)) / cols, ch = (H - 2 * m - g * (rows - 1)) / rows;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push({ x: m + c * (cw + g), y: m + r * (ch + g), w: cw, h: ch });
+    const sx = W / shW, sy = H / shH;               // px per inch
+    const gutIn = s.gutterIn ?? 0.125, marginIn = s.marginIn ?? 0.25;
+    let pieceWIn: number, pieceHIn: number;
+    if (s.cellWIn && s.cellHIn) {
+      // Known product size: derive the up-count from how many actually fit on
+      // the sheet (cols/rows in settings may just be defaults, so ignore them).
+      pieceWIn = s.cellWIn; pieceHIn = s.cellHIn;
+      cols = Math.max(1, Math.floor((shW - 2 * marginIn + gutIn) / (pieceWIn + gutIn)));
+      rows = Math.max(1, Math.floor((shH - 2 * marginIn + gutIn) / (pieceHIn + gutIn)));
+    } else {
+      // Only a cols×rows count is given: the piece fills the available cell.
+      cols = s.cols ?? 2; rows = s.rows ?? 2;
+      pieceWIn = (shW - 2 * marginIn - gutIn * (cols - 1)) / cols;
+      pieceHIn = (shH - 2 * marginIn - gutIn * (rows - 1)) / rows;
+    }
+    cols = Math.max(1, Math.min(cols, 12)); rows = Math.max(1, Math.min(rows, 16));
+    const pw = pieceWIn * sx, ph = pieceHIn * sy, gx = gutIn * sx, gy = gutIn * sy;
+    const gridW = cols * pw + (cols - 1) * gx, gridH = rows * ph + (rows - 1) * gy;
+    const ox = (W - gridW) / 2, oy = (H - gridH) / 2;   // centre the imposition on the sheet
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
+      cells.push({ x: ox + c * (pw + gx), y: oy + r * (ph + gy), w: pw, h: ph });
   }
   return { cells, cols, rows, duplex, s };
 }
