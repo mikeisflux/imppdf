@@ -15,7 +15,7 @@ import {
   BatchModal, QualityMenu, loadDefaultJob, EMPTY_JOB, useCountdown, Modal,
   type AppSettings, type JobInfo, type PreviewQuality, type BatchFile,
 } from './modals';
-import { PreflightInspector, runPreflightChecks, VdpWizard, AskAIPanel, type PfReport } from './inspector-wizards';
+import { PreflightInspector, runPreflightChecks, VdpWizard, type PfReport } from './inspector-wizards';
 import { EditPdfModal } from './edit-pdf';
 import { TemplateLibrary } from './template-library';
 import './press.css';
@@ -68,7 +68,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   const [drag, setDrag] = useState(false);
   const [currentSheet, setCurrentSheet] = useState(1);
   const [modal, setModal] = useState<null | 'settings' | 'jobinfo' | 'pagemanager' | 'batch' | 'templates' | 'vdp' | 'editpdf' | 'loadworkflow'>(null);
-  const [menu, setMenu] = useState<null | 'quality' | 'file' | 'load' | 'askai'>(null);
+  const [menu, setMenu] = useState<null | 'quality' | 'file' | 'load'>(null);
   const [adding, setAdding] = useState(false);
   // Tool-picker view state (lives in the toolbar's Choose Operation segment)
   const [toolView, setToolView] = useState<'grid' | 'list'>('grid');
@@ -424,12 +424,6 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
           <button className="pe-tb-chip pe-tb-chip-btn" disabled={!file || !steps.length} onClick={() => setModal('batch')}>
             <Ic name="batch" size={15} /> Batch {!usage?.isPro && <span className="pe-crown"><Ic name="crown" size={13} /></span>}
           </button>
-          <div style={{ position: 'relative' }}>
-            <button className="pe-tb-chip pe-tb-chip-btn" title="Ask AI — describe the job, get a workflow" onClick={() => setMenu(menu === 'askai' ? null : 'askai')}>
-              <Ic name="sparkle" size={15} /> Ask AI
-            </button>
-            {menu === 'askai' && <AskAIPanel onApply={(next) => setSteps(next)} onClose={() => setMenu(null)} />}
-          </div>
           <button className="pe-btn pe-btn-print" disabled={!file} onClick={doPrint}><Ic name="print" size={16} /> Print</button>
           <button className="pe-btn pe-btn-dl" disabled={!file || rendering} onClick={doDownload}>
             <Ic name="download" size={16} /> {rendering ? '…' : 'Download'}

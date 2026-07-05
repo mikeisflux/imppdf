@@ -1,14 +1,10 @@
 'use client';
-// Preflight Inspector (docked panel), the Variable Data wizard, and the local
-// Ask AI assistant. All run entirely in the browser.
+// Preflight Inspector (docked panel) and the Variable Data wizard.
+// All run entirely in the browser.
 import React, { useMemo, useState } from 'react';
 import { imposeDataMerge } from '@/lib/imposition-toolkit/impose';
-import { RECIPES } from '@/lib/imposition-toolkit/catalog';
-import { Ic, PAPERS } from './panels';
+import { Ic } from './panels';
 import { Modal } from './modals';
-import { recipeToSteps, recipeSupported } from './catalog-bridge';
-import { makeStep, type WorkflowStep } from './steps';
-import { findOp } from './operations';
 
 // ── Preflight checks ─────────────────────────────────────────────────────────
 
@@ -311,96 +307,3 @@ export function VdpWizard({ onClose, onDone }: { onClose: () => void; onDone: (p
   );
 }
 
-// ── Ask AI (local heuristic assistant) ───────────────────────────────────────
-
-const PAPER_WORDS: Record<string, [number, number]> = {
-  a3: PAPERS.A3!, a4: PAPERS.A4!, a5: PAPERS.A5!, sra3: PAPERS.SRA3!,
-  letter: PAPERS.Letter!, legal: PAPERS.Legal!, tabloid: PAPERS.Tabloid!,
-};
-
-export function suggestFromPrompt(q: string): { steps: WorkflowStep[]; why: string } | null {
-  const t = q.toLowerCase();
-  // 1. Best-matching production recipe.
-  let best: { score: number; steps: WorkflowStep[]; why: string } | null = null;
-  for (const r of RECIPES) {
-    if (!recipeSupported(r)) continue;
-    let score = 0;
-    for (const tag of r.tags) if (t.includes(tag.replace(/-/g, ' ')) || t.includes(tag)) score += 2;
-    for (const w of r.name.toLowerCase().split(/[^a-z0-9]+/)) if (w.length > 3 && t.includes(w)) score += 1;
-    if (score > (best?.score ?? 2)) best = { score, steps: recipeToSteps(r), why: `Matched the “${r.name}” production recipe: ${r.desc}` };
-  }
-  // 2. Otherwise compose from keywords.
-  if (!best) {
-    const steps: WorkflowStep[] = [];
-    const add = (s: WorkflowStep) => { s.collapsed = true; steps.push(s); };
-    if (/booklet|saddle|magazine|zine|comic|manga|catalog|book/.test(t)) add(makeStep(/zine/.test(t) ? 'zine' : 'booklet'));
-    else if (/card|label|sticker|repeat/.test(t)) add(makeStep('cards'));
-    else if (/gang|nest|mixed/.test(t)) add(makeStep('gangsheet'));
-    else if (/grid|n.?up|\d+.?up/.test(t)) add(makeStep('grid'));
-    if (/bleed/.test(t)) steps.unshift(makeStep('bleed'));
-    if (/color bar|colour bar|control strip/.test(t)) add(makeStep('colorbar'));
-    if (/cutter|kiss.?cut|die.?cut|regis/.test(t)) add(makeStep(/regis/.test(t) && !/cutter/.test(t) ? 'regmarks' : 'cuttermarks'));
-    if (/watermark|proof|draft/.test(t)) add(makeStep('watermark'));
-    if (/page number|folio|bates/.test(t)) add(makeStep('pagenumbers'));
-    if (/fold mark/.test(t)) add(makeStep('foldmarks'));
-    if (!steps.length) return null;
-    best = { score: 1, steps, why: 'Built a chain from the operations mentioned in your request.' };
-  }
-  // Explicitly requested finishing steps always make the chain, even when a
-  // recipe matched without them.
-  const ensure = (cond: boolean, type: Parameters<typeof makeStep>[0]) => {
-    if (cond && !best!.steps.some((st) => st.type === type)) { const st = makeStep(type); st.collapsed = true; best!.steps.push(st); }
-  };
-  ensure(/color bar|colour bar|control strip/.test(t), 'colorbar');
-  ensure(/cutter/.test(t), 'cuttermarks');
-  ensure(/watermark|proof stamp/.test(t), 'watermark');
-  ensure(/page number|folio|bates/.test(t), 'pagenumbers');
-  // Apply paper size + RTL hints to the first imposition step.
-  const impose = best.steps.find((s) => ['booklet', 'zine', 'grid', 'cards', 'cutstack', 'gangsheet'].includes(s.type));
-  if (impose) {
-    for (const [w, dims] of Object.entries(PAPER_WORDS)) {
-      if (t.includes(w)) { impose.s.sheetWIn = Math.max(...dims); impose.s.sheetHIn = Math.min(...dims); break; }
-    }
-    if (/manga|rtl|right.to.left|hebrew|arabic/.test(t)) impose.s.rtl = true;
-    const sig = t.match(/(\d+)\s*(?:sheet)?\s*signature/);
-    if (sig) impose.s.signatureSheets = +sig[1]!;
-  }
-  if (best.steps.length) best.steps[0]!.collapsed = false;
-  return { steps: best.steps, why: best.why };
-}
-
-export function AskAIPanel({ onApply, onClose }: { onApply: (steps: WorkflowStep[]) => void; onClose: () => void }) {
-  const [q, setQ] = useState('');
-  const [result, setResult] = useState<{ steps: WorkflowStep[]; why: string } | null | 'none'>(null);
-  return (
-    <div className="pe-menu" style={{ width: 380 }}>
-      <div className="pe-menu-label">ASK AI — WORKFLOW ASSISTANT</div>
-      <div style={{ padding: '4px 10px 10px' }}>
-        <textarea className="pe-input" rows={3} placeholder={'e.g. "32-page A5 saddle-stitch magazine on SRA3 with a color bar and cutter marks"'}
-          value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="pe-row" style={{ marginTop: 8, marginBottom: 0 }}>
-          <button className="pe-btn pe-btn-dl" style={{ padding: '7px 13px' }} disabled={!q.trim()}
-            onClick={() => setResult(suggestFromPrompt(q) ?? 'none')}>Suggest workflow</button>
-          <span style={{ flex: 1 }} />
-          <button className="pe-iconbtn" onClick={onClose}><Ic name="close" size={15} /></button>
-        </div>
-        {result === 'none' && <div className="pe-note" style={{ marginTop: 10 }}>Couldn&apos;t map that to any tools — try naming an output (booklet, cards, gang sheet…).</div>}
-        {result && result !== 'none' && (
-          <div style={{ marginTop: 10 }}>
-            <div className="pe-label-sm" style={{ lineHeight: 1.5 }}>{result.why}</div>
-            <div className="pe-cat-chain" style={{ margin: '8px 0 10px' }}>
-              {result.steps.map((st, i) => (
-                <React.Fragment key={st.id}>
-                  {i > 0 && <span className="pe-cat-arrow">→</span>}
-                  <span className="pe-cat-step"><Ic name={findOp(st.type)!.icon} size={12} /> {findOp(st.type)!.label}</span>
-                </React.Fragment>
-              ))}
-            </div>
-            <button className="pe-btn pe-btn-dl" style={{ padding: '7px 13px' }} onClick={() => { onApply(result.steps); onClose(); }}>Apply to workflow</button>
-          </div>
-        )}
-        <div className="pe-menu-foot" style={{ marginTop: 10 }}>Runs entirely on your device — a heuristic assistant, no data leaves the browser.</div>
-      </div>
-    </div>
-  );
-}

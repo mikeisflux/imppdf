@@ -371,7 +371,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       case 'laymarks': b = await addLayMarks(b, { markType: s.markType, edges: s.edges, gripperEdge: s.gripperEdge, sideGuideSide: s.sideGuideSide, pages: s.pages }); break;
       case 'watermark': b = await addTextWatermark(b, { text: s.text, opacity: s.opacity, angleDeg: s.angleDeg, fontSizePt: s.fontSizePt }); break;
       case 'pagenumbers': b = await addPageNumbers(b, { position: s.position, startAt: s.startAt, prefix: s.prefix, suffix: s.suffix, fontSizePt: s.fontSizePt, marginPt: s.marginPt }); break;
-      case 'split': case 'preflight': case 'layers': case 'datamerge': break;
+      case 'split': case 'preflight': case 'datamerge': break;
     }
   }
   return b;

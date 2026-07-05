@@ -106,8 +106,8 @@ export function Hero() {
 
         <Link href="/app" className="hero-ai" aria-label="Open the imposition app">
           <span className="hero-ai-orb" />
-          <span className="hero-ai-label">Ask AI to</span>
-          <span className="hero-ai-input">build a custom imposition</span>
+          <span className="hero-ai-label">Open editor</span>
+          <span className="hero-ai-input">Build a custom imposition</span>
           <span className="hero-ai-send"><IconArrow width={16} height={16} /></span>
         </Link>
       </div>
