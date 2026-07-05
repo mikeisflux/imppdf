@@ -24,6 +24,17 @@ export function paperName(wIn: number, hIn: number): string {
   return 'Custom';
 }
 
+// User-defined paper presets (persisted). Keyed by display name → [w, h] inches.
+const PAPER_PRESETS_KEY = 'pp_paper_presets';
+function loadPaperPresets(): Record<string, [number, number]> {
+  try { return JSON.parse(localStorage.getItem(PAPER_PRESETS_KEY) || '{}'); } catch { return {}; }
+}
+function savePaperPreset(name: string, wh: [number, number]) {
+  const all = loadPaperPresets(); all[name] = wh;
+  try { localStorage.setItem(PAPER_PRESETS_KEY, JSON.stringify(all)); } catch { /* storage full */ }
+}
+const closeIn = (a: number, b: number) => Math.abs(a - b) < 0.05;
+
 // ── Atoms ────────────────────────────────────────────────────────────────────
 export function Ic({ name, size = 20 }: { name: IconName; size?: number }) {
   const C = Icons[name] as (p: Record<string, unknown>) => React.ReactElement;
@@ -115,19 +126,33 @@ function PagesInput({ value, onChange }: { value: string; onChange: (v: string) 
 function PaperSize({ s, up, unit, onUnit }: PanelProps) {
   const wIn = s.sheetWIn as number, hIn = s.sheetHIn as number;
   const [lock, setLock] = useState(false);
-  const name = paperName(wIn, hIn);
+  const [presets, setPresets] = useState<Record<string, [number, number]>>({});
+  useEffect(() => { setPresets(loadPaperPresets()); }, []);
   const land = wIn > hIn;
+  const allPapers = { ...PAPERS, ...presets };
+  const name = (() => {
+    for (const [k, [w, h]] of Object.entries(allPapers)) {
+      if ((closeIn(w, wIn) && closeIn(h, hIn)) || (closeIn(h, wIn) && closeIn(w, hIn))) return k.replace('_', ' ');
+    }
+    return 'Custom';
+  })();
   return (
     <Section label="// PAPER SIZE" help="Output sheet dimensions — the physical paper going through your press.">
       <div className="pe-row">
         <select className="pe-select" value={name} onChange={(e) => {
-          const p = PAPERS[e.target.value.replace(' ', '_')];
-          if (p) up(land ? { sheetWIn: Math.max(...p), sheetHIn: Math.min(...p) } : { sheetWIn: Math.min(...p), sheetHIn: Math.max(...p) });
+          const entry = Object.entries(allPapers).find(([k]) => k.replace('_', ' ') === e.target.value);
+          if (entry) { const p = entry[1]; up(land ? { sheetWIn: Math.max(...p), sheetHIn: Math.min(...p) } : { sheetWIn: Math.min(...p), sheetHIn: Math.max(...p) }); }
         }}>
-          {Object.keys(PAPERS).map((k) => <option key={k}>{k.replace('_', ' ')}</option>)}
+          {Object.keys(allPapers).map((k) => <option key={k}>{k.replace('_', ' ')}</option>)}
           <option>Custom</option>
         </select>
-        <button className="pe-preset-add" title="Save preset"><Ic name="addstep" size={16} /></button>
+        <button className="pe-preset-add" title="Save current size as a preset" onClick={() => {
+          const nm = window.prompt('Preset name', `${fmtIn(wIn, unit)}×${fmtIn(hIn, unit)} ${unit}`);
+          const clean = nm?.trim();
+          if (!clean) return;
+          savePaperPreset(clean, [wIn, hIn]);
+          setPresets(loadPaperPresets());
+        }}><Ic name="addstep" size={16} /></button>
       </div>
       <div className="pe-row"><span className="pe-label" style={{ width: 52 }}>Width</span><NumIn valueIn={wIn} unit={unit} onIn={(v) => up(lock ? { sheetWIn: v, sheetHIn: v * (hIn / wIn) } : { sheetWIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
       <div className="pe-row"><span className="pe-label" style={{ width: 52 }}>Height</span><NumIn valueIn={hIn} unit={unit} onIn={(v) => up(lock ? { sheetHIn: v, sheetWIn: v * (wIn / hIn) } : { sheetHIn: v })} /><button className="pe-lock" onClick={() => setLock((l) => !l)} title="Lock aspect ratio">{lock ? '🔒' : '🔓'}</button></div>
