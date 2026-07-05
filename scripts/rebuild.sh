@@ -1,26 +1,37 @@
 #!/usr/bin/env bash
 #
 # One-shot rebuild + run. Pulls the latest code, installs deps only when they
-# changed, builds, frees the port, and starts the server.
+# changed, builds, then brings the app up. In production the app runs under the
+# systemd service '$SERVICE' (default: impositionpdf) — if that service exists,
+# this restarts it so systemd relaunches with the fresh build. Otherwise it
+# frees the port and runs 'next start' directly (dev boxes).
 #
 # Usage:
-#   ./scripts/rebuild.sh              # pull current branch, build, start on :3000 (foreground)
-#   PORT=3001 ./scripts/rebuild.sh    # start on a different port
+#   ./scripts/rebuild.sh              # pull, build, restart the systemd service (or start on :3000)
+#   PORT=3001 ./scripts/rebuild.sh    # manual-start mode: use a different port
+#   SERVICE=myapp ./scripts/rebuild.sh# restart a differently-named systemd service
+#   ./scripts/rebuild.sh --no-service # ignore systemd; free the port and run 'next start' here
 #   ./scripts/rebuild.sh --no-pull    # skip git pull (build whatever is checked out)
-#   ./scripts/rebuild.sh --bg         # start detached, logging to .rebuild.log
-#   ./scripts/rebuild.sh --build-only # pull + install + build, don't start the server
+#   ./scripts/rebuild.sh --bg         # manual-start mode: start detached, logging to .rebuild.log
+#   ./scripts/rebuild.sh --build-only # pull + install + build, don't start anything
 #
 set -euo pipefail
 
 PORT="${PORT:-3000}"
+# Name of the systemd service that runs the app in production. When present,
+# the script restarts THIS instead of launching its own server (override with
+# SERVICE=… , or force a manual start with --no-service).
+SERVICE="${SERVICE:-impositionpdf}"
 PULL=1
 BG=0
 START=1
+NO_SERVICE=0
 for a in "$@"; do
   case "$a" in
     --no-pull)    PULL=0 ;;
     --bg)         BG=1 ;;
     --build-only) START=0 ;;
+    --no-service) NO_SERVICE=1 ;;
     -h|--help)    grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $a (try --help)" >&2; exit 2 ;;
   esac
@@ -61,7 +72,25 @@ if [ "$START" -eq 0 ]; then
   exit 0
 fi
 
-# Free the port so 'next start' can bind (kills a stale server holding it).
+# In production the app runs under systemd. If that service exists, restart IT
+# so systemd relaunches with the fresh build — never launch a second server,
+# which would just lose the race for the port. (--no-service forces manual.)
+if [ "$NO_SERVICE" -eq 0 ] && command -v systemctl >/dev/null 2>&1 && systemctl cat "$SERVICE" >/dev/null 2>&1; then
+  SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+  say "Restarting systemd service '$SERVICE'…"
+  $SUDO systemctl restart "$SERVICE"
+  sleep 1
+  if systemctl is-active --quiet "$SERVICE"; then
+    say "'$SERVICE' is live on http://localhost:${PORT}/app   (logs: journalctl -u $SERVICE -f)"
+  else
+    echo "  '$SERVICE' did not come up — check: journalctl -u $SERVICE -n 50" >&2
+    exit 1
+  fi
+  exit 0
+fi
+
+# No service manager: free the port so 'next start' can bind (kills a stale
+# server holding it), then start directly.
 say "Freeing port $PORT…"
 if command -v fuser >/dev/null 2>&1; then
   fuser -k "${PORT}/tcp" 2>/dev/null || true
