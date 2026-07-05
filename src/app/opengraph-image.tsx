@@ -1,7 +1,9 @@
 import { ImageResponse } from 'next/og';
 import { siteName } from '@/lib/config';
 
-export const runtime = 'edge';
+// Default (Node) runtime so this image is statically generated at build time,
+// matching the per-tool OG images. Declaring `runtime = 'edge'` here disabled
+// static generation for this route (Next warns about exactly that).
 export const alt = `${siteName} — free online PDF imposition & prepress software`;
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
