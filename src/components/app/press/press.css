@@ -330,21 +330,64 @@
 /* ── Workflow step cards ─────────────────────────────────────────────────── */
 .pe-stepcard {
   border: 1px solid var(--pe-border); border-radius: 14px;
-  padding: 12px; margin-bottom: 2px; background: var(--pe-panel);
+  padding: 12px; margin-bottom: 2px; background: var(--pe-panel); overflow: hidden;
 }
-.pe-stephead { display: flex; align-items: center; gap: 7px; }
+/* Title bar: a distinct header strip breaking out to the card edges, with the
+   tool icon + name on the left and reset / help / back on the right. */
+.pe-stephead {
+  display: flex; align-items: center; gap: 8px;
+  margin: -12px -12px 0; padding: 10px 12px;
+  background: var(--pe-fill);
+  border-bottom: 1px solid var(--pe-border);
+}
+.pe-stephead-ic { color: var(--pe-violet); display: inline-flex; }
 .pe-stepno {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
   color: var(--pe-violet); background: var(--pe-violet-soft);
   border: 1px solid var(--pe-violet); border-radius: 6px; padding: 2px 6px;
 }
-.pe-steptitle { font-size: 14px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pe-stephead-actions { display: flex; gap: 1px; }
+.pe-steptitle { font-size: 15px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-stephead-actions { display: flex; align-items: center; gap: 1px; }
 .pe-stephead-actions .pe-iconbtn { width: 26px; height: 26px; }
 .pe-stephead-actions .pe-iconbtn:disabled { opacity: 0.3; cursor: default; }
-.pe-stepcard .pe-tip { margin: 10px 2px 12px; }
+.pe-stephead-back { margin-left: 3px; }
+.pe-stepcard .pe-tip { margin: 12px 2px 12px; }
 .pe-stepcard .pe-section:last-child { margin-bottom: 2px; }
+/* decorative field icons */
+.pe-check-ic { display: inline-flex; color: var(--pe-muted); margin-right: 1px; }
+.pe-check input:checked ~ .pe-check-ic { color: var(--pe-violet); }
+.pe-row-ic { display: inline-flex; color: var(--pe-muted); flex: 0 0 auto; }
+.pe-radio-thumb { display: inline-flex; align-items: center; color: var(--pe-muted); flex: 0 0 auto; }
+.pe-radio.pe-on .pe-radio-thumb { color: var(--pe-violet); }
+.pe-bleedthumb { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 6px; border: 1px solid var(--pe-border-strong); background: var(--pe-bg); display: grid; place-items: center; }
+.pe-bleedthumb i { width: 14px; height: 14px; display: block; }
+.pe-bt-solid { background: var(--pe-faint); border-radius: 2px; }
+.pe-bt-dashed { border: 1.5px dashed var(--pe-violet); border-radius: 2px; }
+.pe-bt-marks {
+  border: 1px solid var(--pe-faint); border-radius: 1px;
+  background:
+    linear-gradient(var(--pe-muted),var(--pe-muted)) 0 -3px/1px 3px no-repeat,
+    linear-gradient(var(--pe-muted),var(--pe-muted)) 100% -3px/1px 3px no-repeat,
+    linear-gradient(var(--pe-muted),var(--pe-muted)) 0 100%/1px 3px no-repeat;
+}
+/* decorative field icons */
+.pe-check-ic { display: inline-flex; color: var(--pe-muted); margin-right: 1px; }
+.pe-check input:checked ~ .pe-check-ic { color: var(--pe-violet); }
+.pe-row-ic { display: inline-flex; color: var(--pe-muted); flex: 0 0 auto; }
+.pe-radio-thumb { display: inline-flex; align-items: center; color: var(--pe-muted); flex: 0 0 auto; }
+.pe-radio.pe-on .pe-radio-thumb { color: var(--pe-violet); }
+.pe-bleedthumb { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 6px; border: 1px solid var(--pe-border-strong); background: var(--pe-bg); display: grid; place-items: center; }
+.pe-bleedthumb i { width: 14px; height: 14px; display: block; }
+.pe-bt-solid { background: var(--pe-faint); border-radius: 2px; }
+.pe-bt-dashed { border: 1.5px dashed var(--pe-violet); border-radius: 2px; }
+.pe-bt-marks {
+  border: 1px solid var(--pe-faint); border-radius: 1px; position: relative;
+  background:
+    linear-gradient(var(--pe-muted),var(--pe-muted)) 0 -3px/1px 3px no-repeat,
+    linear-gradient(var(--pe-muted),var(--pe-muted)) 100% -3px/1px 3px no-repeat,
+    linear-gradient(var(--pe-muted),var(--pe-muted)) 0 100%/1px 3px no-repeat;
+}
 .pe-step-connector { display: flex; justify-content: center; padding: 7px 0; }
 .pe-step-connector i {
   width: 4px; height: 4px; border-radius: 999px; background: var(--pe-violet);

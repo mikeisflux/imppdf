@@ -41,27 +41,31 @@ export function Section({ label, help, children }: { label: string; help?: strin
   );
 }
 const Tick = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L19 6" /></svg>;
-export function Check({ label, sub, checked, onChange }: { label: React.ReactNode; sub?: string; checked: boolean; onChange: (v: boolean) => void }) {
+export function Check({ label, sub, checked, onChange, icon }: { label: React.ReactNode; sub?: string; checked: boolean; onChange: (v: boolean) => void; icon?: IconName }) {
   return (
     <>
       <label className="pe-check">
         <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
         <span className="pe-box">{checked && <Tick />}</span>
+        {icon && <span className="pe-check-ic"><Ic name={icon} size={16} /></span>}
         {label}
       </label>
       {sub && <div className="pe-check-sub">{sub}</div>}
     </>
   );
 }
-export function Radio({ label, sub, on, onSelect }: { label: React.ReactNode; sub?: string; on: boolean; onSelect: () => void }) {
+export function Radio({ label, sub, on, onSelect, thumb }: { label: React.ReactNode; sub?: string; on: boolean; onSelect: () => void; thumb?: React.ReactNode }) {
   return (
     <label className={`pe-radio ${on ? 'pe-on' : ''}`} onClick={onSelect}>
       <input type="radio" checked={on} readOnly />
       <span className="pe-dot"><i /></span>
+      {thumb && <span className="pe-radio-thumb">{thumb}</span>}
       <span><div className="pe-radio-main">{label}</div>{sub && <div className="pe-radio-sub">{sub}</div>}</span>
     </label>
   );
 }
+// A small monochrome label icon that sits before a field-group heading (Margins, Gutters…).
+export function RowIcon({ name }: { name: IconName }) { return <span className="pe-row-ic"><Ic name={name} size={15} /></span>; }
 export function UnitSel({ unit, onChange }: { unit: Unit; onChange: (u: Unit) => void }) {
   return (
     <select className="pe-select pe-unit" value={unit} onChange={(e) => onChange(e.target.value as Unit)}>
@@ -127,7 +131,7 @@ function PaperSize({ s, up, unit, onUnit }: PanelProps) {
       </div>
       <div className="pe-row"><span className="pe-label" style={{ width: 52 }}>Width</span><NumIn valueIn={wIn} unit={unit} onIn={(v) => up(lock ? { sheetWIn: v, sheetHIn: v * (hIn / wIn) } : { sheetWIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
       <div className="pe-row"><span className="pe-label" style={{ width: 52 }}>Height</span><NumIn valueIn={hIn} unit={unit} onIn={(v) => up(lock ? { sheetHIn: v, sheetWIn: v * (wIn / hIn) } : { sheetHIn: v })} /><button className="pe-lock" onClick={() => setLock((l) => !l)} title="Lock aspect ratio">{lock ? '🔒' : '🔓'}</button></div>
-      <Check label="Landscape" checked={land} onChange={(v) => { const lo = Math.min(wIn, hIn), hi = Math.max(wIn, hIn); up(v ? { sheetWIn: hi, sheetHIn: lo } : { sheetWIn: lo, sheetHIn: hi }); }} />
+      <Check icon="columns" label="Landscape" checked={land} onChange={(v) => { const lo = Math.min(wIn, hIn), hi = Math.max(wIn, hIn); up(v ? { sheetWIn: hi, sheetHIn: lo } : { sheetWIn: lo, sheetHIn: hi }); }} />
     </Section>
   );
 }
@@ -135,8 +139,8 @@ function PaperSize({ s, up, unit, onUnit }: PanelProps) {
 function MarksSection({ s, up, unit, onUnit }: PanelProps) {
   return (
     <Section label="// PRINTER'S MARKS" help="Trim guides and alignment marks outside the live area.">
-      <Check label="Draw crop marks" checked={!!s.addMarks} onChange={(v) => up({ addMarks: v })} />
-      <Check label="Draw center marks" checked={!!s.centerMarks} onChange={(v) => up({ centerMarks: v })} />
+      <Check icon="crop" label="Draw crop marks" checked={!!s.addMarks} onChange={(v) => up({ addMarks: v })} />
+      <Check icon="registration" label="Draw center marks" checked={!!s.centerMarks} onChange={(v) => up({ centerMarks: v })} />
       <div className="pe-row"><span className="pe-label pe-w96">Line length</span><NumIn valueIn={s.markLenIn} unit={unit} onIn={(v) => up({ markLenIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
       <div className="pe-row"><span className="pe-label pe-w96">Line thickness</span><NumIn valueIn={(s.markWeightPt ?? 0.25) / 72} unit={unit} onIn={(v) => up({ markWeightPt: v * 72 })} /><UnitSel unit={unit} onChange={onUnit} /></div>
       <div className="pe-row"><span className="pe-label pe-w96">Line distance</span><NumIn valueIn={s.markOffIn} unit={unit} onIn={(v) => up({ markOffIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
@@ -146,12 +150,17 @@ function MarksSection({ s, up, unit, onUnit }: PanelProps) {
   );
 }
 
+// Small glyphs shown beside each Bleeds option (match the reference thumbnails).
+const BleedThumbNone = () => <span className="pe-bleedthumb"><i className="pe-bt-solid" /></span>;
+const BleedThumbDoc = () => <span className="pe-bleedthumb"><i className="pe-bt-dashed" /></span>;
+const BleedThumbFixed = () => <span className="pe-bleedthumb"><i className="pe-bt-marks" /></span>;
+
 function BleedsSection({ s, up, unit, onUnit }: PanelProps) {
   return (
     <Section label="// BLEEDS" help="Where the artwork bleed comes from when placing pages.">
-      <Radio label="No bleeds" sub="Cards placed with no bleed extension" on={s.bleedMode === 'none'} onSelect={() => up({ bleedMode: 'none' })} />
-      <Radio label="From document" sub="Use bleed info from source PDF" on={s.bleedMode === 'doc'} onSelect={() => up({ bleedMode: 'doc' })} />
-      <Radio label="Fixed bleeds" sub="Specify custom bleed amounts" on={s.bleedMode === 'fixed'} onSelect={() => up({ bleedMode: 'fixed' })} />
+      <Radio thumb={<BleedThumbNone />} label="No bleeds" sub="Cards placed with no bleed extension" on={s.bleedMode === 'none'} onSelect={() => up({ bleedMode: 'none' })} />
+      <Radio thumb={<BleedThumbDoc />} label="From document" sub="Use bleed info from source PDF" on={s.bleedMode === 'doc'} onSelect={() => up({ bleedMode: 'doc' })} />
+      <Radio thumb={<BleedThumbFixed />} label="Fixed bleeds" sub="Specify custom bleed amounts" on={s.bleedMode === 'fixed'} onSelect={() => up({ bleedMode: 'fixed' })} />
       {s.bleedMode === 'fixed' && (
         <div className="pe-row" style={{ marginTop: 8 }}><span className="pe-label pe-w96">Bleed</span><NumIn valueIn={s.bleedIn ?? 0.125} unit={unit} onIn={(v) => up({ bleedIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
       )}
@@ -185,36 +194,36 @@ function BookletPanel(p: PanelProps) {
         <div className="pe-label-sm" style={{ marginBottom: 10, lineHeight: 1.5 }}>
           This is your signature size — sheets per signature. Set 4 for 16-page signatures (each sheet = 4 pages, folded in half). Leave blank for one saddle-stitched booklet.
         </div>
-        <Check label="Fill last saddle" checked={s.fillLastSaddle !== false} onChange={(v) => up({ fillLastSaddle: v })} />
+        <Check icon="booklet" label="Fill last saddle" checked={s.fillLastSaddle !== false} onChange={(v) => up({ fillLastSaddle: v })} />
         <div className="pe-cards2" style={{ marginTop: 8 }}>
           <SelCard on={!s.rtl} cap="LEFT TO RIGHT" onClick={() => up({ rtl: false })}><Flow arrows="ltr" /></SelCard>
           <SelCard on={!!s.rtl} off={!s.rtl} cap="RIGHT TO LEFT" onClick={() => up({ rtl: true })}><Flow arrows="rtl" /></SelCard>
         </div>
       </Section>
       <Section label="// SCALE" help="How source pages fill each half of the spread.">
-        <Check label="Autoscale" checked={s.autoscale !== false} onChange={(v) => up({ autoscale: v })} />
-        <Check label="Preserve aspect ratio" checked={s.preserveAspect !== false} onChange={(v) => up({ preserveAspect: v })} />
+        <Check icon="fit" label="Autoscale" checked={s.autoscale !== false} onChange={(v) => up({ autoscale: v })} />
+        <Check icon="resize" label="Preserve aspect ratio" checked={s.preserveAspect !== false} onChange={(v) => up({ preserveAspect: v })} />
       </Section>
       <Section label="// WHITE SPACE" help="Margins, spine gutter and creep compensation.">
-        <div className="pe-row"><span className="pe-label">Margins:</span><span style={{ flex: 1 }} /><UnitSel unit={unit} onChange={onUnit} /></div>
+        <div className="pe-row"><RowIcon name="dimensionsIc" /><span className="pe-label">Margins:</span><span style={{ flex: 1 }} /><UnitSel unit={unit} onChange={onUnit} /></div>
         <div className="pe-grid2">
           <div className="pe-field-col"><span className="pe-label-sm">Left</span><NumIn valueIn={s.marginIn} unit={unit} onIn={(v) => up({ marginIn: v })} /></div>
           <div className="pe-field-col"><span className="pe-label-sm">Top</span><NumIn valueIn={s.marginTopIn ?? s.marginIn} unit={unit} onIn={(v) => up({ marginTopIn: v })} /></div>
         </div>
-        <div className="pe-row" style={{ marginTop: 12 }}><span className="pe-label">Center Gutter</span></div>
+        <div className="pe-row" style={{ marginTop: 12 }}><RowIcon name="columns" /><span className="pe-label">Center Gutter</span></div>
         <div className="pe-row"><NumIn valueIn={s.gutterIn} unit={unit} onIn={(v) => up({ gutterIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
-        <div className="pe-row" style={{ marginTop: 8 }}><span className="pe-label">Page Creep</span></div>
+        <div className="pe-row" style={{ marginTop: 8 }}><RowIcon name="nudge" /><span className="pe-label">Page Creep</span></div>
         <div className="pe-row"><NumIn valueIn={s.creepIn} unit={unit} onIn={(v) => up({ creepIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
-        <Radio label="Creep Outward" on={s.creepOutward !== false} onSelect={() => up({ creepOutward: true })} />
-        <Radio label="Creep Inward" on={s.creepOutward === false} onSelect={() => up({ creepOutward: false })} />
+        <Radio thumb={<Ic name="tofront" size={16} />} label="Creep Outward" on={s.creepOutward !== false} onSelect={() => up({ creepOutward: true })} />
+        <Radio thumb={<Ic name="toback" size={16} />} label="Creep Inward" on={s.creepOutward === false} onSelect={() => up({ creepOutward: false })} />
         <div style={{ marginTop: 8 }}>
-          <Check label="Center output on page" checked={!!s.centerOutput} onChange={(v) => up({ centerOutput: v })} />
+          <Check icon="fit" label="Center output on page" checked={!!s.centerOutput} onChange={(v) => up({ centerOutput: v })} />
         </div>
       </Section>
       <MarksSection {...p} />
       <BleedsSection {...p} />
       <Section label="// OUTPUT" help="Post-processing applied to the finished spreads.">
-        <Check label="Rotate pages" sub="Portrait orientation for office printers" checked={!!s.rotatePages} onChange={(v) => up({ rotatePages: v })} />
+        <Check icon="rotate" label="Rotate pages" sub="Portrait orientation for office printers" checked={!!s.rotatePages} onChange={(v) => up({ rotatePages: v })} />
       </Section>
     </>
   );
@@ -231,13 +240,13 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' }) {
             <select className="pe-select" value={s.order} onChange={(e) => up({ order: e.target.value })}>
               <option value="sequential">Sequential</option><option value="repeat">Step and Repeat</option><option value="cutstack">Cut and Stack</option>
             </select>
-            <Check label="Double Sided" checked={!!s.duplex} onChange={(v) => up({ duplex: v })} />
+            <Check icon="spreads" label="Double Sided" checked={!!s.duplex} onChange={(v) => up({ duplex: v })} />
           </div>
         </Section>
       )}
       <Section label="// LAYOUT" help="Rows, columns and scaling.">
-        <Check label="Autoscale" checked={s.autoscale !== false} onChange={(v) => up({ autoscale: v })} />
-        <Check label="Preserve aspect ratio" checked={s.preserveAspect !== false} onChange={(v) => up({ preserveAspect: v })} />
+        <Check icon="fit" label="Autoscale" checked={s.autoscale !== false} onChange={(v) => up({ autoscale: v })} />
+        <Check icon="resize" label="Preserve aspect ratio" checked={s.preserveAspect !== false} onChange={(v) => up({ preserveAspect: v })} />
         <div className="pe-grid2" style={{ marginTop: 6 }}>
           <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 56 }}>Columns</span><NumRaw value={s.cols} onValue={(v) => up({ cols: Math.max(1, Math.round(v)) })} min={1} /></div>
           <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 40 }}>Rows</span><NumRaw value={s.rows} onValue={(v) => up({ rows: Math.max(1, Math.round(v)) })} min={1} /></div>
@@ -257,9 +266,9 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' }) {
         </div>
       </Section>
       <Section label="// WHITE SPACE" help="Margins around the sheet and gutters between cells.">
-        <div className="pe-row"><span className="pe-label">Margins:</span><span style={{ flex: 1 }} /><UnitSel unit={unit} onChange={onUnit} /></div>
+        <div className="pe-row"><RowIcon name="dimensionsIc" /><span className="pe-label">Margins:</span><span style={{ flex: 1 }} /><UnitSel unit={unit} onChange={onUnit} /></div>
         <div className="pe-row"><NumIn valueIn={s.marginIn} unit={unit} onIn={(v) => up({ marginIn: v })} /></div>
-        <div className="pe-row" style={{ marginTop: 8 }}><span className="pe-label">Gutters:</span></div>
+        <div className="pe-row" style={{ marginTop: 8 }}><RowIcon name="grid" /><span className="pe-label">Gutters:</span></div>
         <div className="pe-grid2">
           <div className="pe-field-col"><span className="pe-label-sm">Horizontal</span><NumIn valueIn={s.gutterIn} unit={unit} onIn={(v) => up({ gutterIn: v })} /></div>
           <div className="pe-field-col"><span className="pe-label-sm">Vertical</span><NumIn valueIn={s.gutterYIn ?? s.gutterIn} unit={unit} onIn={(v) => up({ gutterYIn: v })} /></div>
@@ -348,7 +357,7 @@ function ColorBarPanel(p: PanelProps) {
           </label>
           <span className="pe-cmyk-strip"><i style={{ background: '#00b7d8' }} /><i style={{ background: '#e52f8c' }} /><i style={{ background: '#f5d90a' }} /><i style={{ background: '#17181d' }} /></span>
         </div>
-        <Check label="Spot colors" checked={!!s.spotColors} onChange={(v) => up({ spotColors: v })} />
+        <Check icon="colorbar" label="Spot colors" checked={!!s.spotColors} onChange={(v) => up({ spotColors: v })} />
       </Section>
       <Section label="// SHAPES" help="Which patch styles are included in the strip.">
         <div className="pe-shapes-grid">
@@ -360,7 +369,7 @@ function ColorBarPanel(p: PanelProps) {
           <ShapeCheck on={s.shapes?.target !== false} onChange={(v) => shape('target', v)}><span className="pe-shp pe-shp-target">⊕</span></ShapeCheck>
         </div>
         <div style={{ marginTop: 12 }}>
-          <Check label="Repeat" checked={!!s.repeat} onChange={(v) => up({ repeat: v })} />
+          <Check icon="duplicate" label="Repeat" checked={!!s.repeat} onChange={(v) => up({ repeat: v })} />
         </div>
         <div className="pe-row" style={{ marginTop: 6 }}><span className="pe-label">Layer</span></div>
         <input className="pe-input" placeholder="(optional)" value={s.layer ?? ''} onChange={(e) => up({ layer: e.target.value })} />
@@ -458,10 +467,10 @@ function CutterMarksPanel(p: PanelProps & { lite?: boolean }) {
       {!lite && (
         <>
           <Section label="// DIELINES" help="Draw cut/crease/perf outlines in their standard colors.">
-            <Check label="Add dielines" checked={!!s.addDielines} onChange={(v) => up({ addDielines: v })} />
+            <Check icon="cuttermarks" label="Add dielines" checked={!!s.addDielines} onChange={(v) => up({ addDielines: v })} />
           </Section>
           <Section label="// ARTWORK" help="Marks-only output for cutter-side file separation.">
-            <Check label="Remove artwork (create a cut-marks only file)" checked={!!s.removeArtwork} onChange={(v) => up({ removeArtwork: v })} />
+            <Check icon="eraser" label="Remove artwork (create a cut-marks only file)" checked={!!s.removeArtwork} onChange={(v) => up({ removeArtwork: v })} />
           </Section>
         </>
       )}
@@ -504,8 +513,8 @@ function ZinePanel(p: PanelProps) {
         <div className="pe-note">{pageCount || '—'} pages → {numSheets} sheet{numSheets === 1 ? '' : 's'} in {fmt === 'mini' ? 'Mini (1/8)' : fmt === 'quarter' ? 'Quarter (1/4)' : 'Half (1/2)'}</div>
       </Section>
       <Section label="// OPTIONS" help="Back-cover flip and signature splitting.">
-        <Check label="Flip back cover" sub="Rotates the back cover 180° so a top-folded zine reads upright." checked={!!s.flipBackCover} onChange={(v) => up({ flipBackCover: v })} />
-        <Check label="Custom signature size" sub="Split long documents into stacked signatures instead of one nested booklet."
+        <Check icon="flip" label="Flip back cover" sub="Rotates the back cover 180° so a top-folded zine reads upright." checked={!!s.flipBackCover} onChange={(v) => up({ flipBackCover: v })} />
+        <Check icon="booklet" label="Custom signature size" sub="Split long documents into stacked signatures instead of one nested booklet."
           checked={(s.signatureSheets ?? 0) > 0} onChange={(v) => up({ signatureSheets: v ? 2 : 0 })} />
         {(s.signatureSheets ?? 0) > 0 && (
           <div className="pe-row"><span className="pe-label pe-w96">Sheets / sig</span><NumRaw value={s.signatureSheets} onValue={(v) => up({ signatureSheets: Math.max(1, Math.round(v)) })} w={70} min={1} /></div>
@@ -651,7 +660,7 @@ function GangSheetPanel(p: PanelProps) {
               <NumRaw value={j.padPt} onValue={(v) => patchJob(i, { padPt: Math.max(0, v) })} />
               <span className="pe-label-sm">pt</span>
             </div>
-            <Check label="Allow rotation" checked={j.allowRotate} onChange={(v) => patchJob(i, { allowRotate: v })} />
+            <Check icon="rotate" label="Allow rotation" checked={j.allowRotate} onChange={(v) => patchJob(i, { allowRotate: v })} />
             {!jobFits(j) && <div className="pe-gang-warn">Sheet too small to fit all jobs. Increase paper size or reduce margins/gutters.</div>}
           </div>
         ))}
@@ -770,8 +779,8 @@ function PdfToolsPanel({ s, up }: PanelProps) {
       </div>
       {s.op === 'optimize' && (
         <>
-          <Check label="Generate object streams (smaller)" checked={s.useObjectStreams !== false} onChange={(v) => up({ useObjectStreams: v })} />
-          <Check label="Remove unreferenced objects" checked={s.removeUnused !== false} onChange={(v) => up({ removeUnused: v })} />
+          <Check icon="layers" label="Generate object streams (smaller)" checked={s.useObjectStreams !== false} onChange={(v) => up({ useObjectStreams: v })} />
+          <Check icon="trash" label="Remove unreferenced objects" checked={s.removeUnused !== false} onChange={(v) => up({ removeUnused: v })} />
           <div className="pe-note">Rebuilds the file with compressed object streams — often 10-40% smaller.</div>
         </>
       )}
@@ -796,10 +805,10 @@ function PdfToolsPanel({ s, up }: PanelProps) {
       )}
       {s.op === 'repair' && (
         <>
-          <Check label="Re-serialize PDF (fix xref, streams)" checked onChange={() => {}} />
-          <Check label="Strip metadata (title, author, etc.)" checked={!!s.stripMetadata} onChange={(v) => up({ stripMetadata: v })} />
-          <Check label="Remove annotations" checked={!!s.removeAnnotations} onChange={(v) => up({ removeAnnotations: v })} />
-          <Check label="Remove JavaScript / actions" checked={s.removeJavaScript !== false} onChange={(v) => up({ removeJavaScript: v })} />
+          <Check icon="settings" label="Re-serialize PDF (fix xref, streams)" checked onChange={() => {}} />
+          <Check icon="eraser" label="Strip metadata (title, author, etc.)" checked={!!s.stripMetadata} onChange={(v) => up({ stripMetadata: v })} />
+          <Check icon="trash" label="Remove annotations" checked={!!s.removeAnnotations} onChange={(v) => up({ removeAnnotations: v })} />
+          <Check icon="close" label="Remove JavaScript / actions" checked={s.removeJavaScript !== false} onChange={(v) => up({ removeJavaScript: v })} />
         </>
       )}
     </Section>
@@ -1185,10 +1194,10 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
             </div>
             <div className="pe-row" style={{ marginTop: 10 }}><span className="pe-label pe-w96">Margin</span><NumIn valueIn={s.marginIn} unit={unit} onIn={(v) => up({ marginIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
             <div className="pe-row"><span className="pe-label pe-w96">Spacing</span><NumIn valueIn={s.paddingIn} unit={unit} onIn={(v) => up({ paddingIn: v })} /></div>
-            <Check label="Allow 90° rotation" checked={!!s.allowRotate} onChange={(v) => up({ allowRotate: v })} />
-            <Check label="Roll media (variable length)" checked={!!s.roll} onChange={(v) => up({ roll: v })} />
-            <Check label="True-shape nesting" checked={!!s.trueShape} onChange={(v) => up({ trueShape: v })} />
-            <Check label="Fill sheet with copies" checked={!!s.fillSheet} onChange={(v) => up({ fillSheet: v })} />
+            <Check icon="rotate" label="Allow 90° rotation" checked={!!s.allowRotate} onChange={(v) => up({ allowRotate: v })} />
+            <Check icon="split" label="Roll media (variable length)" checked={!!s.roll} onChange={(v) => up({ roll: v })} />
+            <Check icon="gangsheet" label="True-shape nesting" checked={!!s.trueShape} onChange={(v) => up({ trueShape: v })} />
+            <Check icon="duplicate" label="Fill sheet with copies" checked={!!s.fillSheet} onChange={(v) => up({ fillSheet: v })} />
           </Section>
         </>
       );
@@ -1214,7 +1223,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
             <div className="pe-row"><span className="pe-label pe-w96">Margin</span><NumIn valueIn={s.marginTopIn} unit={unit} onIn={(v) => up({ marginTopIn: v, marginLeftIn: v, marginRightIn: v, marginBottomIn: v })} /></div>
           </Section>
           <Section label="// NESTING" help="Allow 90° rotation for tighter packing.">
-            <Check label="Allow rotations (0°, 90°)" checked={!!s.allowRotate} onChange={(v) => up({ allowRotate: v })} />
+            <Check icon="rotate" label="Allow rotations (0°, 90°)" checked={!!s.allowRotate} onChange={(v) => up({ allowRotate: v })} />
           </Section>
         </>
       );
@@ -1224,7 +1233,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
           <Section label="// PAGE LAYOUT" help="Wall calendars flip the back page so the hung spread reads upright.">
             <Radio label="Full Sheet" on={!s.halfSheet} onSelect={() => up({ halfSheet: false })} />
             <Radio label="Half Sheet" on={!!s.halfSheet} onSelect={() => up({ halfSheet: true })} />
-            <Check label="Rotate back page 180°" sub="Wall-calendar back flip" checked={!!s.rotateBack} onChange={(v) => up({ rotateBack: v })} />
+            <Check icon="rotate" label="Rotate back page 180°" sub="Wall-calendar back flip" checked={!!s.rotateBack} onChange={(v) => up({ rotateBack: v })} />
           </Section>
           <MarksSection {...{ s, up, unit, onUnit }} />
         </>
@@ -1252,7 +1261,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
               <Ic name="upload" size={14} /> {s.secondName || 'Choose PDF'}
             </button>
             <div style={{ marginTop: 10 }}>
-              <Check label="Reverse second document" sub="For scanned backs collected in reverse order" checked={!!s.reverseB} onChange={(v) => up({ reverseB: v })} />
+              <Check icon="reverse" label="Reverse second document" sub="For scanned backs collected in reverse order" checked={!!s.reverseB} onChange={(v) => up({ reverseB: v })} />
             </div>
           </Section>
           <div className="pe-note" style={{ marginBottom: 12 }}>
@@ -1296,7 +1305,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
             </button>
           </Section>
           <Section label="// SETTINGS" help="Placement of the backdrop underneath each page.">
-            <Check label="Repeat across all pages" checked={s.repeat !== false} onChange={(v) => up({ repeat: v })} />
+            <Check icon="duplicate" label="Repeat across all pages" checked={s.repeat !== false} onChange={(v) => up({ repeat: v })} />
             <div className="pe-grid2">
               <div className="pe-field-col"><span className="pe-label-sm">Offset X (pt)</span><NumRaw value={s.offsetXPt} onValue={(v) => up({ offsetXPt: v })} /></div>
               <div className="pe-field-col"><span className="pe-label-sm">Offset Y (pt)</span><NumRaw value={s.offsetYPt} onValue={(v) => up({ offsetYPt: v })} /></div>
@@ -1365,8 +1374,8 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
               <option value="relative">Relative Colorimetric</option><option value="perceptual">Perceptual</option>
               <option value="saturation">Saturation</option><option value="absolute">Absolute Colorimetric</option>
             </select>
-            <Check label="Convert colours (not just tag)" sub="Rewrite pixels toward the CMYK gamut instead of only tagging" checked={!!s.convert} onChange={(v) => up({ convert: v })} />
-            <Check label="Black-point compensation" checked={s.blackPointComp !== false} onChange={(v) => up({ blackPointComp: v })} />
+            <Check icon="colormanageIc" label="Convert colours (not just tag)" sub="Rewrite pixels toward the CMYK gamut instead of only tagging" checked={!!s.convert} onChange={(v) => up({ convert: v })} />
+            <Check icon="droplet" label="Black-point compensation" checked={s.blackPointComp !== false} onChange={(v) => up({ blackPointComp: v })} />
             <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Rasterize DPI</span>
               <select className="pe-select" style={{ width: 110, flex: '0 0 110px' }} value={s.dpi} onChange={(e) => up({ dpi: +e.target.value })}>
                 <option value={150}>150</option><option value={300}>300</option><option value={600}>600</option>
@@ -1374,7 +1383,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
             </div>
           </Section>
           <Section label="// GAMUT WARNING" help="Paints out-of-gamut pixels bright green in the output.">
-            <Check label="Show out-of-gamut colors" checked={!!s.gamutWarning} onChange={(v) => up({ gamutWarning: v })} />
+            <Check icon="eye" label="Show out-of-gamut colors" checked={!!s.gamutWarning} onChange={(v) => up({ gamutWarning: v })} />
           </Section>
           <div className="pe-note" style={{ marginBottom: 12 }}>
             ⓘ {s.icc
@@ -1415,8 +1424,8 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
             </div>
           </Section>
           <Section label="// APPEARANCE" help="Background + human-readable text.">
-            <Check label="Transparent background" checked={!!s.transparent} onChange={(v) => up({ transparent: v })} />
-            <Check label="Human-readable text under linear codes" checked={!!s.showText} onChange={(v) => up({ showText: v })} />
+            <Check icon="fillbg" label="Transparent background" checked={!!s.transparent} onChange={(v) => up({ transparent: v })} />
+            <Check icon="barcodeIc" label="Human-readable text under linear codes" checked={!!s.showText} onChange={(v) => up({ showText: v })} />
             <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Pages</span><input className="pe-input" value={s.pages} onChange={(e) => up({ pages: e.target.value })} /></div>
           </Section>
         </>
@@ -1514,31 +1523,38 @@ export function StepPanelBody(props: PanelProps & { type: StepType }) {
 }
 
 // ── Step card (collapsible, reorderable) ─────────────────────────────────────
-export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSizes, layerEntries, onToggleLayer, sourceBytes, onChange, onRemove, onMove, canUp, canDown }: {
+export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSizes, layerEntries, onToggleLayer, sourceBytes, onChange, onRemove, onMove, onBack, canUp, canDown, single }: {
   step: WorkflowStep; index: number; unit: Unit; onUnit: (u: Unit) => void; pageCount?: number;
   thumbs?: string[]; pageSizes?: { wPt: number; hPt: number }[];
   layerEntries?: LayerEntry[]; onToggleLayer?: (stepId: string) => void; sourceBytes?: Uint8Array | null;
-  onChange: (next: WorkflowStep) => void; onRemove: () => void; onMove: (dir: -1 | 1) => void;
-  canUp: boolean; canDown: boolean;
+  onChange: (next: WorkflowStep) => void; onRemove: () => void; onMove: (dir: -1 | 1) => void; onBack?: () => void;
+  canUp: boolean; canDown: boolean; single?: boolean;
 }) {
   const op = findOp(step.type);
   if (!op) return null;
   const up = (patch: StepSettings) => onChange({ ...step, s: { ...step.s, ...patch } });
   return (
     <div className={`pe-stepcard ${step.collapsed ? 'pe-collapsed' : ''}`}>
+      {/* Title bar — mirrors the reference: icon + name on the left, reset/help/back on the right */}
       <div className="pe-stephead">
-        <button className="pe-iconbtn" onClick={() => onChange({ ...step, collapsed: !step.collapsed })} title={step.collapsed ? 'Expand' : 'Collapse'}>
-          <span style={{ display: 'inline-flex', transform: step.collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }}><Ic name="chevron" size={15} /></span>
-        </button>
-        <Ic name={op.icon} size={17} />
-        <span className="pe-stepno">STEP {index + 1}</span>
+        {!single && (
+          <button className="pe-iconbtn" onClick={() => onChange({ ...step, collapsed: !step.collapsed })} title={step.collapsed ? 'Expand' : 'Collapse'}>
+            <span style={{ display: 'inline-flex', transform: step.collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }}><Ic name="chevron" size={15} /></span>
+          </button>
+        )}
+        <span className="pe-stephead-ic"><Ic name={op.icon} size={17} /></span>
+        {!single && <span className="pe-stepno">STEP {index + 1}</span>}
         <span className="pe-steptitle">{op.label}</span>
         <span className="pe-stephead-actions">
-          <button className="pe-iconbtn" disabled={!canUp} onClick={() => onMove(-1)} title="Move up"><Ic name="chevronup" size={14} /></button>
-          <button className="pe-iconbtn" disabled={!canDown} onClick={() => onMove(1)} title="Move down"><Ic name="chevron" size={14} /></button>
-          <button className="pe-iconbtn" onClick={() => onChange({ ...step, s: defaultSettings(step.type) })} title="Reset step"><Ic name="undo" size={14} /></button>
-          <button className="pe-iconbtn" title={op.tip}><Ic name="help" size={14} /></button>
-          <button className="pe-iconbtn" onClick={onRemove} title="Remove step"><Ic name="close" size={14} /></button>
+          {!single && <>
+            <button className="pe-iconbtn" disabled={!canUp} onClick={() => onMove(-1)} title="Move up"><Ic name="chevronup" size={14} /></button>
+            <button className="pe-iconbtn" disabled={!canDown} onClick={() => onMove(1)} title="Move down"><Ic name="chevron" size={14} /></button>
+          </>}
+          <button className="pe-iconbtn" onClick={() => onChange({ ...step, s: defaultSettings(step.type) })} title="Reset step"><Ic name="undo" size={15} /></button>
+          <button className="pe-iconbtn" title={op.tip}><Ic name="help" size={15} /></button>
+          {single && onBack
+            ? <button className="pe-back pe-stephead-back" onClick={onBack} title="Back to tools"><Ic name="back" size={14} /> Back</button>
+            : <button className="pe-iconbtn" onClick={onRemove} title="Remove step"><Ic name="close" size={15} /></button>}
         </span>
       </div>
       {!step.collapsed && (

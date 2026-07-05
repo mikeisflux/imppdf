@@ -452,6 +452,8 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
                     onChange={(next) => changeStep(i, next)}
                     onRemove={() => removeStep(i)}
                     onMove={(dir) => moveStep(i, dir)}
+                    onBack={() => setSteps([])}
+                    single={steps.length === 1}
                     canUp={i > 0} canDown={i < steps.length - 1}
                   />
                 </React.Fragment>
