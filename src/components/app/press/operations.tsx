@@ -214,6 +214,10 @@ export const OP_GROUPS: OpGroup[] = [
   ] },
 ];
 
+// Alphabetise the tools within each section so they're easy to scan/find. The
+// category grouping is preserved; only the order inside each group changes.
+for (const g of OP_GROUPS) g.ops.sort((a, b) => a.label.localeCompare(b.label));
+
 export function findOp(id: string | null | undefined): OpDef | undefined {
   if (!id) return undefined;
   for (const g of OP_GROUPS) { const o = g.ops.find((x) => x.id === id); if (o) return o; }
