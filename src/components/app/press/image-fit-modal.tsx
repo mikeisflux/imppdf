@@ -1,33 +1,50 @@
 'use client';
-// Crop / approve dialog. When a source image doesn't match the cell's aspect,
-// this lets the user preview the cover-crop, drag to reposition and zoom, then
-// approve — writing imageZoom / imageOffsetX / imageOffsetY back to the step so
-// the imposition engine crops exactly as previewed.
+// Crop / approve dialog. Steps through every source image so each one can be
+// framed independently: pick Cover / Contain / Stretch, zoom, and drag to
+// reposition the crop, then Next → the next image, or Approve to commit all.
+// The chosen fit / zoom / offset are written per source-page index and applied
+// by the imposition engine exactly as previewed.
 import { useEffect, useRef, useState } from 'react';
 import { useFocusTrap } from './use-focus-trap';
 
 export interface ImageFit { fit: 'cover' | 'contain' | 'stretch'; zoom: number; offsetX: number; offsetY: number; }
+export type FitMap = Record<number, ImageFit>;
 
-export function ImageFitModal({ thumb, cellWIn, cellHIn, value, onApply, onClose }: {
-  thumb: string;
+export function ImageFitModal({ thumbs, index = 0, cellWIn, cellHIn, values, fallback, onApply, onClose }: {
+  thumbs: string[];
+  index?: number;
   cellWIn: number; cellHIn: number;
-  value: ImageFit;
-  onApply: (v: ImageFit) => void;
+  values: FitMap;
+  fallback: ImageFit;
+  onApply: (values: FitMap) => void;
   onClose: () => void;
 }) {
-  const [fit, setFit] = useState<ImageFit['fit']>(value.fit || 'cover');
-  const [zoom, setZoom] = useState(value.zoom || 1);
-  const [ox, setOx] = useState(value.offsetX ?? 0.5);
-  const [oy, setOy] = useState(value.offsetY ?? 0.5);
+  const trap = useFocusTrap<HTMLDivElement>(onClose);
+  const [idx, setIdx] = useState(Math.min(index, Math.max(0, thumbs.length - 1)));
+  const [map, setMap] = useState<FitMap>(values);
   const [img, setImg] = useState<{ w: number; h: number } | null>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
-  const trap = useFocusTrap<HTMLDivElement>(onClose);
+
+  const thumb = thumbs[idx] || '';
+  const cur = map[idx] ?? fallback;
+  const { fit, zoom, offsetX: ox, offsetY: oy } = cur;
+
+  // Merge a patch into the CURRENT image's fit only.
+  const patch = (p: Partial<ImageFit>) =>
+    setMap((m) => ({ ...m, [idx]: { ...(m[idx] ?? fallback), ...p } }));
+
+  // Switching mode applies it live. Contain/Stretch reset zoom & centre so the
+  // mode visibly does its job; you can zoom again afterwards.
+  const chooseFit = (f: ImageFit['fit']) =>
+    patch(f === 'cover' ? { fit: f } : { fit: f, zoom: 1, offsetX: 0.5, offsetY: 0.5 });
 
   // Frame sized to the cell's aspect ratio.
   const FRAME_W = 320;
   const frameH = Math.max(120, Math.min(460, (FRAME_W * cellHIn) / cellWIn));
 
   useEffect(() => {
+    setImg(null);
+    if (!thumb) return;
     const im = new Image();
     im.onload = () => setImg({ w: im.naturalWidth, h: im.naturalHeight });
     im.src = thumb;
@@ -53,19 +70,23 @@ export function ImageFitModal({ thumb, cellWIn, cellHIn, value, onApply, onClose
     if (!drag.current) return;
     const dx = e.clientX - drag.current.x, dy = e.clientY - drag.current.y;
     const spanX = iw - FRAME_W, spanY = ih - frameH;
-    if (spanX > 0) setOx(Math.min(1, Math.max(0, drag.current.ox + dx / spanX)));
-    if (spanY > 0) setOy(Math.min(1, Math.max(0, drag.current.oy + dy / spanY)));
+    const nx = spanX > 0 ? Math.min(1, Math.max(0, drag.current.ox + dx / spanX)) : ox;
+    const ny = spanY > 0 ? Math.min(1, Math.max(0, drag.current.oy + dy / spanY)) : oy;
+    if (nx !== ox || ny !== oy) patch({ offsetX: nx, offsetY: ny });
   };
   const onUp = () => { drag.current = null; };
+
+  const last = idx >= thumbs.length - 1;
+  const multi = thumbs.length > 1;
 
   return (
     <div className="pe-lib-backdrop" style={{ zIndex: 200 }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={trap} className="pe-modal" role="dialog" aria-modal="true" aria-label="Adjust image fit" style={{ maxWidth: 420, padding: 20 }}>
         <div className="pe-row" style={{ marginBottom: 12 }}>
-          <b style={{ flex: 1 }}>Adjust image fit</b>
+          <b style={{ flex: 1 }}>Adjust image fit{multi ? ` · ${idx + 1} of ${thumbs.length}` : ''}</b>
           <div className="pe-segrow">
             {(['cover', 'contain', 'stretch'] as const).map((m) => (
-              <button key={m} className={fit === m ? 'pe-on' : ''} onClick={() => setFit(m)} style={{ textTransform: 'capitalize' }}>{m}</button>
+              <button key={m} className={fit === m ? 'pe-on' : ''} onClick={() => chooseFit(m)} style={{ textTransform: 'capitalize' }}>{m}</button>
             ))}
           </div>
         </div>
@@ -83,14 +104,23 @@ export function ImageFitModal({ thumb, cellWIn, cellHIn, value, onApply, onClose
         <div className="pe-row" style={{ gap: 8, marginBottom: 8 }}>
           <span className="pe-label-sm" style={{ width: 44 }}>Zoom</span>
           <input type="range" className="pe-slider" min={1} max={4} step={0.01} value={zoom} disabled={fit === 'stretch'}
-            onChange={(e) => setZoom(+e.target.value)} style={{ flex: 1 }} />
+            onChange={(e) => patch({ zoom: +e.target.value })} style={{ flex: 1 }} />
           <span className="pe-label-sm pe-mono" style={{ width: 40, textAlign: 'right' }}>{zoom.toFixed(2)}×</span>
         </div>
-        <div className="pe-note" style={{ marginBottom: 12 }}>Drag the image to reposition the crop. Cell is {cellWIn}×{cellHIn}″.</div>
-        <div className="pe-row" style={{ gap: 8, justifyContent: 'flex-end' }}>
-          <button className="pe-btn" onClick={() => { setZoom(1); setOx(0.5); setOy(0.5); setFit('cover'); }}>Reset</button>
+        <div className="pe-note" style={{ marginBottom: 12 }}>
+          {fit === 'stretch' ? 'Stretch distorts the image to fill the cell.' : 'Drag the image to reposition the crop.'} Cell is {cellWIn}×{cellHIn}″.
+        </div>
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
+          {multi && (
+            <>
+              <button className="pe-btn" disabled={idx === 0} onClick={() => setIdx((i) => Math.max(0, i - 1))} aria-label="Previous image">‹ Prev</button>
+              <button className="pe-btn" disabled={last} onClick={() => setIdx((i) => Math.min(thumbs.length - 1, i + 1))} aria-label="Next image">Next ›</button>
+            </>
+          )}
+          <span style={{ flex: 1 }} />
+          <button className="pe-btn" onClick={() => patch({ fit: 'cover', zoom: 1, offsetX: 0.5, offsetY: 0.5 })}>Reset</button>
           <button className="pe-btn" onClick={onClose}>Cancel</button>
-          <button className="pe-btn pe-btn-dl" onClick={() => onApply({ fit, zoom, offsetX: ox, offsetY: oy })}>Approve</button>
+          <button className="pe-btn pe-btn-dl" onClick={() => onApply(map)}>Approve</button>
         </div>
       </div>
     </div>

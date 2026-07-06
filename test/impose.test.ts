@@ -54,3 +54,17 @@ test('imposeNUp: cover fit does not throw and yields a valid PDF', async () => {
   const out = await imposeNUp(await pdfOf(2, 1000, 200), { ...baseNUp, cols: 2, rows: 2, cellWIn: 3.5, cellHIn: 2, fit: 'cover' });
   assert.ok((await pageCount(out)) >= 1);
 });
+
+test('imposeNUp: per-image fit overrides apply without throwing', async () => {
+  // Different fit/zoom per source page: page 0 contained, page 1 cover-zoomed,
+  // page 2 stretched; page 3 falls back to the global fit.
+  const out = await imposeNUp(await pdfOf(4, 1000, 200), {
+    ...baseNUp, cols: 2, rows: 2, cellWIn: 3.5, cellHIn: 2, fit: 'cover',
+    perImage: {
+      0: { fit: 'contain' },
+      1: { fit: 'cover', imageZoom: 1.5, imageOffsetX: 0.2, imageOffsetY: 0.8 },
+      2: { fit: 'stretch' },
+    },
+  });
+  assert.equal(await pageCount(out), 1);
+});

@@ -260,7 +260,9 @@ function BookletPanel(p: PanelProps) {
 function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfectbound' }) {
   const { s, up, unit, onUnit, kind } = p;
   const [fitOpen, setFitOpen] = useState(false);
-  const thumb = (p.thumbs ?? [])[0] || '';
+  const thumbs = p.thumbs ?? [];
+  const thumb = thumbs[0] || '';
+  const perImageCount = Object.keys(s.perImage ?? {}).length;
   const cw = s.cellWIn || (s.sheetWIn ?? 8.5) / (s.cols || 2);
   const ch = s.cellHIn || (s.sheetHIn ?? 11) / (s.rows || 2);
   // Cropping happens when the source aspect doesn't match the cell and fit=cover.
@@ -285,17 +287,21 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
             style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', width: '100%', textAlign: 'left',
               background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: 6,
               color: '#f59e0b', cursor: 'pointer', padding: '8px 10px' }}>
-            <span>⚠</span><span style={{ flex: 1 }}>Image will be cropped to fit — click to adjust the framing.</span>
+            <span>⚠</span><span style={{ flex: 1 }}>Image will be cropped to fit — click to adjust the framing{thumbs.length > 1 ? ' (per image)' : ''}.</span>
           </button>
         )}
-        {(s.imageZoom || s.imageOffsetX != null) && s.fit !== 'stretch' && (
-          <div className="pe-note" style={{ marginTop: 6 }}>Custom crop: {(s.imageZoom ?? 1).toFixed(2)}× · {(Math.round((s.imageOffsetX ?? 0.5) * 100))}%,{Math.round((s.imageOffsetY ?? 0.5) * 100)}%</div>
+        {perImageCount > 0 && (
+          <div className="pe-row" style={{ marginTop: 6, gap: 8, alignItems: 'center' }}>
+            <span className="pe-note" style={{ margin: 0, flex: 1 }}>Custom framing on {perImageCount} image{perImageCount === 1 ? '' : 's'}.</span>
+            <button className="pe-chipbtn" onClick={() => up({ perImage: undefined })}><Ic name="undo" size={12} /> Clear</button>
+          </div>
         )}
       </Section>
       {fitOpen && thumb && (
-        <ImageFitModal thumb={thumb} cellWIn={+cw.toFixed(2)} cellHIn={+ch.toFixed(2)}
-          value={{ fit: s.fit ?? 'cover', zoom: s.imageZoom ?? 1, offsetX: s.imageOffsetX ?? 0.5, offsetY: s.imageOffsetY ?? 0.5 }}
-          onApply={(v) => { up({ fit: v.fit, imageZoom: v.zoom, imageOffsetX: v.offsetX, imageOffsetY: v.offsetY }); setFitOpen(false); }}
+        <ImageFitModal thumbs={thumbs} cellWIn={+cw.toFixed(2)} cellHIn={+ch.toFixed(2)}
+          values={(s.perImage ?? {}) as Record<number, { fit: 'cover' | 'contain' | 'stretch'; zoom: number; offsetX: number; offsetY: number }>}
+          fallback={{ fit: s.fit ?? 'cover', zoom: s.imageZoom ?? 1, offsetX: s.imageOffsetX ?? 0.5, offsetY: s.imageOffsetY ?? 0.5 }}
+          onApply={(v) => { up({ perImage: v }); setFitOpen(false); }}
           onClose={() => setFitOpen(false)} />
       )}
       {kind === 'grid' && (

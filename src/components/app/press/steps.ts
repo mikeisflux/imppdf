@@ -300,6 +300,12 @@ function nupOpts(s: StepSettings) {
     centerMarks: !!s.centerMarks, markWeightPt: s.markWeightPt,
     bleedIn: s.bleedMode === 'fixed' ? s.bleedIn : 0,
     fit: s.fit ?? 'cover', imageZoom: s.imageZoom, imageOffsetX: s.imageOffsetX, imageOffsetY: s.imageOffsetY,
+    // The crop dialog stores per-image {fit,zoom,offsetX,offsetY}; map it to the
+    // engine's {fit,imageZoom,imageOffsetX,imageOffsetY} shape.
+    perImage: s.perImage
+      ? Object.fromEntries(Object.entries(s.perImage as Record<string, { fit?: 'cover' | 'contain' | 'stretch'; zoom?: number; offsetX?: number; offsetY?: number }>)
+          .map(([k, v]) => [k, { fit: v.fit, imageZoom: v.zoom, imageOffsetX: v.offsetX, imageOffsetY: v.offsetY }])) as Record<number, { fit?: 'cover' | 'contain' | 'stretch'; imageZoom?: number; imageOffsetX?: number; imageOffsetY?: number }>
+      : undefined,
   };
 }
 

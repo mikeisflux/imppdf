@@ -330,6 +330,9 @@ export interface NUpOptions {
   imageZoom?: number;
   imageOffsetX?: number;
   imageOffsetY?: number;
+  // Per-source-page overrides of the above, keyed by 0-based source page index.
+  // Set from the crop dialog's per-image flow; each falls back to the globals.
+  perImage?: Record<number, { fit?: 'cover' | 'contain' | 'stretch'; imageZoom?: number; imageOffsetX?: number; imageOffsetY?: number }>;
 }
 
 // Compute the effective grid for an N-Up layout (shared by engine + preview).
@@ -388,15 +391,16 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
     const x=leftGapPt+cc*(cellW+gxPt), y=shH-topGapPt-cellH-rr*(cellH+gyPt);
     // Fit the source into the cell. 'cover' (default) preserves aspect, scales to
     // fill and crops the overflow; 'contain' letterboxes; 'stretch' distorts.
-    const fit = opts.fit ?? 'cover';
+    const pf = opts.perImage?.[pi];                              // per-image override
+    const fit = pf?.fit ?? opts.fit ?? 'cover';
     const sw = emb.width, sh = emb.height;
     if (fit === 'stretch' || !sw || !sh) {
       sheet.drawPage(emb, { x, y, width: cellW, height: cellH });
     } else {
       const base = fit === 'contain' ? Math.min(cellW / sw, cellH / sh) : Math.max(cellW / sw, cellH / sh);
-      const s = base * (opts.imageZoom ?? 1);
+      const s = base * (pf?.imageZoom ?? opts.imageZoom ?? 1);
       const dw = sw * s, dh = sh * s;
-      const ox = opts.imageOffsetX ?? 0.5, oy = opts.imageOffsetY ?? 0.5; // 0..1 anchor
+      const ox = pf?.imageOffsetX ?? opts.imageOffsetX ?? 0.5, oy = pf?.imageOffsetY ?? opts.imageOffsetY ?? 0.5; // 0..1 anchor
       const dx = x + (cellW - dw) * ox, dy = y + (cellH - dh) * oy;
       if (dw > cellW + 0.5 || dh > cellH + 0.5) {
         // Clip to the cell so the cropped overflow can't bleed into neighbours.
