@@ -242,43 +242,43 @@ export interface FieryBookletOptions {
 }
 
 export async function fieryBooklet(bytes: Uint8Array, opts: FieryBookletOptions): Promise<Uint8Array> {
-  const { PDFDocument, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } = await import('pdf-lib');
-  const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
-  const pages = src.getPages();
-  const out = await PDFDocument.create();
-  const embeds = await out.embedPages(pages);
+  const { PDFDocument } = await import('pdf-lib');
+  // Edit the ORIGINAL document in place — do NOT rebuild into a fresh PDF.
+  // Rebuilding (embedPages) discards the document-level colour context Affinity
+  // writes — the embedded ICC profile (sRGB IEC61966-2.1 by default), the
+  // OutputIntent and XMP metadata — which a RIP/Fiery uses to convert RGB→CMYK.
+  // Losing it makes the Fiery fall back to a darker default. Cropping the page
+  // box keeps every object, profile and marker exactly as exported.
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const pages = doc.getPages();
   const rtl = !!opts.rtl;
   const firstRecto = opts.coverIsPage1 !== false;
 
   for (let i = 0; i < pages.length; i++) {
-    const { width: W, height: H } = pages[i]!.getSize();
+    const pg = pages[i]!;
+    const mb = pg.getMediaBox();                    // { x, y, width, height }
     let bPt = (opts.bleedIn ?? 0) * PT;
     if (opts.bleedFromDoc) {
-      try { const tb = pages[i]!.getTrimBox(), mb = pages[i]!.getMediaBox(); bPt = Math.max(0, tb.x - mb.x); }
-      catch { bPt = 0; }
+      try { const tb = pg.getTrimBox(); bPt = Math.max(0, tb.x - mb.x); } catch { bPt = 0; }
     }
+    if (bPt <= 0.01) continue;
+
     // Recto (right-hand) pages are 1,3,5… when page 1 is a recto. Recto → spine
     // on the LEFT for LTR binding; verso → spine on the RIGHT. RTL flips it.
     const recto = firstRecto ? (i % 2 === 0) : (i % 2 === 1);
     const spineLeft = recto ? !rtl : rtl;
 
-    const emb = embeds[i]!;
-    if (bPt <= 0.01) { out.addPage([W, H]).drawPage(emb, { x: 0, y: 0, width: W, height: H }); continue; }
-
-    const newW = Math.max(1, W - bPt);
-    const p = out.addPage([newW, H]);
-    // Clip to the trimmed page bounds so the removed bleed can't linger.
-    p.pushOperators(pushGraphicsState(), rectangle(0, 0, newW, H), clip(), endPath());
-    // spineLeft: shift the page left by the bleed so its LEFT bleed falls off the
-    // page; spineRight: draw at 0 so the RIGHT bleed overflows past newW.
-    p.drawPage(emb, { x: spineLeft ? -bPt : 0, y: 0, width: W, height: H });
-    p.pushOperators(popGraphicsState());
+    // Crop the spine-side bleed off the page box. Content outside the media box
+    // isn't printed, so the bleed is removed while everything else is untouched.
+    const nx = spineLeft ? mb.x + bPt : mb.x;
+    const nw = mb.width - bPt;
+    pg.setMediaBox(nx, mb.y, nw, mb.height);
+    pg.setCropBox(nx, mb.y, nw, mb.height);
     if (opts.setTrimBox !== false) {
-      const tW = W - 2 * bPt, tH = H - 2 * bPt;
-      p.setTrimBox(spineLeft ? 0 : bPt, bPt, tW, tH);
+      pg.setTrimBox(mb.x + bPt, mb.y + bPt, mb.width - 2 * bPt, mb.height - 2 * bPt);
     }
   }
-  return out.save();
+  return doc.save();
 }
 
 // ── N-Up Book (multi-up signature imposition) ───────────────────────────────
