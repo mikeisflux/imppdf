@@ -103,6 +103,10 @@ export interface BookletOptions {
   // and clip the inner (spine-side) bleed so it isn't carried into the fold.
   // Default on when a bleed is known; set false to keep the inner bleed.
   keepSpineBleed?: boolean;
+  // Size the output sheet to the two-page spread (no paper margin) so the art
+  // bleeds to all four sheet edges — for digital/Fiery output. Overrides the
+  // sheet size and margins.
+  fitSheetToSpread?: boolean;
 }
 
 export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Promise<Uint8Array> {
@@ -111,13 +115,32 @@ export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Pr
   const srcPages = srcDoc.getPages();
   const N = srcPages.length;
   const { width: pw, height: ph } = srcPages[0]!.getSize();
-  const mx = opts.marginIn*PT, my = (opts.marginTopIn ?? opts.marginIn)*PT;
-  const gPt = opts.gutterIn*PT, offPt = opts.markOffIn*PT, lenPt = opts.markLenIn*PT;
+  let mx = opts.marginIn*PT, my = (opts.marginTopIn ?? opts.marginIn)*PT;
+  let gPt = opts.gutterIn*PT;
+  const offPt = opts.markOffIn*PT, lenPt = opts.markLenIn*PT;
+
+  // Bleed inset from the source (needed before sizing so fit-to-spread can use it).
+  let bleedSrcPt = (opts.bleedIn ?? 0)*PT;
+  if (opts.bleedFromDoc) {
+    try {
+      const tb = srcPages[0]!.getTrimBox(), mb = srcPages[0]!.getMediaBox();
+      bleedSrcPt = Math.max(0, tb.x - mb.x);
+    } catch { bleedSrcPt = 0; }
+  }
+  const willDropSpine = opts.keepSpineBleed !== true && bleedSrcPt > 0.01;
 
   // Placed page size: with an explicit sheet the pages scale into the two cells;
   // otherwise the spread wraps the source pages 1:1 (legacy behaviour).
   let dw = pw, dh = ph, spreadW: number, spreadH: number;
-  if (opts.sheetWIn && opts.sheetHIn) {
+  if (opts.fitSheetToSpread) {
+    // Bleed to the sheet edge, no paper margin: the output sheet IS the two-page
+    // spread. Pages sit at 1:1; when the spine bleed is dropped the sheet is 2×
+    // the page minus the two inner bleeds so trims butt at the fold with the
+    // outer/top/bottom bleed running off the sheet edges.
+    dw = pw; dh = ph; mx = 0; my = 0; gPt = 0;
+    spreadW = 2*pw - (willDropSpine ? 2*bleedSrcPt : 0);
+    spreadH = ph;
+  } else if (opts.sheetWIn && opts.sheetHIn) {
     spreadW = opts.sheetWIn*PT; spreadH = opts.sheetHIn*PT;
     const cellW = Math.max(1, (spreadW - mx*2 - gPt)/2), cellH = Math.max(1, spreadH - my*2);
     if (opts.autoscale !== false) {
@@ -126,17 +149,9 @@ export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Pr
     }
   } else { spreadW = mx*2 + pw*2 + gPt; spreadH = my*2 + ph; }
   const blockW = dw*2 + gPt;
-  const x0 = opts.centerOutput ? (spreadW - blockW)/2 : mx;
-  const yB = opts.centerOutput ? (spreadH - dh)/2 : spreadH - my - dh;
-
-  // Bleed inset: trim marks land this far inside the placed page edge.
-  let bleedSrcPt = (opts.bleedIn ?? 0)*PT;
-  if (opts.bleedFromDoc) {
-    try {
-      const tb = srcPages[0]!.getTrimBox(), mb = srcPages[0]!.getMediaBox();
-      bleedSrcPt = Math.max(0, tb.x - mb.x);
-    } catch { bleedSrcPt = 0; }
-  }
+  const centered = opts.centerOutput || opts.fitSheetToSpread;
+  const x0 = centered ? (spreadW - blockW)/2 : mx;
+  const yB = centered ? (spreadH - dh)/2 : spreadH - my - dh;
   const bPt = bleedSrcPt * (dw/pw);
 
   const outDoc = await PDFDocument.create();

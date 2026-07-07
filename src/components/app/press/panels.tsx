@@ -231,6 +231,9 @@ function BookletPanel(p: PanelProps) {
       <Section label="// SCALE" help="How source pages fill each half of the spread.">
         <Check icon="fit" label="Autoscale" checked={s.autoscale !== false} onChange={(v) => up({ autoscale: v })} />
         <Check icon="resize" label="Preserve aspect ratio" checked={s.preserveAspect !== false} onChange={(v) => up({ preserveAspect: v })} />
+        <Check icon="bleed" label="Bleed to sheet edge (no margin)"
+          sub="Size the sheet to the spread so the art bleeds off all four edges — for digital/Fiery output. Ignores the paper size and margins."
+          checked={!!s.fitSheetToSpread} onChange={(v) => up({ fitSheetToSpread: v, ...(v ? { addMarks: false } : {}) })} />
       </Section>
       <Section label="// WHITE SPACE" help="Margins, spine gutter and creep compensation.">
         <div className="pe-row"><RowIcon name="dimensionsIc" /><span className="pe-label">Margins:</span><span style={{ flex: 1 }} /><UnitSel unit={unit} onChange={onUnit} /></div>

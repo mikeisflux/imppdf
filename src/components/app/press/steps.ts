@@ -170,6 +170,8 @@ export function defaultSettings(type: StepType): StepSettings {
         rtl: false, signatureSheets: 0, fillLastSaddle: true,
         marginIn: 0.2, marginTopIn: 0.2, gutterIn: 0, creepIn: 0.007, creepOutward: true,
         centerOutput: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125, rotatePages: false,
+        // Digital single issue: bleed to the sheet edge, no paper margin.
+        fitSheetToSpread: true, addMarks: false,
       };
     case 'trading':
       // Standard trading/sports cards (2.5×3.5"), 9-up (3×3) on Letter, sequential.
@@ -291,6 +293,7 @@ function bookletOpts(s: StepSettings) {
     autoscale: s.autoscale !== false, preserveAspect: s.preserveAspect !== false,
     bleedIn: s.bleedMode === 'fixed' ? s.bleedIn : 0, bleedFromDoc: s.bleedMode === 'doc',
     keepSpineBleed: !!s.keepSpineBleed,   // default false → drop inner bleed at the fold
+    fitSheetToSpread: !!s.fitSheetToSpread,
     rotatePages: !!s.rotatePages,
   };
 }
