@@ -68,7 +68,7 @@ export function PayPalSubscribe(
     return <div className="form-note">PayPal is not configured yet. Add your PayPal keys in Admin → Settings.</div>;
   }
   if (!planId) {
-    return <div className="form-note">The {cycle} plan id is not configured.</div>;
+    return <div className="form-note">The {cycle} plan isn’t configured yet. Add the {cycle} plan ID in Admin → Settings → PayPal.</div>;
   }
 
   return (
