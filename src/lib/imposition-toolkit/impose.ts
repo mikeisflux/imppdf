@@ -67,6 +67,57 @@ function drawCropMarks(page: any, rgb: any, tx: number, ty: number, tw: number, 
     page.drawLine({ start:{x:x1,y:y1}, end:{x:x2,y:y2}, thickness, color:c, ...(dashArray ? { dashArray } : {}) });
 }
 
+// Carry the document-level colour context from a SOURCE pdf onto a REBUILT
+// output pdf. Imposition that composes pages into a fresh document (embedPages)
+// keeps each object's own ICC (so screen colour is right) but drops the
+// document-level markers a RIP/Fiery uses to convert RGB→CMYK — the OutputIntent
+// (with its embedded profile) and the XMP metadata — making prints come out
+// dark. This copies those across, deep-copying any referenced streams. Whatever
+// profile the source embeds (e.g. Affinity's default sRGB IEC61966-2.1) is
+// preserved. Best-effort: it must never break an export.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function carryColorContext(srcDoc: any, outDoc: any): Promise<void> {
+  try {
+    const { PDFName, PDFRef, PDFDict, PDFArray, PDFRawStream } = await import('pdf-lib');
+    const scx = srcDoc.context, ocx = outDoc.context;
+    const cache = new Map<unknown, unknown>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dupResolved = (v: any): any => {
+      if (v instanceof PDFRawStream) {
+        const d = ocx.obj({});
+        for (const [k, val] of v.dict.entries()) d.set(k, dup(val));
+        return ocx.register(PDFRawStream.of(d, v.contents));
+      }
+      if (v instanceof PDFDict) {
+        const d = ocx.obj({});
+        for (const [k, val] of v.entries()) d.set(k, dup(val));
+        return d;
+      }
+      if (v instanceof PDFArray) {
+        const a = ocx.obj([]);
+        for (const el of v.asArray()) a.push(dup(el));
+        return a;
+      }
+      return v; // primitives (names/numbers/strings/bools/null) are context-free
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dup = (v: any): any => {
+      if (v instanceof PDFRef) {
+        if (cache.has(v)) return cache.get(v);
+        const copy = dupResolved(scx.lookup(v));
+        cache.set(v, copy);
+        return copy;
+      }
+      return dupResolved(v);
+    };
+    for (const key of ['Metadata', 'OutputIntents']) {
+      const ref = srcDoc.catalog.get(PDFName.of(key));
+      const resolved = ref ? scx.lookup(ref) : null;
+      if (resolved) outDoc.catalog.set(PDFName.of(key), dup(ref));
+    }
+  } catch { /* never break an export over colour metadata */ }
+}
+
 // ── Booklet / Saddle Stitch (2-up) ─────────────────────────────────────────
 
 export interface BookletOptions {
@@ -222,6 +273,7 @@ export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Pr
     start += sigPages;
   }
   if (opts.rotatePages) for (const p of outDoc.getPages()) p.setRotation(degrees(90));
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -339,6 +391,7 @@ export async function imposeNUpBook(bytes: Uint8Array, opts: NUpBookOptions): Pr
       }
     }
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -385,6 +438,7 @@ export async function imposeCalendar(bytes: Uint8Array, opts: CalendarOptions): 
       if (opts.addMarks) { drawCropMarks(pg, rgb, 0, h, w, h, off, len, markStyle); drawCropMarks(pg, rgb, 0, 0, w, h, off, len, markStyle); }
     }
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -527,6 +581,7 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
       for (let r=0; r<rows; r++) for (let c=0; c<cols; c++) place(back, itemAt(si,cellIndexOf(r,c)), r, c, true);
     }
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -587,6 +642,7 @@ export async function imposeTickets(bytes: Uint8Array, opts: TicketOptions): Pro
       }
     }
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -630,6 +686,7 @@ export async function addCropMarksOnly(bytes: Uint8Array, opts: CropMarksOptions
     drawCropMarks(pg,rgb,tx,ty,tw,th,off,len,markStyle);
     if (opts.keyMark) pg.drawRectangle({ x: mPt - 2, y: mPt - 2, width: 4, height: 4, color });
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -699,6 +756,7 @@ export async function rotatePdf(bytes: Uint8Array, angleDeg: number, pages?: str
     pg.drawPage(embeds[i]!, { x: 0, y: 0, width: w, height: h });
     pg.pushOperators(popGraphicsState());
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -723,6 +781,7 @@ export async function flipPdf(bytes: Uint8Array, direction: 'h'|'v', pages?: str
       pg.drawPage(embeds[i]!,{x:0,y:0,width:w,height:h});
     }
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -878,6 +937,7 @@ export async function distortPdf(bytes: Uint8Array, opts: DistortOptions): Promi
     const pg = outDoc.addPage([nw, nh]);
     pg.drawPage(embeds[i]!, { x: 0, y: 0, width: nw, height: nh });
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -981,6 +1041,7 @@ export async function shufflePages(bytes: Uint8Array, orderStr: string): Promise
       if (pg) outDoc.addPage(pg);
     }
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -1038,6 +1099,7 @@ export async function resizePdf(bytes: Uint8Array, opts: ResizeOptions, pages?: 
       }
     }
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -1126,6 +1188,7 @@ export async function addColorBar(bytes: Uint8Array, opts: ColorBarOpts): Promis
       }
     }
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -1167,6 +1230,7 @@ export async function imposeTiledPoster(bytes: Uint8Array, opts: {
       }
     }
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -1222,6 +1286,7 @@ export async function generateBleed(bytes: Uint8Array, opts: BleedOptions): Prom
     }
     pg.setTrimBox(b, b, w, h);
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -1340,6 +1405,7 @@ export async function addJobSlug(bytes: Uint8Array, opts: JobSlugOptions): Promi
     const label = applyTokens(opts.text || 'Job', { pageNum: i + 1, pageCount: embeds.length, fileName: opts.fileName });
     pg.drawText(label, { x: 6, y: ty, font, size: opts.fontSizePt, color: rgb(0.25, 0.25, 0.25) });
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
@@ -3450,6 +3516,7 @@ async function renderNest(outDoc: any, srcPages: any[], sheets: NestPlaced[][], 
       else pg.drawPage(emb, { x: it.x, y: yTop, width: it.w, height: it.h });
     }
   }
+  await carryColorContext(srcPages[0]?.doc, outDoc);
   return outDoc.save();
 }
 
@@ -3759,6 +3826,7 @@ export async function imposeGangJobs(sources: Uint8Array[], jobs: GangJob[], opt
       if (opts.addMarks) drawCropMarks(pg, rgb, x, y, w, h, opts.markOffIn * PT, opts.markLenIn * PT, markStyle);
     }
   }
+  await carryColorContext(srcDocs[0], outDoc);
   return outDoc.save();
 }
 
@@ -3856,6 +3924,7 @@ export async function imposeFoldZine(bytes: Uint8Array, opts: FoldZineOptions): 
       }
     }
   }
+  await carryColorContext(srcDoc, outDoc);
   return outDoc.save();
 }
 
