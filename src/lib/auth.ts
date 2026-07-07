@@ -102,6 +102,18 @@ export async function getCurrentAdmin(): Promise<SessionUser | null> {
     const { payload } = await jwtVerify(token, secret());
     if (!payload.admin) return null;
     const uid = Number(payload.uid);
+    // If this browser is ALSO signed into the regular app as a different user,
+    // drop admin privileges. The admin/user sessions are separate cookies, so
+    // without this a stale admin cookie would keep granting /admin access even
+    // after logging in as an ordinary user. You can't be "acting as" a normal
+    // user and still hold the admin panel.
+    const sess = jar.get(SESSION_COOKIE)?.value;
+    if (sess) {
+      try {
+        const { payload: sp } = await jwtVerify(sess, secret());
+        if (Number(sp.uid) !== uid) return null;
+      } catch { /* invalid/expired user session — ignore, admin cookie stands */ }
+    }
     const row = getDb()
       .prepare('SELECT id, email, name, role, plan, status FROM users WHERE id = ?')
       .get(uid) as SessionUser | undefined;

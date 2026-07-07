@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 import { isSearchEngine, isMaliciousBot } from '@/lib/bot-ua';
 
 // Edge bot gate. Runs before every request except static assets and the SEO
@@ -20,8 +21,49 @@ function clientIp(req: NextRequest): string {
   return req.headers.get('x-real-ip') ?? 'unknown';
 }
 
-export function middleware(req: NextRequest) {
+function authSecret(): Uint8Array {
+  return new TextEncoder().encode(process.env.AUTH_SECRET || 'insecure-dev-secret-change-me');
+}
+
+// Edge-level gate for the admin surface (defense in depth on top of the
+// per-page/per-route getCurrentAdmin() check). Requires a validly-signed admin
+// token with the `admin` claim; if the browser is also signed into the app as a
+// DIFFERENT user, admin is refused. The DB role re-check still happens in
+// getCurrentAdmin() — the edge can't reach the database.
+async function adminGateOk(req: NextRequest): Promise<boolean> {
+  const tok = req.cookies.get('pp_admin')?.value;
+  if (!tok) return false;
+  try {
+    const { payload } = await jwtVerify(tok, authSecret());
+    if (!payload.admin) return false;
+    const adminUid = Number(payload.uid);
+    const sess = req.cookies.get('pp_session')?.value;
+    if (sess) {
+      try {
+        const { payload: sp } = await jwtVerify(sess, authSecret());
+        if (Number(sp.uid) !== adminUid) return false; // acting as another user
+      } catch { /* invalid user session — ignore */ }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function middleware(req: NextRequest) {
   const ua = req.headers.get('user-agent') ?? '';
+  const path = req.nextUrl.pathname;
+
+  // 0. Guard the admin UI + admin API at the edge (login endpoints excepted).
+  const isAdminUi = path === '/admin' || (path.startsWith('/admin/') && path !== '/admin/login');
+  const isAdminApi = path.startsWith('/api/admin/') && path !== '/api/admin/login';
+  if (isAdminUi || isAdminApi) {
+    if (!(await adminGateOk(req))) {
+      return isAdminApi
+        ? new NextResponse('Unauthorized', { status: 401 })
+        : NextResponse.redirect(new URL('/admin/login', req.url));
+    }
+  }
 
   // 1. Always let real crawlers through.
   if (isSearchEngine(ua)) return NextResponse.next();
