@@ -271,7 +271,10 @@
   box-shadow: 0 4px 18px rgba(15, 18, 30, 0.14);
 }
 .pe-dark .pe-sheet { background: #fff; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5); }
-.pe-sheet img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; }
+/* fill (not contain): the sheet div is already sized to the true sheet aspect,
+   so filling avoids a sub-pixel letterbox that would show the white sheet
+   background as a thin line along a full-bleed page's edge. */
+.pe-sheet img { display: block; width: 100%; height: 100%; object-fit: fill; user-select: none; }
 .pe-sheet-clear { background: transparent; background-image: conic-gradient(#8884 0 25%, transparent 0 50%, #8884 0 75%, transparent 0); background-size: 18px 18px; }
 .pe-canvas-wrap.pe-nofill { background: var(--pe-canvas); }
 .pe-rules {
