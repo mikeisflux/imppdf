@@ -53,6 +53,7 @@ export const Icons = {
   coloreffectsIc: (p = {}) => <S {...p}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.9 2.9M15.5 15.5l2.9 2.9M18.4 5.6l-2.9 2.9M8.5 15.5l-2.9 2.9" /></S>,
   colormanageIc: (p = {}) => <S {...p}><path d="m3 17 8-13 4 6-6 9H3Z" /><circle cx="17" cy="16" r="4" /></S>,
   pdfxIc: (p = {}) => <S {...p}><rect x="4" y="3" width="16" height="18" rx="1.5" /><path d="M8 8h4M8 12h8M8 16h8" /><path d="M15 3v5h5" /></S>,
+  fieryBookletIc: (p = {}) => <S {...p}><rect x="3" y="5" width="8" height="14" rx="1" /><rect x="13" y="5" width="8" height="14" rx="1" /><path d="M11 5v14M13 5v14" /></S>,
   barcodeIc: (p = {}) => <S {...p}><path d="M4 5v14M8 5v14M11 5v8M14 5v14M18 5v10M21 5v14" /></S>,
   brailleIc: (p = {}) => <S {...p}><circle cx="7" cy="6" r="1.6" /><circle cx="7" cy="12" r="1.6" /><circle cx="7" cy="18" r="1.6" /><circle cx="14" cy="6" r="1.6" /><circle cx="14" cy="18" r="1.6" /><circle cx="20" cy="12" r="1.6" /></S>,
   droplet: (p = {}) => <S {...p}><path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 1 1-12 0c0-3.4 3-6.5 6-11Z" /><path d="M9 14a3 3 0 0 0 3 3" /></S>,
@@ -119,6 +120,7 @@ export const OP_GROUPS: OpGroup[] = [
   { label: '// LAYOUT', ops: [
     { id: 'cards', label: 'Cards', icon: 'cards', tip: 'Use Cards to tile identical copies of your pages onto larger sheets for efficient cutting.' },
     { id: 'booklet', label: 'Booklet', icon: 'booklet', tip: 'Use Booklet for orders pages so a folded, center-stapled stack reads correctly.' },
+    { id: 'fierybooklet', label: 'Fiery Booklet', icon: 'fieryBookletIc', tip: 'Single-page output for a Fiery/DFE booklet maker: trims the spine-side bleed on each page so the RIP folds a clean booklet.' },
     { id: 'zine', label: 'Zine', icon: 'zine', tip: 'Use Zine for a quick fold-and-staple mini-booklet on office paper.' },
     { id: 'shuffle', label: 'Shuffle', icon: 'shuffle', tip: 'Use Shuffle to reorder pages for printing.' },
     { id: 'grid', label: 'Grid', icon: 'grid', tip: 'Use Grid to arrange pages in an N-up grid layout.' },

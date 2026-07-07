@@ -207,6 +207,62 @@ export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Pr
   return outDoc.save();
 }
 
+// ── Fiery Booklet (single-page output, spine bleed trimmed per page) ─────────
+// For workflows where the RIP/DFE (e.g. an EFI Fiery) does the booklet
+// imposition itself: keep the pages as SINGLE pages in reader order, but trim
+// the bleed off the edge of each page that will sit at the spine when the RIP
+// folds it. In a saddle-stitch booklet the odd pages are right-hand (recto →
+// spine on the LEFT) and the even pages are left-hand (verso → spine on the
+// RIGHT); RTL binding flips that. The other three edges keep full bleed.
+
+export interface FieryBookletOptions {
+  bleedIn?: number;        // fixed spine bleed to trim; used when bleedFromDoc is off
+  bleedFromDoc?: boolean;  // read the bleed inset from the source TrimBox instead
+  rtl?: boolean;           // right-to-left binding (e.g. manga)
+  coverIsPage1?: boolean;  // true (default): page 1 is a recto (spine left for LTR)
+  setTrimBox?: boolean;    // write a TrimBox on each output page (default true)
+}
+
+export async function fieryBooklet(bytes: Uint8Array, opts: FieryBookletOptions): Promise<Uint8Array> {
+  const { PDFDocument, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } = await import('pdf-lib');
+  const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const pages = src.getPages();
+  const out = await PDFDocument.create();
+  const embeds = await out.embedPages(pages);
+  const rtl = !!opts.rtl;
+  const firstRecto = opts.coverIsPage1 !== false;
+
+  for (let i = 0; i < pages.length; i++) {
+    const { width: W, height: H } = pages[i]!.getSize();
+    let bPt = (opts.bleedIn ?? 0) * PT;
+    if (opts.bleedFromDoc) {
+      try { const tb = pages[i]!.getTrimBox(), mb = pages[i]!.getMediaBox(); bPt = Math.max(0, tb.x - mb.x); }
+      catch { bPt = 0; }
+    }
+    // Recto (right-hand) pages are 1,3,5… when page 1 is a recto. Recto → spine
+    // on the LEFT for LTR binding; verso → spine on the RIGHT. RTL flips it.
+    const recto = firstRecto ? (i % 2 === 0) : (i % 2 === 1);
+    const spineLeft = recto ? !rtl : rtl;
+
+    const emb = embeds[i]!;
+    if (bPt <= 0.01) { out.addPage([W, H]).drawPage(emb, { x: 0, y: 0, width: W, height: H }); continue; }
+
+    const newW = Math.max(1, W - bPt);
+    const p = out.addPage([newW, H]);
+    // Clip to the trimmed page bounds so the removed bleed can't linger.
+    p.pushOperators(pushGraphicsState(), rectangle(0, 0, newW, H), clip(), endPath());
+    // spineLeft: shift the page left by the bleed so its LEFT bleed falls off the
+    // page; spineRight: draw at 0 so the RIGHT bleed overflows past newW.
+    p.drawPage(emb, { x: spineLeft ? -bPt : 0, y: 0, width: W, height: H });
+    p.pushOperators(popGraphicsState());
+    if (opts.setTrimBox !== false) {
+      const tW = W - 2 * bPt, tH = H - 2 * bPt;
+      p.setTrimBox(spineLeft ? 0 : bPt, bPt, tW, tH);
+    }
+  }
+  return out.save();
+}
+
 // ── N-Up Book (multi-up signature imposition) ───────────────────────────────
 // Folds multiple pages onto each side of a large press sheet so that, after
 // folding + trimming, pages read sequentially. 2-up (folio) is exactly the

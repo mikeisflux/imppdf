@@ -1516,6 +1516,33 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
           </div>
         </>
       );
+    case 'fierybooklet':
+      return (
+        <>
+          <Section label="// BLEED" help="How much bleed to trim off the spine edge of each page. From the document reads the source TrimBox; Fixed uses the amount you enter.">
+            <div className="pe-row" style={{ gap: 8 }}>
+              <select className="pe-select" style={{ flex: 1 }} value={s.bleedMode} onChange={(e) => up({ bleedMode: e.target.value })}>
+                <option value="doc">From document (TrimBox)</option>
+                <option value="fixed">Fixed amount</option>
+              </select>
+              {s.bleedMode === 'fixed' && (
+                <>
+                  <NumRaw value={s.bleedIn} onValue={(v) => up({ bleedIn: Math.max(0, v) })} w={70} min={0} />
+                  <span className="pe-label-sm">in</span>
+                </>
+              )}
+            </div>
+          </Section>
+          <Section label="// BINDING" help="Which edge is the spine on each page. Odd pages are right-hand (spine left); even pages are left-hand (spine right). RTL flips it.">
+            <Check icon="booklet" label="Right-to-left binding" sub="Manga / RTL: flips which edge is the spine" checked={!!s.rtl} onChange={(v) => up({ rtl: v })} />
+            <Check icon="file" label="Page 1 is a right-hand page" sub="On (default) treats page 1 as a recto (spine on its left)" checked={s.coverIsPage1 !== false} onChange={(v) => up({ coverIsPage1: v })} />
+            <Check icon="scissors" label="Write TrimBox on each page" sub="Marks the finished size so the Fiery knows trim vs. bleed" checked={s.setTrimBox !== false} onChange={(v) => up({ setTrimBox: v })} />
+          </Section>
+          <div className="pe-note" style={{ marginBottom: 12 }}>
+            ⓘ Exports single pages in reader order (not imposed spreads). Each page keeps full bleed on three edges and is trimmed flush on the spine edge, so the Fiery / DFE booklet maker folds a clean booklet.
+          </div>
+        </>
+      );
     case 'barcode':
       return (
         <>

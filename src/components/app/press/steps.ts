@@ -4,7 +4,7 @@
 // PDF through every enabled step in order — exactly what Download/Print export.
 
 import {
-  imposeBooklet, imposeNUp, imposeNUpBook, shufflePages, rotatePdf, flipPdf,
+  imposeBooklet, fieryBooklet, imposeNUp, imposeNUpBook, shufflePages, rotatePdf, flipPdf,
   mergePdfs, splitPdf, cropPdf, resizePdf, overlayPdf, distortPdf, generateBleed,
   addHeaderFooter, addPressColorBar, addCutterMarks, addJobSlug, addFoldMarks,
   addCollatingMarks, addOmrMarks, addGatheringMarks, addLayMarks, addTextWatermark,
@@ -30,7 +30,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -126,6 +126,10 @@ export function defaultSettings(type: StepType): StepSettings {
       // management, so converting here is usually wrong. The generic bundled
       // profile is used unless you upload your press's ICC.
       return { standard: 'x-4', convertCmyk: false, iccSource: 'bundled', intent: 'relative', dpi: 300, conditionName: 'Generic CMYK', icc: null, iccName: '' };
+    case 'fierybooklet':
+      // Single-page output for a Fiery/DFE booklet maker; spine-side bleed is
+      // trimmed per page. Bleed read from the doc's TrimBox by default.
+      return { bleedMode: 'doc', bleedIn: 0.125, rtl: false, coverIsPage1: true, setTrimBox: true };
     case 'editpdf':
       return {};
     case 'booklet':
@@ -351,6 +355,11 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
     switch (step.type) {
       case 'booklet': case 'comic': case 'magazine': case 'catalog': case 'program': case 'notebook': case 'hymnal':
         b = await imposeBooklet(b, bookletOpts(s)); break;
+      case 'fierybooklet':
+        b = await fieryBooklet(b, {
+          bleedIn: s.bleedMode === 'fixed' ? s.bleedIn : 0, bleedFromDoc: s.bleedMode === 'doc',
+          rtl: !!s.rtl, coverIsPage1: s.coverIsPage1 !== false, setTrimBox: s.setTrimBox !== false,
+        }); break;
       case 'zine': b = await imposeFoldZine(b, {
         format: s.format, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn,
         flipBackCover: !!s.flipBackCover, signatureSheets: s.signatureSheets || 0,

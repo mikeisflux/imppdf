@@ -90,3 +90,17 @@ test('imposeBooklet: spine drop is a no-op path when there is no bleed', async (
   const out = await imposeBooklet(await pdfOf(4, 612, 792), { ...baseBook, bleedIn: 0 });
   assert.equal(await pageCount(out), 2);
 });
+
+test('fieryBooklet: single pages out, spine bleed trimmed per page', async () => {
+  const { fieryBooklet } = await import('../src/lib/imposition-toolkit/impose.ts');
+  const PT2 = 72, B = 0.125 * PT2;
+  const W = 6.25 * PT2, H = 9.25 * PT2;           // 6x9 trim + 1/8" bleed all round
+  const out = await fieryBooklet(await pdfOf(4, W, H), { bleedIn: 0.125, rtl: false });
+  const doc = await PDFDocument.load(out);
+  assert.equal(doc.getPageCount(), 4);            // single pages, same order
+  for (const p of doc.getPages()) {
+    const s = p.getSize();
+    assert.ok(Math.abs(s.width - (W - B)) < 0.5, `page width trimmed by one bleed (${s.width})`);
+    assert.ok(Math.abs(s.height - H) < 0.5, 'height unchanged');
+  }
+});
