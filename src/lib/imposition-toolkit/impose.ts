@@ -200,8 +200,11 @@ export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Pr
           const trimLeftR  = foldX + creepPt;        // right page trim-left
           const xLd = trimRightL - dw + bPt;         // left media-left
           const xRd = trimLeftR - bPt;               // right media-left
-          if (eL) drawClipped(pg, eL, xLd, xLd, trimRightL - xLd);   // keep left+trim, clip inner
-          if (eR) drawClipped(pg, eR, xRd, trimLeftR, (xRd+dw) - trimLeftR); // keep trim+right
+          // Clip BOTH pages at the fold itself (not at their creep-shifted trim)
+          // so they always meet with no gap — otherwise creep leaves a hairline
+          // of white sheet at the spine on the inner sheets.
+          if (eL) drawClipped(pg, eL, xLd, xLd, foldX - xLd);        // keep left+trim, clip at fold
+          if (eR) drawClipped(pg, eR, xRd, foldX, (xRd+dw) - foldX); // keep trim+right, clip at fold
           if (opts.addMarks) {
             drawCropMarks(pg,rgb,xLd+bPt,yB+bPt,dw-2*bPt,dh-2*bPt,offPt,lenPt,{...markStyle, skipRight:true});
             drawCropMarks(pg,rgb,xRd+bPt,yB+bPt,dw-2*bPt,dh-2*bPt,offPt,lenPt,{...markStyle, skipLeft:true});
