@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -67,4 +67,26 @@ test('imposeNUp: per-image fit overrides apply without throwing', async () => {
     },
   });
   assert.equal(await pageCount(out), 1);
+});
+
+const baseBook = {
+  rtl: false, marginIn: 0.25, gutterIn: 0, creepIn: 0, addMarks: true,
+  markLenIn: 0.1, markOffIn: 0.1, sheetWIn: 17, sheetHIn: 11,
+  autoscale: true, preserveAspect: true, bleedIn: 0.125,
+};
+
+test('imposeBooklet: spine-bleed drop produces valid spreads', async () => {
+  // 8 pages → 4 spreads (2 sheets × 2 sides). Fixed 1/8" bleed, dropped at spine.
+  const out = await imposeBooklet(await pdfOf(8, 612, 792), { ...baseBook });
+  assert.equal(await pageCount(out), 4);
+});
+
+test('imposeBooklet: keepSpineBleed keeps the legacy full-bleed placement', async () => {
+  const out = await imposeBooklet(await pdfOf(8, 612, 792), { ...baseBook, keepSpineBleed: true });
+  assert.equal(await pageCount(out), 4);
+});
+
+test('imposeBooklet: spine drop is a no-op path when there is no bleed', async () => {
+  const out = await imposeBooklet(await pdfOf(4, 612, 792), { ...baseBook, bleedIn: 0 });
+  assert.equal(await pageCount(out), 2);
 });

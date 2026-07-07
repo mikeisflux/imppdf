@@ -35,6 +35,10 @@ export interface MarkStyle {
   color?: any;
   dash?: number[];
   knockout?: boolean;   // paint a white underlay so marks stay visible on dark art
+  // Suppress marks on a vertical edge — used for the spine/fold of a booklet,
+  // which is folded, not trimmed, so it carries no crop marks.
+  skipLeft?: boolean;
+  skipRight?: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,20 +46,20 @@ function drawCropMarks(page: any, rgb: any, tx: number, ty: number, tw: number, 
   const c = style?.color ?? rgb(0, 0, 0);
   const thickness = style?.weight ?? 0.5;
   const dashArray = style?.dash;
-  const segs: [number, number, number, number][] = [
-    [tx-off-len,ty,  tx-off,ty],      [tx,ty-off-len,  tx,ty-off],
-    [tx+tw+off,ty,   tx+tw+off+len,ty],[tx+tw,ty-off-len,tx+tw,ty-off],
-    [tx-off-len,ty+th,tx-off,ty+th],  [tx,ty+th+off,   tx,ty+th+off+len],
-    [tx+tw+off,ty+th,tx+tw+off+len,ty+th],[tx+tw,ty+th+off,tx+tw,ty+th+off+len],
-  ];
+  const L = !style?.skipLeft, R = !style?.skipRight;   // draw left / right edge marks?
+  const segs: [number, number, number, number][] = [];
+  if (L) segs.push([tx-off-len,ty, tx-off,ty], [tx,ty-off-len, tx,ty-off],
+                   [tx-off-len,ty+th, tx-off,ty+th], [tx,ty+th+off, tx,ty+th+off+len]);
+  if (R) segs.push([tx+tw+off,ty, tx+tw+off+len,ty], [tx+tw,ty-off-len,tx+tw,ty-off],
+                   [tx+tw+off,ty+th,tx+tw+off+len,ty+th], [tx+tw,ty+th+off,tx+tw,ty+th+off+len]);
   if (style?.center) {
     const cx = tx + tw/2, cy = ty + th/2;
     segs.push(
       [cx,ty-off-len,   cx,ty-off],           // bottom-centre
       [cx,ty+th+off,    cx,ty+th+off+len],     // top-centre
-      [tx-off-len,cy,   tx-off,cy],            // left-centre
-      [tx+tw+off,cy,    tx+tw+off+len,cy],     // right-centre
     );
+    if (L) segs.push([tx-off-len,cy, tx-off,cy]);        // left-centre
+    if (R) segs.push([tx+tw+off,cy, tx+tw+off+len,cy]);  // right-centre
   }
   if (style?.knockout) for (const [x1,y1,x2,y2] of segs)
     page.drawLine({ start:{x:x1,y:y1}, end:{x:x2,y:y2}, thickness: thickness+1.4, color: rgb(1,1,1) });
@@ -95,10 +99,14 @@ export interface BookletOptions {
   bleedIn?: number;         // fixed bleed: trim marks sit this far inside each page edge
   bleedFromDoc?: boolean;   // read the bleed inset from the source TrimBox instead
   rotatePages?: boolean;    // rotate output 90° (portrait orientation for office printers)
+  // Industry-standard saddle stitch: butt the two page trims at the spine fold
+  // and clip the inner (spine-side) bleed so it isn't carried into the fold.
+  // Default on when a bleed is known; set false to keep the inner bleed.
+  keepSpineBleed?: boolean;
 }
 
 export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Promise<Uint8Array> {
-  const { PDFDocument, rgb, cmyk, degrees } = await import('pdf-lib');
+  const { PDFDocument, rgb, cmyk, degrees, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } = await import('pdf-lib');
   const srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const srcPages = srcDoc.getPages();
   const N = srcPages.length;
@@ -159,14 +167,37 @@ export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Pr
       if (!opts.rtl) { aL=sigPages-s*2; aR=s*2+1; bL=s*2+2; bR=sigPages-s*2-1; }
       else           { aL=s*2+1; aR=sigPages-s*2; bL=sigPages-s*2-1; bR=s*2+2; }
       const g=(loc:number)=>start-1+loc;   // local → global page number
+      // Drop the spine bleed: butt the two page trims at the fold and clip each
+      // page's inner (spine-side) bleed so it isn't carried across the fold.
+      const dropSpine = opts.keepSpineBleed !== true && bPt > 0.01;
+      const foldX = x0 + dw + gPt/2;                 // fixed fold (sheet centre when centred)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const drawClipped = (pg:any, e:any, px:number, clipX:number, clipW:number) => {
+        pg.pushOperators(pushGraphicsState(), rectangle(clipX, yB, clipW, dh), clip(), endPath());
+        pg.drawPage(e, {x:px, y:yB, width:dw, height:dh});
+        pg.pushOperators(popGraphicsState());
+      };
       for (const [left,right] of [[aL,aR],[bL,bR]] as [number,number][]) {
         const pg = outDoc.addPage([spreadW,spreadH]);
         const eL=emb(g(left)), eR=emb(g(right));
-        if (eL) pg.drawPage(eL, {x:xL,y:yB,width:dw,height:dh});
-        if (eR) pg.drawPage(eR, {x:xR,y:yB,width:dw,height:dh});
-        if (opts.addMarks) {
-          drawCropMarks(pg,rgb,xL+bPt,yB+bPt,dw-2*bPt,dh-2*bPt,offPt,lenPt,markStyle);
-          drawCropMarks(pg,rgb,xR+bPt,yB+bPt,dw-2*bPt,dh-2*bPt,offPt,lenPt,markStyle);
+        if (dropSpine) {
+          const trimRightL = foldX - creepPt;        // left page trim-right (creep shifts outward)
+          const trimLeftR  = foldX + creepPt;        // right page trim-left
+          const xLd = trimRightL - dw + bPt;         // left media-left
+          const xRd = trimLeftR - bPt;               // right media-left
+          if (eL) drawClipped(pg, eL, xLd, xLd, trimRightL - xLd);   // keep left+trim, clip inner
+          if (eR) drawClipped(pg, eR, xRd, trimLeftR, (xRd+dw) - trimLeftR); // keep trim+right
+          if (opts.addMarks) {
+            drawCropMarks(pg,rgb,xLd+bPt,yB+bPt,dw-2*bPt,dh-2*bPt,offPt,lenPt,{...markStyle, skipRight:true});
+            drawCropMarks(pg,rgb,xRd+bPt,yB+bPt,dw-2*bPt,dh-2*bPt,offPt,lenPt,{...markStyle, skipLeft:true});
+          }
+        } else {
+          if (eL) pg.drawPage(eL, {x:xL,y:yB,width:dw,height:dh});
+          if (eR) pg.drawPage(eR, {x:xR,y:yB,width:dw,height:dh});
+          if (opts.addMarks) {
+            drawCropMarks(pg,rgb,xL+bPt,yB+bPt,dw-2*bPt,dh-2*bPt,offPt,lenPt,markStyle);
+            drawCropMarks(pg,rgb,xR+bPt,yB+bPt,dw-2*bPt,dh-2*bPt,offPt,lenPt,markStyle);
+          }
         }
       }
     }

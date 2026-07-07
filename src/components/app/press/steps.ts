@@ -286,6 +286,7 @@ function bookletOpts(s: StepSettings) {
     sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn,
     autoscale: s.autoscale !== false, preserveAspect: s.preserveAspect !== false,
     bleedIn: s.bleedMode === 'fixed' ? s.bleedIn : 0, bleedFromDoc: s.bleedMode === 'doc',
+    keepSpineBleed: !!s.keepSpineBleed,   // default false → drop inner bleed at the fold
     rotatePages: !!s.rotatePages,
   };
 }
