@@ -128,8 +128,8 @@ export function defaultSettings(type: StepType): StepSettings {
       return { standard: 'x-4', convertCmyk: false, iccSource: 'bundled', intent: 'relative', dpi: 300, conditionName: 'Generic CMYK', icc: null, iccName: '' };
     case 'fierybooklet':
       // Single-page output for a Fiery/DFE booklet maker; spine-side bleed is
-      // trimmed per page. Bleed read from the doc's TrimBox by default.
-      return { bleedMode: 'doc', bleedIn: 0.125, rtl: false, coverIsPage1: true, setTrimBox: true };
+      // trimmed per page. Fiery bleed is always 1/8".
+      return { rtl: false, coverIsPage1: true, setTrimBox: true };
     case 'editpdf':
       return {};
     case 'booklet':
@@ -356,8 +356,9 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       case 'booklet': case 'comic': case 'magazine': case 'catalog': case 'program': case 'notebook': case 'hymnal':
         b = await imposeBooklet(b, bookletOpts(s)); break;
       case 'fierybooklet':
+        // Fiery bleed is always 1/8".
         b = await fieryBooklet(b, {
-          bleedIn: s.bleedMode === 'fixed' ? s.bleedIn : 0, bleedFromDoc: s.bleedMode === 'doc',
+          bleedIn: 0.125, bleedFromDoc: false,
           rtl: !!s.rtl, coverIsPage1: s.coverIsPage1 !== false, setTrimBox: s.setTrimBox !== false,
         }); break;
       case 'zine': b = await imposeFoldZine(b, {
