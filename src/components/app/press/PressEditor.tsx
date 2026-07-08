@@ -1,6 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getPdfInfo, getPageSizes, shufflePages, downloadPdf, downloadFile, makeZip, setPdfJobInfo, mergePdfs } from '@/lib/imposition-toolkit/impose';
+import { getPdfInfo, getPageSizes, shufflePages, downloadPdf, downloadFile, setPdfJobInfo, mergePdfs } from '@/lib/imposition-toolkit/impose';
 import type { PdfPageInfo } from '@/lib/imposition-toolkit/impose';
 import { rasterizePdfThumbs, rasterizePdfSheets, type RenderedSheet } from '@/lib/imposition-toolkit/page-thumbs';
 import { findOp } from './operations';
@@ -311,15 +311,20 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   }
 
   async function runBatch(files: BatchFile[], progress: (d: number, t: number) => void) {
-    const outs: { name: string; data: Uint8Array }[] = [];
+    // Process and download each file ONE AT A TIME — never accumulate all
+    // outputs and never zip them. A single ZIP buffer over several large books
+    // exceeds the typed-array size limit (~2GB) and errors out, and it wastes
+    // memory. Streaming one output at a time keeps peak memory low and delivers
+    // each finished PDF as its own file.
     for (let i = 0; i < files.length; i++) {
       progress(i, files.length);
       const out = await runPipeline(files[i]!.bytes, pipelineSteps, true);
-      outs.push({ name: resolveName(settings.nameTemplate, { fileName: files[i]!.name, tool: toolLabel, pages: 0, paperSize: outPaper, custom: settings.customText }), data: out });
+      downloadPdf(out, resolveName(settings.nameTemplate, { fileName: files[i]!.name, tool: toolLabel, pages: 0, paperSize: outPaper, custom: settings.customText }));
+      // Let the browser flush each download (so rapid ones aren't dropped) and
+      // give the GC a chance to reclaim the output before the next file.
+      await new Promise((r) => setTimeout(r, 500));
     }
     progress(files.length, files.length);
-    if (outs.length === 1) downloadPdf(outs[0]!.data, outs[0]!.name);
-    else downloadFile(makeZip(outs), 'batch-output.zip', 'application/zip');
   }
 
   // Preflight auto-fix: replace the SOURCE document with a corrected copy.
