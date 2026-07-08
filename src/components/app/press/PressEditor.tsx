@@ -27,7 +27,6 @@ export interface PressUsage { authenticated: boolean; isPro: boolean; remaining:
 
 // Sheets rendered per quality tier (preview only — exports are always complete).
 const QUALITY_PX: Record<PreviewQuality, number> = { auto: 0, ultralow: 520, low: 820, standard: 1240, high: 1900 };
-const MAX_SHEETS = 32;
 
 const HIDE_BY_FEATURE: Record<string, string[]> = {
   advancedTools: ['distort', 'slugline', 'foldmarks', 'regmarks', 'collating', 'omr', 'gathering', 'laymarks', 'dimensions', 'whitevarnish', 'braille'],
@@ -209,7 +208,8 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
         const px = settings.previewQuality === 'auto'
           ? (file.info.count > 16 ? 700 : 1000)
           : QUALITY_PX[settings.previewQuality];
-        const r = await rasterizePdfSheets(out, { maxPx: px, maxPages: MAX_SHEETS, fillWhite: fillBg });
+        // Preview every sheet — never cap the count.
+        const r = await rasterizePdfSheets(out, { maxPx: px, fillWhite: fillBg });
         if (seq !== renderSeq.current) return;
         setSheets(r.sheets); setTotalSheets(r.total);
       } catch (e) {
