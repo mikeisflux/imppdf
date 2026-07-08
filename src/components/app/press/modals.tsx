@@ -366,7 +366,10 @@ export function PageManagerModal({ thumbs, pageCount, onClose, onApply, onDownlo
 
 // ── Batch ────────────────────────────────────────────────────────────────────
 
-export interface BatchFile { name: string; bytes: Uint8Array; }
+// Either a pre-loaded buffer (the currently open file) or a lazy File handle.
+// Handles cost ~nothing in memory; their bytes are read only when that file is
+// being processed, so a large batch never holds every source at once.
+export interface BatchFile { name: string; bytes?: Uint8Array; file?: File; }
 
 export function BatchModal({ initial, isPro, onClose, onRun }: {
   initial: BatchFile[]; isPro: boolean; onClose: () => void;
@@ -387,10 +390,11 @@ export function BatchModal({ initial, isPro, onClose, onRun }: {
       <button className="pe-chipbtn" disabled={running} onClick={() => {
         const inp = document.createElement('input');
         inp.type = 'file'; inp.accept = 'application/pdf'; inp.multiple = true;
-        inp.onchange = async () => {
-          const list = Array.from(inp.files ?? []);
-          const loaded = await Promise.all(list.map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
-          setFiles((s) => [...s, ...loaded]);
+        inp.onchange = () => {
+          // Keep File handles only — bytes are read one at a time during the run
+          // so a large batch never loads every source into memory at once.
+          const list = Array.from(inp.files ?? []).map((f) => ({ name: f.name, file: f }));
+          setFiles((s) => [...s, ...list]);
         };
         inp.click();
       }}><Ic name="addstep" size={14} /> Add PDFs</button>

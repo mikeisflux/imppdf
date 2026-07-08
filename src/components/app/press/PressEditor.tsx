@@ -318,11 +318,18 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
     // each finished PDF as its own file.
     for (let i = 0; i < files.length; i++) {
       progress(i, files.length);
-      const out = await runPipeline(files[i]!.bytes, pipelineSteps, true);
-      downloadPdf(out, resolveName(settings.nameTemplate, { fileName: files[i]!.name, tool: toolLabel, pages: 0, paperSize: outPaper, custom: settings.customText }));
-      // Let the browser flush each download (so rapid ones aren't dropped) and
-      // give the GC a chance to reclaim the output before the next file.
-      await new Promise((r) => setTimeout(r, 500));
+      const f = files[i]!;
+      // Read this file's bytes only now (from its File handle), process, and
+      // download it, then let everything for this file be reclaimed before the
+      // next. Peak memory is ~one source + one output — it can't run out on a
+      // large batch, and each finished book downloads as it completes.
+      let bytes = f.bytes ?? new Uint8Array(await f.file!.arrayBuffer());
+      const out = await runPipeline(bytes, pipelineSteps, true);
+      bytes = null as unknown as Uint8Array;                       // release the source
+      downloadPdf(out, resolveName(settings.nameTemplate, { fileName: f.name, tool: toolLabel, pages: 0, paperSize: outPaper, custom: settings.customText }));
+      // Yield so the browser flushes this download (rapid ones aren't dropped)
+      // and the GC can reclaim the output before the next file is read.
+      await new Promise((r) => setTimeout(r, 400));
     }
     progress(files.length, files.length);
   }
