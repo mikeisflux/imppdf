@@ -389,7 +389,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
               <button className="pe-menu-row" onClick={() => { folderRef.current?.click(); setMenu(null); }}>
                 <Ic name="folder" size={16} /> Add Folder…
               </button>
-              <button className="pe-menu-row" disabled={!file || !steps.length} onClick={() => { setModal('batch'); setMenu(null); }}>
+              <button className="pe-menu-row" disabled={!steps.length} onClick={() => { setModal('batch'); setMenu(null); }}>
                 <Ic name="batch" size={16} /> Batch Process…
               </button>
               <button className="pe-menu-row" onClick={() => { setModal('templates'); setMenu(null); }}>
@@ -467,7 +467,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
             </button>
             {menu === 'quality' && <QualityMenu value={settings.previewQuality} onChange={(q) => updateSettings({ ...settings, previewQuality: q })} onClose={() => setMenu(null)} />}
           </div>
-          <button className="pe-tb-chip pe-tb-chip-btn" disabled={!file || !steps.length} onClick={() => setModal('batch')}>
+          <button className="pe-tb-chip pe-tb-chip-btn" disabled={!steps.length} onClick={() => setModal('batch')}>
             <Ic name="batch" size={15} /> Batch {!usage?.isPro && <span className="pe-crown"><Ic name="crown" size={13} /></span>}
           </button>
           <button className="pe-btn pe-btn-print" disabled={!file} onClick={doPrint}><Ic name="print" size={16} /> Print</button>
