@@ -331,6 +331,24 @@ function nupOpts(s: StepSettings) {
   };
 }
 
+// Map a step's settings onto the replicateFill engine options. N-up tools store
+// the gutter as gutterIn/gutterYIn; the dedicated Replicate tool uses
+// gutterXIn/gutterYIn — accept whichever is present.
+function replicateOpts(s: StepSettings) {
+  return {
+    cols: s.cols, rows: s.rows, page: s.page ?? 1,
+    cellWIn: s.cellWIn || undefined, cellHIn: s.cellHIn || undefined,
+    marginIn: s.marginIn,
+    gutterXIn: s.gutterXIn ?? s.gutterIn ?? 0,
+    gutterYIn: s.gutterYIn ?? s.gutterIn ?? 0,
+    fit: (s.fit ?? 'contain') as 'contain' | 'cover' | 'stretch',
+    extras: ((s.extras ?? []) as { bytes: Uint8Array; page?: number; qty?: number }[])
+      .filter((e) => e && e.bytes),
+    addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,
+    centerMarks: !!s.centerMarks, markWeightPt: s.markWeightPt,
+  };
+}
+
 // Insert file B into the pipeline document at a position (or every N pages).
 async function mergeInsert(a: Uint8Array, bFile: Uint8Array, s: StepSettings): Promise<Uint8Array> {
   const { PDFDocument } = await import('pdf-lib');
@@ -404,17 +422,10 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       case 'trifold': case 'zfold': case 'gatefold': case 'menu':
       case 'poster': case 'banner': case 'rollbanner': case 'featherflag': case 'yardsign':
       case 'boxcarton': case 'presfolder':
-        b = await imposeNUp(b, nupOpts(s)); break;
-      case 'replicate': b = await replicateFill(b, {
-        cols: s.cols, rows: s.rows, page: s.page,
-        cellWIn: s.cellWIn || undefined, cellHIn: s.cellHIn || undefined,
-        marginIn: s.marginIn, gutterXIn: s.gutterXIn, gutterYIn: s.gutterYIn,
-        fit: s.fit ?? 'contain',
-        extras: ((s.extras ?? []) as { bytes: Uint8Array; page?: number; qty?: number }[])
-          .filter((e) => e && e.bytes),
-        addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,
-        centerMarks: !!s.centerMarks, markWeightPt: s.markWeightPt,
-      }); break;
+        // Single-sheet gang tools can opt into Replicate (auto-sized sheet +
+        // copies + extra art); otherwise the normal fixed-sheet N-up runs.
+        b = s.replicate ? await replicateFill(b, replicateOpts(s)) : await imposeNUp(b, nupOpts(s)); break;
+      case 'replicate': b = await replicateFill(b, replicateOpts(s)); break;
       case 'nupbook': b = await imposeNUpBook(b, {
         nUp: s.nUp, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, marginIn: s.marginIn,
         gutterIn: s.gutterIn, creepIn: s.creepIn, rtl: !!s.rtl, signatureSheets: s.signatureSheets,

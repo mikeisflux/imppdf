@@ -201,6 +201,7 @@ export interface PanelProps {
   up: (patch: StepSettings) => void;
   unit: Unit;
   onUnit: (u: Unit) => void;
+  type?: StepType;
   pageCount?: number;
   thumbs?: string[];
   pageSizes?: { wPt: number; hPt: number }[];
@@ -273,8 +274,23 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
   const cellAspect = cw / ch, srcAspect = src && src.hPt ? src.wPt / src.hPt : cellAspect;
   const willCrop = !!thumb && (s.fit ?? 'cover') === 'cover'
     && s.imageOffsetX == null && Math.abs(cellAspect - srcAspect) / cellAspect > 0.04;
+  const canReplicate = !!p.type && REPLICABLE_SINGLE_SHEET.has(p.type);
+  const rep = replicateSheet(s, p.pageSizes ?? []);
+  const fmtRep = (v: number) => (unit === 'mm' ? `${(v * 25.4).toFixed(1)} mm` : `${v.toFixed(2)}"`);
   return (
     <>
+      {canReplicate && (
+        <Section label="// REPLICATE" help="Auto-size the sheet to your columns × rows and fill it with as many copies of the image as possible. Add extra images/PDFs to fill leftover cells.">
+          <Check icon="replicateIc" label="Replicate — auto-size sheet & fill with copies" checked={!!s.replicate} onChange={(v) => up({ replicate: v })} />
+          {s.replicate && (
+            <div className="pe-note" style={{ marginTop: 8 }}>
+              Sheet auto-sizes to <b>{fmtRep(rep.wIn)} × {fmtRep(rep.hIn)}</b> from {rep.cols}×{rep.rows} —
+              {' '}{rep.primaryCopies} cop{rep.primaryCopies === 1 ? 'y' : 'ies'}{rep.extraCells > 0 ? ` + ${rep.extraCells} extra` : ''}.
+              The paper size below is ignored while Replicate is on.
+            </div>
+          )}
+        </Section>
+      )}
       <PaperSize {...p} />
       <Section label="// IMAGE FIT" help="How each page/image fills its cell. Cover preserves proportions and crops the overflow.">
         <div className="pe-row" style={{ gap: 8 }}>
@@ -349,6 +365,7 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
       </Section>
       <MarksSection {...p} />
       <BleedsSection {...p} />
+      {canReplicate && s.replicate && <ExtraArtSection s={s} up={up} n={rep.N} />}
     </>
   );
 }
@@ -663,22 +680,94 @@ const WORK_STYLES = [
   { id: 'perfecting', label: 'Perfecting', cap: 'Both sides in one pass' },
 ];
 
+// Flat, cut-apart single-sheet tools that can offer the Replicate option.
+// Excludes anything bound (booklet/comic/perfectbound), folded, large-format
+// or packaging — replicate only makes sense for gang-on-a-sheet items.
+export const REPLICABLE_SINGLE_SHEET = new Set<StepType>([
+  'cards', 'grid', 'cutstack', 'trading', 'bookmark', 'flyer', 'indexcard',
+  'business', 'postcard', 'rackcard', 'hangtag', 'label', 'namebadge', 'ticket',
+  'coupon', 'placecard', 'greeting', 'doorhanger', 'envelope', 'coaster', 'contact', 'compslip',
+]);
+
+// Compute the auto-derived replicate sheet from a step's grid + cell/gutter/margin.
+// N-up tools store the gutter as gutterIn/gutterYIn; the dedicated Replicate tool
+// uses gutterXIn/gutterYIn — read whichever is present.
+function replicateSheet(s: StepSettings, pageSizes: { wPt: number; hPt: number }[]) {
+  const cols = Math.max(1, Math.round(s.cols || 1));
+  const rows = Math.max(1, Math.round(s.rows || 1));
+  const src = pageSizes[0];
+  const cellWIn = s.cellWIn > 0 ? s.cellWIn : (src ? src.wPt / 72 : 3.5);
+  const cellHIn = s.cellHIn > 0 ? s.cellHIn : (src ? src.hPt / 72 : 2);
+  const gx = s.gutterXIn ?? s.gutterIn ?? 0;
+  const gy = s.gutterYIn ?? s.gutterIn ?? 0;
+  const m = s.marginIn ?? 0;
+  const extras = (s.extras ?? []) as { qty?: number }[];
+  const extraCells = extras.reduce((n, e) => n + Math.max(1, Math.round(e.qty ?? 1)), 0);
+  const N = cols * rows;
+  return {
+    cols, rows, N, cellWIn, cellHIn, extraCells,
+    primaryCopies: Math.max(0, N - extraCells),
+    wIn: 2 * m + cols * cellWIn + (cols - 1) * gx,
+    hIn: 2 * m + rows * cellHIn + (rows - 1) * gy,
+  };
+}
+
+// Uploader + list for the additional images/PDFs that fill leftover cells.
+// Shared by the Replicate tool and the Replicate option on N-up tools.
+function ExtraArtSection({ s, up, n }: { s: StepSettings; up: (patch: StepSettings) => void; n: number }) {
+  const extras = (s.extras ?? []) as { name: string; bytes: Uint8Array; page?: number; qty?: number }[];
+  const extraCells = extras.reduce((acc, e) => acc + Math.max(1, Math.round(e.qty ?? 1)), 0);
+  const patchExtra = (i: number, patch: Record<string, unknown>) => up({ extras: extras.map((e, k) => (k === i ? { ...e, ...patch } : e)) });
+  return (
+    <Section label="// ADDITIONAL ART" help="Optional. Drop other images or PDF pages into leftover cells. Each takes as many cells as its quantity; the rest fill with copies of the main image.">
+      {extras.map((e, i) => (
+        <div key={`${e.name}-${i}`} className="pe-gang-job">
+          <div className="pe-row" style={{ marginBottom: 8 }}>
+            <span className="pe-gang-thumb"><Ic name="file" size={16} /></span>
+            <span className="pe-label" style={{ fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+            <button className="pe-iconbtn" aria-label="Remove art" title="Remove art" onClick={() => up({ extras: extras.filter((_, k) => k !== i) })}><Ic name="trash" size={14} /></button>
+          </div>
+          <div className="pe-grid2">
+            <div className="pe-field-col"><span className="pe-label-sm">Page</span><NumRaw value={e.page ?? 1} onValue={(v) => patchExtra(i, { page: Math.max(1, Math.round(v)) })} min={1} /></div>
+            <div className="pe-field-col"><span className="pe-label-sm">Cells</span><NumRaw value={e.qty ?? 1} onValue={(v) => patchExtra(i, { qty: Math.max(1, Math.round(v)) })} min={1} /></div>
+          </div>
+        </div>
+      ))}
+      {extraCells > n && <div className="pe-gang-warn">More extra cells than the grid holds — some extras won&apos;t be placed. Increase columns/rows or reduce quantities.</div>}
+      <div className="pe-gang-addfiles" onClick={() => {
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = 'application/pdf,image/*'; inp.multiple = true;
+        inp.onchange = async () => {
+          const list = Array.from(inp.files ?? []);
+          const next = [...extras];
+          for (const f of list) {
+            let bytes = new Uint8Array(await f.arrayBuffer());
+            // Wrap a raster image in a one-page PDF so it embeds like any source.
+            if (f.type.startsWith('image/')) {
+              const { imageToPdf } = await import('@/lib/imposition-toolkit/impose');
+              bytes = new Uint8Array(await imageToPdf(bytes, f.type));
+            }
+            next.push({ name: f.name, bytes, page: 1, qty: 1 });
+          }
+          up({ extras: next });
+        };
+        inp.click();
+      }}>
+        <Ic name="upload" size={20} />
+        <div>Drag and drop or <span style={{ color: 'var(--pe-violet)' }}>browse</span> to add another image or PDF.</div>
+      </div>
+    </Section>
+  );
+}
+
 // ── Replicate (auto-sized step-and-repeat, single-sheet items only) ─────────
 function ReplicatePanel(p: PanelProps) {
   const { s, up, unit, onUnit, thumbs = [], pageSizes = [] } = p;
   const cols = Math.max(1, Math.round(s.cols || 1));
   const rows = Math.max(1, Math.round(s.rows || 1));
   const N = cols * rows;
-  const src = pageSizes[0];
-  // Cell = explicit size (>0) or the source page's own size. Sheet is derived.
-  const cellWIn = s.cellWIn > 0 ? s.cellWIn : (src ? src.wPt / 72 : 3.5);
-  const cellHIn = s.cellHIn > 0 ? s.cellHIn : (src ? src.hPt / 72 : 2);
-  const sheetWIn = 2 * s.marginIn + cols * cellWIn + (cols - 1) * s.gutterXIn;
-  const sheetHIn = 2 * s.marginIn + rows * cellHIn + (rows - 1) * s.gutterYIn;
-  const extras = (s.extras ?? []) as { name: string; bytes: Uint8Array; page?: number; qty?: number }[];
-  const extraCells = extras.reduce((n, e) => n + Math.max(1, Math.round(e.qty ?? 1)), 0);
-  const primaryCopies = Math.max(0, N - extraCells);
-  const patchExtra = (i: number, patch: Record<string, unknown>) => up({ extras: extras.map((e, k) => (k === i ? { ...e, ...patch } : e)) });
+  const sheet = replicateSheet(s, pageSizes);
+  const { extraCells, primaryCopies } = sheet;
   const fmt = (v: number) => (unit === 'mm' ? `${(v * 25.4).toFixed(1)} mm` : `${v.toFixed(2)}"`);
   return (
     <>
@@ -692,7 +781,7 @@ function ReplicatePanel(p: PanelProps) {
           <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 40 }}>Rows</span><NumRaw value={s.rows} onValue={(v) => up({ rows: Math.max(1, Math.round(v)) })} min={1} /></div>
         </div>
         <div className="pe-note" style={{ marginTop: 10 }}>
-          Sheet auto-sizes to <b>{fmt(sheetWIn)} × {fmt(sheetHIn)}</b> — {N} cell{N === 1 ? '' : 's'}:
+          Sheet auto-sizes to <b>{fmt(sheet.wIn)} × {fmt(sheet.hIn)}</b> — {N} cell{N === 1 ? '' : 's'}:
           {' '}{primaryCopies} cop{primaryCopies === 1 ? 'y' : 'ies'} of the image{extraCells > 0 ? ` + ${extraCells} extra` : ''}.
         </div>
       </Section>
@@ -721,44 +810,7 @@ function ReplicatePanel(p: PanelProps) {
         </div>
       </Section>
       <MarksSection {...p} />
-      <Section label="// ADDITIONAL ART" help="Optional. Drop other images or PDF pages into leftover cells. Each takes as many cells as its quantity; the rest fill with copies of the main image.">
-        {extras.map((e, i) => (
-          <div key={`${e.name}-${i}`} className="pe-gang-job">
-            <div className="pe-row" style={{ marginBottom: 8 }}>
-              <span className="pe-gang-thumb"><Ic name="file" size={16} /></span>
-              <span className="pe-label" style={{ fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
-              <button className="pe-iconbtn" aria-label="Remove art" title="Remove art" onClick={() => up({ extras: extras.filter((_, k) => k !== i) })}><Ic name="trash" size={14} /></button>
-            </div>
-            <div className="pe-grid2">
-              <div className="pe-field-col"><span className="pe-label-sm">Page</span><NumRaw value={e.page ?? 1} onValue={(v) => patchExtra(i, { page: Math.max(1, Math.round(v)) })} min={1} /></div>
-              <div className="pe-field-col"><span className="pe-label-sm">Cells</span><NumRaw value={e.qty ?? 1} onValue={(v) => patchExtra(i, { qty: Math.max(1, Math.round(v)) })} min={1} /></div>
-            </div>
-          </div>
-        ))}
-        {extraCells > N && <div className="pe-gang-warn">More extra cells than the grid holds — some extras won&apos;t be placed. Increase columns/rows or reduce quantities.</div>}
-        <div className="pe-gang-addfiles" onClick={() => {
-          const inp = document.createElement('input');
-          inp.type = 'file'; inp.accept = 'application/pdf,image/*'; inp.multiple = true;
-          inp.onchange = async () => {
-            const list = Array.from(inp.files ?? []);
-            const next = [...extras];
-            for (const f of list) {
-              let bytes = new Uint8Array(await f.arrayBuffer());
-              // Wrap a raster image in a one-page PDF so it embeds like any source.
-              if (f.type.startsWith('image/')) {
-                const { imageToPdf } = await import('@/lib/imposition-toolkit/impose');
-                bytes = new Uint8Array(await imageToPdf(bytes, f.type));
-              }
-              next.push({ name: f.name, bytes, page: 1, qty: 1 });
-            }
-            up({ extras: next });
-          };
-          inp.click();
-        }}>
-          <Ic name="upload" size={20} />
-          <div>Drag and drop or <span style={{ color: 'var(--pe-violet)' }}>browse</span> to add another image or PDF.</div>
-        </div>
-      </Section>
+      <ExtraArtSection s={s} up={up} n={N} />
       {thumbs[0] && <div className="pe-note" style={{ marginTop: 10 }}>Main image: copies fill every cell not used by additional art.</div>}
     </>
   );
