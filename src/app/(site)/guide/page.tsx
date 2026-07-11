@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { GUIDES, POPULAR_GUIDE_LINKS } from '@/lib/tools';
 import { IconArrow } from '@/components/icons';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: 'Guides',
-  description: 'Step-by-step imposition and prepress tutorials — booklets, N-up, step & repeat, bleed and more.',
-};
+  description: 'Step-by-step imposition and prepress tutorials — booklets, N-up, step & repeat, bleed, crop marks and more, all done in your browser.',
+  path: '/guide',
+});
 
 export default function GuidePage() {
   return (

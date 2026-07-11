@@ -5,11 +5,13 @@ import { PlanPanel } from '@/components/account/PlanPanel';
 import { publicConfig } from '@/lib/settings';
 import { CATEGORY_LABEL, toolsByCategory, ToolCategory } from '@/lib/tools';
 import { IconCheck, IconArrow } from '@/components/icons';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: 'Pricing',
-  description: 'Start free, then upgrade to Pro for unlimited downloads. Billed via PayPal.',
-};
+  description: 'Start free, then upgrade to Pro for unlimited downloads and every imposition tool. Billed monthly or yearly via PayPal.',
+  path: '/pricing',
+});
 export const dynamic = 'force-dynamic';
 
 const PRO_FEATURES = [

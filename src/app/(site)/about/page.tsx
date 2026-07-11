@@ -1,6 +1,11 @@
 import Link from 'next/link';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata = { title: 'About', description: 'About ImpositionPDF — browser-based PDF imposition and prepress.' };
+export const metadata = pageMetadata({
+  title: 'About',
+  description: 'About ImpositionPDF — free, browser-based PDF imposition and prepress software. Impose booklets, N-up, gang sheets and more with nothing uploaded.',
+  path: '/about',
+});
 
 export default function AboutPage() {
   return (

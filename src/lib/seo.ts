@@ -1,6 +1,7 @@
 // Centralised SEO copy: keyword set (incl. competitor terms) and JSON-LD
 // structured data. Imported by the root layout and page metadata.
-import { siteName, siteUrl } from './config';
+import type { Metadata } from 'next';
+import { siteName, siteUrl, siteContact } from './config';
 
 export const seoDescription =
   'Free browser-based PDF imposition & prepress software. Impose booklets, N-up, step & repeat, gang sheets, business cards, comics and trade paperbacks with crop marks, bleed and registration — all in your browser, nothing uploaded.';
@@ -43,17 +44,52 @@ export function faqStructuredData() {
   };
 }
 
-// Schema.org SoftwareApplication — helps Google render a rich result.
-export function structuredData() {
+// Schema.org Organization — the brand node every other node points to. Carries
+// the public phone number so it can surface in a knowledge panel.
+export function organizationData() {
   return {
-    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${siteUrl}/#organization`,
+    name: siteName,
+    url: siteUrl,
+    logo: { '@type': 'ImageObject', url: `${siteUrl}/favicon.svg` },
+    image: `${siteUrl}/opengraph-image`,
+    description: seoDescription,
+    telephone: siteContact.phoneE164,
+    contactPoint: [{
+      '@type': 'ContactPoint',
+      telephone: siteContact.phoneE164,
+      contactType: 'customer support',
+      areaServed: 'US',
+      availableLanguage: ['English'],
+    }],
+  };
+}
+
+// Schema.org WebSite — ties the domain to the Organization as publisher.
+export function websiteData() {
+  return {
+    '@type': 'WebSite',
+    '@id': `${siteUrl}/#website`,
+    name: siteName,
+    url: siteUrl,
+    inLanguage: 'en-US',
+    publisher: { '@id': `${siteUrl}/#organization` },
+  };
+}
+
+// Schema.org SoftwareApplication — helps Google render a rich result.
+export function softwareAppData() {
+  return {
     '@type': 'SoftwareApplication',
+    '@id': `${siteUrl}/#app`,
     name: siteName,
     url: siteUrl,
     applicationCategory: 'DesignApplication',
     applicationSubCategory: 'Prepress / PDF Imposition',
     operatingSystem: 'Web browser',
     description: seoDescription,
+    publisher: { '@id': `${siteUrl}/#organization` },
     offers: {
       '@type': 'Offer',
       price: '0',
@@ -68,5 +104,33 @@ export function structuredData() {
     aggregateRating: {
       '@type': 'AggregateRating', ratingValue: '4.8', ratingCount: '126',
     },
+  };
+}
+
+// Single connected @graph emitted site-wide in the root layout: Organization +
+// WebSite + SoftwareApplication, cross-linked by @id.
+export function siteGraph() {
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [organizationData(), websiteData(), softwareAppData()],
+  };
+}
+
+// ── Reusable page metadata ───────────────────────────────────────────────────
+// Builds a consistent Metadata object with canonical URL, Open Graph and Twitter
+// cards for every static page, so no page ships without them.
+export function pageMetadata(opts: {
+  title: string; description: string; path: string; noindex?: boolean;
+}): Metadata {
+  const { title, description, path, noindex } = opts;
+  const canonical = path.startsWith('http') ? path : path || '/';
+  const ogTitle = `${title} · ${siteName}`;
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: { type: 'website', siteName, title: ogTitle, description, url: `${siteUrl}${canonical === '/' ? '' : canonical}` },
+    twitter: { card: 'summary_large_image', title: ogTitle, description },
+    ...(noindex ? { robots: { index: false, follow: true } } : {}),
   };
 }

@@ -5,6 +5,14 @@ export const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'ImpositionPDF';
 export const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
+// Public contact details — surfaced in the footer, the contact page and the
+// Organization structured data (NAP consistency helps local/brand SEO).
+export const siteContact = {
+  phoneDisplay: process.env.NEXT_PUBLIC_SITE_PHONE || '(219) 238-6540',
+  phoneHref: 'tel:+12192386540',   // E.164 for tel: links
+  phoneE164: '+1-219-238-6540',    // schema.org telephone
+};
+
 export const recaptcha = {
   siteKey: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '',
   version: (process.env.NEXT_PUBLIC_RECAPTCHA_VERSION || 'v2') as 'v2' | 'v3',

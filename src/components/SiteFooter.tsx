@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { TOOLS, Tool } from '@/lib/tools';
+import { siteContact } from '@/lib/config';
 
 // Group tools into the four footer columns shown in the design.
 const COLS: { title: string; cats: Tool['category'][] }[] = [
@@ -33,7 +34,11 @@ export function SiteFooter() {
         </div>
 
         <div className="pp-footer-bottom">
-          <div className="muted">© 2026 ImpositionPDF. Files stay on your device.</div>
+          <div className="muted">
+            © 2026 ImpositionPDF. Files stay on your device.
+            <span className="sep">/</span>
+            <a href={siteContact.phoneHref}>{siteContact.phoneDisplay}</a>
+          </div>
           <div className="pp-footer-links">
             <Link href="/about">About</Link>
             <span className="sep">/</span>

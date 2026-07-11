@@ -1,4 +1,10 @@
-export const metadata = { title: 'Privacy Policy' };
+import { pageMetadata } from '@/lib/seo';
+
+export const metadata = pageMetadata({
+  title: 'Privacy Policy',
+  description: 'How ImpositionPDF handles your data. Your PDFs are imposed locally in your browser and never uploaded to our servers.',
+  path: '/privacy',
+});
 
 export default function PrivacyPage() {
   return (

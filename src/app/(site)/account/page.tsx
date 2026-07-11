@@ -6,7 +6,7 @@ import { publicConfig } from '@/lib/settings';
 import { PlanPanel } from '@/components/account/PlanPanel';
 import { LogoutButton } from '@/components/account/LogoutButton';
 
-export const metadata = { title: 'My account' };
+export const metadata = { title: 'My account', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 export default async function AccountPage() {

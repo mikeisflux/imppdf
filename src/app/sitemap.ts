@@ -5,11 +5,11 @@ import { COMPETITORS } from '@/lib/compare';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  const staticRoutes = ['', '/about', '/pricing', '/guide', '/contact', '/compare'].map((path) => ({
+  const staticRoutes = ['', '/app', '/about', '/pricing', '/guide', '/contact', '/compare'].map((path) => ({
     url: `${siteUrl}${path}`,
     lastModified: now,
     changeFrequency: 'weekly' as const,
-    priority: path === '' ? 1 : 0.7,
+    priority: path === '' ? 1 : path === '/app' ? 0.9 : 0.7,
   }));
   const toolRoutes = TOOLS.map((t) => ({
     url: `${siteUrl}/tools/${t.slug}`,

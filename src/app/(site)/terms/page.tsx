@@ -1,4 +1,10 @@
-export const metadata = { title: 'Terms of Service' };
+import { pageMetadata } from '@/lib/seo';
+
+export const metadata = pageMetadata({
+  title: 'Terms of Service',
+  description: 'The terms that govern your use of ImpositionPDF, our free browser-based PDF imposition and prepress software.',
+  path: '/terms',
+});
 
 export default function TermsPage() {
   return (
