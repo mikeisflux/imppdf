@@ -663,6 +663,107 @@ const WORK_STYLES = [
   { id: 'perfecting', label: 'Perfecting', cap: 'Both sides in one pass' },
 ];
 
+// ── Replicate (auto-sized step-and-repeat, single-sheet items only) ─────────
+function ReplicatePanel(p: PanelProps) {
+  const { s, up, unit, onUnit, thumbs = [], pageSizes = [] } = p;
+  const cols = Math.max(1, Math.round(s.cols || 1));
+  const rows = Math.max(1, Math.round(s.rows || 1));
+  const N = cols * rows;
+  const src = pageSizes[0];
+  // Cell = explicit size (>0) or the source page's own size. Sheet is derived.
+  const cellWIn = s.cellWIn > 0 ? s.cellWIn : (src ? src.wPt / 72 : 3.5);
+  const cellHIn = s.cellHIn > 0 ? s.cellHIn : (src ? src.hPt / 72 : 2);
+  const sheetWIn = 2 * s.marginIn + cols * cellWIn + (cols - 1) * s.gutterXIn;
+  const sheetHIn = 2 * s.marginIn + rows * cellHIn + (rows - 1) * s.gutterYIn;
+  const extras = (s.extras ?? []) as { name: string; bytes: Uint8Array; page?: number; qty?: number }[];
+  const extraCells = extras.reduce((n, e) => n + Math.max(1, Math.round(e.qty ?? 1)), 0);
+  const primaryCopies = Math.max(0, N - extraCells);
+  const patchExtra = (i: number, patch: Record<string, unknown>) => up({ extras: extras.map((e, k) => (k === i ? { ...e, ...patch } : e)) });
+  const fmt = (v: number) => (unit === 'mm' ? `${(v * 25.4).toFixed(1)} mm` : `${v.toFixed(2)}"`);
+  return (
+    <>
+      <div className="pe-note" style={{ marginBottom: 12 }}>
+        Replicate fills a grid with copies of your image and <b>sizes the sheet to the columns &amp; rows</b> you choose.
+        For flat, single-sheet items only (cards, labels, stickers, coasters). Not for booklets, saddle/perfect-bound or comics.
+      </div>
+      <Section label="// GRID" help="Choose columns and rows. The sheet size is computed from these and the cell size.">
+        <div className="pe-grid2">
+          <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 56 }}>Columns</span><NumRaw value={s.cols} onValue={(v) => up({ cols: Math.max(1, Math.round(v)) })} min={1} /></div>
+          <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 40 }}>Rows</span><NumRaw value={s.rows} onValue={(v) => up({ rows: Math.max(1, Math.round(v)) })} min={1} /></div>
+        </div>
+        <div className="pe-note" style={{ marginTop: 10 }}>
+          Sheet auto-sizes to <b>{fmt(sheetWIn)} × {fmt(sheetHIn)}</b> — {N} cell{N === 1 ? '' : 's'}:
+          {' '}{primaryCopies} cop{primaryCopies === 1 ? 'y' : 'ies'} of the image{extraCells > 0 ? ` + ${extraCells} extra` : ''}.
+        </div>
+      </Section>
+      <Section label="// CELL SIZE" help="Leave at 0 to use the image's own size — the sheet then auto-populates from the art. Set a size to scale every cell.">
+        <div className="pe-row"><span className="pe-label">Cell size</span><span style={{ flex: 1 }} /><UnitSel unit={unit} onChange={onUnit} /></div>
+        <div className="pe-grid2">
+          <div className="pe-field-col"><span className="pe-label-sm">Width (0 = auto)</span><NumIn valueIn={s.cellWIn ?? 0} unit={unit} onIn={(v) => up({ cellWIn: Math.max(0, v) })} /></div>
+          <div className="pe-field-col"><span className="pe-label-sm">Height (0 = auto)</span><NumIn valueIn={s.cellHIn ?? 0} unit={unit} onIn={(v) => up({ cellHIn: Math.max(0, v) })} /></div>
+        </div>
+        <div className="pe-row" style={{ marginTop: 8, gap: 8 }}>
+          <span className="pe-label" style={{ width: 56 }}>Fit</span>
+          <select className="pe-select" value={s.fit ?? 'contain'} onChange={(e) => up({ fit: e.target.value })} style={{ flex: 1 }}>
+            <option value="contain">Contain — fit inside the cell</option>
+            <option value="cover">Cover — fill &amp; crop</option>
+            <option value="stretch">Stretch — distort to fill</option>
+          </select>
+        </div>
+      </Section>
+      <Section label="// WHITE SPACE" help="Paper margin around the whole grid and gutters between cells.">
+        <div className="pe-row"><span className="pe-label">Margin</span></div>
+        <div className="pe-row"><NumIn valueIn={s.marginIn} unit={unit} onIn={(v) => up({ marginIn: Math.max(0, v) })} /></div>
+        <div className="pe-row" style={{ marginTop: 8 }}><span className="pe-label">Gutters</span></div>
+        <div className="pe-grid2">
+          <div className="pe-field-col"><span className="pe-label-sm">Horizontal</span><NumIn valueIn={s.gutterXIn} unit={unit} onIn={(v) => up({ gutterXIn: Math.max(0, v) })} /></div>
+          <div className="pe-field-col"><span className="pe-label-sm">Vertical</span><NumIn valueIn={s.gutterYIn} unit={unit} onIn={(v) => up({ gutterYIn: Math.max(0, v) })} /></div>
+        </div>
+      </Section>
+      <MarksSection {...p} />
+      <Section label="// ADDITIONAL ART" help="Optional. Drop other images or PDF pages into leftover cells. Each takes as many cells as its quantity; the rest fill with copies of the main image.">
+        {extras.map((e, i) => (
+          <div key={`${e.name}-${i}`} className="pe-gang-job">
+            <div className="pe-row" style={{ marginBottom: 8 }}>
+              <span className="pe-gang-thumb"><Ic name="file" size={16} /></span>
+              <span className="pe-label" style={{ fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+              <button className="pe-iconbtn" aria-label="Remove art" title="Remove art" onClick={() => up({ extras: extras.filter((_, k) => k !== i) })}><Ic name="trash" size={14} /></button>
+            </div>
+            <div className="pe-grid2">
+              <div className="pe-field-col"><span className="pe-label-sm">Page</span><NumRaw value={e.page ?? 1} onValue={(v) => patchExtra(i, { page: Math.max(1, Math.round(v)) })} min={1} /></div>
+              <div className="pe-field-col"><span className="pe-label-sm">Cells</span><NumRaw value={e.qty ?? 1} onValue={(v) => patchExtra(i, { qty: Math.max(1, Math.round(v)) })} min={1} /></div>
+            </div>
+          </div>
+        ))}
+        {extraCells > N && <div className="pe-gang-warn">More extra cells than the grid holds — some extras won&apos;t be placed. Increase columns/rows or reduce quantities.</div>}
+        <div className="pe-gang-addfiles" onClick={() => {
+          const inp = document.createElement('input');
+          inp.type = 'file'; inp.accept = 'application/pdf,image/*'; inp.multiple = true;
+          inp.onchange = async () => {
+            const list = Array.from(inp.files ?? []);
+            const next = [...extras];
+            for (const f of list) {
+              let bytes = new Uint8Array(await f.arrayBuffer());
+              // Wrap a raster image in a one-page PDF so it embeds like any source.
+              if (f.type.startsWith('image/')) {
+                const { imageToPdf } = await import('@/lib/imposition-toolkit/impose');
+                bytes = new Uint8Array(await imageToPdf(bytes, f.type));
+              }
+              next.push({ name: f.name, bytes, page: 1, qty: 1 });
+            }
+            up({ extras: next });
+          };
+          inp.click();
+        }}>
+          <Ic name="upload" size={20} />
+          <div>Drag and drop or <span style={{ color: 'var(--pe-violet)' }}>browse</span> to add another image or PDF.</div>
+        </div>
+      </Section>
+      {thumbs[0] && <div className="pe-note" style={{ marginTop: 10 }}>Main image: copies fill every cell not used by additional art.</div>}
+    </>
+  );
+}
+
 function GangSheetPanel(p: PanelProps) {
   const { s, up, unit, onUnit, pageCount = 0, thumbs = [], pageSizes = [] } = p;
   // Sync one job per source page whenever the loaded document changes.
@@ -1721,7 +1822,7 @@ function PreflightPanel({ sourceBytes, pageSizes = [], pageCount = 0, onApplyFix
 
 // N-Up-driven layout tools (generic + domain presets) all use the N-Up panel.
 const NUP_TOOLS = new Set<StepType>([
-  'cards', 'grid', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer',
+  'cards', 'grid', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer', 'indexcard',
   'business', 'postcard', 'rackcard', 'hangtag', 'label', 'namebadge', 'ticket', 'coupon', 'placecard', 'greeting',
   'doorhanger', 'envelope', 'coaster', 'contact', 'compslip',
   'trifold', 'zfold', 'gatefold', 'menu',
@@ -1743,6 +1844,7 @@ export function StepPanelBody(props: PanelProps & { type: StepType }) {
   if (type === 'colorbar') return <ColorBarPanel {...props} />;
   if (type === 'cuttermarks') return <CutterMarksPanel {...props} />;
   if (type === 'regmarks') return <CutterMarksPanel {...props} lite />;
+  if (type === 'replicate') return <ReplicatePanel {...props} />;
   if (type === 'gangsheet') return <GangSheetPanel {...props} />;
   if (type === 'customimpose') return <CustomImposePanel {...props} />;
   if (type === 'pdftools') return <PdfToolsPanel {...props} />;

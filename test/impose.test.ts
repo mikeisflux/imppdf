@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp, imposeBooklet } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -103,4 +103,29 @@ test('fieryBooklet: single pages out, spine bleed trimmed per page', async () =>
     assert.ok(Math.abs(s.width - (W - B)) < 0.5, `page width trimmed by one bleed (${s.width})`);
     assert.ok(Math.abs(s.height - H) < 0.5, 'height unchanged');
   }
+});
+
+test('replicateFill: sheet auto-sizes to cols×rows of the source page', async () => {
+  const PT2 = 72, W = 3.5 * PT2, H = 2 * PT2;      // 3.5×2" card
+  const out = await replicateFill(await pdfOf(1, W, H), {
+    cols: 2, rows: 5, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125, addMarks: false,
+  });
+  const doc = await PDFDocument.load(out);
+  assert.equal(doc.getPageCount(), 1);
+  const s = doc.getPage(0).getSize();
+  const expW = (2 * 0.25 + 2 * 3.5 + 1 * 0.125) * PT2;
+  const expH = (2 * 0.25 + 5 * 2 + 4 * 0.125) * PT2;
+  assert.ok(Math.abs(s.width - expW) < 0.5, `sheet width from grid (${s.width} vs ${expW})`);
+  assert.ok(Math.abs(s.height - expH) < 0.5, `sheet height from grid (${s.height} vs ${expH})`);
+});
+
+test('replicateFill: extra art occupies its cells, primary fills the rest', async () => {
+  const PT2 = 72, W = 3 * PT2, H = 3 * PT2;
+  const extra = await pdfOf(1, W, H);
+  const out = await replicateFill(await pdfOf(1, W, H), {
+    cols: 2, rows: 2, marginIn: 0, gutterXIn: 0, gutterYIn: 0, addMarks: false,
+    extras: [{ bytes: extra, qty: 1 }],
+  });
+  const doc = await PDFDocument.load(out);
+  assert.equal(doc.getPageCount(), 1);             // still one packed sheet
 });

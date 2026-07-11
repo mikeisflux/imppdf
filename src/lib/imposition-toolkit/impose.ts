@@ -3713,6 +3713,157 @@ export async function getPageSizes(bytes: Uint8Array): Promise<{ wPt: number; hP
   return doc.getPages().map((p) => { const { width, height } = p.getSize(); return { wPt: width, hPt: height }; });
 }
 
+// ── Replicate (single-sheet step-and-repeat with auto sheet size) ───────────
+// Fills a cols×rows grid with copies of one image/PDF page and SIZES THE SHEET
+// to the grid — the sheet is derived from the chosen columns and rows, not the
+// other way round. Any leftover cells (when extra art is added) are filled with
+// additional images/PDF pages so a single press sheet is packed edge to edge.
+// This is for FLAT single-sheet items only (cards, labels, stickers, coasters…)
+// — never booklets, saddle/perfect-bound, or graphic-novel signatures.
+
+// Wrap a raster image (JPEG/PNG, or anything the browser can decode) into a
+// one-page PDF sized to the image, so it embeds like any other source page.
+async function rasterImageToPng(bytes: Uint8Array, mime: string): Promise<{ png: Uint8Array; w: number; h: number }> {
+  const blob = new Blob([new Uint8Array(bytes)], { type: mime || 'image/png' });
+  const bmp = await createImageBitmap(blob);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const canvas: any = typeof OffscreenCanvas !== 'undefined'
+    ? new OffscreenCanvas(bmp.width, bmp.height)
+    : Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
+  canvas.getContext('2d').drawImage(bmp, 0, 0);
+  const out: Blob = canvas.convertToBlob
+    ? await canvas.convertToBlob({ type: 'image/png' })
+    : await new Promise<Blob>((res) => canvas.toBlob((b: Blob) => res(b), 'image/png'));
+  return { png: new Uint8Array(await out.arrayBuffer()), w: bmp.width, h: bmp.height };
+}
+
+export async function imageToPdf(bytes: Uint8Array, mime: string): Promise<Uint8Array> {
+  const { PDFDocument } = await import('pdf-lib');
+  const doc = await PDFDocument.create();
+  const isJpg = /jpe?g/i.test(mime) || (bytes[0] === 0xff && bytes[1] === 0xd8);
+  const isPng = /png/i.test(mime) || (bytes[0] === 0x89 && bytes[1] === 0x50);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let emb: any;
+  if (isJpg) emb = await doc.embedJpg(bytes);
+  else if (isPng) emb = await doc.embedPng(bytes);
+  else { const r = await rasterImageToPng(bytes, mime); emb = await doc.embedPng(r.png); }
+  const pg = doc.addPage([emb.width, emb.height]);
+  pg.drawImage(emb, { x: 0, y: 0, width: emb.width, height: emb.height });
+  return doc.save();
+}
+
+export interface ReplicateExtra {
+  bytes: Uint8Array;      // an additional image-PDF / vector PDF to drop into a cell
+  page?: number;          // 1-based page within that file (default 1)
+  qty?: number;           // how many cells it should occupy (default 1)
+}
+
+export interface ReplicateOptions {
+  cols: number;
+  rows: number;
+  page?: number;          // primary page (1-based, default 1)
+  cellWIn?: number;       // explicit cell size; when omitted the primary page size is the cell
+  cellHIn?: number;
+  marginIn: number;       // paper margin around the whole grid
+  gutterXIn: number;      // gap between columns
+  gutterYIn: number;      // gap between rows
+  fit?: 'contain' | 'stretch' | 'cover';   // how each item fills its cell (default contain)
+  extras?: ReplicateExtra[];
+  addMarks?: boolean; markLenIn?: number; markOffIn?: number; centerMarks?: boolean; markWeightPt?: number;
+}
+
+export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions): Promise<Uint8Array> {
+  const { PDFDocument, rgb } = await import('pdf-lib');
+  const cols = Math.max(1, Math.round(opts.cols));
+  const rows = Math.max(1, Math.round(opts.rows));
+  const N = cols * rows;
+  const fit = opts.fit ?? 'contain';
+
+  const srcDoc = await PDFDocument.load(primary, { ignoreEncryption: true });
+  const srcPages = srcDoc.getPages();
+  if (!srcPages.length) throw new Error('Empty PDF');
+  const pIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.page ?? 1))) - 1;
+  const primaryPage = srcPages[pIdx]!;
+  const pSize = primaryPage.getSize();
+
+  // Cell = explicit size if given, else the primary page's own size. The sheet
+  // is then computed FROM the grid.
+  const cellW = opts.cellWIn ? opts.cellWIn * PT : pSize.width;
+  const cellH = opts.cellHIn ? opts.cellHIn * PT : pSize.height;
+  const m = opts.marginIn * PT, gx = opts.gutterXIn * PT, gy = opts.gutterYIn * PT;
+  const sheetW = 2 * m + cols * cellW + (cols - 1) * gx;
+  const sheetH = 2 * m + rows * cellH + (rows - 1) * gy;
+
+  const outDoc = await PDFDocument.create();
+  const pg = outDoc.addPage([sheetW, sheetH]);
+
+  // Embed the primary page once.
+  const [primEmb] = await outDoc.embedPages([primaryPage]);
+
+  // Build the cell fill order: extras first (each taking `qty` cells), then the
+  // primary fills every remaining cell — "as many copies as possible".
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type CellArt = { emb: any; w: number; h: number };
+  const order: CellArt[] = [];
+  for (const ex of opts.extras ?? []) {
+    if (order.length >= N) break;
+    try {
+      const exDoc = await PDFDocument.load(ex.bytes.slice(), { ignoreEncryption: true });
+      const exPages = exDoc.getPages();
+      if (!exPages.length) continue;
+      const exi = Math.min(exPages.length, Math.max(1, Math.round(ex.page ?? 1))) - 1;
+      const exPage = exPages[exi]!;
+      const [exEmb] = await outDoc.embedPages([exPage]);
+      const es = exPage.getSize();
+      const qty = Math.max(1, Math.round(ex.qty ?? 1));
+      for (let q = 0; q < qty && order.length < N; q++) order.push({ emb: exEmb, w: es.width, h: es.height });
+    } catch { /* skip an unreadable extra */ }
+  }
+  while (order.length < N) order.push({ emb: primEmb, w: pSize.width, h: pSize.height });
+
+  const markStyle: MarkStyle = { center: !!opts.centerMarks, weight: opts.markWeightPt };
+  const off = (opts.markOffIn ?? 0.125) * PT, len = (opts.markLenIn ?? 0.43) * PT;
+
+  // Draw row-major, top row first (top-down reading order on the sheet).
+  for (let i = 0; i < N; i++) {
+    const art = order[i]!;
+    const col = i % cols, row = Math.floor(i / cols);
+    const cellX = m + col * (cellW + gx);
+    const cellYTop = m + row * (cellH + gy);          // from the top edge
+    const cellY = sheetH - cellYTop - cellH;          // PDF bottom-up
+
+    // Scale the art into the cell per the fit mode.
+    let dw = cellW, dh = cellH, dx = cellX, dy = cellY;
+    if (fit !== 'stretch') {
+      const sc = fit === 'cover'
+        ? Math.max(cellW / art.w, cellH / art.h)
+        : Math.min(cellW / art.w, cellH / art.h);
+      dw = art.w * sc; dh = art.h * sc;
+      dx = cellX + (cellW - dw) / 2;
+      dy = cellY + (cellH - dh) / 2;
+    }
+
+    if (fit === 'cover' && (dw > cellW + 0.5 || dh > cellH + 0.5)) {
+      // Clip the overflow to the cell so neighbours stay clean (pdf-lib exposes
+      // no clip helper — build the clip path with low-level content operators).
+      const { pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } = await import('pdf-lib');
+      pg.pushOperators(pushGraphicsState(),
+        moveTo(cellX, cellY), lineTo(cellX + cellW, cellY),
+        lineTo(cellX + cellW, cellY + cellH), lineTo(cellX, cellY + cellH),
+        closePath(), clip(), endPath());
+      pg.drawPage(art.emb, { x: dx, y: dy, width: dw, height: dh });
+      pg.pushOperators(popGraphicsState());
+    } else {
+      pg.drawPage(art.emb, { x: dx, y: dy, width: dw, height: dh });
+    }
+
+    if (opts.addMarks) drawCropMarks(pg, rgb, cellX, cellY, cellW, cellH, off, len, markStyle);
+  }
+
+  await carryColorContext(srcDoc, outDoc);
+  return outDoc.save();
+}
+
 // ── Gang sheet (per-job quantities, shelf packing) ──────────────────────────
 // Packs jobs — (source, page, quantity) triples — onto press sheets using
 // first-fit-decreasing shelf packing. Jobs that cannot fit even on an empty

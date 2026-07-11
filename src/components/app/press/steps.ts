@@ -12,6 +12,7 @@ import {
   nestPdf, imposeCalendar, insertPages as insertPagesOp, mixPdfs, nudgePdf,
   addBackdropFile, applyColorEffects, applyColorManagement, addBarcodeStamp,
   addDimensions, addWhiteVarnish, addBraille, optimizePdf, repairPdf, decryptPdf, setLayers,
+  replicateFill,
 } from '@/lib/imposition-toolkit/impose';
 import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/imposition-toolkit/impose';
 
@@ -30,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'replicate' | 'indexcard';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -130,6 +131,19 @@ export function defaultSettings(type: StepType): StepSettings {
       // Single-page output for a Fiery/DFE booklet maker; spine-side bleed is
       // trimmed per page. Fiery bleed is always 1/8".
       return { rtl: false, coverIsPage1: true, setTrimBox: true };
+    case 'replicate':
+      // Step-and-repeat that SIZES the sheet to the chosen columns × rows and
+      // fills every cell with a copy of the image. cellWIn/cellHIn of 0 means
+      // "use the source's own size" so the sheet auto-populates from the art.
+      // Extra images/PDFs drop into leftover cells. Single-sheet items only.
+      return {
+        cols: 3, rows: 3, cellWIn: 0, cellHIn: 0, page: 1,
+        marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125, fit: 'contain',
+        extras: [], ...MARKS,
+      };
+    case 'indexcard':
+      // Index cards (3×5"), 4-up on Letter, one copy per cell.
+      return nupPreset({ cols: 2, rows: 2, cellWIn: 3, cellHIn: 5, order: 'repeat' });
     case 'editpdf':
       return {};
     case 'booklet':
@@ -383,7 +397,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         break;
       }
       case 'cards': case 'grid': case 'cutstack': case 'perfectbound':
-      case 'trading': case 'bookmark': case 'flyer':
+      case 'trading': case 'bookmark': case 'flyer': case 'indexcard':
       case 'business': case 'postcard': case 'rackcard': case 'hangtag': case 'label':
       case 'namebadge': case 'ticket': case 'coupon': case 'placecard': case 'greeting':
       case 'doorhanger': case 'envelope': case 'coaster': case 'contact': case 'compslip':
@@ -391,6 +405,16 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       case 'poster': case 'banner': case 'rollbanner': case 'featherflag': case 'yardsign':
       case 'boxcarton': case 'presfolder':
         b = await imposeNUp(b, nupOpts(s)); break;
+      case 'replicate': b = await replicateFill(b, {
+        cols: s.cols, rows: s.rows, page: s.page,
+        cellWIn: s.cellWIn || undefined, cellHIn: s.cellHIn || undefined,
+        marginIn: s.marginIn, gutterXIn: s.gutterXIn, gutterYIn: s.gutterYIn,
+        fit: s.fit ?? 'contain',
+        extras: ((s.extras ?? []) as { bytes: Uint8Array; page?: number; qty?: number }[])
+          .filter((e) => e && e.bytes),
+        addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,
+        centerMarks: !!s.centerMarks, markWeightPt: s.markWeightPt,
+      }); break;
       case 'nupbook': b = await imposeNUpBook(b, {
         nUp: s.nUp, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, marginIn: s.marginIn,
         gutterIn: s.gutterIn, creepIn: s.creepIn, rtl: !!s.rtl, signatureSheets: s.signatureSheets,
@@ -604,6 +628,7 @@ const WF_KEY = 'pp_workflows';
 function stripBytes(s: StepSettings): StepSettings {
   const c: StepSettings = { ...s };
   if (Array.isArray(c.files)) c.files = [];
+  if (Array.isArray(c.extras)) c.extras = [];
   if (c.stamp) { c.stamp = null; c.stampName = ''; }
   return c;
 }
