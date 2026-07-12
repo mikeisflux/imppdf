@@ -456,9 +456,13 @@ export interface NUpOptions {
   markLenIn: number;
   markOffIn: number;
   // Optional: place each item at a fixed physical size (cards/labels). When set,
-  // cols/rows are auto-computed to fit the sheet and the grid is centered.
+  // cols/rows are honoured (clamped to what fits) and the grid is centered.
   cellWIn?: number;
   cellHIn?: number;
+  // Auto-orient the cell to the artwork: if the source page is landscape but the
+  // cell is portrait (or vice-versa), swap the cell's width/height so the art
+  // isn't cropped to the wrong orientation. Default on for fixed-size cells.
+  autoOrient?: boolean;
   // Optional vertical gutter (defaults to gutterIn). Lets labels use a
   // horizontal gutter with zero vertical gap (e.g. Avery 5160).
   gutterYIn?: number;
@@ -494,6 +498,13 @@ export interface NUpOptions {
   perImage?: Record<number, { fit?: 'cover' | 'contain' | 'stretch'; imageZoom?: number; imageOffsetX?: number; imageOffsetY?: number }>;
 }
 
+// Orient a fixed cell to the artwork: swap width/height when the source and cell
+// disagree on landscape/portrait. Returns the (possibly swapped) [w, h] inches.
+export function orientCell(cellWIn: number, cellHIn: number, srcLandscape: boolean): [number, number] {
+  const cellLandscape = cellWIn > cellHIn;
+  return srcLandscape === cellLandscape ? [cellWIn, cellHIn] : [cellHIn, cellWIn];
+}
+
 // Compute the effective grid for an N-Up layout (shared by engine + preview).
 export interface NUpGrid { cols: number; rows: number; cellWPt: number; cellHPt: number; leftGapPt: number; topGapPt: number; gxPt: number; gyPt: number; }
 export function computeNUpGrid(opts: NUpOptions): NUpGrid {
@@ -525,7 +536,15 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
   const srcPages = srcDoc.getPages();
   const N = srcPages.length;
   const shW=opts.sheetWIn*PT, shH=opts.sheetHIn*PT;
-  const { cols, rows, cellWPt:cellW, cellHPt:cellH, leftGapPt, topGapPt, gxPt, gyPt } = computeNUpGrid(opts);
+  // Respect the artwork's orientation: if it's landscape but the fixed cell is
+  // portrait (or vice-versa), swap the cell so the art isn't cropped sideways.
+  let gridOpts = opts;
+  if (opts.autoOrient !== false && opts.cellWIn && opts.cellHIn && srcPages.length) {
+    const s0 = srcPages[0]!.getSize();
+    const [cw, ch] = orientCell(opts.cellWIn, opts.cellHIn, s0.width > s0.height);
+    if (cw !== opts.cellWIn) gridOpts = { ...opts, cellWIn: cw, cellHIn: ch };
+  }
+  const { cols, rows, cellWPt:cellW, cellHPt:cellH, leftGapPt, topGapPt, gxPt, gyPt } = computeNUpGrid(gridOpts);
   const perSheet=cols*rows;
   const duplex=!!opts.duplex;
   // In duplex mode the source is front,back,front,back… so one "item" = 2 pages.

@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { zineSheetLayout, zinePanels, type ZineFormat } from '@/lib/imposition-toolkit/impose';
+import { zineSheetLayout, zinePanels, orientCell, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
 import { ImageFitModal } from './image-fit-modal';
@@ -267,10 +267,14 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
   const thumbs = p.thumbs ?? [];
   const thumb = thumbs[0] || '';
   const perImageCount = Object.keys(s.perImage ?? {}).length;
-  const cw = s.cellWIn || (s.sheetWIn ?? 8.5) / (s.cols || 2);
-  const ch = s.cellHIn || (s.sheetHIn ?? 11) / (s.rows || 2);
+  let cw = s.cellWIn || (s.sheetWIn ?? 8.5) / (s.cols || 2);
+  let ch = s.cellHIn || (s.sheetHIn ?? 11) / (s.rows || 2);
   // Cropping happens when the source aspect doesn't match the cell and fit=cover.
   const src = (p.pageSizes ?? [])[0];
+  // Mirror the engine's auto-orient: show the cell in the artwork's orientation.
+  if (s.autoOrient !== false && s.cellWIn && s.cellHIn && src && src.wPt && src.hPt) {
+    [cw, ch] = orientCell(cw, ch, src.wPt > src.hPt);
+  }
   const cellAspect = cw / ch, srcAspect = src && src.hPt ? src.wPt / src.hPt : cellAspect;
   const willCrop = !!thumb && (s.fit ?? 'cover') === 'cover'
     && s.imageOffsetX == null && Math.abs(cellAspect - srcAspect) / cellAspect > 0.04;
@@ -336,6 +340,7 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
       <Section label="// LAYOUT" help="Rows, columns and scaling.">
         <Check icon="fit" label="Autoscale" checked={s.autoscale !== false} onChange={(v) => up({ autoscale: v })} />
         <Check icon="resize" label="Preserve aspect ratio" checked={s.preserveAspect !== false} onChange={(v) => up({ preserveAspect: v })} />
+        <Check icon="rotate" label="Auto-orient cell to artwork" checked={s.autoOrient !== false} onChange={(v) => up({ autoOrient: v })} />
         <div className="pe-grid2" style={{ marginTop: 6 }}>
           <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 56 }}>Columns</span><NumRaw value={s.cols} onValue={(v) => up({ cols: Math.max(1, Math.round(v)) })} min={1} /></div>
           <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 40 }}>Rows</span><NumRaw value={s.rows} onValue={(v) => up({ rows: Math.max(1, Math.round(v)) })} min={1} /></div>

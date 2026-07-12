@@ -321,6 +321,7 @@ function nupOpts(s: StepSettings) {
   return {
     cols: s.cols, rows: s.rows, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn,
     cellWIn: s.cellWIn || undefined, cellHIn: s.cellHIn || undefined,
+    autoOrient: s.autoOrient !== false,   // orient the cell to the artwork by default
     duplexFlip: s.duplexFlip, rtl: !!s.rtl,
     marginIn: s.marginIn, gutterIn: s.gutterIn, gutterYIn: s.gutterYIn,
     repeatFirst: s.order === 'repeat', cutStack: s.order === 'cutstack', snake: !!s.snake,

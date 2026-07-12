@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, orientCell } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -37,6 +37,22 @@ test('computeNUpGrid: 1×1 places a single cell even when many would fit', () =>
   const g = computeNUpGrid({ ...baseNUp, cols: 1, rows: 1, cellWIn: 3, cellHIn: 5 });
   assert.equal(g.cols, 1);
   assert.equal(g.rows, 1);
+});
+
+test('orientCell swaps a portrait cell for landscape artwork (and leaves matches alone)', () => {
+  assert.deepEqual(orientCell(3, 5, true), [5, 3]);    // portrait cell, landscape art → swap
+  assert.deepEqual(orientCell(3, 5, false), [3, 5]);   // both portrait → unchanged
+  assert.deepEqual(orientCell(5, 3, true), [5, 3]);    // both landscape → unchanged
+  assert.deepEqual(orientCell(5, 3, false), [3, 5]);   // landscape cell, portrait art → swap
+});
+
+test('imposeNUp: auto-orients the sheet-cell layout for landscape art', async () => {
+  // Landscape source (w>h) into a portrait 3×5 cell, 1×1 → the placed cell is
+  // oriented landscape, so with a landscape sheet it fills without cropping.
+  const out = await imposeNUp(await pdfOf(1, 720, 288), {
+    ...baseNUp, sheetWIn: 11, sheetHIn: 8.5, cols: 1, rows: 1, cellWIn: 3, cellHIn: 5, fit: 'cover',
+  });
+  assert.equal(await pageCount(out), 1);
 });
 
 test('computeNUpGrid clamps requested cols/rows to what physically fits', () => {
