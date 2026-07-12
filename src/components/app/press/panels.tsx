@@ -93,9 +93,9 @@ export function NumIn({ valueIn, unit, onIn, w }: { valueIn: number; unit: Unit;
       onChange={(e) => { setTxt(e.target.value); const v = parseFloat(e.target.value); if (!Number.isNaN(v)) onIn(toIn(v, unit)); }} />
   );
 }
-export function NumRaw({ value, onValue, w, min }: { value: number; onValue: (v: number) => void; w?: number; min?: number }) {
-  return <input className="pe-input pe-num" style={w ? { width: w, flex: `0 0 ${w}px` } : undefined} type="number" min={min} value={Number.isFinite(value) ? value : ''}
-    onChange={(e) => { const v = +e.target.value; if (!Number.isNaN(v)) onValue(min !== undefined ? Math.max(min, v) : v); }} />;
+export function NumRaw({ value, onValue, w, min, max }: { value: number; onValue: (v: number) => void; w?: number; min?: number; max?: number }) {
+  return <input className="pe-input pe-num" style={w ? { width: w, flex: `0 0 ${w}px` } : undefined} type="number" min={min} max={max} value={Number.isFinite(value) ? value : ''}
+    onChange={(e) => { let v = +e.target.value; if (Number.isNaN(v)) return; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onValue(v); }} />;
 }
 export function SelCard({ on, off, cap, children, onClick }: { on?: boolean; off?: boolean; cap: string; children: React.ReactNode; onClick?: () => void }) {
   return (
@@ -278,6 +278,25 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
   const cellAspect = cw / ch, srcAspect = src && src.hPt ? src.wPt / src.hPt : cellAspect;
   const willCrop = !!thumb && (s.fit ?? 'cover') === 'cover'
     && s.imageOffsetX == null && Math.abs(cellAspect - srcAspect) / cellAspect > 0.04;
+  // How many fixed-size cells actually fit the SELECTED sheet inside its margins.
+  // Used to cap the Columns/Rows inputs so the layout can never exceed the paper.
+  const fixedCell = s.cellWIn > 0 && s.cellHIn > 0;
+  const marginIn = s.marginIn ?? 0, gxIn = s.gutterIn ?? 0, gyIn = s.gutterYIn ?? s.gutterIn ?? 0;
+  const usableW = (s.sheetWIn ?? 8.5) - 2 * marginIn, usableH = (s.sheetHIn ?? 11) - 2 * marginIn;
+  const maxCols = fixedCell ? Math.max(1, Math.floor((usableW + gxIn) / (cw + gxIn) + 1e-6)) : undefined;
+  const maxRows = fixedCell ? Math.max(1, Math.floor((usableH + gyIn) / (ch + gyIn) + 1e-6)) : undefined;
+  // Cap only applies when the sheet is fixed (not in Replicate mode, which sizes
+  // the sheet from the grid instead).
+  const capCols = !s.replicate ? maxCols : undefined;
+  const capRows = !s.replicate ? maxRows : undefined;
+  // If a persisted grid exceeds what now fits (e.g. the sheet shrank), pull it back.
+  useEffect(() => {
+    const patch: StepSettings = {};
+    if (capCols !== undefined && s.cols > capCols) patch.cols = capCols;
+    if (capRows !== undefined && s.rows > capRows) patch.rows = capRows;
+    if (Object.keys(patch).length) up(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capCols, capRows, s.cols, s.rows]);
   const canReplicate = !!p.type && REPLICABLE_SINGLE_SHEET.has(p.type);
   const rep = replicateSheet(s, p.pageSizes ?? []);
   const fmtRep = (v: number) => (unit === 'mm' ? `${(v * 25.4).toFixed(1)} mm` : `${v.toFixed(2)}"`);
@@ -342,9 +361,14 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
         <Check icon="resize" label="Preserve aspect ratio" checked={s.preserveAspect !== false} onChange={(v) => up({ preserveAspect: v })} />
         <Check icon="rotate" label="Auto-orient cell to artwork" checked={s.autoOrient !== false} onChange={(v) => up({ autoOrient: v })} />
         <div className="pe-grid2" style={{ marginTop: 6 }}>
-          <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 56 }}>Columns</span><NumRaw value={s.cols} onValue={(v) => up({ cols: Math.max(1, Math.round(v)) })} min={1} /></div>
-          <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 40 }}>Rows</span><NumRaw value={s.rows} onValue={(v) => up({ rows: Math.max(1, Math.round(v)) })} min={1} /></div>
+          <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 56 }}>Columns</span><NumRaw value={s.cols} onValue={(v) => up({ cols: Math.max(1, capCols ? Math.min(capCols, Math.round(v)) : Math.round(v)) })} min={1} max={capCols} /></div>
+          <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 40 }}>Rows</span><NumRaw value={s.rows} onValue={(v) => up({ rows: Math.max(1, capRows ? Math.min(capRows, Math.round(v)) : Math.round(v)) })} min={1} max={capRows} /></div>
         </div>
+        {fixedCell && !s.replicate && (capCols !== undefined || capRows !== undefined) && (
+          <div className="pe-note" style={{ marginTop: 6 }}>
+            At this cell size, {capCols ?? '—'} × {capRows ?? '—'} ({(capCols ?? 1) * (capRows ?? 1)}-up) fit inside the {s.sheetWIn}×{s.sheetHIn}" sheet with your margins. Columns/rows are capped so nothing runs off the paper.
+          </div>
+        )}
         {kind === 'cards' && (
           <>
             <div className="pe-label-sm" style={{ margin: '10px 0 5px' }}>Card size (optional — auto-fits the grid and centers the block)</div>
@@ -701,8 +725,12 @@ function replicateSheet(s: StepSettings, pageSizes: { wPt: number; hPt: number }
   const cols = Math.max(1, Math.round(s.cols || 1));
   const rows = Math.max(1, Math.round(s.rows || 1));
   const src = pageSizes[0];
-  const cellWIn = s.cellWIn > 0 ? s.cellWIn : (src ? src.wPt / 72 : 3.5);
-  const cellHIn = s.cellHIn > 0 ? s.cellHIn : (src ? src.hPt / 72 : 2);
+  let cellWIn = s.cellWIn > 0 ? s.cellWIn : (src ? src.wPt / 72 : 3.5);
+  let cellHIn = s.cellHIn > 0 ? s.cellHIn : (src ? src.hPt / 72 : 2);
+  // Mirror the engine's auto-orient so the "auto-sizes to X×Y" note is accurate.
+  if (s.autoOrient !== false && s.cellWIn > 0 && s.cellHIn > 0 && src && src.wPt && src.hPt) {
+    [cellWIn, cellHIn] = orientCell(cellWIn, cellHIn, src.wPt > src.hPt);
+  }
   const gx = s.gutterXIn ?? s.gutterIn ?? 0;
   const gy = s.gutterYIn ?? s.gutterIn ?? 0;
   const m = s.marginIn ?? 0;

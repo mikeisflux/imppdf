@@ -154,6 +154,20 @@ test('replicateFill: sheet auto-sizes to cols×rows of the source page', async (
   assert.ok(Math.abs(s.height - expH) < 0.5, `sheet height from grid (${s.height} vs ${expH})`);
 });
 
+test('replicateFill: auto-orients an explicit cell to landscape artwork', async () => {
+  // Landscape source, explicit portrait 3×5 cell, 2×2. Auto-orient swaps the
+  // cell to 5×3, so the sheet is sized landscape-wide, not portrait-tall.
+  const out = await replicateFill(await pdfOf(1, 720, 288), {
+    cols: 2, rows: 2, cellWIn: 3, cellHIn: 5, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125, addMarks: false,
+  });
+  const doc = await PDFDocument.load(out);
+  const s = doc.getPage(0).getSize();
+  const expW = (2 * 0.25 + 2 * 5 + 1 * 0.125) * 72;   // cell width oriented to 5"
+  const expH = (2 * 0.25 + 2 * 3 + 1 * 0.125) * 72;   // cell height oriented to 3"
+  assert.ok(Math.abs(s.width - expW) < 0.5, `sheet width follows landscape art (${s.width} vs ${expW})`);
+  assert.ok(Math.abs(s.height - expH) < 0.5, `sheet height follows landscape art (${s.height} vs ${expH})`);
+});
+
 test('replicateFill: extra art occupies its cells, primary fills the rest', async () => {
   const PT2 = 72, W = 3 * PT2, H = 3 * PT2;
   const extra = await pdfOf(1, W, H);

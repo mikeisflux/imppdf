@@ -349,6 +349,7 @@ function replicateOpts(s: StepSettings) {
     gutterXIn: s.gutterXIn ?? s.gutterIn ?? 0,
     gutterYIn: s.gutterYIn ?? s.gutterIn ?? 0,
     fit: (s.fit ?? 'contain') as 'contain' | 'cover' | 'stretch',
+    autoOrient: s.autoOrient !== false,   // orient the cell to the artwork by default
     extras: ((s.extras ?? []) as { bytes: Uint8Array; page?: number; qty?: number }[])
       .filter((e) => e && e.bytes),
     addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,

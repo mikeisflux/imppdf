@@ -3792,6 +3792,7 @@ export interface ReplicateOptions {
   gutterXIn: number;      // gap between columns
   gutterYIn: number;      // gap between rows
   fit?: 'contain' | 'stretch' | 'cover';   // how each item fills its cell (default contain)
+  autoOrient?: boolean;   // orient an explicit cell to the artwork (default on)
   extras?: ReplicateExtra[];
   addMarks?: boolean; markLenIn?: number; markOffIn?: number; centerMarks?: boolean; markWeightPt?: number;
 }
@@ -3810,10 +3811,15 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
   const primaryPage = srcPages[pIdx]!;
   const pSize = primaryPage.getSize();
 
-  // Cell = explicit size if given, else the primary page's own size. The sheet
-  // is then computed FROM the grid.
-  const cellW = opts.cellWIn ? opts.cellWIn * PT : pSize.width;
-  const cellH = opts.cellHIn ? opts.cellHIn * PT : pSize.height;
+  // Cell = explicit size if given, else the primary page's own size (which is
+  // already correctly oriented). The sheet is then computed FROM the grid.
+  let cellW = opts.cellWIn ? opts.cellWIn * PT : pSize.width;
+  let cellH = opts.cellHIn ? opts.cellHIn * PT : pSize.height;
+  // Respect the artwork's orientation: swap an explicit portrait/landscape cell
+  // to match the source so the auto-sized sheet follows the art, not the preset.
+  if (opts.autoOrient !== false && opts.cellWIn && opts.cellHIn) {
+    [cellW, cellH] = orientCell(cellW, cellH, pSize.width > pSize.height);
+  }
   const m = opts.marginIn * PT, gx = opts.gutterXIn * PT, gy = opts.gutterYIn * PT;
   const sheetW = 2 * m + cols * cellW + (cols - 1) * gx;
   const sheetH = 2 * m + rows * cellH + (rows - 1) * gy;
