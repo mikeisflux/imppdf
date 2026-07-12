@@ -503,8 +503,13 @@ export function computeNUpGrid(opts: NUpOptions): NUpGrid {
   if (fixed) {
     const cellW=opts.cellWIn!*PT, cellH=opts.cellHIn!*PT;
     // +1e-6 so an exact edge fit (e.g. 3 cards = 11.000") isn't lost to float error.
-    const cols=Math.max(1, Math.floor((shW-2*mPt+gxPt)/(cellW+gxPt)+1e-6));
-    const rows=Math.max(1, Math.floor((shH-2*mPt+gyPt)/(cellH+gyPt)+1e-6));
+    const fitCols=Math.max(1, Math.floor((shW-2*mPt+gxPt)/(cellW+gxPt)+1e-6));
+    const fitRows=Math.max(1, Math.floor((shH-2*mPt+gyPt)/(cellH+gyPt)+1e-6));
+    // Honour the requested columns/rows — never silently fill the whole sheet.
+    // Only fall back to the max that fits when a count is missing/zero, and never
+    // exceed what physically fits. This is what makes 1×1 place a single copy.
+    const cols=Math.max(1, Math.min(opts.cols || fitCols, fitCols));
+    const rows=Math.max(1, Math.min(opts.rows || fitRows, fitRows));
     const blockW=cols*cellW+(cols-1)*gxPt, blockH=rows*cellH+(rows-1)*gyPt;
     return { cols, rows, cellWPt:cellW, cellHPt:cellH, leftGapPt:(shW-blockW)/2, topGapPt:(shH-blockH)/2, gxPt, gyPt };
   }

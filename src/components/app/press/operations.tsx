@@ -121,7 +121,7 @@ export const OP_GROUPS: OpGroup[] = [
   { label: '// LAYOUT', ops: [
     { id: 'cards', label: 'Cards', icon: 'cards', tip: 'Use Cards to tile identical copies of your pages onto larger sheets for efficient cutting.' },
     { id: 'replicate', label: 'Replicate', icon: 'replicateIc', tip: 'Step-and-repeat one image and auto-size the sheet to your columns × rows — as many copies as possible. Add extra images/PDFs to fill leftover cells. Single-sheet items only.' },
-    { id: 'indexcard', label: 'Index Cards', icon: 'cards', tip: 'Gang index cards (3×5") 4-up on Letter, one copy per cell.' },
+    { id: 'indexcard', label: 'Index Cards', icon: 'cards', tip: 'Index cards (3×5") on Letter. Starts as one copy — raise columns/rows or tick Replicate to gang up.' },
     { id: 'booklet', label: 'Booklet', icon: 'booklet', tip: 'Use Booklet for orders pages so a folded, center-stapled stack reads correctly.' },
     { id: 'fierybooklet', label: 'Fiery Booklet', icon: 'fieryBookletIc', tip: 'Single-page output for a Fiery/DFE booklet maker: trims the spine-side bleed on each page so the RIP folds a clean booklet.' },
     { id: 'zine', label: 'Zine', icon: 'zine', tip: 'Use Zine for a quick fold-and-staple mini-booklet on office paper.' },

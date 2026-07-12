@@ -54,9 +54,13 @@ const MARKS = { addMarks: true, centerMarks: true, markLenIn: 0.43, markOffIn: 0
 // Base N-Up settings for the domain "preset" layout tools (business cards,
 // postcards, hang tags…). Each tool just overrides size/count.
 const nupPreset = (o: StepSettings): StepSettings => ({
-  sheetWIn: 8.5, sheetHIn: 11, cols: 2, rows: 2, cellWIn: 3.5, cellHIn: 2,
+  sheetWIn: 8.5, sheetHIn: 11, cellWIn: 3.5, cellHIn: 2,
   marginIn: 0.25, gutterIn: 0.125, gutterYIn: 0.125, order: 'sequential', duplex: false,
   autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125, ...o,
+  // Every gang tool starts as a single 1×1 copy — the user raises columns/rows
+  // (or ticks Replicate) to gang up. This keeps the preset's cell SIZE while
+  // never tiling the sheet on its own.
+  cols: 1, rows: 1,
 });
 // Base Booklet settings for book/magazine "preset" tools. Each overrides trim/sheet.
 const bookletPreset = (o: StepSettings): StepSettings => ({
@@ -142,8 +146,9 @@ export function defaultSettings(type: StepType): StepSettings {
         extras: [], ...MARKS,
       };
     case 'indexcard':
-      // Index cards (3×5"), 4-up on Letter, one copy per cell.
-      return nupPreset({ cols: 2, rows: 2, cellWIn: 3, cellHIn: 5, order: 'repeat' });
+      // Index cards (3×5") on Letter. Starts as a single 1×1 copy; raise
+      // columns/rows (or tick Replicate) to gang up.
+      return nupPreset({ cellWIn: 3, cellHIn: 5 });
     case 'editpdf':
       return {};
     case 'booklet':
@@ -159,7 +164,7 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'grid':
     case 'cutstack':
       return {
-        sheetWIn: 12.6, sheetHIn: 17.72, cols: 2, rows: 2,
+        sheetWIn: 12.6, sheetHIn: 17.72, cols: 1, rows: 1,
         marginIn: 0.25, gutterIn: 0.125, gutterYIn: 0.125,
         order: type === 'cards' ? 'repeat' : type === 'cutstack' ? 'cutstack' : 'sequential',
         duplex: false, autoscale: true, preserveAspect: true, ...MARKS,
@@ -188,16 +193,17 @@ export function defaultSettings(type: StepType): StepSettings {
         fitSheetToSpread: true, addMarks: false,
       };
     case 'trading':
-      // Standard trading/sports cards (2.5×3.5"), 9-up (3×3) on Letter, sequential.
+      // Standard trading/sports cards (2.5×3.5") on Letter. Starts 1×1; raise
+      // columns/rows (or tick Replicate) to gang up.
       return {
-        sheetWIn: 8.5, sheetHIn: 11, cols: 3, rows: 3, cellWIn: 2.5, cellHIn: 3.5,
+        sheetWIn: 8.5, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 2.5, cellHIn: 3.5,
         marginIn: 0.25, gutterIn: 0.1, gutterYIn: 0.1, order: 'sequential', duplex: false,
         autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125,
       };
     case 'bookmark':
-      // Bookmarks (2×6"), 4-up across on Letter, sequential.
+      // Bookmarks (2×6") on Letter. Starts 1×1; raise columns/rows to gang up.
       return {
-        sheetWIn: 8.5, sheetHIn: 11, cols: 4, rows: 1, cellWIn: 2, cellHIn: 6,
+        sheetWIn: 8.5, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 2, cellHIn: 6,
         marginIn: 0.25, gutterIn: 0.125, gutterYIn: 0.125, order: 'sequential', duplex: false,
         autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125,
       };

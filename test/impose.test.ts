@@ -23,13 +23,26 @@ async function pageCount(bytes: Uint8Array) {
   return (await PDFDocument.load(bytes)).getPageCount();
 }
 
-test('computeNUpGrid centres a fixed-size grid on the sheet', () => {
-  const g = computeNUpGrid({ ...baseNUp, cellWIn: 3.5, cellHIn: 2 });
-  assert.equal(g.cols, 2);          // floor((8.5-0.5)/3.625) = 2
-  assert.equal(g.rows, 5);          // floor((11-0.5)/2.125) = 5
+test('computeNUpGrid honours requested cols/rows and centres the block', () => {
+  const g = computeNUpGrid({ ...baseNUp, cols: 2, rows: 5, cellWIn: 3.5, cellHIn: 2 });
+  assert.equal(g.cols, 2);          // requested 2, fits 2
+  assert.equal(g.rows, 5);          // requested 5, fits 5
   const blockW = g.cols * g.cellWPt + (g.cols - 1) * g.gxPt;
   const expectLeft = (8.5 * PT - blockW) / 2;
   assert.ok(Math.abs(g.leftGapPt - expectLeft) < 0.01, 'block is horizontally centred');
+});
+
+test('computeNUpGrid: 1×1 places a single cell even when many would fit', () => {
+  // The core bug fix: a fixed cell size must NOT fill the whole sheet.
+  const g = computeNUpGrid({ ...baseNUp, cols: 1, rows: 1, cellWIn: 3, cellHIn: 5 });
+  assert.equal(g.cols, 1);
+  assert.equal(g.rows, 1);
+});
+
+test('computeNUpGrid clamps requested cols/rows to what physically fits', () => {
+  const g = computeNUpGrid({ ...baseNUp, cols: 99, rows: 99, cellWIn: 3.5, cellHIn: 2 });
+  assert.equal(g.cols, 2);          // only 2 columns fit on 8.5"
+  assert.equal(g.rows, 5);          // only 5 rows fit on 11"
 });
 
 test('exact 2-up (two Letter pages) fits on 11x17 with zero margin', () => {
@@ -39,8 +52,14 @@ test('exact 2-up (two Letter pages) fits on 11x17 with zero margin', () => {
 });
 
 test('imposeNUp: 10 pages, 10-up → 1 sheet', async () => {
-  const out = await imposeNUp(await pdfOf(10), { ...baseNUp, cellWIn: 3.5, cellHIn: 2 });
+  const out = await imposeNUp(await pdfOf(10), { ...baseNUp, cols: 2, rows: 5, cellWIn: 3.5, cellHIn: 2 });
   assert.equal(await pageCount(out), 1);
+});
+
+test('imposeNUp: 1×1 fixed cell places one page per sheet (no auto-tiling)', async () => {
+  // 4 pages, 1×1 → one page per sheet → 4 sheets (not tiled onto one).
+  const out = await imposeNUp(await pdfOf(4), { ...baseNUp, cols: 1, rows: 1, cellWIn: 3, cellHIn: 5 });
+  assert.equal(await pageCount(out), 4);
 });
 
 test('imposeNUp: duplex pairs two source pages per leaf', async () => {
