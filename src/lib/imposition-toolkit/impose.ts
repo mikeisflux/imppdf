@@ -3783,10 +3783,10 @@ export interface ReplicateExtra {
 }
 
 export interface ReplicateOptions {
-  cols: number;
-  rows: number;
+  sheetWIn: number;       // the SELECTED sheet — Replicate fills it, never grows past it
+  sheetHIn: number;
   page?: number;          // primary page (1-based, default 1)
-  cellWIn?: number;       // explicit cell size; when omitted the primary page size is the cell
+  cellWIn?: number;       // explicit cell size; when omitted the image's own size is used
   cellHIn?: number;
   marginIn: number;       // paper margin around the whole grid
   gutterXIn: number;      // gap between columns
@@ -3797,11 +3797,21 @@ export interface ReplicateOptions {
   addMarks?: boolean; markLenIn?: number; markOffIn?: number; centerMarks?: boolean; markWeightPt?: number;
 }
 
+// How many copies safely fit the selected sheet, and the centred grid geometry.
+export function replicateGrid(opts: {
+  sheetWIn: number; sheetHIn: number; cellWIn: number; cellHIn: number;
+  marginIn: number; gutterXIn: number; gutterYIn: number;
+}): { cols: number; rows: number } {
+  const shW = opts.sheetWIn * PT, shH = opts.sheetHIn * PT, m = opts.marginIn * PT;
+  const gx = opts.gutterXIn * PT, gy = opts.gutterYIn * PT;
+  const cellW = opts.cellWIn * PT, cellH = opts.cellHIn * PT;
+  const cols = Math.max(1, Math.floor((shW - 2 * m + gx) / (cellW + gx) + 1e-6));
+  const rows = Math.max(1, Math.floor((shH - 2 * m + gy) / (cellH + gy) + 1e-6));
+  return { cols, rows };
+}
+
 export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions): Promise<Uint8Array> {
-  const { PDFDocument, rgb } = await import('pdf-lib');
-  const cols = Math.max(1, Math.round(opts.cols));
-  const rows = Math.max(1, Math.round(opts.rows));
-  const N = cols * rows;
+  const { PDFDocument, rgb, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } = await import('pdf-lib');
   const fit = opts.fit ?? 'contain';
 
   const srcDoc = await PDFDocument.load(primary, { ignoreEncryption: true });
@@ -3811,27 +3821,29 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
   const primaryPage = srcPages[pIdx]!;
   const pSize = primaryPage.getSize();
 
-  // Cell = explicit size if given, else the primary page's own size (which is
-  // already correctly oriented). The sheet is then computed FROM the grid.
-  let cellW = opts.cellWIn ? opts.cellWIn * PT : pSize.width;
-  let cellH = opts.cellHIn ? opts.cellHIn * PT : pSize.height;
-  // Respect the artwork's orientation: swap an explicit portrait/landscape cell
-  // to match the source so the auto-sized sheet follows the art, not the preset.
+  // Cell = explicit size if given, else the image's own size (already oriented).
+  let cellWIn = opts.cellWIn || pSize.width / PT;
+  let cellHIn = opts.cellHIn || pSize.height / PT;
   if (opts.autoOrient !== false && opts.cellWIn && opts.cellHIn) {
-    [cellW, cellH] = orientCell(cellW, cellH, pSize.width > pSize.height);
+    [cellWIn, cellHIn] = orientCell(cellWIn, cellHIn, pSize.width > pSize.height);
   }
+
+  // Fill the SELECTED sheet with as many copies as safely fit inside the margins.
+  const { cols, rows } = replicateGrid({ ...opts, cellWIn, cellHIn });
+  const N = cols * rows;
+  const shW = opts.sheetWIn * PT, shH = opts.sheetHIn * PT;
   const m = opts.marginIn * PT, gx = opts.gutterXIn * PT, gy = opts.gutterYIn * PT;
-  const sheetW = 2 * m + cols * cellW + (cols - 1) * gx;
-  const sheetH = 2 * m + rows * cellH + (rows - 1) * gy;
+  const cellW = cellWIn * PT, cellH = cellHIn * PT;
+  // Centre the packed block on the sheet (gaps are never less than the margin).
+  const blockW = cols * cellW + (cols - 1) * gx, blockH = rows * cellH + (rows - 1) * gy;
+  const leftGap = (shW - blockW) / 2, topGap = (shH - blockH) / 2;
 
   const outDoc = await PDFDocument.create();
-  const pg = outDoc.addPage([sheetW, sheetH]);
-
-  // Embed the primary page once.
+  const pg = outDoc.addPage([shW, shH]);
   const [primEmb] = await outDoc.embedPages([primaryPage]);
 
-  // Build the cell fill order: extras first (each taking `qty` cells), then the
-  // primary fills every remaining cell — "as many copies as possible".
+  // Fill order: extras first (each taking `qty` cells), then the primary fills
+  // every remaining cell.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type CellArt = { emb: any; w: number; h: number };
   const order: CellArt[] = [];
@@ -3858,25 +3870,16 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
   for (let i = 0; i < N; i++) {
     const art = order[i]!;
     const col = i % cols, row = Math.floor(i / cols);
-    const cellX = m + col * (cellW + gx);
-    const cellYTop = m + row * (cellH + gy);          // from the top edge
-    const cellY = sheetH - cellYTop - cellH;          // PDF bottom-up
+    const cellX = leftGap + col * (cellW + gx);
+    const cellY = shH - topGap - cellH - row * (cellH + gy);   // PDF bottom-up
 
-    // Scale the art into the cell per the fit mode.
     let dw = cellW, dh = cellH, dx = cellX, dy = cellY;
     if (fit !== 'stretch') {
-      const sc = fit === 'cover'
-        ? Math.max(cellW / art.w, cellH / art.h)
-        : Math.min(cellW / art.w, cellH / art.h);
+      const sc = fit === 'cover' ? Math.max(cellW / art.w, cellH / art.h) : Math.min(cellW / art.w, cellH / art.h);
       dw = art.w * sc; dh = art.h * sc;
-      dx = cellX + (cellW - dw) / 2;
-      dy = cellY + (cellH - dh) / 2;
+      dx = cellX + (cellW - dw) / 2; dy = cellY + (cellH - dh) / 2;
     }
-
     if (fit === 'cover' && (dw > cellW + 0.5 || dh > cellH + 0.5)) {
-      // Clip the overflow to the cell so neighbours stay clean (pdf-lib exposes
-      // no clip helper — build the clip path with low-level content operators).
-      const { pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } = await import('pdf-lib');
       pg.pushOperators(pushGraphicsState(),
         moveTo(cellX, cellY), lineTo(cellX + cellW, cellY),
         lineTo(cellX + cellW, cellY + cellH), lineTo(cellX, cellY + cellH),
@@ -3886,7 +3889,6 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
     } else {
       pg.drawPage(art.emb, { x: dx, y: dy, width: dw, height: dh });
     }
-
     if (opts.addMarks) drawCropMarks(pg, rgb, cellX, cellY, cellW, cellH, off, len, markStyle);
   }
 

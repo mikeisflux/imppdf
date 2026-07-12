@@ -136,12 +136,11 @@ export function defaultSettings(type: StepType): StepSettings {
       // trimmed per page. Fiery bleed is always 1/8".
       return { rtl: false, coverIsPage1: true, setTrimBox: true };
     case 'replicate':
-      // Step-and-repeat that SIZES the sheet to the chosen columns × rows and
-      // fills every cell with a copy of the image. cellWIn/cellHIn of 0 means
-      // "use the source's own size" so the sheet auto-populates from the art.
-      // Extra images/PDFs drop into leftover cells. Single-sheet items only.
+      // Fills the SELECTED sheet with as many copies of the image as safely fit.
+      // cellWIn/cellHIn of 0 means "use the image's own size". Extra images/PDFs
+      // drop into leftover cells. Single-sheet items only.
       return {
-        cols: 3, rows: 3, cellWIn: 0, cellHIn: 0, page: 1,
+        sheetWIn: 8.5, sheetHIn: 11, cellWIn: 0, cellHIn: 0, page: 1,
         marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125, fit: 'contain',
         extras: [], ...MARKS,
       };
@@ -343,7 +342,8 @@ function nupOpts(s: StepSettings) {
 // gutterXIn/gutterYIn — accept whichever is present.
 function replicateOpts(s: StepSettings) {
   return {
-    cols: s.cols, rows: s.rows, page: s.page ?? 1,
+    // Replicate fills the SELECTED sheet with as many copies as safely fit.
+    sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, page: s.page ?? 1,
     cellWIn: s.cellWIn || undefined, cellHIn: s.cellHIn || undefined,
     marginIn: s.marginIn,
     gutterXIn: s.gutterXIn ?? s.gutterIn ?? 0,

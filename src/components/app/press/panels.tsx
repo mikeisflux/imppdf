@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { zineSheetLayout, zinePanels, orientCell, type ZineFormat } from '@/lib/imposition-toolkit/impose';
+import { zineSheetLayout, zinePanels, orientCell, replicateGrid, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
 import { ImageFitModal } from './image-fit-modal';
@@ -299,17 +299,16 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
   }, [capCols, capRows, s.cols, s.rows]);
   const canReplicate = !!p.type && REPLICABLE_SINGLE_SHEET.has(p.type);
   const rep = replicateSheet(s, p.pageSizes ?? []);
-  const fmtRep = (v: number) => (unit === 'mm' ? `${(v * 25.4).toFixed(1)} mm` : `${v.toFixed(2)}"`);
   return (
     <>
       {canReplicate && (
-        <Section label="// REPLICATE" help="Auto-size the sheet to your columns × rows and fill it with as many copies of the image as possible. Add extra images/PDFs to fill leftover cells.">
-          <Check icon="replicateIc" label="Replicate — auto-size sheet & fill with copies" checked={!!s.replicate} onChange={(v) => up({ replicate: v })} />
+        <Section label="// REPLICATE" help="Fill the selected sheet with as many copies of the image as safely fit inside your margins. Add extra images/PDFs to take some of the cells.">
+          <Check icon="replicateIc" label="Replicate — fill the sheet with copies" checked={!!s.replicate} onChange={(v) => up({ replicate: v })} />
           {s.replicate && (
             <div className="pe-note" style={{ marginTop: 8 }}>
-              Sheet auto-sizes to <b>{fmtRep(rep.wIn)} × {fmtRep(rep.hIn)}</b> from {rep.cols}×{rep.rows} —
-              {' '}{rep.primaryCopies} cop{rep.primaryCopies === 1 ? 'y' : 'ies'}{rep.extraCells > 0 ? ` + ${rep.extraCells} extra` : ''}.
-              The paper size below is ignored while Replicate is on.
+              Fills the <b>{s.sheetWIn}×{s.sheetHIn}"</b> sheet — <b>{rep.N}</b> that safely fit ({rep.cols}×{rep.rows}):
+              {' '}{rep.primaryCopies} cop{rep.primaryCopies === 1 ? 'y' : 'ies'} of the image{rep.extraCells > 0 ? ` + ${rep.extraCells} extra` : ''}.
+              Set the sheet and cell size below.
             </div>
           )}
         </Section>
@@ -718,31 +717,27 @@ export const REPLICABLE_SINGLE_SHEET = new Set<StepType>([
   'coupon', 'placecard', 'greeting', 'doorhanger', 'envelope', 'coaster', 'contact', 'compslip',
 ]);
 
-// Compute the auto-derived replicate sheet from a step's grid + cell/gutter/margin.
-// N-up tools store the gutter as gutterIn/gutterYIn; the dedicated Replicate tool
-// uses gutterXIn/gutterYIn — read whichever is present.
+// How many copies Replicate will pack onto the SELECTED sheet (the engine mirror),
+// plus the oriented cell size. N-up tools store the gutter as gutterIn/gutterYIn;
+// the dedicated Replicate tool uses gutterXIn/gutterYIn — read whichever is present.
 function replicateSheet(s: StepSettings, pageSizes: { wPt: number; hPt: number }[]) {
-  const cols = Math.max(1, Math.round(s.cols || 1));
-  const rows = Math.max(1, Math.round(s.rows || 1));
   const src = pageSizes[0];
   let cellWIn = s.cellWIn > 0 ? s.cellWIn : (src ? src.wPt / 72 : 3.5);
   let cellHIn = s.cellHIn > 0 ? s.cellHIn : (src ? src.hPt / 72 : 2);
-  // Mirror the engine's auto-orient so the "auto-sizes to X×Y" note is accurate.
+  // Mirror the engine's auto-orient so the fit count is accurate.
   if (s.autoOrient !== false && s.cellWIn > 0 && s.cellHIn > 0 && src && src.wPt && src.hPt) {
     [cellWIn, cellHIn] = orientCell(cellWIn, cellHIn, src.wPt > src.hPt);
   }
-  const gx = s.gutterXIn ?? s.gutterIn ?? 0;
-  const gy = s.gutterYIn ?? s.gutterIn ?? 0;
-  const m = s.marginIn ?? 0;
+  const gutterXIn = s.gutterXIn ?? s.gutterIn ?? 0;
+  const gutterYIn = s.gutterYIn ?? s.gutterIn ?? 0;
+  const { cols, rows } = replicateGrid({
+    sheetWIn: s.sheetWIn ?? 8.5, sheetHIn: s.sheetHIn ?? 11,
+    cellWIn, cellHIn, marginIn: s.marginIn ?? 0, gutterXIn, gutterYIn,
+  });
   const extras = (s.extras ?? []) as { qty?: number }[];
   const extraCells = extras.reduce((n, e) => n + Math.max(1, Math.round(e.qty ?? 1)), 0);
   const N = cols * rows;
-  return {
-    cols, rows, N, cellWIn, cellHIn, extraCells,
-    primaryCopies: Math.max(0, N - extraCells),
-    wIn: 2 * m + cols * cellWIn + (cols - 1) * gx,
-    hIn: 2 * m + rows * cellHIn + (rows - 1) * gy,
-  };
+  return { cols, rows, N, cellWIn, cellHIn, extraCells, primaryCopies: Math.max(0, N - extraCells) };
 }
 
 // Uploader + list for the additional images/PDFs that fill leftover cells.
@@ -766,7 +761,7 @@ function ExtraArtSection({ s, up, n }: { s: StepSettings; up: (patch: StepSettin
           </div>
         </div>
       ))}
-      {extraCells > n && <div className="pe-gang-warn">More extra cells than the grid holds — some extras won&apos;t be placed. Increase columns/rows or reduce quantities.</div>}
+      {extraCells > n && <div className="pe-gang-warn">More extra cells ({extraCells}) than fit the sheet ({n}) — some extras won&apos;t be placed. Use a bigger sheet or smaller cell, or reduce quantities.</div>}
       <div className="pe-gang-addfiles" onClick={() => {
         const inp = document.createElement('input');
         inp.type = 'file'; inp.accept = 'application/pdf,image/*'; inp.multiple = true;
@@ -793,32 +788,23 @@ function ExtraArtSection({ s, up, n }: { s: StepSettings; up: (patch: StepSettin
   );
 }
 
-// ── Replicate (auto-sized step-and-repeat, single-sheet items only) ─────────
+// ── Replicate (fill the selected sheet with copies, single-sheet items only) ──
 function ReplicatePanel(p: PanelProps) {
   const { s, up, unit, onUnit, thumbs = [], pageSizes = [] } = p;
-  const cols = Math.max(1, Math.round(s.cols || 1));
-  const rows = Math.max(1, Math.round(s.rows || 1));
-  const N = cols * rows;
   const sheet = replicateSheet(s, pageSizes);
-  const { extraCells, primaryCopies } = sheet;
-  const fmt = (v: number) => (unit === 'mm' ? `${(v * 25.4).toFixed(1)} mm` : `${v.toFixed(2)}"`);
+  const { N, extraCells, primaryCopies } = sheet;
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Replicate fills a grid with copies of your image and <b>sizes the sheet to the columns &amp; rows</b> you choose.
+        Replicate <b>fills the selected sheet</b> with as many copies of your image as safely fit inside the margins.
         For flat, single-sheet items only (cards, labels, stickers, coasters). Not for booklets, saddle/perfect-bound or comics.
       </div>
-      <Section label="// GRID" help="Choose columns and rows. The sheet size is computed from these and the cell size.">
-        <div className="pe-grid2">
-          <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 56 }}>Columns</span><NumRaw value={s.cols} onValue={(v) => up({ cols: Math.max(1, Math.round(v)) })} min={1} /></div>
-          <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 40 }}>Rows</span><NumRaw value={s.rows} onValue={(v) => up({ rows: Math.max(1, Math.round(v)) })} min={1} /></div>
-        </div>
-        <div className="pe-note" style={{ marginTop: 10 }}>
-          Sheet auto-sizes to <b>{fmt(sheet.wIn)} × {fmt(sheet.hIn)}</b> — {N} cell{N === 1 ? '' : 's'}:
-          {' '}{primaryCopies} cop{primaryCopies === 1 ? 'y' : 'ies'} of the image{extraCells > 0 ? ` + ${extraCells} extra` : ''}.
-        </div>
-      </Section>
-      <Section label="// CELL SIZE" help="Leave at 0 to use the image's own size — the sheet then auto-populates from the art. Set a size to scale every cell.">
+      <PaperSize {...p} />
+      <div className="pe-note" style={{ margin: '2px 0 12px' }}>
+        Fills the <b>{s.sheetWIn}×{s.sheetHIn}"</b> sheet — <b>{N}</b> that safely fit ({sheet.cols}×{sheet.rows}):
+        {' '}{primaryCopies} cop{primaryCopies === 1 ? 'y' : 'ies'} of the image{extraCells > 0 ? ` + ${extraCells} extra` : ''}.
+      </div>
+      <Section label="// CELL SIZE" help="Leave at 0 to use the image's own size. Set a size to gang at a fixed card size; more or fewer fit the sheet accordingly.">
         <div className="pe-row"><span className="pe-label">Cell size</span><span style={{ flex: 1 }} /><UnitSel unit={unit} onChange={onUnit} /></div>
         <div className="pe-grid2">
           <div className="pe-field-col"><span className="pe-label-sm">Width (0 = auto)</span><NumIn valueIn={s.cellWIn ?? 0} unit={unit} onIn={(v) => up({ cellWIn: Math.max(0, v) })} /></div>

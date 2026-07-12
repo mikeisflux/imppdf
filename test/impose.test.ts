@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, orientCell } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -140,41 +140,37 @@ test('fieryBooklet: single pages out, spine bleed trimmed per page', async () =>
   }
 });
 
-test('replicateFill: sheet auto-sizes to cols×rows of the source page', async () => {
-  const PT2 = 72, W = 3.5 * PT2, H = 2 * PT2;      // 3.5×2" card
-  const out = await replicateFill(await pdfOf(1, W, H), {
-    cols: 2, rows: 5, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125, addMarks: false,
+test('replicateGrid: packs as many fixed cells as safely fit the sheet', () => {
+  // 3.5×2" cards on 8.5×11" with 0.25" margin, 0.125" gutter → 2 cols × 5 rows.
+  const g = replicateGrid({ sheetWIn: 8.5, sheetHIn: 11, cellWIn: 3.5, cellHIn: 2, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125 });
+  assert.equal(g.cols, 2);
+  assert.equal(g.rows, 5);
+});
+
+test('replicateFill: output is exactly the SELECTED sheet size (never grows)', async () => {
+  const out = await replicateFill(await pdfOf(1, 3.5 * 72, 2 * 72), {
+    sheetWIn: 8.5, sheetHIn: 11, cellWIn: 3.5, cellHIn: 2, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125, addMarks: false,
   });
   const doc = await PDFDocument.load(out);
   assert.equal(doc.getPageCount(), 1);
   const s = doc.getPage(0).getSize();
-  const expW = (2 * 0.25 + 2 * 3.5 + 1 * 0.125) * PT2;
-  const expH = (2 * 0.25 + 5 * 2 + 4 * 0.125) * PT2;
-  assert.ok(Math.abs(s.width - expW) < 0.5, `sheet width from grid (${s.width} vs ${expW})`);
-  assert.ok(Math.abs(s.height - expH) < 0.5, `sheet height from grid (${s.height} vs ${expH})`);
+  assert.ok(Math.abs(s.width - 8.5 * 72) < 0.5, `sheet width is the selected 8.5" (${s.width})`);
+  assert.ok(Math.abs(s.height - 11 * 72) < 0.5, `sheet height is the selected 11" (${s.height})`);
 });
 
-test('replicateFill: auto-orients an explicit cell to landscape artwork', async () => {
-  // Landscape source, explicit portrait 3×5 cell, 2×2. Auto-orient swaps the
-  // cell to 5×3, so the sheet is sized landscape-wide, not portrait-tall.
-  const out = await replicateFill(await pdfOf(1, 720, 288), {
-    cols: 2, rows: 2, cellWIn: 3, cellHIn: 5, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125, addMarks: false,
-  });
-  const doc = await PDFDocument.load(out);
-  const s = doc.getPage(0).getSize();
-  const expW = (2 * 0.25 + 2 * 5 + 1 * 0.125) * 72;   // cell width oriented to 5"
-  const expH = (2 * 0.25 + 2 * 3 + 1 * 0.125) * 72;   // cell height oriented to 3"
-  assert.ok(Math.abs(s.width - expW) < 0.5, `sheet width follows landscape art (${s.width} vs ${expW})`);
-  assert.ok(Math.abs(s.height - expH) < 0.5, `sheet height follows landscape art (${s.height} vs ${expH})`);
+test('replicateGrid: auto-oriented landscape cell changes how many fit', () => {
+  // A 3×5 cell oriented to 5×3 for landscape art fits differently on 11×17.
+  const portrait = replicateGrid({ sheetWIn: 11, sheetHIn: 17, cellWIn: 3, cellHIn: 5, marginIn: 0.25, gutterXIn: 0, gutterYIn: 0 });
+  const landscape = replicateGrid({ sheetWIn: 11, sheetHIn: 17, cellWIn: 5, cellHIn: 3, marginIn: 0.25, gutterXIn: 0, gutterYIn: 0 });
+  assert.notDeepEqual([portrait.cols, portrait.rows], [landscape.cols, landscape.rows]);
 });
 
 test('replicateFill: extra art occupies its cells, primary fills the rest', async () => {
-  const PT2 = 72, W = 3 * PT2, H = 3 * PT2;
-  const extra = await pdfOf(1, W, H);
-  const out = await replicateFill(await pdfOf(1, W, H), {
-    cols: 2, rows: 2, marginIn: 0, gutterXIn: 0, gutterYIn: 0, addMarks: false,
+  const extra = await pdfOf(1, 3 * 72, 3 * 72);
+  const out = await replicateFill(await pdfOf(1, 3 * 72, 3 * 72), {
+    sheetWIn: 8.5, sheetHIn: 11, cellWIn: 3, cellHIn: 3, marginIn: 0, gutterXIn: 0, gutterYIn: 0, addMarks: false,
     extras: [{ bytes: extra, qty: 1 }],
   });
   const doc = await PDFDocument.load(out);
-  assert.equal(doc.getPageCount(), 1);             // still one packed sheet
+  assert.equal(doc.getPageCount(), 1);             // one packed sheet, the selected size
 });
