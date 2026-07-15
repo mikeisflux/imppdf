@@ -5,7 +5,7 @@ import type { PdfPageInfo } from '@/lib/imposition-toolkit/impose';
 import { rasterizePdfThumbs, rasterizePdfSheets, type RenderedSheet } from '@/lib/imposition-toolkit/page-thumbs';
 import { findOp } from './operations';
 import {
-  makeStep, runPipeline, splitStep, runSplit, buildJdf, resolveName,
+  makeStep, runPipeline, splitStep, runSplit, serialStep, runSerial, serialRange, buildJdf, resolveName,
   listWorkflows, saveWorkflow, deleteWorkflow, workflowToSteps,
   type StepType, type WorkflowStep, type SavedWorkflow,
 } from './steps';
@@ -268,8 +268,20 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
     try {
       setRendering(true);
       const out = await buildFinal();
+      const serial = serialStep(steps);
       const sp = splitStep(steps);
-      if (sp) {
+      if (serial) {
+        // Numbered limited-edition run: emit ONE file per serial number, one at a
+        // time (memory-safe — never a giant concatenated PDF). Zero-pad the index
+        // so the files sort correctly in a Fiery hot folder.
+        const { total } = serialRange(serial.s);
+        const width = String(total).length;
+        const baseName = namedOutput().replace(/\.pdf$/i, '');
+        await runSerial(out, serial, async (copy, n, tot) => {
+          downloadPdf(copy, `${baseName}_${String(n).padStart(width, '0')}of${tot}.pdf`);
+          await new Promise((r) => setTimeout(r, 300));   // let the browser flush each download
+        });
+      } else if (sp) {
         const parts = await runSplit(out, sp);
         parts.forEach((p, i) => downloadPdf(p, namedOutput().replace(/\.pdf$/, `-part${i + 1}.pdf`)));
       } else {

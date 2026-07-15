@@ -333,6 +333,49 @@ export async function fieryBooklet(bytes: Uint8Array, opts: FieryBookletOptions)
   return doc.save();
 }
 
+// ── Serial / limited-edition number stamp ───────────────────────────────────
+// Draws one line of text (e.g. "1/200") on a single page, anchored to the
+// bottom-right of that page's visible box. Edits the page IN PLACE (appends to
+// its content stream) so the document-level colour context — embedded ICC,
+// OutputIntent, XMP — is preserved exactly, same as fieryBooklet. Used by the
+// Fiery Serial Booklet tool to number each copy of a limited run on page 1.
+
+export interface SerialNumberOptions {
+  text: string;
+  page?: number;           // 1-based page to stamp (default 1)
+  insetRightIn?: number;   // distance of the text's right edge from the page right (default 0.75")
+  insetBottomIn?: number;  // baseline distance from the page bottom (default 0.75")
+  fontSizePt?: number;     // default 12
+  bold?: boolean;          // Helvetica-Bold when true (default true)
+  colorR?: number; colorG?: number; colorB?: number;   // 0..1, default black
+}
+
+export async function stampSerialNumber(bytes: Uint8Array, opts: SerialNumberOptions): Promise<Uint8Array> {
+  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const pages = doc.getPages();
+  const idx = Math.min(pages.length, Math.max(1, Math.round(opts.page ?? 1))) - 1;
+  const pg = pages[idx];
+  if (!pg) return doc.save();
+  // Use the visible page box (CropBox, falling back to MediaBox) so the number
+  // sits inside the trimmed book, not out in any leftover bleed.
+  let box: { x: number; y: number; width: number; height: number };
+  try { box = pg.getCropBox(); } catch { const s = pg.getSize(); box = { x: 0, y: 0, width: s.width, height: s.height }; }
+  const size = opts.fontSizePt ?? 12;
+  const font = await doc.embedFont(opts.bold === false ? StandardFonts.Helvetica : StandardFonts.HelveticaBold);
+  const w = font.widthOfTextAtSize(opts.text, size);
+  const insetR = (opts.insetRightIn ?? 0.75) * PT, insetB = (opts.insetBottomIn ?? 0.75) * PT;
+  const x = box.x + box.width - insetR - w;
+  const y = box.y + insetB;
+  pg.drawText(opts.text, { x, y, size, font, color: rgb(opts.colorR ?? 0, opts.colorG ?? 0, opts.colorB ?? 0) });
+  return doc.save();
+}
+
+// Format a serial label, e.g. serialLabel('{n}/{total}', 3, 200) → "3/200".
+export function serialLabel(template: string, n: number, total: number): string {
+  return (template || '{n}/{total}').replace(/\{n\}/g, String(n)).replace(/\{total\}/g, String(total));
+}
+
 // ── N-Up Book (multi-up signature imposition) ───────────────────────────────
 // Folds multiple pages onto each side of a large press sheet so that, after
 // folding + trimming, pages read sequentially. 2-up (folio) is exactly the

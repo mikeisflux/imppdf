@@ -4,7 +4,7 @@
 // PDF through every enabled step in order — exactly what Download/Print export.
 
 import {
-  imposeBooklet, fieryBooklet, imposeNUp, imposeNUpBook, shufflePages, rotatePdf, flipPdf,
+  imposeBooklet, fieryBooklet, stampSerialNumber, serialLabel, imposeNUp, imposeNUpBook, shufflePages, rotatePdf, flipPdf,
   mergePdfs, splitPdf, cropPdf, resizePdf, overlayPdf, distortPdf, generateBleed,
   addHeaderFooter, addPressColorBar, addCutterMarks, addJobSlug, addFoldMarks,
   addCollatingMarks, addOmrMarks, addGatheringMarks, addLayMarks, addTextWatermark,
@@ -31,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'replicate' | 'indexcard';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -135,6 +135,15 @@ export function defaultSettings(type: StepType): StepSettings {
       // Single-page output for a Fiery/DFE booklet maker; spine-side bleed is
       // trimmed per page. Fiery bleed is always 1/8".
       return { rtl: false, coverIsPage1: true, setTrimBox: true };
+    case 'fieryserial':
+      // Fiery Booklet (spine-bleed trim, single pages) PLUS a limited-edition
+      // serial number stamped on page 1 only, bottom-right, 3/4" insets. On
+      // export it emits the whole run as separate numbered files (1/total …).
+      return {
+        rtl: false, coverIsPage1: true, setTrimBox: true,
+        total: 200, start: 1, end: 0, template: '{n}/{total}',
+        fontSizePt: 12, bold: true, insetRightIn: 0.75, insetBottomIn: 0.75,
+      };
     case 'replicate':
       // Fills the SELECTED sheet with as many copies of the image as safely fit.
       // cellWIn/cellHIn of 0 means "use the image's own size". Extra images/PDFs
@@ -404,6 +413,23 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           bleedIn: 0.125, bleedFromDoc: false,
           rtl: !!s.rtl, coverIsPage1: s.coverIsPage1 !== false, setTrimBox: s.setTrimBox !== false,
         }); break;
+      case 'fieryserial': {
+        // Same spine-bleed trim as Fiery Booklet. The per-copy numbering happens
+        // at export (one file per serial number) — see runSerial(). For the live
+        // PREVIEW only, stamp the first number so the corner is visible.
+        b = await fieryBooklet(b, {
+          bleedIn: 0.125, bleedFromDoc: false,
+          rtl: !!s.rtl, coverIsPage1: s.coverIsPage1 !== false, setTrimBox: s.setTrimBox !== false,
+        });
+        if (!forExport) {
+          b = await stampSerialNumber(b, {
+            text: serialLabel(s.template, Math.max(1, Math.round(s.start ?? 1)), Math.max(1, Math.round(s.total ?? 1))),
+            page: 1, insetRightIn: s.insetRightIn ?? 0.75, insetBottomIn: s.insetBottomIn ?? 0.75,
+            fontSizePt: s.fontSizePt ?? 12, bold: s.bold !== false,
+          });
+        }
+        break;
+      }
       case 'zine': b = await imposeFoldZine(b, {
         format: s.format, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn,
         flipBackCover: !!s.flipBackCover, signatureSheets: s.signatureSheets || 0,
@@ -578,6 +604,38 @@ export function splitStep(steps: WorkflowStep[]): WorkflowStep | undefined {
 }
 export async function runSplit(bytes: Uint8Array, step: WorkflowStep): Promise<Uint8Array[]> {
   return splitPdf(bytes, step.s.ranges);
+}
+
+// ── Fiery Serial Booklet: numbered edition output ────────────────────────────
+// The export path calls this instead of a single download when a fieryserial
+// step is enabled. `base` is the already-trimmed booklet (forExport pipeline,
+// NOT yet numbered). We stamp page 1 with each serial number and hand the caller
+// one file at a time via `onCopy`, so peak memory stays at ~one book — never a
+// giant concatenated PDF that could exceed the browser's limits.
+export function serialStep(steps: WorkflowStep[]): WorkflowStep | undefined {
+  return steps.find((st) => st.enabled && st.type === 'fieryserial');
+}
+export function serialRange(s: StepSettings): { start: number; end: number; total: number } {
+  const total = Math.max(1, Math.round(s.total ?? 1));
+  const start = Math.min(total, Math.max(1, Math.round(s.start ?? 1)));
+  const end = Math.min(total, Math.max(start, Math.round(s.end || total)));
+  return { start, end, total };
+}
+export async function runSerial(
+  base: Uint8Array,
+  step: WorkflowStep,
+  onCopy: (bytes: Uint8Array, n: number, total: number) => Promise<void> | void,
+): Promise<void> {
+  const s = step.s;
+  const { start, end, total } = serialRange(s);
+  for (let n = start; n <= end; n++) {
+    const copy = await stampSerialNumber(base, {
+      text: serialLabel(s.template, n, total), page: 1,
+      insetRightIn: s.insetRightIn ?? 0.75, insetBottomIn: s.insetBottomIn ?? 0.75,
+      fontSizePt: s.fontSizePt ?? 12, bold: s.bold !== false,
+    });
+    await onCopy(copy, n, total);
+  }
 }
 
 // ── JDF ticket (CIP4 JDF 1.2, Cutting) ───────────────────────────────────────

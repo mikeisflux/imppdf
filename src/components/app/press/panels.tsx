@@ -1704,6 +1704,49 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
           </div>
         </>
       );
+    case 'fieryserial': {
+      const total = Math.max(1, Math.round(s.total || 1));
+      const start = Math.min(total, Math.max(1, Math.round(s.start || 1)));
+      const end = Math.min(total, Math.max(start, Math.round(s.end || total)));
+      const count = end - start + 1;
+      const preview = (s.template || '{n}/{total}').replace(/\{n\}/g, String(start)).replace(/\{total\}/g, String(total));
+      return (
+        <>
+          <Section label="// BINDING" help="Same spine-bleed trim as Fiery Booklet. Odd pages are right-hand (spine left); even pages are left-hand (spine right). RTL flips it.">
+            <Check icon="booklet" label="Right-to-left binding" sub="Manga / RTL: flips which edge is the spine" checked={!!s.rtl} onChange={(v) => up({ rtl: v })} />
+            <Check icon="file" label="Page 1 is a right-hand page" sub="On (default) treats page 1 as a recto (spine on its left)" checked={s.coverIsPage1 !== false} onChange={(v) => up({ coverIsPage1: v })} />
+            <Check icon="scissors" label="Write TrimBox on each page" sub="Marks the finished size so the Fiery knows trim vs. bleed" checked={s.setTrimBox !== false} onChange={(v) => up({ setTrimBox: v })} />
+          </Section>
+          <Section label="// EDITION NUMBER" help="Stamps a running serial number on page 1 only. Export produces one file per number (e.g. 1/200 … 200/200).">
+            <div className="pe-grid2">
+              <div className="pe-field-col"><span className="pe-label-sm">Edition size (total)</span><NumRaw value={s.total} onValue={(v) => up({ total: Math.max(1, Math.round(v)) })} min={1} /></div>
+              <div className="pe-field-col"><span className="pe-label-sm">Format</span><input className="pe-input pe-mono" value={s.template ?? '{n}/{total}'} onChange={(e) => up({ template: e.target.value })} /></div>
+            </div>
+            <div className="pe-grid2" style={{ marginTop: 8 }}>
+              <div className="pe-field-col"><span className="pe-label-sm">From #</span><NumRaw value={s.start} onValue={(v) => up({ start: Math.max(1, Math.round(v)) })} min={1} max={total} /></div>
+              <div className="pe-field-col"><span className="pe-label-sm">To # (0 = all)</span><NumRaw value={s.end} onValue={(v) => up({ end: Math.max(0, Math.round(v)) })} min={0} max={total} /></div>
+            </div>
+            <div className="pe-note" style={{ marginTop: 8 }}>
+              Stamps <b>{preview}</b> in the bottom-right of page 1. Exports <b>{count}</b> numbered file{count === 1 ? '' : 's'} ({start}/{total} … {end}/{total}), one at a time.
+            </div>
+          </Section>
+          <Section label="// PLACEMENT" help="Where the number sits on page 1, measured from the bottom-right corner of the trimmed page.">
+            <div className="pe-grid2">
+              <div className="pe-field-col"><span className="pe-label-sm">From right</span><NumIn valueIn={s.insetRightIn ?? 0.75} unit={unit} onIn={(v) => up({ insetRightIn: Math.max(0, v) })} /></div>
+              <div className="pe-field-col"><span className="pe-label-sm">From bottom</span><NumIn valueIn={s.insetBottomIn ?? 0.75} unit={unit} onIn={(v) => up({ insetBottomIn: Math.max(0, v) })} /></div>
+            </div>
+            <div className="pe-row" style={{ marginTop: 8, gap: 8, alignItems: 'center' }}>
+              <span className="pe-label-sm" style={{ width: 70 }}>Font size</span><NumRaw value={s.fontSizePt ?? 12} onValue={(v) => up({ fontSizePt: Math.max(4, v) })} min={4} /><span className="pe-label-sm">pt</span>
+              <span style={{ flex: 1 }} />
+              <Check icon="file" label="Bold" checked={s.bold !== false} onChange={(v) => up({ bold: v })} />
+            </div>
+          </Section>
+          <div className="pe-note" style={{ marginBottom: 12 }}>
+            ⓘ Same spine-bleed trim as Fiery Booklet (single pages, colour preserved). The only addition is the serial number on <b>page 1 only</b>. Download emits one PDF per copy so a limited run of {total} becomes {total} numbered books.
+          </div>
+        </>
+      );
+    }
     case 'barcode':
       return (
         <>

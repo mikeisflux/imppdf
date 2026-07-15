@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -173,4 +173,18 @@ test('replicateFill: extra art occupies its cells, primary fills the rest', asyn
   });
   const doc = await PDFDocument.load(out);
   assert.equal(doc.getPageCount(), 1);             // one packed sheet, the selected size
+});
+
+test('serialLabel formats the running number', () => {
+  assert.equal(serialLabel('{n}/{total}', 3, 200), '3/200');
+  assert.equal(serialLabel('No. {n} of {total}', 1, 50), 'No. 1 of 50');
+});
+
+test('stampSerialNumber: stamps only the chosen page, keeps page count', async () => {
+  const src = await pdfOf(4, 6 * 72, 9 * 72);
+  const out = await stampSerialNumber(src, { text: '7/200', page: 1, insetRightIn: 0.75, insetBottomIn: 0.75 });
+  const doc = await PDFDocument.load(out);
+  assert.equal(doc.getPageCount(), 4);                 // single pages preserved
+  const s = doc.getPage(0).getSize();
+  assert.ok(Math.abs(s.width - 6 * 72) < 0.5 && Math.abs(s.height - 9 * 72) < 0.5, 'page geometry unchanged');
 });
