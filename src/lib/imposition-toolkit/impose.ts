@@ -39,6 +39,11 @@ export interface MarkStyle {
   // which is folded, not trimmed, so it carries no crop marks.
   skipLeft?: boolean;
   skipRight?: boolean;
+  // Max outward distance (points) a mark may reach from the trim edge on each
+  // side, measured from the trim box. Used to keep marks inside the gutter/margin
+  // so ganged cards' crop marks never cross into a neighbour's artwork. Omit for
+  // no clamp (full length).
+  reach?: { l?: number; r?: number; t?: number; b?: number };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,19 +52,30 @@ function drawCropMarks(page: any, rgb: any, tx: number, ty: number, tw: number, 
   const thickness = style?.weight ?? 0.5;
   const dashArray = style?.dash;
   const L = !style?.skipLeft, R = !style?.skipRight;   // draw left / right edge marks?
+  // Clamp each side's mark length to the room available before the neighbour.
+  const rc = style?.reach;
+  const eff = (side: 'l' | 'r' | 't' | 'b') => {
+    const r = rc?.[side];
+    return r === undefined ? len : Math.max(0, Math.min(len, r - off));
+  };
+  const lL = eff('l'), lR = eff('r'), lT = eff('t'), lB = eff('b');
   const segs: [number, number, number, number][] = [];
-  if (L) segs.push([tx-off-len,ty, tx-off,ty], [tx,ty-off-len, tx,ty-off],
-                   [tx-off-len,ty+th, tx-off,ty+th], [tx,ty+th+off, tx,ty+th+off+len]);
-  if (R) segs.push([tx+tw+off,ty, tx+tw+off+len,ty], [tx+tw,ty-off-len,tx+tw,ty-off],
-                   [tx+tw+off,ty+th,tx+tw+off+len,ty+th], [tx+tw,ty+th+off,tx+tw,ty+th+off+len]);
+  if (L) {
+    if (lL > 0) segs.push([tx-off-lL,ty, tx-off,ty], [tx-off-lL,ty+th, tx-off,ty+th]);   // left horizontals
+    if (lB > 0) segs.push([tx,ty-off-lB, tx,ty-off]);                                    // bottom-left vertical
+    if (lT > 0) segs.push([tx,ty+th+off, tx,ty+th+off+lT]);                              // top-left vertical
+  }
+  if (R) {
+    if (lR > 0) segs.push([tx+tw+off,ty, tx+tw+off+lR,ty], [tx+tw+off,ty+th, tx+tw+off+lR,ty+th]);   // right horizontals
+    if (lB > 0) segs.push([tx+tw,ty-off-lB, tx+tw,ty-off]);                              // bottom-right vertical
+    if (lT > 0) segs.push([tx+tw,ty+th+off, tx+tw,ty+th+off+lT]);                        // top-right vertical
+  }
   if (style?.center) {
     const cx = tx + tw/2, cy = ty + th/2;
-    segs.push(
-      [cx,ty-off-len,   cx,ty-off],           // bottom-centre
-      [cx,ty+th+off,    cx,ty+th+off+len],     // top-centre
-    );
-    if (L) segs.push([tx-off-len,cy, tx-off,cy]);        // left-centre
-    if (R) segs.push([tx+tw+off,cy, tx+tw+off+len,cy]);  // right-centre
+    if (lB > 0) segs.push([cx,ty-off-lB,   cx,ty-off]);          // bottom-centre
+    if (lT > 0) segs.push([cx,ty+th+off,    cx,ty+th+off+lT]);   // top-centre
+    if (L && lL > 0) segs.push([tx-off-lL,cy, tx-off,cy]);       // left-centre
+    if (R && lR > 0) segs.push([tx+tw+off,cy, tx+tw+off+lR,cy]); // right-centre
   }
   if (style?.knockout) for (const [x1,y1,x2,y2] of segs)
     page.drawLine({ start:{x:x1,y:y1}, end:{x:x2,y:y2}, thickness: thickness+1.4, color: rgb(1,1,1) });
@@ -637,7 +653,19 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
         sheet.drawPage(emb, { x: dx, y: dy, width: dw, height: dh });
       }
     }
-    if (opts.addMarks) drawCropMarks(sheet,rgb,x+bl,y+bl,cellW-2*bl,cellH-2*bl,off,len,markStyle);
+    if (opts.addMarks) {
+      // Clamp each mark to the room available before the neighbour cell so crop
+      // marks never run across the gutter into an adjacent card's artwork. An
+      // interior edge shares its gutter with the neighbour (half each); an outer
+      // edge can use the full margin.
+      const reach = {
+        l: bl + (cc === 0 ? leftGapPt : gxPt / 2),
+        r: bl + (cc === cols - 1 ? leftGapPt : gxPt / 2),
+        t: bl + (rr === 0 ? topGapPt : gyPt / 2),
+        b: bl + (rr === rows - 1 ? topGapPt : gyPt / 2),
+      };
+      drawCropMarks(sheet, rgb, x + bl, y + bl, cellW - 2 * bl, cellH - 2 * bl, off, len, { ...markStyle, reach });
+    }
   };
 
   for (let si=0; si<numSheets; si++) {
@@ -3932,7 +3960,15 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
     } else {
       pg.drawPage(art.emb, { x: dx, y: dy, width: dw, height: dh });
     }
-    if (opts.addMarks) drawCropMarks(pg, rgb, cellX, cellY, cellW, cellH, off, len, markStyle);
+    if (opts.addMarks) {
+      const reach = {
+        l: col === 0 ? leftGap : gx / 2,
+        r: col === cols - 1 ? leftGap : gx / 2,
+        t: row === 0 ? topGap : gy / 2,
+        b: row === rows - 1 ? topGap : gy / 2,
+      };
+      drawCropMarks(pg, rgb, cellX, cellY, cellW, cellH, off, len, { ...markStyle, reach });
+    }
   }
 
   await carryColorContext(srcDoc, outDoc);

@@ -363,10 +363,17 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
           <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 56 }}>Columns</span><NumRaw value={s.cols} onValue={(v) => up({ cols: Math.max(1, capCols ? Math.min(capCols, Math.round(v)) : Math.round(v)) })} min={1} max={capCols} /></div>
           <div className="pe-row" style={{ margin: 0 }}><span className="pe-label" style={{ width: 40 }}>Rows</span><NumRaw value={s.rows} onValue={(v) => up({ rows: Math.max(1, capRows ? Math.min(capRows, Math.round(v)) : Math.round(v)) })} min={1} max={capRows} /></div>
         </div>
-        {fixedCell && !s.replicate && (capCols !== undefined || capRows !== undefined) && (
-          <div className="pe-note" style={{ marginTop: 6 }}>
-            At this cell size, {capCols ?? '—'} × {capRows ?? '—'} ({(capCols ?? 1) * (capRows ?? 1)}-up) fit inside the {s.sheetWIn}×{s.sheetHIn}" sheet with your margins. Columns/rows are capped so nothing runs off the paper.
-          </div>
+        {fixedCell && !s.replicate && (
+          (cw > usableW + 1e-6 || ch > usableH + 1e-6) ? (
+            <div className="pe-gang-warn" style={{ marginTop: 6 }}>
+              ⚠ The {cw.toFixed(2)}×{ch.toFixed(2)}&quot; card is larger than the printable area of the {s.sheetWIn}×{s.sheetHIn}&quot; sheet ({usableW.toFixed(2)}×{usableH.toFixed(2)}&quot; inside the margins). It can&apos;t fit — pick a bigger sheet, a smaller card, or smaller margins.
+            </div>
+          ) : (
+            <div className="pe-note" style={{ marginTop: 6 }}>
+              {src ? <>Uploaded art is <b>{(src.wPt / 72).toFixed(2)}×{(src.hPt / 72).toFixed(2)}&quot;</b>. </> : null}
+              At <b>{cw.toFixed(2)}×{ch.toFixed(2)}&quot;</b> per card, up to <b>{(capCols ?? 1) * (capRows ?? 1)}</b> ({capCols}×{capRows}) fit the {s.sheetWIn}×{s.sheetHIn}&quot; sheet. Columns/rows are capped so nothing runs off the paper.
+            </div>
+          )
         )}
         {kind === 'cards' && (
           <>

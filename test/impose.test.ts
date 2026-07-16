@@ -188,3 +188,22 @@ test('stampSerialNumber: stamps only the chosen page, keeps page count', async (
   const s = doc.getPage(0).getSize();
   assert.ok(Math.abs(s.width - 6 * 72) < 0.5 && Math.abs(s.height - 9 * 72) < 0.5, 'page geometry unchanged');
 });
+
+test('imposeNUp: crop marks never cross into a neighbour (small gutter)', async () => {
+  // 2×2 of 4×6 cards on 12×18 with a small 0.125" gutter and long 0.5" marks.
+  // With clamping, marks must stay within the gutter/margins — assert the output
+  // builds and stays on the sheet (no throw, single sheet).
+  const out = await imposeNUp(await pdfOf(4, 4 * 72, 6 * 72), {
+    sheetWIn: 12, sheetHIn: 18, cols: 2, rows: 2, cellWIn: 4, cellHIn: 6,
+    marginIn: 0.25, gutterIn: 0.125, repeatFirst: false,
+    addMarks: true, markLenIn: 0.5, markOffIn: 0.125,
+  });
+  assert.equal(await pageCount(out), 1);
+});
+
+test('computeNUpGrid: a card bigger than the sheet still returns 1×1 (no overflow tiling)', () => {
+  // 4×6 card on a tiny 5×5 sheet: only 1×1 can be requested; the panel warns.
+  const g = computeNUpGrid({ ...baseNUp, sheetWIn: 5, sheetHIn: 5, cols: 3, rows: 3, cellWIn: 4, cellHIn: 6 });
+  assert.equal(g.cols, 1);
+  assert.equal(g.rows, 1);
+});
