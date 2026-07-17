@@ -207,3 +207,27 @@ test('computeNUpGrid: a card bigger than the sheet still returns 1×1 (no overfl
   assert.equal(g.cols, 1);
   assert.equal(g.rows, 1);
 });
+
+test('computeNUpGrid reserves space for cut marks (fewer fit with marks on)', () => {
+  const noMarks = computeNUpGrid({ ...baseNUp, cols: 99, rows: 99, sheetWIn: 12, sheetHIn: 12, cellWIn: 2, cellHIn: 2, marginIn: 0, gutterIn: 0, addMarks: false });
+  const withMarks = computeNUpGrid({ ...baseNUp, cols: 99, rows: 99, sheetWIn: 12, sheetHIn: 12, cellWIn: 2, cellHIn: 2, marginIn: 0, gutterIn: 0, addMarks: true, markOffIn: 0.125, markLenIn: 0.5 });
+  assert.ok(withMarks.cols < noMarks.cols || withMarks.rows < noMarks.rows, 'marks reserve space so fewer fit');
+});
+
+test('replicateGrid: markAllow reserves space and lowers the count', () => {
+  const bare = replicateGrid({ sheetWIn: 11, sheetHIn: 17, cellWIn: 5, cellHIn: 5, marginIn: 0, gutterXIn: 0, gutterYIn: 0 });
+  const marked = replicateGrid({ sheetWIn: 11, sheetHIn: 17, cellWIn: 5, cellHIn: 5, marginIn: 0, gutterXIn: 0, gutterYIn: 0, markAllowIn: 0.5 });
+  assert.ok(marked.cols * marked.rows <= bare.cols * bare.rows);
+  assert.ok(marked.marginIn >= 0.5 && marked.gutterXIn >= 0.5, 'effective margin/gutter grew to fit marks');
+});
+
+test('replicateFill: rotates the image 90° when that packs more, output still one sheet', async () => {
+  // Wide 10×3" image on a tall 12×22" sheet: rotating to 3×10 fits more.
+  const up = replicateGrid({ sheetWIn: 12, sheetHIn: 22, cellWIn: 10, cellHIn: 3, marginIn: 0, gutterXIn: 0, gutterYIn: 0 });
+  const turned = replicateGrid({ sheetWIn: 12, sheetHIn: 22, cellWIn: 3, cellHIn: 10, marginIn: 0, gutterXIn: 0, gutterYIn: 0 });
+  assert.ok(turned.cols * turned.rows > up.cols * up.rows, 'rotating fits more');
+  const out = await replicateFill(await pdfOf(1, 10 * 72, 3 * 72), {
+    sheetWIn: 12, sheetHIn: 22, marginIn: 0, gutterXIn: 0, gutterYIn: 0, addMarks: false,
+  });
+  assert.equal(await pageCount(out), 1);
+});

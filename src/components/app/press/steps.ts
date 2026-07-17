@@ -351,14 +351,15 @@ function nupOpts(s: StepSettings) {
 // gutterXIn/gutterYIn — accept whichever is present.
 function replicateOpts(s: StepSettings) {
   return {
-    // Replicate fills the SELECTED sheet with as many copies as safely fit.
+    // Replicate fills the SELECTED sheet with as many copies as safely fit,
+    // and tiles the image at its OWN NATIVE SIZE (no cellWIn/cellHIn passed).
+    // Respecting the image size is the whole point — fixed card sizes are the
+    // job of the normal N-up tools instead.
     sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, page: s.page ?? 1,
-    cellWIn: s.cellWIn || undefined, cellHIn: s.cellHIn || undefined,
     marginIn: s.marginIn,
     gutterXIn: s.gutterXIn ?? s.gutterIn ?? 0,
     gutterYIn: s.gutterYIn ?? s.gutterIn ?? 0,
     fit: (s.fit ?? 'contain') as 'contain' | 'cover' | 'stretch',
-    autoOrient: s.autoOrient !== false,   // orient the cell to the artwork by default
     extras: ((s.extras ?? []) as { bytes: Uint8Array; page?: number; qty?: number }[])
       .filter((e) => e && e.bytes),
     addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,

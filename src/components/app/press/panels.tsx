@@ -281,7 +281,13 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
   // How many fixed-size cells actually fit the SELECTED sheet inside its margins.
   // Used to cap the Columns/Rows inputs so the layout can never exceed the paper.
   const fixedCell = s.cellWIn > 0 && s.cellHIn > 0;
-  const marginIn = s.marginIn ?? 0, gxIn = s.gutterIn ?? 0, gyIn = s.gutterYIn ?? s.gutterIn ?? 0;
+  // Mirror the engine: reserve room for cut marks (markOff+markLen) and bleed
+  // before deciding how many fit, so the input cap matches what actually prints.
+  const markAllow = s.addMarks ? ((s.markOffIn ?? 0) + (s.markLenIn ?? 0)) : 0;
+  const bleedIn = s.bleedMode === 'fixed' ? (s.bleedIn ?? 0) : 0;
+  const marginIn = Math.max(s.marginIn ?? 0, markAllow, bleedIn);
+  const gxIn = Math.max(s.gutterIn ?? 0, markAllow, 2 * bleedIn);
+  const gyIn = Math.max(s.gutterYIn ?? s.gutterIn ?? 0, markAllow, 2 * bleedIn);
   const usableW = (s.sheetWIn ?? 8.5) - 2 * marginIn, usableH = (s.sheetHIn ?? 11) - 2 * marginIn;
   const maxCols = fixedCell ? Math.max(1, Math.floor((usableW + gxIn) / (cw + gxIn) + 1e-6)) : undefined;
   const maxRows = fixedCell ? Math.max(1, Math.floor((usableH + gyIn) / (ch + gyIn) + 1e-6)) : undefined;
@@ -304,13 +310,16 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
       {canReplicate && (
         <Section label="// REPLICATE" help="Fill the selected sheet with as many copies of the image as safely fit inside your margins. Add extra images/PDFs to take some of the cells.">
           <Check icon="replicateIc" label="Replicate — fill the sheet with copies" checked={!!s.replicate} onChange={(v) => up({ replicate: v })} />
-          {s.replicate && (
-            <div className="pe-note" style={{ marginTop: 8 }}>
-              Fills the <b>{s.sheetWIn}×{s.sheetHIn}"</b> sheet — <b>{rep.N}</b> that safely fit ({rep.cols}×{rep.rows}):
-              {' '}{rep.primaryCopies} cop{rep.primaryCopies === 1 ? 'y' : 'ies'} of the image{rep.extraCells > 0 ? ` + ${rep.extraCells} extra` : ''}.
-              Set the sheet and cell size below.
+          {s.replicate && (rep.hasImage && !rep.fits ? (
+            <div className="pe-gang-warn" style={{ marginTop: 8 }}>
+              ⚠ Your image ({rep.cellWIn.toFixed(2)}×{rep.cellHIn.toFixed(2)}&quot;) is larger than the printable area of the {s.sheetWIn}×{s.sheetHIn}&quot; sheet (once margins and cut marks are reserved). Use a bigger sheet or smaller margins.
             </div>
-          )}
+          ) : (
+            <div className="pe-note" style={{ marginTop: 8 }}>
+              {rep.hasImage ? <>Your image is <b>{rep.cellWIn.toFixed(2)}×{rep.cellHIn.toFixed(2)}&quot;</b>. </> : null}
+              At its native size{rep.rotated ? ' (rotated 90° to fit more)' : ''}, <b>{rep.N}</b> safely fit ({rep.cols}×{rep.rows}) on the <b>{s.sheetWIn}×{s.sheetHIn}&quot;</b> sheet with room for the margins and cut marks{rep.extraCells > 0 ? ` (${rep.extraCells} replaced by extra art)` : ''}. Set the sheet size and margins below.
+            </div>
+          ))}
         </Section>
       )}
       <PaperSize {...p} />
@@ -729,22 +738,24 @@ export const REPLICABLE_SINGLE_SHEET = new Set<StepType>([
 // the dedicated Replicate tool uses gutterXIn/gutterYIn — read whichever is present.
 function replicateSheet(s: StepSettings, pageSizes: { wPt: number; hPt: number }[]) {
   const src = pageSizes[0];
-  let cellWIn = s.cellWIn > 0 ? s.cellWIn : (src ? src.wPt / 72 : 3.5);
-  let cellHIn = s.cellHIn > 0 ? s.cellHIn : (src ? src.hPt / 72 : 2);
-  // Mirror the engine's auto-orient so the fit count is accurate.
-  if (s.autoOrient !== false && s.cellWIn > 0 && s.cellHIn > 0 && src && src.wPt && src.hPt) {
-    [cellWIn, cellHIn] = orientCell(cellWIn, cellHIn, src.wPt > src.hPt);
-  }
-  const gutterXIn = s.gutterXIn ?? s.gutterIn ?? 0;
-  const gutterYIn = s.gutterYIn ?? s.gutterIn ?? 0;
-  const { cols, rows } = replicateGrid({
-    sheetWIn: s.sheetWIn ?? 8.5, sheetHIn: s.sheetHIn ?? 11,
-    cellWIn, cellHIn, marginIn: s.marginIn ?? 0, gutterXIn, gutterYIn,
-  });
+  // Replicate tiles the image at its OWN native size — that's the whole point.
+  const cellWIn = src ? src.wPt / 72 : 3.5;
+  const cellHIn = src ? src.hPt / 72 : 5;
+  const markAllowIn = s.addMarks ? ((s.markOffIn ?? 0.125) + (s.markLenIn ?? 0.43)) : 0;
+  const base = {
+    sheetWIn: s.sheetWIn ?? 8.5, sheetHIn: s.sheetHIn ?? 11, marginIn: s.marginIn ?? 0,
+    gutterXIn: s.gutterXIn ?? s.gutterIn ?? 0, gutterYIn: s.gutterYIn ?? s.gutterIn ?? 0, markAllowIn,
+  };
+  const upright = replicateGrid({ ...base, cellWIn, cellHIn });
+  const turned = replicateGrid({ ...base, cellWIn: cellHIn, cellHIn: cellWIn });
+  // Rotate the image 90° if that packs more copies onto the sheet (engine mirror).
+  const rotated = turned.cols * turned.rows > upright.cols * upright.rows;
+  const grid = rotated ? turned : upright;
+  const { cols, rows, fits } = grid;
   const extras = (s.extras ?? []) as { qty?: number }[];
   const extraCells = extras.reduce((n, e) => n + Math.max(1, Math.round(e.qty ?? 1)), 0);
   const N = cols * rows;
-  return { cols, rows, N, cellWIn, cellHIn, extraCells, primaryCopies: Math.max(0, N - extraCells) };
+  return { cols, rows, N, cellWIn, cellHIn, rotated, extraCells, primaryCopies: Math.max(0, N - extraCells), fits, hasImage: !!src };
 }
 
 // Uploader + list for the additional images/PDFs that fill leftover cells.
@@ -803,29 +814,20 @@ function ReplicatePanel(p: PanelProps) {
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Replicate <b>fills the selected sheet</b> with as many copies of your image as safely fit inside the margins.
-        For flat, single-sheet items only (cards, labels, stickers, coasters). Not for booklets, saddle/perfect-bound or comics.
+        Replicate <b>fills the selected sheet</b> with as many copies of your image <b>at its own native size</b> as safely fit — reserving room for the margins and cut marks. It never resizes or squishes the art.
+        For flat, single-sheet items only (cards, labels, stickers). Not for booklets, saddle/perfect-bound or comics.
       </div>
       <PaperSize {...p} />
-      <div className="pe-note" style={{ margin: '2px 0 12px' }}>
-        Fills the <b>{s.sheetWIn}×{s.sheetHIn}"</b> sheet — <b>{N}</b> that safely fit ({sheet.cols}×{sheet.rows}):
-        {' '}{primaryCopies} cop{primaryCopies === 1 ? 'y' : 'ies'} of the image{extraCells > 0 ? ` + ${extraCells} extra` : ''}.
-      </div>
-      <Section label="// CELL SIZE" help="Leave at 0 to use the image's own size. Set a size to gang at a fixed card size; more or fewer fit the sheet accordingly.">
-        <div className="pe-row"><span className="pe-label">Cell size</span><span style={{ flex: 1 }} /><UnitSel unit={unit} onChange={onUnit} /></div>
-        <div className="pe-grid2">
-          <div className="pe-field-col"><span className="pe-label-sm">Width (0 = auto)</span><NumIn valueIn={s.cellWIn ?? 0} unit={unit} onIn={(v) => up({ cellWIn: Math.max(0, v) })} /></div>
-          <div className="pe-field-col"><span className="pe-label-sm">Height (0 = auto)</span><NumIn valueIn={s.cellHIn ?? 0} unit={unit} onIn={(v) => up({ cellHIn: Math.max(0, v) })} /></div>
+      {sheet.hasImage && !sheet.fits ? (
+        <div className="pe-gang-warn" style={{ margin: '2px 0 12px' }}>
+          ⚠ Your image ({sheet.cellWIn.toFixed(2)}×{sheet.cellHIn.toFixed(2)}&quot;) is larger than the printable area of the {s.sheetWIn}×{s.sheetHIn}&quot; sheet once margins and cut marks are reserved. Use a bigger sheet or smaller margins.
         </div>
-        <div className="pe-row" style={{ marginTop: 8, gap: 8 }}>
-          <span className="pe-label" style={{ width: 56 }}>Fit</span>
-          <select className="pe-select" value={s.fit ?? 'contain'} onChange={(e) => up({ fit: e.target.value })} style={{ flex: 1 }}>
-            <option value="contain">Contain — fit inside the cell</option>
-            <option value="cover">Cover — fill &amp; crop</option>
-            <option value="stretch">Stretch — distort to fill</option>
-          </select>
+      ) : (
+        <div className="pe-note" style={{ margin: '2px 0 12px' }}>
+          {sheet.hasImage ? <>Your image is <b>{sheet.cellWIn.toFixed(2)}×{sheet.cellHIn.toFixed(2)}&quot;</b>. </> : null}
+          At its native size{sheet.rotated ? ' (rotated 90° to fit more)' : ''}, <b>{N}</b> safely fit ({sheet.cols}×{sheet.rows}) on the <b>{s.sheetWIn}×{s.sheetHIn}&quot;</b> sheet{extraCells > 0 ? ` (${extraCells} replaced by extra art)` : ''}.
         </div>
-      </Section>
+      )}
       <Section label="// WHITE SPACE" help="Paper margin around the whole grid and gutters between cells.">
         <div className="pe-row"><span className="pe-label">Margin</span></div>
         <div className="pe-row"><NumIn valueIn={s.marginIn} unit={unit} onIn={(v) => up({ marginIn: Math.max(0, v) })} /></div>

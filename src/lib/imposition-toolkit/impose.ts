@@ -572,16 +572,25 @@ export function computeNUpGrid(opts: NUpOptions): NUpGrid {
   const fixed = !!(opts.cellWIn && opts.cellHIn);
   if (fixed) {
     const cellW=opts.cellWIn!*PT, cellH=opts.cellHIn!*PT;
+    // ALWAYS reserve room for the cut marks and bleed before deciding how many
+    // fit — never assume. The margin/gutters grow to at least the mark reach
+    // (markOff + markLen) and the bleed (2× in a shared gutter), so marks never
+    // land in a neighbour's art and the count reflects real production spacing.
+    const markAllow = opts.addMarks ? ((opts.markOffIn ?? 0) + (opts.markLenIn ?? 0)) : 0;
+    const bleed = opts.bleedIn ?? 0;
+    const effM = Math.max(opts.marginIn, markAllow, bleed) * PT;
+    const effGx = Math.max(opts.gutterIn, markAllow, 2 * bleed) * PT;
+    const effGy = Math.max((opts.gutterYIn ?? opts.gutterIn), markAllow, 2 * bleed) * PT;
     // +1e-6 so an exact edge fit (e.g. 3 cards = 11.000") isn't lost to float error.
-    const fitCols=Math.max(1, Math.floor((shW-2*mPt+gxPt)/(cellW+gxPt)+1e-6));
-    const fitRows=Math.max(1, Math.floor((shH-2*mPt+gyPt)/(cellH+gyPt)+1e-6));
+    const fitCols=Math.max(1, Math.floor((shW-2*effM+effGx)/(cellW+effGx)+1e-6));
+    const fitRows=Math.max(1, Math.floor((shH-2*effM+effGy)/(cellH+effGy)+1e-6));
     // Honour the requested columns/rows — never silently fill the whole sheet.
     // Only fall back to the max that fits when a count is missing/zero, and never
     // exceed what physically fits. This is what makes 1×1 place a single copy.
     const cols=Math.max(1, Math.min(opts.cols || fitCols, fitCols));
     const rows=Math.max(1, Math.min(opts.rows || fitRows, fitRows));
-    const blockW=cols*cellW+(cols-1)*gxPt, blockH=rows*cellH+(rows-1)*gyPt;
-    return { cols, rows, cellWPt:cellW, cellHPt:cellH, leftGapPt:(shW-blockW)/2, topGapPt:(shH-blockH)/2, gxPt, gyPt };
+    const blockW=cols*cellW+(cols-1)*effGx, blockH=rows*cellH+(rows-1)*effGy;
+    return { cols, rows, cellWPt:cellW, cellHPt:cellH, leftGapPt:(shW-blockW)/2, topGapPt:(shH-blockH)/2, gxPt:effGx, gyPt:effGy };
   }
   const cols=Math.max(1,opts.cols), rows=Math.max(1,opts.rows);
   const cellW=(shW-mPt*2-gxPt*(cols-1))/cols;
@@ -3864,6 +3873,7 @@ export interface ReplicateOptions {
   gutterYIn: number;      // gap between rows
   fit?: 'contain' | 'stretch' | 'cover';   // how each item fills its cell (default contain)
   autoOrient?: boolean;   // orient an explicit cell to the artwork (default on)
+  autoRotate?: boolean;   // rotate the image 90° if that packs more onto the sheet (default on)
   extras?: ReplicateExtra[];
   addMarks?: boolean; markLenIn?: number; markOffIn?: number; centerMarks?: boolean; markWeightPt?: number;
 }
@@ -3872,17 +3882,27 @@ export interface ReplicateOptions {
 export function replicateGrid(opts: {
   sheetWIn: number; sheetHIn: number; cellWIn: number; cellHIn: number;
   marginIn: number; gutterXIn: number; gutterYIn: number;
-}): { cols: number; rows: number } {
-  const shW = opts.sheetWIn * PT, shH = opts.sheetHIn * PT, m = opts.marginIn * PT;
-  const gx = opts.gutterXIn * PT, gy = opts.gutterYIn * PT;
+  // Extra clear space each item needs for its cut marks (= markOff + markLen).
+  // The margin and gutters are grown to at least this so marks always have room,
+  // which lowers the count to what SAFELY fits with borders and marks.
+  markAllowIn?: number;
+}): { cols: number; rows: number; marginIn: number; gutterXIn: number; gutterYIn: number; fits: boolean } {
+  const mark = Math.max(0, opts.markAllowIn ?? 0);
+  const marginIn = Math.max(opts.marginIn, mark);
+  const gutterXIn = Math.max(opts.gutterXIn, mark);
+  const gutterYIn = Math.max(opts.gutterYIn, mark);
+  const shW = opts.sheetWIn * PT, shH = opts.sheetHIn * PT, m = marginIn * PT;
+  const gx = gutterXIn * PT, gy = gutterYIn * PT;
   const cellW = opts.cellWIn * PT, cellH = opts.cellHIn * PT;
-  const cols = Math.max(1, Math.floor((shW - 2 * m + gx) / (cellW + gx) + 1e-6));
-  const rows = Math.max(1, Math.floor((shH - 2 * m + gy) / (cellH + gy) + 1e-6));
-  return { cols, rows };
+  const usableW = shW - 2 * m, usableH = shH - 2 * m;
+  const fits = cellW <= usableW + 1e-6 && cellH <= usableH + 1e-6;
+  const cols = Math.max(1, Math.floor((usableW + gx) / (cellW + gx) + 1e-6));
+  const rows = Math.max(1, Math.floor((usableH + gy) / (cellH + gy) + 1e-6));
+  return { cols, rows, marginIn, gutterXIn, gutterYIn, fits };
 }
 
 export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions): Promise<Uint8Array> {
-  const { PDFDocument, rgb, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } = await import('pdf-lib');
+  const { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } = await import('pdf-lib');
   const fit = opts.fit ?? 'contain';
 
   const srcDoc = await PDFDocument.load(primary, { ignoreEncryption: true });
@@ -3892,18 +3912,32 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
   const primaryPage = srcPages[pIdx]!;
   const pSize = primaryPage.getSize();
 
-  // Cell = explicit size if given, else the image's own size (already oriented).
+  // Cell = the image's OWN native size (default) — respect the art, don't squish
+  // it into a preset card. An explicit cell size is honoured only if passed.
   let cellWIn = opts.cellWIn || pSize.width / PT;
   let cellHIn = opts.cellHIn || pSize.height / PT;
   if (opts.autoOrient !== false && opts.cellWIn && opts.cellHIn) {
     [cellWIn, cellHIn] = orientCell(cellWIn, cellHIn, pSize.width > pSize.height);
   }
 
-  // Fill the SELECTED sheet with as many copies as safely fit inside the margins.
-  const { cols, rows } = replicateGrid({ ...opts, cellWIn, cellHIn });
+  // Fill the SELECTED sheet with as many copies as SAFELY fit — reserving room
+  // for the margins AND the cut marks (the grid grows the gutters/margin to at
+  // least the mark reach), so the count reflects real production spacing.
+  const markAllow = opts.addMarks ? ((opts.markOffIn ?? 0.125) + (opts.markLenIn ?? 0.43)) : 0;
+  const gridOf = (w: number, h: number) => replicateGrid({
+    sheetWIn: opts.sheetWIn, sheetHIn: opts.sheetHIn, cellWIn: w, cellHIn: h,
+    marginIn: opts.marginIn, gutterXIn: opts.gutterXIn, gutterYIn: opts.gutterYIn, markAllowIn: markAllow,
+  });
+  const upright = gridOf(cellWIn, cellHIn);
+  const turned = gridOf(cellHIn, cellWIn);
+  // If rotating the image 90° packs more copies onto the sheet, do it.
+  const rotate = opts.autoRotate !== false && turned.cols * turned.rows > upright.cols * upright.rows;
+  const grid = rotate ? turned : upright;
+  if (rotate) { const t = cellWIn; cellWIn = cellHIn; cellHIn = t; }
+  const { cols, rows } = grid;
   const N = cols * rows;
   const shW = opts.sheetWIn * PT, shH = opts.sheetHIn * PT;
-  const m = opts.marginIn * PT, gx = opts.gutterXIn * PT, gy = opts.gutterYIn * PT;
+  const m = grid.marginIn * PT, gx = grid.gutterXIn * PT, gy = grid.gutterYIn * PT;
   const cellW = cellWIn * PT, cellH = cellHIn * PT;
   // Centre the packed block on the sheet (gaps are never less than the margin).
   const blockW = cols * cellW + (cols - 1) * gx, blockH = rows * cellH + (rows - 1) * gy;
@@ -3944,22 +3978,27 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
     const cellX = leftGap + col * (cellW + gx);
     const cellY = shH - topGap - cellH - row * (cellH + gy);   // PDF bottom-up
 
+    // Footprint after the optional 90° rotation (art.w/h are the native dims).
+    const fw = rotate ? art.h : art.w, fh = rotate ? art.w : art.h;
     let dw = cellW, dh = cellH, dx = cellX, dy = cellY;
     if (fit !== 'stretch') {
-      const sc = fit === 'cover' ? Math.max(cellW / art.w, cellH / art.h) : Math.min(cellW / art.w, cellH / art.h);
-      dw = art.w * sc; dh = art.h * sc;
+      const sc = fit === 'cover' ? Math.max(cellW / fw, cellH / fh) : Math.min(cellW / fw, cellH / fh);
+      dw = fw * sc; dh = fh * sc;
       dx = cellX + (cellW - dw) / 2; dy = cellY + (cellH - dh) / 2;
     }
-    if (fit === 'cover' && (dw > cellW + 0.5 || dh > cellH + 0.5)) {
-      pg.pushOperators(pushGraphicsState(),
-        moveTo(cellX, cellY), lineTo(cellX + cellW, cellY),
-        lineTo(cellX + cellW, cellY + cellH), lineTo(cellX, cellY + cellH),
-        closePath(), clip(), endPath());
-      pg.drawPage(art.emb, { x: dx, y: dy, width: dw, height: dh });
-      pg.pushOperators(popGraphicsState());
+    const needClip = fit === 'cover' && (dw > cellW + 0.5 || dh > cellH + 0.5);
+    if (needClip) pg.pushOperators(pushGraphicsState(),
+      moveTo(cellX, cellY), lineTo(cellX + cellW, cellY),
+      lineTo(cellX + cellW, cellY + cellH), lineTo(cellX, cellY + cellH),
+      closePath(), clip(), endPath());
+    if (rotate) {
+      // 90° CCW: the native page draws with width=dh, height=dw, anchored so the
+      // rotated footprint lands exactly in [dx,dx+dw]×[dy,dy+dh].
+      pg.drawPage(art.emb, { x: dx + dw, y: dy, width: dh, height: dw, rotate: degrees(90) });
     } else {
       pg.drawPage(art.emb, { x: dx, y: dy, width: dw, height: dh });
     }
+    if (needClip) pg.pushOperators(popGraphicsState());
     if (opts.addMarks) {
       const reach = {
         l: col === 0 ? leftGap : gx / 2,
