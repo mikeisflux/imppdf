@@ -276,7 +276,7 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
     [cw, ch] = orientCell(cw, ch, src.wPt > src.hPt);
   }
   const cellAspect = cw / ch, srcAspect = src && src.hPt ? src.wPt / src.hPt : cellAspect;
-  const willCrop = !!thumb && (s.fit ?? 'cover') === 'cover'
+  const willCrop = !!thumb && (s.fit ?? 'contain') === 'cover'
     && s.imageOffsetX == null && Math.abs(cellAspect - srcAspect) / cellAspect > 0.04;
   // How many fixed-size cells actually fit the SELECTED sheet inside its margins.
   // Used to cap the Columns/Rows inputs so the layout can never exceed the paper.
@@ -323,11 +323,11 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
         </Section>
       )}
       <PaperSize {...p} />
-      <Section label="// IMAGE FIT" help="How each page/image fills its cell. Cover preserves proportions and crops the overflow.">
+      <Section label="// IMAGE FIT" help="How each page/image fills its cell. Contain (default) keeps the whole graphic and its proportions; Cover fills the cell and crops the overflow.">
         <div className="pe-row" style={{ gap: 8 }}>
-          <select className="pe-select" value={s.fit ?? 'cover'} onChange={(e) => up({ fit: e.target.value })} style={{ flex: 1 }}>
+          <select className="pe-select" value={s.fit ?? 'contain'} onChange={(e) => up({ fit: e.target.value })} style={{ flex: 1 }}>
+            <option value="contain">Contain — show whole graphic</option>
             <option value="cover">Cover — fill &amp; crop</option>
-            <option value="contain">Contain — fit inside</option>
             <option value="stretch">Stretch — distort to fill</option>
           </select>
           <button className="pe-btn" disabled={!thumb} title={thumb ? '' : 'Add a PDF/image first'} onClick={() => setFitOpen(true)}>Adjust &amp; crop…</button>
@@ -350,7 +350,7 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
       {fitOpen && thumb && (
         <ImageFitModal thumbs={thumbs} cellWIn={+cw.toFixed(2)} cellHIn={+ch.toFixed(2)}
           values={(s.perImage ?? {}) as Record<number, { fit: 'cover' | 'contain' | 'stretch'; zoom: number; offsetX: number; offsetY: number }>}
-          fallback={{ fit: s.fit ?? 'cover', zoom: s.imageZoom ?? 1, offsetX: s.imageOffsetX ?? 0.5, offsetY: s.imageOffsetY ?? 0.5 }}
+          fallback={{ fit: s.fit ?? 'contain', zoom: s.imageZoom ?? 1, offsetX: s.imageOffsetX ?? 0.5, offsetY: s.imageOffsetY ?? 0.5 }}
           onApply={(v) => { up({ perImage: v }); setFitOpen(false); }}
           onClose={() => setFitOpen(false)} />
       )}

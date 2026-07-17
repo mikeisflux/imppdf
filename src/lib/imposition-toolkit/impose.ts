@@ -643,7 +643,9 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
     // Fit the source into the cell. 'cover' (default) preserves aspect, scales to
     // fill and crops the overflow; 'contain' letterboxes; 'stretch' distorts.
     const pf = opts.perImage?.[pi];                              // per-image override
-    const fit = pf?.fit ?? opts.fit ?? 'cover';
+    // Default 'contain' so the graphic keeps its aspect ratio and is never
+    // cropped/stretched unless the user explicitly chooses Cover or Stretch.
+    const fit = pf?.fit ?? opts.fit ?? 'contain';
     const sw = emb.width, sh = emb.height;
     if (fit === 'stretch' || !sw || !sh) {
       sheet.drawPage(emb, { x, y, width: cellW, height: cellH });

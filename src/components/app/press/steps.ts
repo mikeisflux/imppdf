@@ -336,7 +336,7 @@ function nupOpts(s: StepSettings) {
     duplex: !!s.duplex, addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,
     centerMarks: !!s.centerMarks, markWeightPt: s.markWeightPt,
     bleedIn: s.bleedMode === 'fixed' ? s.bleedIn : 0,
-    fit: s.fit ?? 'cover', imageZoom: s.imageZoom, imageOffsetX: s.imageOffsetX, imageOffsetY: s.imageOffsetY,
+    fit: s.fit ?? 'contain', imageZoom: s.imageZoom, imageOffsetX: s.imageOffsetX, imageOffsetY: s.imageOffsetY,
     // The crop dialog stores per-image {fit,zoom,offsetX,offsetY}; map it to the
     // engine's {fit,imageZoom,imageOffsetX,imageOffsetY} shape.
     perImage: s.perImage
