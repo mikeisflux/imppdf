@@ -21,7 +21,7 @@ function loadSdk(clientId: string): Promise<void> {
 }
 
 export function PayPalSubscribe(
-  { planId, cycle, clientId }: { planId: string; cycle: 'monthly' | 'yearly'; clientId: string },
+  { planId, cycle, clientId, userId }: { planId: string; cycle: 'monthly' | 'yearly'; clientId: string; userId?: number },
 ) {
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -36,7 +36,10 @@ export function PayPalSubscribe(
       ref.current.innerHTML = '';
       window.paypal.Buttons({
         style: { shape: 'pill', color: 'gold', layout: 'horizontal', label: 'subscribe', height: 44 },
-        createSubscription: (_data: any, actions: any) => actions.subscription.create({ plan_id: planId }),
+        // Stamp the user id as custom_id so the webhook can link the payment to
+        // this account even if the browser's activate call below never lands.
+        createSubscription: (_data: any, actions: any) =>
+          actions.subscription.create(userId ? { plan_id: planId, custom_id: String(userId) } : { plan_id: planId }),
         onApprove: async (data: any) => {
           setStatus('processing');
           try {

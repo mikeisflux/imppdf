@@ -1,6 +1,6 @@
 import { badRequest, json, unauthorized } from '@/lib/http';
 import { getCurrentUser } from '@/lib/auth';
-import { getSubscription, paypalConfigured } from '@/lib/paypal';
+import { getSubscription, paypalConfigured, enforceSingleSubscription } from '@/lib/paypal';
 import { upsertSubscription } from '@/lib/subscriptions';
 import { serverPaypal } from '@/lib/settings';
 
@@ -38,6 +38,12 @@ export async function POST(req: Request) {
     status: sub.status,
     currentPeriodEnd: Number.isNaN(periodEnd) ? null : periodEnd,
   });
+
+  // One active subscription per user: cancel any older duplicate the customer
+  // may have created (e.g. by checking out twice) so they aren't double-charged.
+  if (['ACTIVE', 'APPROVAL_PENDING', 'APPROVED'].includes(String(sub.status).toUpperCase())) {
+    try { await enforceSingleSubscription(user.id, sub.id); } catch { /* best-effort */ }
+  }
 
   return json({ ok: true, status: sub.status });
 }

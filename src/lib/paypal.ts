@@ -46,6 +46,21 @@ export async function getSubscription(id: string): Promise<PayPalSubscription> {
   return (await res.json()) as PayPalSubscription;
 }
 
+// Enforce one active subscription per user: cancel every OTHER live PayPal
+// subscription so a customer who checked out more than once isn't charged twice.
+// Best-effort — a PayPal cancel failure still marks the row cancelled locally so
+// the UI is consistent, and the webhook will reconcile the real state later.
+export async function enforceSingleSubscription(userId: number, keepPaypalId: string): Promise<number> {
+  const { otherLiveSubscriptions, markSubscriptionStatus } = await import('./subscriptions');
+  const dups = otherLiveSubscriptions(userId, keepPaypalId);
+  for (const d of dups) {
+    if (!d.paypal_subscription_id) continue;
+    try { await cancelSubscription(d.paypal_subscription_id, 'Superseded by a newer subscription'); } catch { /* already gone / network */ }
+    markSubscriptionStatus(d.paypal_subscription_id, 'CANCELLED');
+  }
+  return dups.length;
+}
+
 export async function cancelSubscription(id: string, reason = 'User requested cancellation') {
   const token = await accessToken();
   const res = await fetch(`${baseUrl()}/v1/billing/subscriptions/${id}/cancel`, {

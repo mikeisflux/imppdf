@@ -20,11 +20,12 @@ const PRO_FEATURES = [
 ];
 
 export function PlanPanel({
-  plan, subscription, cfg,
+  plan, subscription, cfg, userId,
 }: {
   plan: 'free' | 'pro';
   subscription: { status: string; billing_cycle: string | null; current_period_end: number | null } | null;
   cfg: BillingConfig;
+  userId?: number;
 }) {
   const router = useRouter();
   const [cycle, setCycle] = useState<'monthly' | 'yearly'>('yearly');
@@ -84,7 +85,7 @@ export function PlanPanel({
         ))}
       </ul>
 
-      <PayPalSubscribe planId={planId} cycle={cycle} clientId={cfg.clientId} />
+      <PayPalSubscribe planId={planId} cycle={cycle} clientId={cfg.clientId} userId={userId} />
     </div>
   );
 }

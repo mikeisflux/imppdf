@@ -81,7 +81,7 @@ export default async function PricingPage() {
       {/* Inline subscribe for signed-in free users */}
       {user && user.plan === 'free' && (
         <div style={{ maxWidth: 520, marginTop: 26 }}>
-          <PlanPanel plan="free" subscription={null} cfg={billingCfg} />
+          <PlanPanel plan="free" subscription={null} cfg={billingCfg} userId={user.id} />
         </div>
       )}
 

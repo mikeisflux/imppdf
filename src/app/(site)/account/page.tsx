@@ -59,6 +59,7 @@ export default async function AccountPage() {
           current_period_end: sub.current_period_end,
         } : null}
         cfg={billingCfg}
+        userId={user.id}
       />
     </div>
   );

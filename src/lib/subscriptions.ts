@@ -122,11 +122,51 @@ export function findSubscriptionByPaypalId(id: string): SubscriptionRow | undefi
     .get(id) as SubscriptionRow | undefined;
 }
 
-export function listSubscriptions(): (SubscriptionRow & { email: string })[] {
+// Other real (non-manual) PayPal subscriptions for a user that are still live —
+// used to enforce a single active subscription so a customer is never
+// double-charged for two overlapping plans.
+export function otherLiveSubscriptions(userId: number, exceptPaypalId: string): SubscriptionRow[] {
   return getDb()
     .prepare(
-      `SELECT s.*, u.email FROM subscriptions s JOIN users u ON u.id = s.user_id
+      `SELECT * FROM subscriptions
+       WHERE user_id = ? AND paypal_subscription_id != ?
+         AND paypal_subscription_id NOT LIKE 'manual-%'
+         AND UPPER(status) IN ('ACTIVE','APPROVAL_PENDING','APPROVED')`,
+    )
+    .all(userId, exceptPaypalId) as SubscriptionRow[];
+}
+
+export function markSubscriptionStatus(paypalSubscriptionId: string, status: string) {
+  getDb()
+    .prepare('UPDATE subscriptions SET status = ?, updated_at = ? WHERE paypal_subscription_id = ?')
+    .run(status, Date.now(), paypalSubscriptionId);
+}
+
+export function listSubscriptions(): (SubscriptionRow & { email: string; plan: string })[] {
+  return getDb()
+    .prepare(
+      `SELECT s.*, u.email, u.plan FROM subscriptions s JOIN users u ON u.id = s.user_id
        ORDER BY s.updated_at DESC`,
     )
-    .all() as (SubscriptionRow & { email: string })[];
+    .all() as (SubscriptionRow & { email: string; plan: string })[];
+}
+
+// Reconcile user plans from the subscription records already in the database:
+// anyone with a live subscription is set to Pro. Fixes accounts that paid but
+// were never upgraded (e.g. the browser's activate call never landed). Returns
+// the emails that were flipped to Pro so the admin can see who was activated.
+export function reconcilePlansFromDb(): { activated: string[] } {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT s.user_id, u.email, u.plan FROM subscriptions s JOIN users u ON u.id = s.user_id
+       WHERE UPPER(s.status) IN ('ACTIVE','APPROVAL_PENDING','APPROVED')`,
+    )
+    .all() as { user_id: number; email: string; plan: string }[];
+  const activated: string[] = [];
+  for (const r of rows) {
+    if (r.plan !== 'pro') activated.push(r.email);
+    setUserPlan(r.user_id, 'pro');
+  }
+  return { activated };
 }

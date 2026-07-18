@@ -1,4 +1,5 @@
 import { listSubscriptions } from '@/lib/subscriptions';
+import { SubscriptionsReconcile } from '@/components/admin/SubscriptionsReconcile';
 
 export const metadata = { title: 'Admin · Subscriptions' };
 export const dynamic = 'force-dynamic';
@@ -15,15 +16,17 @@ export default function AdminSubscriptionsPage() {
     <div>
       <h1>Subscriptions</h1>
       <p className="admin-page-sub">{subs.length} subscription records synced from PayPal.</p>
+      <SubscriptionsReconcile />
       <div className="card card-pad" style={{ overflowX: 'auto' }}>
         <table className="admin-table">
           <thead>
-            <tr><th>User</th><th>PayPal ID</th><th>Cycle</th><th>Status</th><th>Renews / ends</th><th>Updated</th></tr>
+            <tr><th>User</th><th>Plan</th><th>PayPal ID</th><th>Cycle</th><th>Status</th><th>Renews / ends</th><th>Updated</th></tr>
           </thead>
           <tbody>
             {subs.map((s) => (
               <tr key={s.id}>
                 <td>{s.email}</td>
+                <td><span className={`badge ${s.plan === 'pro' ? 'badge-green' : 'badge-gray'}`}>{s.plan}</span></td>
                 <td className="key-mono">{s.paypal_subscription_id || '—'}</td>
                 <td style={{ textTransform: 'capitalize' }}>{s.billing_cycle || '—'}</td>
                 <td><span className={`badge ${statusBadge(s.status)}`}>{s.status}</span></td>
@@ -31,7 +34,7 @@ export default function AdminSubscriptionsPage() {
                 <td className="muted">{new Date(s.updated_at).toLocaleDateString()}</td>
               </tr>
             ))}
-            {subs.length === 0 && <tr><td colSpan={6} className="muted">No subscriptions yet.</td></tr>}
+            {subs.length === 0 && <tr><td colSpan={7} className="muted">No subscriptions yet.</td></tr>}
           </tbody>
         </table>
       </div>
