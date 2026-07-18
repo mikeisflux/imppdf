@@ -36,7 +36,7 @@ export function SubscriptionsReconcile() {
     setBusy('import'); setMsg(''); setErr('');
     try {
       const d = await post({ action: 'import', subscriptionId: subId.trim(), email: email.trim() || undefined });
-      setMsg(`Linked ${subId.trim()} to ${d.email} (${d.status}).`);
+      setMsg(`Linked ${subId.trim()} to ${d.email} (${d.status}).${d.note ? ` ${d.note}.` : ''}`);
       setSubId(''); setEmail('');
       router.refresh();
     } catch (e) { setErr(e instanceof Error ? e.message : 'Failed.'); }

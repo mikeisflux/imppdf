@@ -24,48 +24,62 @@ export async function POST(req: Request) {
   }
 
   if (action === 'import') {
-    if (!paypalConfigured()) return badRequest('PayPal is not configured.');
     const subscriptionId = String(body?.subscriptionId ?? '').trim();
     if (!subscriptionId) return badRequest('Enter a PayPal subscription ID (e.g. I-XXXXXXXX).');
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let sub: any;
-    try { sub = await getSubscription(subscriptionId); }
-    catch { return badRequest('Could not fetch that subscription from PayPal — check the ID.'); }
-
-    // Resolve the user: an email typed by the admin wins, then custom_id, then
-    // the PayPal subscriber email.
     const typedEmail = String(body?.email ?? '').trim();
+
+    // Try to pull the authoritative record from PayPal. If that fails (env/creds/
+    // network) we can still link it manually from the admin-entered email — the
+    // admin has confirmed the payment in the PayPal dashboard.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let sub: any = null;
+    let fetchErr = '';
+    if (paypalConfigured()) {
+      try { sub = await getSubscription(subscriptionId); }
+      catch (e) { fetchErr = e instanceof Error ? e.message : 'PayPal lookup failed.'; }
+    } else {
+      fetchErr = 'PayPal is not configured.';
+    }
+
+    // Resolve the user: admin-entered email wins, then custom_id, then the
+    // PayPal subscriber email.
     let user = typedEmail ? findUserByEmail(typedEmail) : undefined;
-    if (!user) {
+    if (!user && sub) {
       const customId = String(sub.custom_id ?? '').trim();
       if (/^\d+$/.test(customId)) user = findUserById(Number(customId));
+      if (!user) {
+        const email = String(sub.subscriber?.email_address ?? '').trim();
+        if (email) user = findUserByEmail(email);
+      }
     }
     if (!user) {
-      const email = String(sub.subscriber?.email_address ?? '').trim();
-      if (email) user = findUserByEmail(email);
-    }
-    if (!user) {
-      return badRequest('Could not match this subscription to a user. Enter the account email to link it.');
+      return badRequest(fetchErr
+        ? `PayPal lookup failed: ${fetchErr} Enter the account email above to link it manually.`
+        : 'Could not match this subscription to a user — enter the account email to link it.');
     }
 
+    const planId: string | null = sub?.plan_id ?? null;
     const cycle =
-      sub.plan_id === serverPaypal().planYearly ? 'yearly' :
-      sub.plan_id === serverPaypal().planMonthly ? 'monthly' : null;
-    const periodEnd = sub.billing_info?.next_billing_time ? Date.parse(sub.billing_info.next_billing_time) : null;
+      planId === serverPaypal().planYearly ? 'yearly' :
+      planId === serverPaypal().planMonthly ? 'monthly' : null;
+    const periodEnd = sub?.billing_info?.next_billing_time ? Date.parse(sub.billing_info.next_billing_time) : null;
+    const status: string = sub?.status ?? 'ACTIVE';
 
     upsertSubscription({
       userId: user.id,
-      paypalSubscriptionId: sub.id,
-      planId: sub.plan_id ?? null,
+      paypalSubscriptionId: subscriptionId,
+      planId,
       billingCycle: cycle,
-      status: sub.status,
+      status,
       currentPeriodEnd: periodEnd && !Number.isNaN(periodEnd) ? periodEnd : null,
     });
-    if (['ACTIVE', 'APPROVAL_PENDING', 'APPROVED'].includes(String(sub.status).toUpperCase())) {
-      try { await enforceSingleSubscription(user.id, sub.id); } catch { /* best-effort */ }
+    if (['ACTIVE', 'APPROVAL_PENDING', 'APPROVED'].includes(status.toUpperCase())) {
+      try { await enforceSingleSubscription(user.id, subscriptionId); } catch { /* best-effort */ }
     }
-    return json({ ok: true, email: user.email, status: sub.status });
+    return json({
+      ok: true, email: user.email, status,
+      note: sub ? undefined : `Linked from the email you entered — PayPal wasn't queried (${fetchErr})`,
+    });
   }
 
   return badRequest('Unknown action.');

@@ -13,7 +13,7 @@ export function paypalConfigured() {
 }
 
 async function accessToken(): Promise<string> {
-  const { clientId: paypalClientId, secret: paypalSecret } = serverPaypal();
+  const { clientId: paypalClientId, secret: paypalSecret, env } = serverPaypal();
   const auth = Buffer.from(`${paypalClientId}:${paypalSecret}`).toString('base64');
   const res = await fetch(`${baseUrl()}/v1/oauth2/token`, {
     method: 'POST',
@@ -23,7 +23,7 @@ async function accessToken(): Promise<string> {
     },
     body: 'grant_type=client_credentials',
   });
-  if (!res.ok) throw new Error(`PayPal auth failed: ${res.status}`);
+  if (!res.ok) throw new Error(`PayPal auth failed (${res.status}) on the ${env} environment — check the client ID/secret and PAYPAL_ENV in Settings.`);
   const data = (await res.json()) as { access_token: string };
   return data.access_token;
 }
@@ -42,7 +42,13 @@ export async function getSubscription(id: string): Promise<PayPalSubscription> {
   const res = await fetch(`${baseUrl()}/v1/billing/subscriptions/${id}`, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
-  if (!res.ok) throw new Error(`PayPal getSubscription failed: ${res.status}`);
+  if (!res.ok) {
+    const env = serverPaypal().env;
+    const hint = res.status === 404
+      ? ` — not found on the ${env} environment (if this is a live subscription, set PAYPAL_ENV to "live")`
+      : ` on the ${env} environment`;
+    throw new Error(`PayPal getSubscription failed (${res.status})${hint}.`);
+  }
   return (await res.json()) as PayPalSubscription;
 }
 
