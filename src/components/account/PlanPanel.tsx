@@ -30,20 +30,43 @@ export function PlanPanel({
   const router = useRouter();
   const [cycle, setCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [cancelling, setCancelling] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [err, setErr] = useState('');
 
   async function cancel() {
     if (!confirm('Cancel your Pro subscription? You will return to the free tier.')) return;
-    setCancelling(true);
-    await fetch('/api/paypal/cancel', { method: 'POST' });
+    setCancelling(true); setErr('');
+    const res = await fetch('/api/paypal/cancel', { method: 'POST' });
     setCancelling(false);
+    if (!res.ok) { const d = await res.json().catch(() => ({})); setErr(d.error || 'Could not cancel.'); return; }
     router.refresh();
   }
 
+  // Switch an active PayPal subscription to the other billing cycle. PayPal may
+  // return an approval URL the subscriber must confirm.
+  async function changePlan(to: 'monthly' | 'yearly') {
+    setChanging(true); setErr('');
+    try {
+      const res = await fetch('/api/paypal/revise', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cycle: to }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(d.error || 'Could not change the plan.'); setChanging(false); return; }
+      if (d.approveUrl) { window.location.href = d.approveUrl; return; }
+      router.refresh();
+    } catch { setErr('Network error changing the plan.'); }
+    setChanging(false);
+  }
+
   if (plan === 'pro') {
+    const current = (subscription?.billing_cycle || '').toLowerCase();
+    const canManage = subscription?.status === 'ACTIVE' && !!subscription?.billing_cycle && current !== 'manual';
+    const other: 'monthly' | 'yearly' = current === 'yearly' ? 'monthly' : 'yearly';
+    const otherPrice = other === 'yearly' ? `${cfg.currency} ${cfg.priceYearly}/yr` : `${cfg.currency} ${cfg.priceMonthly}/mo`;
     return (
       <div className="card card-pad panel">
         <h2>Your plan</h2>
-        <p className="panel-sub">Thanks for supporting ImpositionPDF.</p>
+        <p className="panel-sub">Manage or cancel your subscription anytime.</p>
         <div className="kv"><span className="k">Plan</span><span><span className="badge badge-brand">Pro</span></span></div>
         <div className="kv"><span className="k">Status</span><span>{subscription?.status || 'ACTIVE'}</span></div>
         {subscription?.billing_cycle && (
@@ -52,11 +75,20 @@ export function PlanPanel({
         {subscription?.current_period_end && (
           <div className="kv"><span className="k">Renews / ends</span><span>{new Date(subscription.current_period_end).toLocaleDateString()}</span></div>
         )}
-        {subscription?.status === 'ACTIVE' && (
-          <button className="btn btn-ghost btn-plain" style={{ marginTop: 16 }} onClick={cancel} disabled={cancelling}>
-            {cancelling ? 'Cancelling…' : 'Cancel subscription'}
-          </button>
-        )}
+        {err && <div className="form-error" style={{ marginTop: 12 }}>{err}</div>}
+        <div className="row wrap" style={{ marginTop: 16, gap: 10 }}>
+          {canManage && (
+            <button className="btn btn-ghost btn-plain" onClick={() => changePlan(other)} disabled={changing || cancelling}>
+              {changing ? 'Switching…' : `Switch to ${other} · ${otherPrice}`}
+            </button>
+          )}
+          {subscription?.status === 'ACTIVE' && (
+            <button className="btn btn-ghost btn-plain" onClick={cancel} disabled={cancelling || changing}>
+              {cancelling ? 'Cancelling…' : 'Cancel subscription'}
+            </button>
+          )}
+        </div>
+        {current === 'manual' && <p className="muted" style={{ marginTop: 12, fontSize: 13 }}>This is a complimentary plan managed by our team — contact us to make changes.</p>}
       </div>
     );
   }

@@ -67,6 +67,26 @@ export async function enforceSingleSubscription(userId: number, keepPaypalId: st
   return dups.length;
 }
 
+// Change a live subscription to a different plan (monthly ↔ yearly). PayPal may
+// require the subscriber to approve the change — when it does it returns an
+// approval link the browser should redirect to. Once approved, PayPal fires a
+// BILLING.SUBSCRIPTION.UPDATED webhook and our records re-sync.
+export async function reviseSubscription(id: string, planId: string, returnUrl: string, cancelUrl: string): Promise<{ approveUrl?: string }> {
+  const token = await accessToken();
+  const res = await fetch(`${baseUrl()}/v1/billing/subscriptions/${id}/revise`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      plan_id: planId,
+      application_context: { return_url: returnUrl, cancel_url: cancelUrl },
+    }),
+  });
+  if (!res.ok) throw new Error(`PayPal plan change failed (${res.status}) on the ${serverPaypal().env} environment.`);
+  const data = (await res.json()) as { links?: { rel: string; href: string }[] };
+  const approve = data.links?.find((l) => l.rel === 'approve' || l.rel === 'edit')?.href;
+  return { approveUrl: approve };
+}
+
 export async function cancelSubscription(id: string, reason = 'User requested cancellation') {
   const token = await accessToken();
   const res = await fetch(`${baseUrl()}/v1/billing/subscriptions/${id}/cancel`, {
