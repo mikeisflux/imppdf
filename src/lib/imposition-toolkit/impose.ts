@@ -3564,8 +3564,12 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
           buf[si + 2] = Math.round(y * a * 255);
           buf[si + 3] = Math.round(k * a * 255);
         }
-        if (opts.whiteUnder !== false) buf[si + 4] = panel.whiteMode === 'flood' ? 255 : Math.round(a * 255);
-        if (opts.varnish) buf[si + 5] = Math.round(a * 255);
+        // White under-base AND gloss varnish follow the same rule: flood the
+        // large panels (B/D); follow the artwork's alpha on the small panels
+        // (A/C) so both spots track transparency exactly where the art does.
+        const flood = panel.whiteMode === 'flood';
+        if (opts.whiteUnder !== false) buf[si + 4] = flood ? 255 : Math.round(a * 255);
+        if (opts.varnish) buf[si + 5] = flood ? 255 : Math.round(a * 255);
       }
     }
   }
