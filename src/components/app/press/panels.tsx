@@ -903,7 +903,46 @@ function DivinityBoxPanel(p: PanelProps) {
       <Section label="// MARKS" help="Fold guide ticks in the no-print gaps between panels.">
         <Check icon="foldmarks" label="Fold ticks" checked={s.foldMarks !== false} onChange={(v) => up({ foldMarks: v })} />
       </Section>
+      <DivinityBoxTiffExport s={s} up={up} />
     </>
+  );
+}
+
+// Production TIFF export: uncompressed, interleaved CMYK + W1/V1 spot channels.
+function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSettings) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const dpi = s.tiffDpi ?? 300;
+  const hasArt = ['a', 'b', 'c', 'd'].some((k) => (s[k] as { bytes?: Uint8Array } | null)?.bytes);
+  async function download() {
+    setBusy(true); setErr('');
+    try {
+      const { divinityBoxTiff, downloadFile } = await import('@/lib/imposition-toolkit/impose');
+      const art = (v: { bytes?: Uint8Array } | null | undefined) => (v?.bytes ? { bytes: v.bytes } : null);
+      const tiff = await divinityBoxTiff({
+        a: art(s.a), b: art(s.b), c: art(s.c), d: art(s.d),
+        fit: (s.fit ?? 'cover') as 'cover' | 'contain' | 'stretch',
+        whiteUnder: s.whiteUnder !== false, varnish: !!s.varnish, dpi,
+      });
+      downloadFile(tiff, 'divinity-box.tif', 'image/tiff');
+    } catch (e) { setErr(e instanceof Error ? e.message : 'TIFF export failed.'); }
+    finally { setBusy(false); }
+  }
+  return (
+    <Section label="// TIFF EXPORT" help="Uncompressed, interleaved TIFF with CMYK plus the W1 (white) and V1 (varnish) spot channels — the file your RIP needs for a black box.">
+      <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
+        <span className="pe-label" style={{ width: 56 }}>DPI</span>
+        <select className="pe-select" value={dpi} onChange={(e) => up({ tiffDpi: Number(e.target.value) })} style={{ width: 110 }}>
+          <option value={150}>150</option><option value={200}>200</option><option value={300}>300</option>
+        </select>
+        <span style={{ flex: 1 }} />
+        <button className="pe-btn" onClick={download} disabled={busy || !hasArt}>{busy ? 'Rendering…' : 'Download TIFF'}</button>
+      </div>
+      <div className="pe-note" style={{ marginTop: 8 }}>
+        Channels: <b>C M Y K + W1 + V1</b>, 8-bit, no compression, interleaved. White floods panels B/D and follows the artwork on the small panels A/C. Higher DPI = larger file (300 dpi ≈ 140 MB).
+      </div>
+      {err && <div className="form-error" style={{ marginTop: 8 }}>{err}</div>}
+    </Section>
   );
 }
 

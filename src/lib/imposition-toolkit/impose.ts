@@ -3365,12 +3365,15 @@ export async function addWhiteVarnish(bytes: Uint8Array, opts: WhiteVarnishOptio
 
 const DBOX_SHEET_W_MM = 300, DBOX_SHEET_H_MM = 572;
 const DBOX_FOLDS_MM = [48, 262, 313, 524];
-// key, label, top offset from the sheet top (mm), print height (mm).
+// key, label, top offset from the sheet top (mm), print height (mm), and how the
+// white under-base is built: the SMALL panels (A, C) follow the artwork's shape
+// (alpha) so the black box shows through transparent areas; the LARGE panels
+// (B, D) flood the whole panel.
 export const DIVINITY_BOX_PANELS = [
-  { key: 'a', label: 'A', topMm: 0,     hMm: 46.5, wMm: 300 },
-  { key: 'b', label: 'B', topMm: 49.5,  hMm: 211,  wMm: 300 },
-  { key: 'c', label: 'C', topMm: 263.5, hMm: 48,   wMm: 300 },
-  { key: 'd', label: 'D', topMm: 314.5, hMm: 208,  wMm: 300 },
+  { key: 'a', label: 'A', topMm: 0,     hMm: 46.5, wMm: 300, whiteMode: 'shaped' as const },
+  { key: 'b', label: 'B', topMm: 49.5,  hMm: 211,  wMm: 300, whiteMode: 'flood' as const },
+  { key: 'c', label: 'C', topMm: 263.5, hMm: 48,   wMm: 300, whiteMode: 'shaped' as const },
+  { key: 'd', label: 'D', topMm: 314.5, hMm: 208,  wMm: 300, whiteMode: 'flood' as const },
 ] as const;
 
 export interface DivinityBoxArt { bytes: Uint8Array; page?: number }
@@ -3458,6 +3461,76 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
 
   if (colorSrc) await carryColorContext(colorSrc, out);
   return out.save();
+}
+
+// Render the box as an UNCOMPRESSED, INTERLEAVED separated TIFF: CMYK art plus
+// the W1 (white under-base) and V1 (varnish) spot channels a RIP needs to print
+// on black stock. Small panels' white follows the artwork alpha; large panels
+// flood. Browser-only (uses pdf.js + canvas).
+export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number }): Promise<Uint8Array> {
+  const { encodeSeparatedTiff } = await import('./tiff');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfjs: any = await import('pdfjs-dist');
+  try { pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default; } catch { /* bundler resolves worker */ }
+
+  const dpi = opts.dpi ?? 300;
+  const pxPerMm = dpi / 25.4;
+  const W = Math.max(1, Math.round(DBOX_SHEET_W_MM * pxPerMm));
+  const H = Math.max(1, Math.round(DBOX_SHEET_H_MM * pxPerMm));
+  const spp = 6;                                     // C M Y K W1 V1
+  const buf = new Uint8Array(W * H * spp);           // all zero → no ink (black substrate shows)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mkCanvas = (w: number, h: number): any =>
+    typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h)
+      : Object.assign(document.createElement('canvas'), { width: w, height: h });
+
+  for (const panel of DIVINITY_BOX_PANELS) {
+    const art = opts[panel.key];
+    if (!art?.bytes) continue;
+    let img: Uint8ClampedArray, pwPx: number, phPx: number;
+    try {
+      const doc = await pdfjs.getDocument({ data: art.bytes.slice() }).promise;
+      const page = await doc.getPage(Math.max(1, Math.round(art.page ?? 1)));
+      pwPx = Math.max(1, Math.round(panel.wMm * pxPerMm));
+      phPx = Math.max(1, Math.round(panel.hMm * pxPerMm));
+      const vp1 = page.getViewport({ scale: 1 });
+      const scale = Math.max(pwPx / vp1.width, phPx / vp1.height);   // cover-fit
+      const vp = page.getViewport({ scale });
+      const aw = Math.max(1, Math.round(vp.width)), ah = Math.max(1, Math.round(vp.height));
+      const artCanvas = mkCanvas(aw, ah);
+      await page.render({ canvasContext: artCanvas.getContext('2d'), viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
+      const pc = mkCanvas(pwPx, phPx);
+      const pctx = pc.getContext('2d');
+      pctx.drawImage(artCanvas, (pwPx - aw) / 2, (phPx - ah) / 2);   // centre the cover-scaled art
+      img = pctx.getImageData(0, 0, pwPx, phPx).data;
+    } catch { continue; }
+
+    const topPx = Math.round(panel.topMm * pxPerMm);
+    for (let yy = 0; yy < phPx; yy++) {
+      const sy = topPx + yy; if (sy < 0 || sy >= H) continue;
+      for (let xx = 0; xx < pwPx && xx < W; xx++) {
+        const si = (sy * W + xx) * spp;
+        const pi = (yy * pwPx + xx) * 4;
+        const a = img[pi + 3]! / 255;
+        if (a > 0) {
+          const r = img[pi]! / 255, g = img[pi + 1]! / 255, b = img[pi + 2]! / 255;
+          const k = 1 - Math.max(r, g, b);
+          const c = k < 1 ? (1 - r - k) / (1 - k) : 0;
+          const m = k < 1 ? (1 - g - k) / (1 - k) : 0;
+          const y = k < 1 ? (1 - b - k) / (1 - k) : 0;
+          buf[si] = Math.round(c * a * 255);
+          buf[si + 1] = Math.round(m * a * 255);
+          buf[si + 2] = Math.round(y * a * 255);
+          buf[si + 3] = Math.round(k * a * 255);
+        }
+        if (opts.whiteUnder !== false) buf[si + 4] = panel.whiteMode === 'flood' ? 255 : Math.round(a * 255);
+        if (opts.varnish) buf[si + 5] = Math.round(a * 255);
+      }
+    }
+  }
+
+  return encodeSeparatedTiff({ width: W, height: H, interleaved: buf, inkNames: ['Cyan', 'Magenta', 'Yellow', 'Black', 'W1', 'V1'], dpi });
 }
 
 // ── Braille (Grade-1) ───────────────────────────────────────────────────────
