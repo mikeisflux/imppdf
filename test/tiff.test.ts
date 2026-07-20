@@ -55,9 +55,30 @@ test('encodeRgbSpotTiff: RGB photometric, 5 samples R G B W1 V1, spot names pres
   // Pixel data intact at StripOffsets.
   const so = tags.get(273)!.v;
   for (let i = 0; i < interleaved.length; i++) assert.equal(out[so + i], interleaved[i]);
-  // The channel names "W1" and "V1" appear (ASCII) inside the Photoshop block.
-  const ascii = String.fromCharCode(...out).slice(0, so);
-  assert.ok(ascii.includes('W1') && ascii.includes('V1'), 'spot channel names W1/V1 embedded');
-  // '8BIM' resource signature present.
-  assert.ok(ascii.includes('8BIM'), 'Photoshop 8BIM resource signature present');
+  // The declared image ends exactly at EOF — no missing bytes (which is what
+  // triggers Photoshop's "unexpected end-of-file"), no trailing slop.
+  assert.equal(so + tags.get(279)!.v, out.length, 'StripOffset + StripByteCounts == file length');
+  // Walk the Photoshop 8BIM resource section (BIG-endian) and confirm every
+  // resource's declared size stays within the block — a bad size is exactly
+  // what makes a reader run past EOF.
+  const rs = tags.get(34377)!;
+  const be16 = (o: number) => (out[o]! << 8) | out[o + 1]!;
+  const be32 = (o: number) => ((out[o]! << 24) | (out[o + 1]! << 16) | (out[o + 2]! << 8) | out[o + 3]!) >>> 0;
+  let q = rs.v; const end = rs.v + rs.count; const found: string[] = [];
+  while (q + 12 <= end) {
+    assert.equal(be32(q), 0x3842494d, '8BIM signature at each resource');   // '8BIM'
+    const id = be16(q + 4);
+    const nameLen = out[q + 6]!;                        // Pascal name (padded to even w/ the length byte)
+    const namePad = (1 + nameLen) % 2 ? 1 : 0;
+    let p2 = q + 6 + 1 + nameLen + namePad;
+    const size = be32(p2); p2 += 4;
+    assert.ok(p2 + size <= end, `resource ${id} size ${size} stays within the block`);
+    if (id === 0x03ee) {                                // alpha/spot channel names
+      let c = p2; const e = p2 + size;
+      while (c < e) { const l = out[c]!; found.push(String.fromCharCode(...out.slice(c + 1, c + 1 + l))); c += 1 + l; }
+    }
+    q = p2 + size + (size % 2 ? 1 : 0);
+  }
+  assert.deepEqual(found, ['W1', 'V1'], 'channel names are exactly W1, V1 in order');
+  assert.equal(q, end, 'resource walk consumes the block exactly (no overrun/underrun)');
 });

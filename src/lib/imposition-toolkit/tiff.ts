@@ -32,39 +32,24 @@ export interface RgbSpotTiffInput {
 }
 
 // A Photoshop "8BIM" image-resource blob (BIG-endian, per Adobe's spec) naming
-// the extra channels. Resource 1006 (0x03EE) = alpha/spot channel names as
-// concatenated Pascal strings; resource 1045 (0x0415) = the same as Unicode.
-// Both together make Photoshop label the channels exactly (W1, V1) and in order.
+// the extra channels: resource 1006 (0x03EE) = alpha/spot channel names as
+// concatenated Pascal strings (length byte + ASCII). Photoshop reads these to
+// label the channels exactly (W1, V1) and in order. Kept to this single,
+// well-defined resource so no size field can be misread — a malformed resource
+// makes readers run past EOF ("unexpected end-of-file").
 function photoshopChannelNames(names: string[]): Uint8Array {
   const enc = new TextEncoder();
-  const blocks: Uint8Array[] = [];
-  const be32 = (v: number) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v, false); return b; };
-  const resource = (id: number, data: Uint8Array) => {
-    const pad = data.length % 2 ? 1 : 0;
-    const out = new Uint8Array(4 + 2 + 2 + 4 + data.length + pad);
-    const dv = new DataView(out.buffer);
-    out[0] = 0x38; out[1] = 0x42; out[2] = 0x49; out[3] = 0x4d;   // '8BIM'
-    dv.setUint16(4, id, false);                                    // resource id (BE)
-    dv.setUint16(6, 0, false);                                     // empty Pascal name + pad
-    dv.setUint32(8, data.length, false);                           // size (BE, unpadded)
-    out.set(data, 12);
-    return out;
-  };
-  // 1006: Pascal strings (length byte + ASCII), concatenated.
   const pas: number[] = [];
   for (const n of names) { const b = enc.encode(n); pas.push(b.length, ...b); }
-  blocks.push(resource(0x03ee, new Uint8Array(pas)));
-  // 1045: 4-byte count then, per name, 4-byte length (chars incl. NUL) + UTF-16BE.
-  const uni: number[] = [...be32(names.length)];
-  for (const n of names) {
-    uni.push(...be32(n.length + 1));
-    for (const ch of n) { const c = ch.charCodeAt(0); uni.push((c >> 8) & 0xff, c & 0xff); }
-    uni.push(0, 0);   // NUL terminator (UTF-16)
-  }
-  blocks.push(resource(0x0415, new Uint8Array(uni)));
-  const total = blocks.reduce((s, b) => s + b.length, 0);
-  const out = new Uint8Array(total);
-  let o = 0; for (const b of blocks) { out.set(b, o); o += b.length; }
+  const data = new Uint8Array(pas);
+  const pad = data.length % 2 ? 1 : 0;
+  const out = new Uint8Array(4 + 2 + 2 + 4 + data.length + pad);
+  const dv = new DataView(out.buffer);
+  out[0] = 0x38; out[1] = 0x42; out[2] = 0x49; out[3] = 0x4d;   // '8BIM'
+  dv.setUint16(4, 0x03ee, false);                                // resource id 1006 (BE)
+  dv.setUint16(6, 0, false);                                     // empty Pascal name + pad
+  dv.setUint32(8, data.length, false);                           // size (BE, unpadded)
+  out.set(data, 12);
   return out;
 }
 
