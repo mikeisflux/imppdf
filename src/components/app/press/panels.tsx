@@ -932,14 +932,17 @@ function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSet
     <Section label="// TIFF EXPORT" help="Uncompressed, interleaved TIFF with CMYK plus the W1 (white) and V1 (varnish) spot channels — the file your RIP needs for a black box.">
       <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
         <span className="pe-label" style={{ width: 56 }}>DPI</span>
-        <select className="pe-select" value={dpi} onChange={(e) => up({ tiffDpi: Number(e.target.value) })} style={{ width: 110 }}>
-          <option value={150}>150</option><option value={200}>200</option><option value={300}>300</option>
+        <select className="pe-select" value={dpi} onChange={(e) => up({ tiffDpi: Number(e.target.value) })} style={{ width: 130 }}>
+          <option value={300}>300 (recommended)</option><option value={360}>360</option><option value={600}>600 (fine detail)</option>
         </select>
         <span style={{ flex: 1 }} />
         <button className="pe-btn" onClick={download} disabled={busy || !hasArt}>{busy ? 'Rendering…' : 'Download TIFF'}</button>
       </div>
       <div className="pe-note" style={{ marginTop: 8 }}>
-        Channels: <b>C M Y K + W1 + V1</b>, 8-bit, no compression, interleaved. White floods panels B/D and follows the artwork on the small panels A/C. Higher DPI = larger file (300 dpi ≈ 140 MB).
+        Channels: <b>C M Y K + W1 + V1</b>, 8-bit, no compression, interleaved. White floods panels B/D and follows the artwork on the small panels A/C.
+      </div>
+      <div className="pe-note" style={{ marginTop: 6 }}>
+        Use <b>300 dpi</b> — that&apos;s the file resolution an Epson X600 UV workflow wants. The head&apos;s 720×1440 is the RIP&apos;s output/screening resolution, not the file&apos;s; a 1440&nbsp;dpi file would be ~3&nbsp;GB and the RIP would just downsample it. 600 is only for very fine linework (≈575&nbsp;MB).
       </div>
       {err && <div className="form-error" style={{ marginTop: 8 }}>{err}</div>}
     </Section>
