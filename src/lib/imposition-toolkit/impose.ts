@@ -3365,6 +3365,38 @@ export async function addWhiteVarnish(bytes: Uint8Array, opts: WhiteVarnishOptio
 
 const DBOX_SHEET_W_MM = 300, DBOX_SHEET_H_MM = 572;
 const DBOX_FOLDS_MM = [48, 262, 313, 524];
+// CHOKE: the white under-base is pulled IN this many pixels from every art edge
+// so slight press misregistration never shows a white halo past the printed art
+// on the black box. (A "choke" = underprint shrunk relative to the art it sits
+// under; the opposite is a "spread".) DO NOT remove — required for clean edges.
+const DBOX_WHITE_CHOKE_PX = 3;
+
+// Erode a single-channel 8-bit plane by `r` px (separable min filter). Any pixel
+// within `r` of a zero pixel — OR within `r` of the plane edge — drops to 0, so
+// bright (255 = full ink) regions shrink inward by `r`. This is the choke.
+export function chokePlane(src: Uint8Array, w: number, h: number, r: number): Uint8Array {
+  if (r <= 0) return src;
+  const tmp = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      let mn = (x - r < 0 || x + r > w - 1) ? 0 : 255;   // edge of sheet counts as empty
+      const lo = Math.max(0, x - r), hi = Math.min(w - 1, x + r);
+      for (let k = lo; k <= hi && mn > 0; k++) { const v = src[row + k]!; if (v < mn) mn = v; }
+      tmp[row + x] = mn;
+    }
+  }
+  const out = new Uint8Array(w * h);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      let mn = (y - r < 0 || y + r > h - 1) ? 0 : 255;
+      const lo = Math.max(0, y - r), hi = Math.min(h - 1, y + r);
+      for (let k = lo; k <= hi && mn > 0; k++) { const v = tmp[k * w + x]!; if (v < mn) mn = v; }
+      out[y * w + x] = mn;
+    }
+  }
+  return out;
+}
 // key, label, top offset from the sheet top (mm), print height (mm), and how the
 // white under-base is built: the SMALL panels (A, C) follow the artwork's shape
 // (alpha) so the black box shows through transparent areas; the LARGE panels
@@ -3439,14 +3471,16 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
   // varnish "V1" on top of each panel (appended → above the art).
   const F = (n: number) => n.toFixed(3);
   const cache: SepCache = new Map();
-  const fillRect = (spot: string, preview: { r: number; g: number; b: number }, under: boolean) => {
+  const fillRect = (spot: string, preview: { r: number; g: number; b: number }, under: boolean, insetPt = 0) => {
     const resName = ensureSeparation(PL, out, pg, spot, preview, cache);
     const body = placedPanels
-      .map((r) => `${F(r.x)} ${F(r.y)} ${F(r.w)} ${F(r.h)} re`)
+      .map((r) => `${F(r.x + insetPt)} ${F(r.y + insetPt)} ${F(Math.max(0, r.w - 2 * insetPt))} ${F(Math.max(0, r.h - 2 * insetPt))} re`)
       .join('\n');
     addContentStream(PL, out.context, pg, `\nq\n/${resName} cs\n1 scn\n${body}\nf\nQ\n`, under);
   };
-  if (opts.whiteUnder !== false && placedPanels.length) fillRect('W1', { r: 1, g: 1, b: 1 }, true);
+  // White under-base choked inward (see DBOX_WHITE_CHOKE_PX): 3 px @ 300 dpi ≈ 0.72 pt.
+  const chokePt = (DBOX_WHITE_CHOKE_PX / 300) * 72;
+  if (opts.whiteUnder !== false && placedPanels.length) fillRect('W1', { r: 1, g: 1, b: 1 }, true, chokePt);
   if (opts.varnish && placedPanels.length) fillRect('V1', { r: 0.85, g: 0.86, b: 0.92 }, false);
 
   // Fold ticks in the no-print gaps (short edge ticks; never over artwork).
@@ -3497,12 +3531,18 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
       const vp1 = page.getViewport({ scale: 1 });
       const scale = Math.max(pwPx / vp1.width, phPx / vp1.height);   // cover-fit
       const vp = page.getViewport({ scale });
-      const aw = Math.max(1, Math.round(vp.width)), ah = Math.max(1, Math.round(vp.height));
+      // Render AT LEAST panel size in both axes (ceil, never short), then
+      // crop-centre to fill the panel EDGE-TO-EDGE. The panel's edges sample the
+      // art's interior, so rounding never leaves an uncovered strip — the white
+      // under-base can't peek out as a thin line on this borderless, zero-bleed
+      // box. DO NOT reintroduce centre-with-rounding here (that caused the line).
+      const aw = Math.max(pwPx, Math.ceil(vp.width)), ah = Math.max(phPx, Math.ceil(vp.height));
       const artCanvas = mkCanvas(aw, ah);
       await page.render({ canvasContext: artCanvas.getContext('2d'), viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
       const pc = mkCanvas(pwPx, phPx);
       const pctx = pc.getContext('2d');
-      pctx.drawImage(artCanvas, (pwPx - aw) / 2, (phPx - ah) / 2);   // centre the cover-scaled art
+      const sx = Math.floor((aw - pwPx) / 2), sy = Math.floor((ah - phPx) / 2);
+      pctx.drawImage(artCanvas, sx, sy, pwPx, phPx, 0, 0, pwPx, phPx);   // crop-fill full panel
       img = pctx.getImageData(0, 0, pwPx, phPx).data;
     } catch { continue; }
 
@@ -3528,6 +3568,14 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
         if (opts.varnish) buf[si + 5] = Math.round(a * 255);
       }
     }
+  }
+
+  // Choke the white under-base inward by DBOX_WHITE_CHOKE_PX (see above).
+  if (opts.whiteUnder !== false && DBOX_WHITE_CHOKE_PX > 0) {
+    const plane = new Uint8Array(W * H);
+    for (let i = 0, p = 4; i < W * H; i++, p += spp) plane[i] = buf[p]!;
+    const choked = chokePlane(plane, W, H, DBOX_WHITE_CHOKE_PX);
+    for (let i = 0, p = 4; i < W * H; i++, p += spp) buf[p] = choked[i]!;
   }
 
   return encodeSeparatedTiff({ width: W, height: H, interleaved: buf, inkNames: ['Cyan', 'Magenta', 'Yellow', 'Black', 'W1', 'V1'], dpi });

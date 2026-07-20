@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -247,4 +247,33 @@ test('imposeDivinityBox: builds the 300×572mm flat with panels + white spot', a
   const s = doc.getPage(0).getSize();
   assert.ok(Math.abs(s.width - 300 * 72 / 25.4) < 0.6, `sheet width 300mm (${s.width})`);
   assert.ok(Math.abs(s.height - 572 * 72 / 25.4) < 0.6, `sheet height 572mm (${s.height})`);
+});
+
+test('chokePlane: white under-base pulls in by r px from every edge (choke trap)', () => {
+  // 20×20 solid-white (255) plane; choke by 3 px.
+  const w = 20, h = 20;
+  const src = new Uint8Array(w * h).fill(255);
+  const out = chokePlane(src, w, h, 3);
+  const at = (x: number, y: number) => out[y * w + x];
+  // Pixels within 3 px of the sheet edge are choked to 0.
+  assert.equal(at(0, 0), 0, 'corner choked');
+  assert.equal(at(2, 10), 0, 'within 3px of left edge choked');
+  assert.equal(at(10, 2), 0, 'within 3px of top edge choked');
+  assert.equal(at(17, 10), 0, 'within 3px of right edge choked');
+  // The interior (>= 3 px from every edge) is untouched.
+  assert.equal(at(3, 3), 255, 'first fully-interior pixel kept');
+  assert.equal(at(10, 10), 255, 'centre kept');
+  assert.equal(at(16, 16), 255, 'interior kept');
+  // A hole in the middle erodes outward by exactly 3 px (square) too.
+  const src2 = new Uint8Array(w * h).fill(255);
+  src2[10 * w + 10] = 0;                       // single empty pixel, well off the edges
+  const out2 = chokePlane(src2, w, h, 3);
+  const at2 = (x: number, y: number) => out2[y * w + x];
+  assert.equal(at2(10, 10), 0, 'hole stays empty');
+  assert.equal(at2(13, 10), 0, '3px right of hole choked');
+  assert.equal(at2(14, 10), 255, '4px right of hole kept');
+  assert.equal(at2(10, 13), 0, '3px below hole choked');
+  assert.equal(at2(10, 14), 255, '4px below hole kept');
+  // r <= 0 is a no-op (returns the same reference).
+  assert.equal(chokePlane(src, w, h, 0), src);
 });

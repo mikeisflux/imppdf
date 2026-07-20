@@ -900,8 +900,8 @@ function DivinityBoxPanel(p: PanelProps) {
         <Check icon="droplet" label="White under-base (W1)" sub="Prints white behind every panel — required on black stock" checked={s.whiteUnder !== false} onChange={(v) => up({ whiteUnder: v })} />
         <Check icon="droplet" label="Gloss varnish (V1)" sub="Spot gloss over each panel" checked={!!s.varnish} onChange={(v) => up({ varnish: v })} />
       </Section>
-      <Section label="// MARKS" help="Fold guide ticks in the no-print gaps between panels.">
-        <Check icon="foldmarks" label="Fold ticks" checked={s.foldMarks !== false} onChange={(v) => up({ foldMarks: v })} />
+      <Section label="// MARKS" help="Off by default — this is a borderless, zero-bleed box, so no marks touch the artwork. Enable only if your finisher wants tiny fold ticks in the no-print gaps.">
+        <Check icon="foldmarks" label="Fold ticks (off = no marks at all)" sub="Tiny guides in the panel gaps only — never over the art" checked={!!s.foldMarks} onChange={(v) => up({ foldMarks: v })} />
       </Section>
       <DivinityBoxTiffExport s={s} up={up} />
     </>
@@ -939,7 +939,7 @@ function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSet
         <button className="pe-btn" onClick={download} disabled={busy || !hasArt}>{busy ? 'Rendering…' : 'Download TIFF'}</button>
       </div>
       <div className="pe-note" style={{ marginTop: 8 }}>
-        Channels: <b>C M Y K + W1 + V1</b>, 8-bit, no compression, interleaved. White floods panels B/D and follows the artwork on the small panels A/C.
+        Channels: <b>C M Y K + W1 + V1</b>, 8-bit, no compression, interleaved. White floods panels B/D and follows the artwork on the small panels A/C, choked in <b>3&nbsp;px</b> so no white halo shows past the art on the black box.
       </div>
       <div className="pe-note" style={{ marginTop: 6 }}>
         Use <b>300 dpi</b> — that&apos;s the file resolution an Epson X600 UV workflow wants. The head&apos;s 720×1440 is the RIP&apos;s output/screening resolution, not the file&apos;s; a 1440&nbsp;dpi file would be ~3&nbsp;GB and the RIP would just downsample it. 600 is only for very fine linework (≈575&nbsp;MB).

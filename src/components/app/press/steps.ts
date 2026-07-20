@@ -161,7 +161,9 @@ export function defaultSettings(type: StepType): StepSettings {
       // Fixed 300×572 mm box flat with four printable panels (A–D). Each panel
       // takes its own uploaded art; a white under-base (W1) prints behind every
       // panel because the box is black, with optional gloss varnish (V1).
-      return { a: null, b: null, c: null, d: null, fit: 'cover', whiteUnder: true, varnish: false, foldMarks: true };
+      // foldMarks default OFF: this is a borderless, zero-bleed box — no crop,
+      // cut, registration, or fold marks on the artwork unless explicitly asked.
+      return { a: null, b: null, c: null, d: null, fit: 'cover', whiteUnder: true, varnish: false, foldMarks: false };
     case 'editpdf':
       return {};
     case 'booklet':
