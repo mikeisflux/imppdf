@@ -3541,18 +3541,16 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
       const vp1 = page.getViewport({ scale: 1 });
       const scale = Math.max(pwPx / vp1.width, phPx / vp1.height);   // cover-fit
       const vp = page.getViewport({ scale });
-      // Render AT LEAST panel size in both axes (ceil, never short), then
-      // crop-centre to fill the panel EDGE-TO-EDGE. The panel's edges sample the
-      // art's interior, so rounding never leaves an uncovered strip — the white
-      // under-base can't peek out as a thin line on this borderless, zero-bleed
-      // box. DO NOT reintroduce centre-with-rounding here (that caused the line).
-      const aw = Math.max(pwPx, Math.ceil(vp.width)), ah = Math.max(phPx, Math.ceil(vp.height));
-      const artCanvas = mkCanvas(aw, ah);
-      await page.render({ canvasContext: artCanvas.getContext('2d'), viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
+      // Render the cover-scaled art DIRECTLY into the panel-sized canvas with a
+      // centering (crop) transform — a single render, no intermediate drawImage.
+      // This is critical: a two-step render-then-drawImage-crop can FLATTEN the
+      // alpha to fully opaque in some canvas engines, which makes W1 (= alpha)
+      // flood the whole panel with white. Rendering straight in keeps every
+      // transparent pixel transparent. DO NOT reintroduce a drawImage crop here.
       const pc = mkCanvas(pwPx, phPx);
       const pctx = pc.getContext('2d');
-      const sx = Math.floor((aw - pwPx) / 2), sy = Math.floor((ah - phPx) / 2);
-      pctx.drawImage(artCanvas, sx, sy, pwPx, phPx, 0, 0, pwPx, phPx);   // crop-fill full panel
+      const tx = -(vp.width - pwPx) / 2, ty = -(vp.height - phPx) / 2;   // crop-centre
+      await page.render({ canvasContext: pctx, viewport: vp, transform: [1, 0, 0, 1, tx, ty], background: 'rgba(0,0,0,0)' }).promise;
       img = pctx.getImageData(0, 0, pwPx, phPx).data;
     } catch { continue; }
 
