@@ -3497,12 +3497,14 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
   return out.save();
 }
 
-// Render the box as an UNCOMPRESSED, INTERLEAVED separated TIFF: CMYK art plus
-// the W1 (white under-base) and V1 (varnish) spot channels a RIP needs to print
-// on black stock. Small panels' white follows the artwork alpha; large panels
-// flood. Browser-only (uses pdf.js + canvas).
+// Render the box as an UNCOMPRESSED, INTERLEAVED TIFF the RIP can open: an 8-bit
+// RGB image with the W1 (white under-base) and V1 (varnish) spot channels after
+// it, IN ORDER — samples are R, G, B, W1, V1. RGB (not CMYK/Separated) is what
+// Photoshop and the RIP actually open; a Separated TIFF reports "unsupported
+// color space". Small panels' white/varnish follow the artwork alpha; large
+// panels flood; the white is choked 3 px. Browser-only (pdf.js + canvas).
 export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number }): Promise<Uint8Array> {
-  const { encodeSeparatedTiff } = await import('./tiff');
+  const { encodeRgbSpotTiff } = await import('./tiff');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdfjs: any = await import('pdfjs-dist');
   try { pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default; } catch { /* bundler resolves worker */ }
@@ -3511,8 +3513,11 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
   const pxPerMm = dpi / 25.4;
   const W = Math.max(1, Math.round(DBOX_SHEET_W_MM * pxPerMm));
   const H = Math.max(1, Math.round(DBOX_SHEET_H_MM * pxPerMm));
-  const spp = 6;                                     // C M Y K W1 V1
-  const buf = new Uint8Array(W * H * spp);           // all zero → no ink (black substrate shows)
+  // RGB base + the two spot channels the RIP needs, IN ORDER: R G B W1 V1.
+  // (RGB — not CMYK — so the file opens; a Separated/CMYK TIFF reports
+  // "unsupported color space". W1/V1 stay exactly as required.)
+  const spp = 5;                                     // R G B W1 V1
+  const buf = new Uint8Array(W * H * spp);           // all zero → black substrate shows, no white/varnish
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mkCanvas = (w: number, h: number): any =>
@@ -3554,35 +3559,31 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
         const pi = (yy * pwPx + xx) * 4;
         const a = img[pi + 3]! / 255;
         if (a > 0) {
-          const r = img[pi]! / 255, g = img[pi + 1]! / 255, b = img[pi + 2]! / 255;
-          const k = 1 - Math.max(r, g, b);
-          const c = k < 1 ? (1 - r - k) / (1 - k) : 0;
-          const m = k < 1 ? (1 - g - k) / (1 - k) : 0;
-          const y = k < 1 ? (1 - b - k) / (1 - k) : 0;
-          buf[si] = Math.round(c * a * 255);
-          buf[si + 1] = Math.round(m * a * 255);
-          buf[si + 2] = Math.round(y * a * 255);
-          buf[si + 3] = Math.round(k * a * 255);
+          // RGB straight from the artwork (channels 0,1,2 = R,G,B).
+          buf[si] = img[pi]!;
+          buf[si + 1] = img[pi + 1]!;
+          buf[si + 2] = img[pi + 2]!;
         }
-        // White under-base AND gloss varnish follow the same rule: flood the
-        // large panels (B/D); follow the artwork's alpha on the small panels
-        // (A/C) so both spots track transparency exactly where the art does.
+        // White under-base (W1, channel 3) AND gloss varnish (V1, channel 4)
+        // follow the same rule: flood the large panels (B/D); follow the
+        // artwork's alpha on the small panels (A/C) so both spots track
+        // transparency exactly where the art does.
         const flood = panel.whiteMode === 'flood';
-        if (opts.whiteUnder !== false) buf[si + 4] = flood ? 255 : Math.round(a * 255);
-        if (opts.varnish) buf[si + 5] = flood ? 255 : Math.round(a * 255);
+        if (opts.whiteUnder !== false) buf[si + 3] = flood ? 255 : Math.round(a * 255);
+        if (opts.varnish) buf[si + 4] = flood ? 255 : Math.round(a * 255);
       }
     }
   }
 
-  // Choke the white under-base inward by DBOX_WHITE_CHOKE_PX (see above).
+  // Choke the white under-base (W1, channel 3) inward by DBOX_WHITE_CHOKE_PX.
   if (opts.whiteUnder !== false && DBOX_WHITE_CHOKE_PX > 0) {
     const plane = new Uint8Array(W * H);
-    for (let i = 0, p = 4; i < W * H; i++, p += spp) plane[i] = buf[p]!;
+    for (let i = 0, p = 3; i < W * H; i++, p += spp) plane[i] = buf[p]!;
     const choked = chokePlane(plane, W, H, DBOX_WHITE_CHOKE_PX);
-    for (let i = 0, p = 4; i < W * H; i++, p += spp) buf[p] = choked[i]!;
+    for (let i = 0, p = 3; i < W * H; i++, p += spp) buf[p] = choked[i]!;
   }
 
-  return encodeSeparatedTiff({ width: W, height: H, interleaved: buf, inkNames: ['Cyan', 'Magenta', 'Yellow', 'Black', 'W1', 'V1'], dpi });
+  return encodeRgbSpotTiff({ width: W, height: H, interleaved: buf, spotNames: ['W1', 'V1'], dpi });
 }
 
 // ── Braille (Grade-1) ───────────────────────────────────────────────────────
