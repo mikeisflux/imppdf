@@ -12,7 +12,7 @@ import {
   nestPdf, imposeCalendar, insertPages as insertPagesOp, mixPdfs, nudgePdf,
   addBackdropFile, applyColorEffects, applyColorManagement, addBarcodeStamp,
   addDimensions, addWhiteVarnish, addBraille, optimizePdf, repairPdf, decryptPdf, setLayers,
-  replicateFill,
+  replicateFill, imposeDivinityBox,
 } from '@/lib/imposition-toolkit/impose';
 import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/imposition-toolkit/impose';
 
@@ -31,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'divinitybox';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -157,6 +157,11 @@ export function defaultSettings(type: StepType): StepSettings {
       // Index cards (3×5") on Letter. Starts as a single 1×1 copy; raise
       // columns/rows (or tick Replicate) to gang up.
       return nupPreset({ cellWIn: 3, cellHIn: 5 });
+    case 'divinitybox':
+      // Fixed 300×572 mm box flat with four printable panels (A–D). Each panel
+      // takes its own uploaded art; a white under-base (W1) prints behind every
+      // panel because the box is black, with optional gloss varnish (V1).
+      return { a: null, b: null, c: null, d: null, fit: 'cover', whiteUnder: true, varnish: false, foldMarks: true };
     case 'editpdf':
       return {};
     case 'booklet':
@@ -461,6 +466,17 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         // copies + extra art); otherwise the normal fixed-sheet N-up runs.
         b = s.replicate ? await replicateFill(b, replicateOpts(s)) : await imposeNUp(b, nupOpts(s)); break;
       case 'replicate': b = await replicateFill(b, replicateOpts(s)); break;
+      case 'divinitybox': {
+        // Self-contained: builds the box flat from the four uploaded panels and
+        // ignores the pipeline input entirely.
+        const art = (v: { bytes?: Uint8Array } | null | undefined) => (v?.bytes ? { bytes: v.bytes } : null);
+        b = await imposeDivinityBox({
+          a: art(s.a), b: art(s.b), c: art(s.c), d: art(s.d),
+          fit: (s.fit ?? 'cover') as 'cover' | 'contain' | 'stretch',
+          whiteUnder: s.whiteUnder !== false, varnish: !!s.varnish, foldMarks: s.foldMarks !== false,
+        });
+        break;
+      }
       case 'nupbook': b = await imposeNUpBook(b, {
         nUp: s.nUp, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, marginIn: s.marginIn,
         gutterIn: s.gutterIn, creepIn: s.creepIn, rtl: !!s.rtl, signatureSheets: s.signatureSheets,
@@ -708,6 +724,7 @@ function stripBytes(s: StepSettings): StepSettings {
   if (Array.isArray(c.files)) c.files = [];
   if (Array.isArray(c.extras)) c.extras = [];
   if (c.stamp) { c.stamp = null; c.stampName = ''; }
+  for (const k of ['a', 'b', 'c', 'd'] as const) if (c[k] && (c[k] as { bytes?: Uint8Array }).bytes) c[k] = null;
   return c;
 }
 

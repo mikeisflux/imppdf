@@ -55,6 +55,7 @@ export const Icons = {
   pdfxIc: (p = {}) => <S {...p}><rect x="4" y="3" width="16" height="18" rx="1.5" /><path d="M8 8h4M8 12h8M8 16h8" /><path d="M15 3v5h5" /></S>,
   fieryBookletIc: (p = {}) => <S {...p}><rect x="3" y="5" width="8" height="14" rx="1" /><rect x="13" y="5" width="8" height="14" rx="1" /><path d="M11 5v14M13 5v14" /></S>,
   fierySerialIc: (p = {}) => <S {...p}><rect x="3" y="5" width="8" height="14" rx="1" /><rect x="13" y="5" width="8" height="14" rx="1" /><path d="M11 5v14M13 5v14" /><path d="M15.5 16.5h4" /><path d="M17.5 14.5l-.6 3.5" /></S>,
+  divinityBoxIc: (p = {}) => <S {...p}><rect x="7" y="3" width="10" height="4" rx="0.5" /><rect x="7" y="7" width="10" height="9" rx="0.5" /><rect x="7" y="16" width="10" height="4" rx="0.5" /><path d="M7 7h10M7 16h10" /></S>,
   replicateIc: (p = {}) => <S {...p}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></S>,
   barcodeIc: (p = {}) => <S {...p}><path d="M4 5v14M8 5v14M11 5v8M14 5v14M18 5v10M21 5v14" /></S>,
   brailleIc: (p = {}) => <S {...p}><circle cx="7" cy="6" r="1.6" /><circle cx="7" cy="12" r="1.6" /><circle cx="7" cy="18" r="1.6" /><circle cx="14" cy="6" r="1.6" /><circle cx="14" cy="18" r="1.6" /><circle cx="20" cy="12" r="1.6" /></S>,
@@ -172,6 +173,7 @@ export const OP_GROUPS: OpGroup[] = [
   { label: '// PACKAGING', ops: [
     { id: 'boxcarton', label: 'Box / Carton', icon: 'cuttermarks', tip: 'Folding-carton die flat positioned for die-cutting.' },
     { id: 'presfolder', label: 'Presentation Folder', icon: 'folder', tip: 'Presentation folder die flat with pocket and glue tabs.' },
+    { id: 'divinitybox', label: 'Divinity Box', icon: 'divinityBoxIc', tip: 'The 300×572 mm box flat: upload art for panels A–D, with a white under-base (W1) and optional varnish (V1) spot layer for printing on black stock.' },
   ] },
   { label: '// ADVANCED', ops: [
     { id: 'preflight', label: 'PDF Preflight', icon: 'preflight', tip: 'Inspect page geometry, boxes and warnings before you impose.' },

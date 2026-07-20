@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { zineSheetLayout, zinePanels, orientCell, replicateGrid, type ZineFormat } from '@/lib/imposition-toolkit/impose';
+import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
 import { ImageFitModal } from './image-fit-modal';
@@ -210,6 +210,8 @@ export interface PanelProps {
   sourceBytes?: Uint8Array | null;
   // Replace the loaded source PDF with a corrected copy (preflight auto-fix).
   onApplyFix?: (bytes: Uint8Array, label: string) => void | Promise<void>;
+  // Arm the editor source from a tool that supplies its own art (Divinity Box).
+  onLoadSource?: (bytes: Uint8Array, name: string) => void | Promise<void>;
 }
 
 function BookletPanel(p: PanelProps) {
@@ -840,6 +842,67 @@ function ReplicatePanel(p: PanelProps) {
       <MarksSection {...p} />
       <ExtraArtSection s={s} up={up} n={N} />
       {thumbs[0] && <div className="pe-note" style={{ marginTop: 10 }}>Main image: copies fill every cell not used by additional art.</div>}
+    </>
+  );
+}
+
+// ── Divinity Box (four-panel box flat with white/varnish spots) ─────────────
+function DivinityBoxPanel(p: PanelProps) {
+  const { s, up, onLoadSource } = p;
+  const pickArt = (key: 'a' | 'b' | 'c' | 'd') => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/pdf,image/*';
+    inp.onchange = async () => {
+      const f = inp.files?.[0]; if (!f) return;
+      let bytes = new Uint8Array(await f.arrayBuffer());
+      if (f.type.startsWith('image/')) {
+        const { imageToPdf } = await import('@/lib/imposition-toolkit/impose');
+        bytes = new Uint8Array(await imageToPdf(bytes, f.type));
+      }
+      up({ [key]: { name: f.name, bytes } });
+      // Arm the editor so preview/export can run — this tool builds from its own
+      // panels and ignores the working source.
+      onLoadSource?.(new Uint8Array(bytes), 'divinity-box');
+    };
+    inp.click();
+  };
+  return (
+    <>
+      <div className="pe-note" style={{ marginBottom: 12 }}>
+        Full flat box layout — <b>300 × 572 mm</b> (1:1). Upload artwork for each printable panel below.
+        Because the box is black, a white under-base (spot <b>W1</b>) prints behind every panel; add gloss varnish (spot <b>V1</b>) if you need it.
+      </div>
+      <Section label="// PANELS" help="Each panel takes its own artwork (PDF or image), placed at its exact size on the flat. Panel E is a no-print glue tab.">
+        {DIVINITY_BOX_PANELS.map((panel) => {
+          const art = s[panel.key] as { name: string } | null | undefined;
+          return (
+            <div key={panel.key} className="pe-gang-job">
+              <div className="pe-row" style={{ marginBottom: 6 }}>
+                <span className="pe-gang-thumb"><b style={{ fontSize: 13 }}>{panel.label}</b></span>
+                <span className="pe-label" style={{ flex: 1 }}>Panel {panel.label} <span className="pe-label-sm">· {panel.wMm} × {panel.hMm} mm</span></span>
+                {art && <button className="pe-iconbtn" aria-label="Remove art" title="Remove art" onClick={() => up({ [panel.key]: null })}><Ic name="trash" size={14} /></button>}
+              </div>
+              {art
+                ? <div className="pe-note" style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ {art.name} <button className="pe-chipbtn" style={{ marginLeft: 8 }} onClick={() => pickArt(panel.key)}>Replace</button></div>
+                : <button className="pe-btn" onClick={() => pickArt(panel.key)}>Upload panel {panel.label}…</button>}
+            </div>
+          );
+        })}
+      </Section>
+      <Section label="// FIT" help="How each panel's art fills its panel. Use full-coverage art so the panel prints edge to edge.">
+        <select className="pe-select" value={s.fit ?? 'cover'} onChange={(e) => up({ fit: e.target.value })}>
+          <option value="cover">Cover — fill the panel &amp; crop</option>
+          <option value="contain">Contain — fit inside the panel</option>
+          <option value="stretch">Stretch — distort to fill</option>
+        </select>
+      </Section>
+      <Section label="// SPOT LAYERS" help="Named spot separations the RIP reads. W1 = white under-base (behind each panel); V1 = gloss varnish (on top).">
+        <Check icon="droplet" label="White under-base (W1)" sub="Prints white behind every panel — required on black stock" checked={s.whiteUnder !== false} onChange={(v) => up({ whiteUnder: v })} />
+        <Check icon="droplet" label="Gloss varnish (V1)" sub="Spot gloss over each panel" checked={!!s.varnish} onChange={(v) => up({ varnish: v })} />
+      </Section>
+      <Section label="// MARKS" help="Fold guide ticks in the no-print gaps between panels.">
+        <Check icon="foldmarks" label="Fold ticks" checked={s.foldMarks !== false} onChange={(v) => up({ foldMarks: v })} />
+      </Section>
     </>
   );
 }
@@ -1968,6 +2031,7 @@ export function StepPanelBody(props: PanelProps & { type: StepType }) {
   if (type === 'cuttermarks') return <CutterMarksPanel {...props} />;
   if (type === 'regmarks') return <CutterMarksPanel {...props} lite />;
   if (type === 'replicate') return <ReplicatePanel {...props} />;
+  if (type === 'divinitybox') return <DivinityBoxPanel {...props} />;
   if (type === 'gangsheet') return <GangSheetPanel {...props} />;
   if (type === 'customimpose') return <CustomImposePanel {...props} />;
   if (type === 'pdftools') return <PdfToolsPanel {...props} />;
@@ -1976,11 +2040,12 @@ export function StepPanelBody(props: PanelProps & { type: StepType }) {
 }
 
 // ── Step card (collapsible, reorderable) ─────────────────────────────────────
-export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSizes, layerEntries, onToggleLayer, sourceBytes, onApplyFix, onChange, onRemove, onMove, onBack, canUp, canDown, single }: {
+export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSizes, layerEntries, onToggleLayer, sourceBytes, onApplyFix, onLoadSource, onChange, onRemove, onMove, onBack, canUp, canDown, single }: {
   step: WorkflowStep; index: number; unit: Unit; onUnit: (u: Unit) => void; pageCount?: number;
   thumbs?: string[]; pageSizes?: { wPt: number; hPt: number }[];
   layerEntries?: LayerEntry[]; onToggleLayer?: (stepId: string) => void; sourceBytes?: Uint8Array | null;
   onApplyFix?: (bytes: Uint8Array, label: string) => void | Promise<void>;
+  onLoadSource?: (bytes: Uint8Array, name: string) => void | Promise<void>;
   onChange: (next: WorkflowStep) => void; onRemove: () => void; onMove: (dir: -1 | 1) => void; onBack?: () => void;
   canUp: boolean; canDown: boolean; single?: boolean;
 }) {
@@ -2015,7 +2080,7 @@ export function StepCard({ step, index, unit, onUnit, pageCount, thumbs, pageSiz
         <>
           <div className="pe-tip"><Ic name="bulb" size={16} /> {op.tip}</div>
           <StepPanelBody type={step.type} s={step.s} up={up} unit={unit} onUnit={onUnit} pageCount={pageCount}
-            thumbs={thumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={onToggleLayer} sourceBytes={sourceBytes} onApplyFix={onApplyFix} />
+            thumbs={thumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={onToggleLayer} sourceBytes={sourceBytes} onApplyFix={onApplyFix} onLoadSource={onLoadSource} />
         </>
       )}
     </div>

@@ -231,3 +231,20 @@ test('replicateFill: rotates the image 90° when that packs more, output still o
   });
   assert.equal(await pageCount(out), 1);
 });
+
+test('imposeDivinityBox: builds the 300×572mm flat with panels + white spot', async () => {
+  const { imposeDivinityBox } = await import('../src/lib/imposition-toolkit/impose.ts');
+  const panel = (w: number, h: number) => pdfOf(1, w * 72 / 25.4, h * 72 / 25.4);
+  const out = await imposeDivinityBox({
+    a: { bytes: await panel(300, 46.5) },
+    b: { bytes: await panel(300, 211) },
+    c: { bytes: await panel(300, 48) },
+    d: { bytes: await panel(300, 208) },
+    whiteUnder: true, varnish: true, foldMarks: true,
+  });
+  const doc = await PDFDocument.load(out);
+  assert.equal(doc.getPageCount(), 1);
+  const s = doc.getPage(0).getSize();
+  assert.ok(Math.abs(s.width - 300 * 72 / 25.4) < 0.6, `sheet width 300mm (${s.width})`);
+  assert.ok(Math.abs(s.height - 572 * 72 / 25.4) < 0.6, `sheet height 572mm (${s.height})`);
+});

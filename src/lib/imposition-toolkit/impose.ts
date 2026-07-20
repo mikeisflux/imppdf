@@ -3356,6 +3356,110 @@ export async function addWhiteVarnish(bytes: Uint8Array, opts: WhiteVarnishOptio
   return doc.save();
 }
 
+// ── Divinity Box (fixed 300×572 mm flat, panels A–D + white/varnish spots) ──
+// The full flat box layout from the New_Box template: full-width panels stacked
+// top→bottom with 3 mm no-print fold gaps between them. Panel E is a no-print
+// glue tab. Each printable panel takes its own uploaded artwork. Because the box
+// is printed on black stock, a white under-base (spot "W1") goes behind every
+// panel, with an optional gloss varnish (spot "V1") on top.
+
+const DBOX_SHEET_W_MM = 300, DBOX_SHEET_H_MM = 572;
+const DBOX_FOLDS_MM = [48, 262, 313, 524];
+// key, label, top offset from the sheet top (mm), print height (mm).
+export const DIVINITY_BOX_PANELS = [
+  { key: 'a', label: 'A', topMm: 0,     hMm: 46.5, wMm: 300 },
+  { key: 'b', label: 'B', topMm: 49.5,  hMm: 211,  wMm: 300 },
+  { key: 'c', label: 'C', topMm: 263.5, hMm: 48,   wMm: 300 },
+  { key: 'd', label: 'D', topMm: 314.5, hMm: 208,  wMm: 300 },
+] as const;
+
+export interface DivinityBoxArt { bytes: Uint8Array; page?: number }
+export interface DivinityBoxOptions {
+  a?: DivinityBoxArt | null; b?: DivinityBoxArt | null; c?: DivinityBoxArt | null; d?: DivinityBoxArt | null;
+  fit?: 'cover' | 'contain' | 'stretch';   // how each panel's art fills its panel (default cover)
+  whiteUnder?: boolean;    // spot "W1" white under-base behind each panel (default true — black box)
+  varnish?: boolean;       // spot "V1" gloss varnish on top of each panel (default false)
+  foldMarks?: boolean;     // fold ticks in the no-print gaps (default true)
+}
+
+export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8Array> {
+  const PL = await import('pdf-lib');
+  const { PDFDocument, rgb } = PL;
+  const MM = PT / 25.4;
+  const fit = opts.fit ?? 'cover';
+  const sheetW = DBOX_SHEET_W_MM * MM, sheetH = DBOX_SHEET_H_MM * MM;
+
+  const out = await PDFDocument.create();
+  const pg = out.addPage([sheetW, sheetH]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let colorSrc: any = null;
+
+  interface Placed { x: number; y: number; w: number; h: number }
+  const placedPanels: Placed[] = [];
+
+  // Draw each panel's artwork (art is appended → sits above the white base).
+  for (const panel of DIVINITY_BOX_PANELS) {
+    const art = opts[panel.key];
+    if (!art?.bytes) continue;
+    let src, emb, sz;
+    try {
+      src = await PDFDocument.load(art.bytes.slice(), { ignoreEncryption: true });
+      const pages = src.getPages();
+      if (!pages.length) continue;
+      const idx = Math.min(pages.length, Math.max(1, Math.round(art.page ?? 1))) - 1;
+      const p = pages[idx]!;
+      [emb] = await out.embedPages([p]);
+      sz = p.getSize();
+    } catch { continue; }
+    if (!colorSrc) colorSrc = src;
+
+    const cellW = panel.wMm * MM, cellH = panel.hMm * MM;
+    const cellX = (sheetW - cellW) / 2;                       // full width, centred
+    const cellY = sheetH - panel.topMm * MM - cellH;          // PDF bottom-up
+    placedPanels.push({ x: cellX, y: cellY, w: cellW, h: cellH });
+
+    let dw = cellW, dh = cellH, dx = cellX, dy = cellY;
+    if (fit !== 'stretch' && sz.width && sz.height) {
+      const s = fit === 'cover' ? Math.max(cellW / sz.width, cellH / sz.height) : Math.min(cellW / sz.width, cellH / sz.height);
+      dw = sz.width * s; dh = sz.height * s; dx = cellX + (cellW - dw) / 2; dy = cellY + (cellH - dh) / 2;
+    }
+    if (fit === 'cover' && (dw > cellW + 0.5 || dh > cellH + 0.5)) {
+      pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(cellX, cellY, cellW, cellH), PL.clip(), PL.endPath());
+      pg.drawPage(emb, { x: dx, y: dy, width: dw, height: dh });
+      pg.pushOperators(PL.popGraphicsState());
+    } else {
+      pg.drawPage(emb, { x: dx, y: dy, width: dw, height: dh });
+    }
+  }
+
+  // Spot separations. White "W1" under each panel (prepended → behind the art);
+  // varnish "V1" on top of each panel (appended → above the art).
+  const F = (n: number) => n.toFixed(3);
+  const cache: SepCache = new Map();
+  const fillRect = (spot: string, preview: { r: number; g: number; b: number }, under: boolean) => {
+    const resName = ensureSeparation(PL, out, pg, spot, preview, cache);
+    const body = placedPanels
+      .map((r) => `${F(r.x)} ${F(r.y)} ${F(r.w)} ${F(r.h)} re`)
+      .join('\n');
+    addContentStream(PL, out.context, pg, `\nq\n/${resName} cs\n1 scn\n${body}\nf\nQ\n`, under);
+  };
+  if (opts.whiteUnder !== false && placedPanels.length) fillRect('W1', { r: 1, g: 1, b: 1 }, true);
+  if (opts.varnish && placedPanels.length) fillRect('V1', { r: 0.85, g: 0.86, b: 0.92 }, false);
+
+  // Fold ticks in the no-print gaps (short edge ticks; never over artwork).
+  if (opts.foldMarks !== false) {
+    const tick = 0.22 * PT, w = 0.5;
+    for (const f of DBOX_FOLDS_MM) {
+      const y = sheetH - f * MM;
+      pg.drawLine({ start: { x: 0, y }, end: { x: tick, y }, thickness: w, color: rgb(0, 0, 0) });
+      pg.drawLine({ start: { x: sheetW - tick, y }, end: { x: sheetW, y }, thickness: w, color: rgb(0, 0, 0) });
+    }
+  }
+
+  if (colorSrc) await carryColorContext(colorSrc, out);
+  return out.save();
+}
+
 // ── Braille (Grade-1) ───────────────────────────────────────────────────────
 const BRAILLE_G1: Record<string, number[]> = {
   a: [1], b: [1, 2], c: [1, 4], d: [1, 4, 5], e: [1, 5], f: [1, 2, 4], g: [1, 2, 4, 5], h: [1, 2, 5], i: [2, 4], j: [2, 4, 5],

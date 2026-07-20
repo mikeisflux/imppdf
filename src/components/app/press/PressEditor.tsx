@@ -347,6 +347,17 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   }
 
   // Preflight auto-fix: replace the SOURCE document with a corrected copy.
+  // Arm the editor with a source document from a tool that supplies its own art
+  // (e.g. Divinity Box uploads its panels in-panel). Sets the working file even
+  // when none is loaded, so preview/export can run.
+  async function loadSourceBytes(bytes: Uint8Array, name: string) {
+    try {
+      const info = await getPdfInfo(bytes);
+      setFile({ name, bytes, info });
+      setSheets([]); setTotalSheets(0); setError('');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not load the file.'); }
+  }
+
   async function applyPreflightFix(bytes: Uint8Array, label: string) {
     if (!file) return;
     try {
@@ -519,7 +530,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
                   <StepCard
                     step={st} index={i} unit={unit} onUnit={setUnit} pageCount={file?.info.count}
                     thumbs={srcThumbs} pageSizes={pageSizes} layerEntries={layerEntries} onToggleLayer={toggleLayer} sourceBytes={file?.bytes ?? null}
-                    onApplyFix={applyPreflightFix}
+                    onApplyFix={applyPreflightFix} onLoadSource={loadSourceBytes}
                     onChange={(next) => changeStep(i, next)}
                     onRemove={() => removeStep(i)}
                     onMove={(dir) => moveStep(i, dir)}
