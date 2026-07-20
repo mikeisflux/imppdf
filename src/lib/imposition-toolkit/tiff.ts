@@ -24,10 +24,16 @@ export interface SeparatedTiffInput {
 export interface RgbSpotTiffInput {
   width: number;
   height: number;
-  // Interleaved, row-major: per pixel R,G,B then one byte per spot channel, in
-  // spotNames order. Length must be width*height*(3+spotNames.length).
+  // Interleaved, row-major: per pixel R,G,B, then (if alpha) one transparency
+  // byte, then one byte per spot channel in spotNames order.
+  // Length must be width*height*(3 + (alpha?1:0) + spotNames.length).
   interleaved: Uint8Array;
-  spotNames: string[];   // e.g. ['W1','V1'] — become named channels after RGB, in order
+  spotNames: string[];   // e.g. ['W1','V1'] — become named channels, in order
+  // When true, the sample right after RGB is a transparency (unassociated) alpha,
+  // so transparent areas read back transparent — never black. Layout: R,G,B,A,spots.
+  // Photoshop shows this as the checkerboard, not a channel row, so the Channels
+  // panel still reads R,G,B + the spot names.
+  alpha?: boolean;
   dpi?: number;
 }
 
@@ -55,8 +61,9 @@ function photoshopChannelNames(names: string[]): Uint8Array {
 
 export function encodeRgbSpotTiff(input: RgbSpotTiffInput): Uint8Array {
   const { width, height, interleaved, spotNames } = input;
-  const spp = 3 + spotNames.length;
-  const nExtra = spotNames.length;
+  const hasAlpha = !!input.alpha;
+  const spp = 3 + (hasAlpha ? 1 : 0) + spotNames.length;
+  const nExtra = (hasAlpha ? 1 : 0) + spotNames.length;
   const dpi = input.dpi ?? 300;
   if (interleaved.length !== width * height * spp) {
     throw new Error(`TIFF: interleaved length ${interleaved.length} != ${width}×${height}×${spp}`);
@@ -68,7 +75,14 @@ export function encodeRgbSpotTiff(input: RgbSpotTiffInput): Uint8Array {
   const bitsArr = new Uint8Array(spp * 2);
   { const dv = new DataView(bitsArr.buffer); for (let i = 0; i < spp; i++) dv.setUint16(i * 2, 8, true); }
   const rational = (num: number, den: number) => { const b = new Uint8Array(8); const dv = new DataView(b.buffer); dv.setUint32(0, num, true); dv.setUint32(4, den, true); return b; };
-  const extraArr = (() => { const b = new Uint8Array(nExtra * 2); return b; })();   // ExtraSamples: all 0 (unspecified → spot, not alpha)
+  // ExtraSamples: the transparency alpha (if any) is UNASSOCIATED (2) so
+  // transparent areas read back transparent — not black; the spot channels are
+  // UNSPECIFIED (0) so they read as named channels, not alpha.
+  const extraArr = (() => {
+    const b = new Uint8Array(nExtra * 2); const dv = new DataView(b.buffer);
+    if (hasAlpha) dv.setUint16(0, 2, true);   // first extra = unassociated alpha
+    return b;
+  })();
   const psResources = photoshopChannelNames(spotNames);
 
   tags.push({ id: 256, type: TYPE.LONG, count: 1, value: width });            // ImageWidth

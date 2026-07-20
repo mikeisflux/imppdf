@@ -939,7 +939,7 @@ function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSet
         <button className="pe-btn" onClick={download} disabled={busy || !hasArt}>{busy ? 'Rendering…' : 'Download TIFF'}</button>
       </div>
       <div className="pe-note" style={{ marginTop: 8 }}>
-        Channels, in order: <b>R G B + W1 + V1</b> — 8-bit RGB with the white and varnish spots after it, no compression, interleaved. (RGB, not CMYK, so it opens.) White floods panels B/D and follows the artwork on the small panels A/C, choked in <b>3&nbsp;px</b> so no white halo shows past the art on the black box.
+        Channels, in order: <b>R G B + transparency + W1 + V1</b> — 8-bit RGB with an alpha and the white/varnish spots, no compression, interleaved. (RGB, not CMYK, so it opens.) Transparency is respected everywhere: any area with no art — an empty panel, the gaps, around a logo — stays transparent and prints nothing, so the black box shows through. White & varnish follow the artwork, choked <b>3&nbsp;px</b> so no white halo shows past the art.
       </div>
       <div className="pe-note" style={{ marginTop: 6 }}>
         Use <b>300 dpi</b> — that&apos;s the file resolution an Epson X600 UV workflow wants. The head&apos;s 720×1440 is the RIP&apos;s output/screening resolution, not the file&apos;s; a 1440&nbsp;dpi file would be ~3&nbsp;GB and the RIP would just downsample it. 600 is only for very fine linework (≈575&nbsp;MB).

@@ -3498,11 +3498,14 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
 }
 
 // Render the box as an UNCOMPRESSED, INTERLEAVED TIFF the RIP can open: an 8-bit
-// RGB image with the W1 (white under-base) and V1 (varnish) spot channels after
-// it, IN ORDER — samples are R, G, B, W1, V1. RGB (not CMYK/Separated) is what
-// Photoshop and the RIP actually open; a Separated TIFF reports "unsupported
-// color space". Small panels' white/varnish follow the artwork alpha; large
-// panels flood; the white is choked 3 px. Browser-only (pdf.js + canvas).
+// RGB image with a transparency alpha and the W1 (white under-base) / V1
+// (varnish) spot channels, IN ORDER — samples are R, G, B, A, W1, V1. RGB (not
+// CMYK/Separated) is what Photoshop and the RIP open; a Separated TIFF reports
+// "unsupported color space". The alpha carries the artwork's transparency, and
+// white/varnish follow it everywhere, so anywhere there's no art — an empty
+// panel, the gaps between panels, the non-printable flap, around a logo — prints
+// NOTHING and the black box shows through (never a black or white block). The
+// white is choked 3 px. Browser-only (pdf.js + canvas).
 export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number }): Promise<Uint8Array> {
   const { encodeRgbSpotTiff } = await import('./tiff');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3513,11 +3516,13 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
   const pxPerMm = dpi / 25.4;
   const W = Math.max(1, Math.round(DBOX_SHEET_W_MM * pxPerMm));
   const H = Math.max(1, Math.round(DBOX_SHEET_H_MM * pxPerMm));
-  // RGB base + the two spot channels the RIP needs, IN ORDER: R G B W1 V1.
-  // (RGB — not CMYK — so the file opens; a Separated/CMYK TIFF reports
-  // "unsupported color space". W1/V1 stay exactly as required.)
-  const spp = 5;                                     // R G B W1 V1
-  const buf = new Uint8Array(W * H * spp);           // all zero → black substrate shows, no white/varnish
+  // RGB + a transparency alpha + the two spot channels the RIP needs, IN ORDER:
+  // R G B A W1 V1. RGB (not CMYK) so it opens; the alpha carries the artwork's
+  // transparency so empty areas print NOTHING (the black box shows) instead of
+  // black; W1/V1 follow that same transparency. Photoshop shows the alpha as the
+  // checkerboard, so the Channels panel still reads R,G,B,W1,V1.
+  const spp = 6;                                     // R G B A W1 V1
+  const buf = new Uint8Array(W * H * spp);           // all zero → transparent, no ink (black substrate shows)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mkCanvas = (w: number, h: number): any =>
@@ -3557,33 +3562,37 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
       for (let xx = 0; xx < pwPx && xx < W; xx++) {
         const si = (sy * W + xx) * spp;
         const pi = (yy * pwPx + xx) * 4;
-        const a = img[pi + 3]! / 255;
-        if (a > 0) {
+        const aByte = img[pi + 3]!;                  // artwork transparency (0 = transparent)
+        const a = aByte / 255;
+        if (aByte > 0) {
           // RGB straight from the artwork (channels 0,1,2 = R,G,B).
           buf[si] = img[pi]!;
           buf[si + 1] = img[pi + 1]!;
           buf[si + 2] = img[pi + 2]!;
         }
-        // White under-base (W1, channel 3) AND gloss varnish (V1, channel 4)
-        // follow the same rule: flood the large panels (B/D); follow the
-        // artwork's alpha on the small panels (A/C) so both spots track
-        // transparency exactly where the art does.
-        const flood = panel.whiteMode === 'flood';
-        if (opts.whiteUnder !== false) buf[si + 3] = flood ? 255 : Math.round(a * 255);
-        if (opts.varnish) buf[si + 4] = flood ? 255 : Math.round(a * 255);
+        buf[si + 3] = aByte;                          // A: transparency — empty areas stay transparent, never black
+        // White under-base (W1, channel 4) and gloss varnish (V1, channel 5)
+        // follow the artwork's transparency EVERYWHERE: no art → no white, no
+        // varnish → the black box shows through. (No flooding; flooding would
+        // print white where the designer left it transparent.)
+        if (opts.whiteUnder !== false) buf[si + 4] = aByte;
+        if (opts.varnish) buf[si + 5] = aByte;
       }
     }
   }
 
-  // Choke the white under-base (W1, channel 3) inward by DBOX_WHITE_CHOKE_PX.
+  // Choke the white under-base (W1, channel 4) inward by DBOX_WHITE_CHOKE_PX so
+  // no white halo shows past the art. The colour (RGB) and transparency (A) keep
+  // their full extent — only the white plate pulls in.
   if (opts.whiteUnder !== false && DBOX_WHITE_CHOKE_PX > 0) {
     const plane = new Uint8Array(W * H);
-    for (let i = 0, p = 3; i < W * H; i++, p += spp) plane[i] = buf[p]!;
+    for (let i = 0, p = 4; i < W * H; i++, p += spp) plane[i] = buf[p]!;
     const choked = chokePlane(plane, W, H, DBOX_WHITE_CHOKE_PX);
-    for (let i = 0, p = 3; i < W * H; i++, p += spp) buf[p] = choked[i]!;
+    for (let i = 0, p = 4; i < W * H; i++, p += spp) buf[p] = choked[i]!;
   }
 
-  return encodeRgbSpotTiff({ width: W, height: H, interleaved: buf, spotNames: ['W1', 'V1'], dpi });
+  // R G B A W1 V1 — alpha:true writes the transparency as the first extra sample.
+  return encodeRgbSpotTiff({ width: W, height: H, interleaved: buf, spotNames: ['W1', 'V1'], alpha: true, dpi });
 }
 
 // ── Braille (Grade-1) ───────────────────────────────────────────────────────
