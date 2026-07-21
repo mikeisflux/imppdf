@@ -3370,11 +3370,14 @@ const DBOX_FOLDS_MM = [48, 262, 313, 524];
 // on the black box. (A "choke" = underprint shrunk relative to the art it sits
 // under; the opposite is a "spread".) DO NOT remove — required for clean edges.
 const DBOX_WHITE_CHOKE_PX = 3;
-// Spot plates are BINARY, full-strength: any pixel at/above this alpha gets
-// SOLID 100% W1/V1 ink (like filling a magic-wand selection with
-// 100,100,100,100); below it gets none. Never scale spot ink by alpha — that
-// starves the white at anti-aliased edges and soft art.
-const DBOX_SPOT_MIN_A = 8;   // ≈3% alpha — skips stray near-invisible pixels
+// Spot plates are SOLID, full-strength: 100% W1/V1 ink across the art (like
+// filling a magic-wand selection with 100,100,100,100) — never scaled by alpha,
+// which starves the white at soft art. The plate EDGE is traced like an
+// anti-aliased wand selection: solid at/above SOLID_A, nothing below MIN_A,
+// thin AA ramp between. Tracing solid from ~3% instead follows the OUTER
+// fringe of soft/upscaled edges and fattens/chunks the shapes.
+const DBOX_SPOT_MIN_A = 96;    // below ≈38% alpha: no ink (outside the contour)
+const DBOX_SPOT_SOLID_A = 160; // at/above ≈63% alpha: solid 100% ink
 
 // Erode a single-channel 8-bit plane by `r` px (separable min filter). Any pixel
 // within `r` of a zero pixel — OR within `r` of the plane edge — drops to 0, so
@@ -3579,10 +3582,16 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
         // the shop's magic-wand-the-art → fill 100,100,100,100 workflow. NOT
         // proportional to alpha: scaling ink by alpha starves the plate at
         // anti-aliased edges/soft art ("not putting down enough white").
-        // DBOX_SPOT_MIN_A keeps near-invisible stray pixels from getting solid
-        // ink. Stored as INK LEVEL here (255 = full ink); INVERTED to Photoshop
-        // spot-channel polarity (0/black = 100% ink) in one pass at the end.
-        const spotInk = aByte >= DBOX_SPOT_MIN_A ? 255 : 0;
+        // The EDGE is traced like an anti-aliased wand selection: solid from
+        // DBOX_SPOT_SOLID_A up, zero below DBOX_SPOT_MIN_A, and a thin AA ramp
+        // between — tracing at the visual contour. Tracing everything above ~3%
+        // instead followed the OUTER fringe of soft/upscaled edges and fattened
+        // and chunked the shapes ("pixelated my logo"). Stored as INK LEVEL here
+        // (255 = full ink); INVERTED to Photoshop spot-channel polarity
+        // (0/black = 100% ink) in one pass at the end.
+        const spotInk = aByte >= DBOX_SPOT_SOLID_A ? 255
+          : aByte < DBOX_SPOT_MIN_A ? 0
+          : Math.round(((aByte - DBOX_SPOT_MIN_A) * 255) / (DBOX_SPOT_SOLID_A - DBOX_SPOT_MIN_A));
         if (opts.whiteUnder !== false) buf[si + 4] = spotInk;
         if (opts.varnish) buf[si + 5] = spotInk;
       }
