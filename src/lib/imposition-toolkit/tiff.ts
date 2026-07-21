@@ -38,6 +38,8 @@ export interface RgbSpotTiffInput {
   // Without it, Photoshop assigns the user's working RGB space to the untagged
   // file — sRGB pixel values read as e.g. Adobe RGB and every colour shifts.
   iccProfile?: Uint8Array;
+  // Override the ≈1 MB-per-strip default (mainly for tests).
+  rowsPerStrip?: number;
   dpi?: number;
 }
 
@@ -135,15 +137,25 @@ export function encodeRgbSpotTiff(input: RgbSpotTiffInput): Uint8Array {
     hasAlpha ? [{ name: 'Transparency', kind: 'mask', rgb: [255, 0, 0] }, ...spotDefs] : spotDefs,
   );
 
+  // STRIPS — write MANY SMALL STRIPS (Photoshop-style), never one giant strip.
+  // A single ~146 MB strip makes some RIP readers glitch at buffer boundaries
+  // ("tons of lines in the print"); a Photoshop re-save of the same pixels
+  // printed clean, and the only structural difference is the strip layout.
+  const rowBytes = width * spp;
+  const rowsPerStrip = input.rowsPerStrip ?? Math.max(1, Math.floor((1 << 20) / rowBytes));   // ≈1 MB strips
+  const nStrips = Math.ceil(height / rowsPerStrip);
+  const stripCounts = new Uint8Array(nStrips * 4);
+  const stripOffsets = new Uint8Array(nStrips * 4);   // patched once layout is known
+
   tags.push({ id: 256, type: TYPE.LONG, count: 1, value: width });            // ImageWidth
   tags.push({ id: 257, type: TYPE.LONG, count: 1, value: height });           // ImageLength
   tags.push({ id: 258, type: TYPE.SHORT, count: spp, data: bitsArr });        // BitsPerSample
   tags.push({ id: 259, type: TYPE.SHORT, count: 1, value: 1 });               // Compression = none
   tags.push({ id: 262, type: TYPE.SHORT, count: 1, value: 2 });               // Photometric = RGB
-  tags.push({ id: 273, type: TYPE.LONG, count: 1, value: 0 });                // StripOffsets (patched)
+  tags.push({ id: 273, type: TYPE.LONG, count: nStrips, data: nStrips > 1 ? stripOffsets : undefined, value: 0 }); // StripOffsets (patched)
   tags.push({ id: 277, type: TYPE.SHORT, count: 1, value: spp });             // SamplesPerPixel
-  tags.push({ id: 278, type: TYPE.LONG, count: 1, value: height });           // RowsPerStrip
-  tags.push({ id: 279, type: TYPE.LONG, count: 1, value: width * height * spp }); // StripByteCounts
+  tags.push({ id: 278, type: TYPE.LONG, count: 1, value: rowsPerStrip });     // RowsPerStrip
+  tags.push({ id: 279, type: TYPE.LONG, count: nStrips, data: nStrips > 1 ? stripCounts : undefined, value: width * height * spp }); // StripByteCounts
   tags.push({ id: 282, type: TYPE.RATIONAL, count: 1, data: rational(dpi, 1) }); // XResolution
   tags.push({ id: 283, type: TYPE.RATIONAL, count: 1, data: rational(dpi, 1) }); // YResolution
   tags.push({ id: 284, type: TYPE.SHORT, count: 1, value: 1 });               // PlanarConfiguration = interleaved
@@ -161,8 +173,21 @@ export function encodeRgbSpotTiff(input: RgbSpotTiffInput): Uint8Array {
     if (t.data && t.data.length > 4) { cursor = align(cursor); tagDataOffset.set(t.id, cursor); cursor += t.data.length; }
   }
   cursor = align(cursor);
-  const stripOffset = cursor;
-  const total = stripOffset + interleaved.length;
+  const stripBase = cursor;
+  const total = stripBase + interleaved.length;
+
+  // Fill the strip offset/count arrays now that the base is known. Strips are
+  // consecutive, so offsets are just running sums.
+  {
+    const oc = new DataView(stripOffsets.buffer), cc = new DataView(stripCounts.buffer);
+    let off = stripBase;
+    for (let s = 0; s < nStrips; s++) {
+      const rows = Math.min(rowsPerStrip, height - s * rowsPerStrip);
+      oc.setUint32(s * 4, off, true);
+      cc.setUint32(s * 4, rows * rowBytes, true);
+      off += rows * rowBytes;
+    }
+  }
 
   const out = new Uint8Array(total);
   const dv = new DataView(out.buffer);
@@ -173,7 +198,7 @@ export function encodeRgbSpotTiff(input: RgbSpotTiffInput): Uint8Array {
     dv.setUint16(p, t.id, true);
     dv.setUint16(p + 2, t.type, true);
     dv.setUint32(p + 4, t.count, true);
-    if (t.id === 273) { dv.setUint32(p + 8, stripOffset, true); }
+    if (t.id === 273 && nStrips === 1) { dv.setUint32(p + 8, stripBase, true); }
     else if (t.data && t.data.length > 4) { dv.setUint32(p + 8, tagDataOffset.get(t.id)!, true); }
     else if (t.data) { out.set(t.data, p + 8); }
     else if (t.type === TYPE.SHORT) { dv.setUint16(p + 8, t.value ?? 0, true); }
@@ -184,7 +209,7 @@ export function encodeRgbSpotTiff(input: RgbSpotTiffInput): Uint8Array {
   for (const t of tags) {
     if (t.data && t.data.length > 4) out.set(t.data, tagDataOffset.get(t.id)!);
   }
-  out.set(interleaved, stripOffset);
+  out.set(interleaved, stripBase);
   return out;
 }
 

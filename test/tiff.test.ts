@@ -95,3 +95,30 @@ test('encodeRgbSpotTiff: RGB photometric, 6 samples R G B A W1 V1, alpha + spot 
   assert.deepEqual(kinds, [1, 2, 2], 'DisplayInfo kinds: mask, spot, spot');
   assert.equal(q, end, 'resource walk consumes the block exactly (no overrun/underrun)');
 });
+
+test('encodeRgbSpotTiff: multi-strip layout (Photoshop-style) reassembles exactly', () => {
+  const width = 5, height = 7, spp = 6;
+  const interleaved = new Uint8Array(width * height * spp).map((_, i) => (i * 7) % 256);
+  // Force 2 rows per strip → 4 strips (7 rows: 2+2+2+1).
+  const out = encodeRgbSpotTiff({ width, height, interleaved, spotNames: ['W1', 'V1'], alpha: true, rowsPerStrip: 2, dpi: 300 });
+  const ifd = u32(out, 4);
+  const nTags = u16(out, ifd);
+  const tags = new Map<number, { type: number; count: number; v: number }>();
+  for (let i = 0; i < nTags; i++) {
+    const p = ifd + 2 + i * 12;
+    tags.set(u16(out, p), { type: u16(out, p + 2), count: u32(out, p + 4), v: u32(out, p + 8) });
+  }
+  assert.equal(tags.get(278)!.v, 2, 'RowsPerStrip = 2');
+  assert.equal(tags.get(273)!.count, 4, '4 strip offsets');
+  assert.equal(tags.get(279)!.count, 4, '4 strip byte counts');
+  const rowBytes = width * spp;
+  const offArr = tags.get(273)!.v, cntArr = tags.get(279)!.v;   // out-of-line arrays
+  const rebuilt = new Uint8Array(width * height * spp);
+  let dst = 0, expect = [2, 2, 2, 1];
+  for (let s = 0; s < 4; s++) {
+    const off = u32(out, offArr + s * 4), cnt = u32(out, cntArr + s * 4);
+    assert.equal(cnt, expect[s]! * rowBytes, `strip ${s} byte count`);
+    rebuilt.set(out.subarray(off, off + cnt), dst); dst += cnt;
+  }
+  assert.deepEqual(Array.from(rebuilt), Array.from(interleaved), 'strips reassemble to the exact pixel data');
+});
