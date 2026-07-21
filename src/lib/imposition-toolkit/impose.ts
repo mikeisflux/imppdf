@@ -3571,8 +3571,9 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
         buf[si + 3] = aByte;                          // A: transparency — empty areas stay transparent, never black
         // White under-base (W1, channel 4) and gloss varnish (V1, channel 5)
         // follow the artwork's transparency EVERYWHERE: no art → no white, no
-        // varnish → the black box shows through. (No flooding; flooding would
-        // print white where the designer left it transparent.)
+        // varnish → the black box shows through. Stored as INK LEVEL here
+        // (255 = full ink at art); INVERTED to Photoshop spot-channel polarity
+        // (0/black = 100% ink) in one pass at the end — see below.
         if (opts.whiteUnder !== false) buf[si + 4] = aByte;
         if (opts.varnish) buf[si + 5] = aByte;
       }
@@ -3580,13 +3581,25 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
   }
 
   // Choke the white under-base (W1, channel 4) inward by DBOX_WHITE_CHOKE_PX so
-  // no white halo shows past the art. The colour (RGB) and transparency (A) keep
-  // their full extent — only the white plate pulls in.
+  // no white halo shows past the art. Runs on INK LEVEL (bright = ink), before
+  // the polarity inversion below. Colour (RGB) and transparency (A) keep full
+  // extent — only the white plate pulls in.
   if (opts.whiteUnder !== false && DBOX_WHITE_CHOKE_PX > 0) {
     const plane = new Uint8Array(W * H);
     for (let i = 0, p = 4; i < W * H; i++, p += spp) plane[i] = buf[p]!;
     const choked = chokePlane(plane, W, H, DBOX_WHITE_CHOKE_PX);
     for (let i = 0, p = 4; i < W * H; i++, p += spp) buf[p] = choked[i]!;
+  }
+
+  // SPOT-CHANNEL POLARITY — DO NOT CHANGE: Photoshop spot channels are like a
+  // layer mask filled with black where ink prints: 0 (black) = 100% ink,
+  // 255 (white) = no ink. Invert BOTH W1 and V1 from ink level to that
+  // convention, across the whole sheet — so art areas go black (full ink) and
+  // empty panels/gaps/flap read white (NO ink). Without this inversion the
+  // plates read backwards and white/varnish dump onto every empty space.
+  for (let i = 0, p = 4; i < W * H; i++, p += spp) {
+    buf[p] = 255 - buf[p]!;         // W1
+    buf[p + 1] = 255 - buf[p + 1]!; // V1
   }
 
   // R G B A W1 V1 — alpha:true writes the transparency as the first extra sample.

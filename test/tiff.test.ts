@@ -67,6 +67,7 @@ test('encodeRgbSpotTiff: RGB photometric, 6 samples R G B A W1 V1, alpha + spot 
   const be16 = (o: number) => (out[o]! << 8) | out[o + 1]!;
   const be32 = (o: number) => ((out[o]! << 24) | (out[o + 1]! << 16) | (out[o + 2]! << 8) | out[o + 3]!) >>> 0;
   let q = rs.v; const end = rs.v + rs.count; const found: string[] = [];
+  const kinds: number[] = [];
   while (q + 12 <= end) {
     assert.equal(be32(q), 0x3842494d, '8BIM signature at each resource');   // '8BIM'
     const id = be16(q + 4);
@@ -79,8 +80,14 @@ test('encodeRgbSpotTiff: RGB photometric, 6 samples R G B A W1 V1, alpha + spot 
       let c = p2; const e = p2 + size;
       while (c < e) { const l = out[c]!; found.push(String.fromCharCode(...out.slice(c + 1, c + 1 + l))); c += 1 + l; }
     }
+    if (id === 0x03ef) {                                // DisplayInfo: 14 bytes per channel, kind at +12
+      for (let c = p2; c + 14 <= p2 + size; c += 14) kinds.push(out[c + 12]!);
+    }
     q = p2 + size + (size % 2 ? 1 : 0);
   }
-  assert.deepEqual(found, ['W1', 'V1'], 'channel names are exactly W1, V1 in order');
+  // Transparency slot must be named so it can't eat "W1"; spots read back W1, V1
+  // exactly and IN ORDER. W1/V1 are kind 2 = SPOT plates, transparency is not.
+  assert.deepEqual(found, ['Transparency', 'W1', 'V1'], 'channel names: Transparency, W1, V1 in order');
+  assert.deepEqual(kinds, [1, 2, 2], 'DisplayInfo kinds: mask, spot, spot');
   assert.equal(q, end, 'resource walk consumes the block exactly (no overrun/underrun)');
 });

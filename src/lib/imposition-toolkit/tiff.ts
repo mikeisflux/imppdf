@@ -43,19 +43,53 @@ export interface RgbSpotTiffInput {
 // label the channels exactly (W1, V1) and in order. Kept to this single,
 // well-defined resource so no size field can be misread — a malformed resource
 // makes readers run past EOF ("unexpected end-of-file").
-function photoshopChannelNames(names: string[]): Uint8Array {
-  const enc = new TextEncoder();
-  const pas: number[] = [];
-  for (const n of names) { const b = enc.encode(n); pas.push(b.length, ...b); }
-  const data = new Uint8Array(pas);
+function psResource(id: number, data: Uint8Array): Uint8Array {
   const pad = data.length % 2 ? 1 : 0;
   const out = new Uint8Array(4 + 2 + 2 + 4 + data.length + pad);
   const dv = new DataView(out.buffer);
   out[0] = 0x38; out[1] = 0x42; out[2] = 0x49; out[3] = 0x4d;   // '8BIM'
-  dv.setUint16(4, 0x03ee, false);                                // resource id 1006 (BE)
+  dv.setUint16(4, id, false);                                    // resource id (BE)
   dv.setUint16(6, 0, false);                                     // empty Pascal name + pad
   dv.setUint32(8, data.length, false);                           // size (BE, unpadded)
   out.set(data, 12);
+  return out;
+}
+
+export interface PsChannelDef {
+  name: string;
+  // 'spot' = a printing spot plate (W1 white, V1 varnish) — gets a colour chip
+  // and is what a RIP reads as W/V. 'mask' = non-printing (the transparency).
+  kind: 'spot' | 'mask';
+  rgb: [number, number, number];   // display colour chip
+}
+
+function photoshopChannelNames(defs: PsChannelDef[]): Uint8Array {
+  const enc = new TextEncoder();
+  // 1006: channel names as concatenated Pascal strings, in channel order.
+  const pas: number[] = [];
+  for (const d of defs) { const b = enc.encode(d.name); pas.push(b.length, ...b); }
+  // 1007: DisplayInfo — one 14-byte record per channel, in the same order:
+  // colourSpace(0=RGB) + 4×u16 colour + opacity + kind(2=spot, 1=mask) + pad.
+  // kind=2 is what makes W1/V1 true SPOT channels (colour chip, RIP-readable)
+  // instead of anonymous alphas.
+  const di = new Uint8Array(defs.length * 14);
+  { const dv = new DataView(di.buffer);
+    defs.forEach((d, i) => {
+      const o = i * 14;
+      dv.setInt16(o, 0, false);                                  // colourSpace RGB
+      dv.setUint16(o + 2, d.rgb[0] * 257, false);
+      dv.setUint16(o + 4, d.rgb[1] * 257, false);
+      dv.setUint16(o + 6, d.rgb[2] * 257, false);
+      dv.setUint16(o + 8, 0, false);                             // 4th component unused
+      dv.setInt16(o + 10, d.kind === 'spot' ? 100 : 50, false);  // opacity %
+      di[o + 12] = d.kind === 'spot' ? 2 : 1;                    // kind
+      di[o + 13] = 0;                                            // padding
+    });
+  }
+  const a = psResource(0x03ee, new Uint8Array(pas));
+  const b = psResource(0x03ef, di);
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0); out.set(b, a.length);
   return out;
 }
 
@@ -83,7 +117,22 @@ export function encodeRgbSpotTiff(input: RgbSpotTiffInput): Uint8Array {
     if (hasAlpha) dv.setUint16(0, 2, true);   // first extra = unassociated alpha
     return b;
   })();
-  const psResources = photoshopChannelNames(spotNames);
+  // CHANNEL NAMING — DO NOT CHANGE: the spot channels MUST read back as exactly
+  // "W1" (white) and "V1" (varnish), flagged as SPOT (DisplayInfo kind 2) so
+  // Photoshop and the RIP read them as printing plates. Photoshop assigns the
+  // 1006/1007 records to ALL extra channels IN ORDER, including the transparency
+  // alpha it consumes as the checkerboard — so the transparency slot must be
+  // named too, or it eats "W1" and shifts every spot name off by one
+  // (W1→"V1", V1→"Alpha 3").
+  const spotDefs: PsChannelDef[] = spotNames.map((n) => ({
+    name: n, kind: 'spot',
+    // Chip colours: W* (white ink) shows white, V* (varnish) shows yellow —
+    // matching how the shop's Photoshop files display them.
+    rgb: n.toUpperCase().startsWith('W') ? [255, 255, 255] : n.toUpperCase().startsWith('V') ? [255, 255, 0] : [255, 0, 255],
+  }));
+  const psResources = photoshopChannelNames(
+    hasAlpha ? [{ name: 'Transparency', kind: 'mask', rgb: [255, 0, 0] }, ...spotDefs] : spotDefs,
+  );
 
   tags.push({ id: 256, type: TYPE.LONG, count: 1, value: width });            // ImageWidth
   tags.push({ id: 257, type: TYPE.LONG, count: 1, value: height });           // ImageLength
