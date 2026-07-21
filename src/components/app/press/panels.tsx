@@ -869,7 +869,7 @@ function DivinityBoxPanel(p: PanelProps) {
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Full flat box layout — <b>300 × 572 mm</b> (1:1). Upload artwork for each printable panel below.
+        Full flat box layout — <b>306 × 572 mm</b> incl. 3&nbsp;mm bleed left+right (trim 300 × 572, 1:1). Upload artwork for each printable panel below; art spans the full width so the side trims cut through ink.
         Because the box is black, a white under-base (spot <b>W1</b>) prints behind every panel; add gloss varnish (spot <b>V1</b>) if you need it.
       </div>
       <Section label="// PANELS" help="Each panel takes its own artwork (PDF or image), placed at its exact size on the flat. Panel E is a no-print glue tab.">

@@ -3363,8 +3363,13 @@ export async function addWhiteVarnish(bytes: Uint8Array, opts: WhiteVarnishOptio
 // is printed on black stock, a white under-base (spot "W1") goes behind every
 // panel, with an optional gloss varnish (spot "V1") on top.
 
-const DBOX_SHEET_W_MM = 300, DBOX_SHEET_H_MM = 572;
-const DBOX_FOLDS_MM = [48, 262, 313, 524];
+// Sheet per the owner's New_Box_Full template (2026-07): 306 × 572 mm INCLUDING
+// 3 mm bleed on the LEFT and RIGHT only (trim 300 × 572; no top/bottom bleed).
+// Artwork spans the full 306 so the side trim cuts through ink.
+const DBOX_TRIM_W_MM = 300, DBOX_BLEED_MM = 3;
+const DBOX_SHEET_W_MM = DBOX_TRIM_W_MM + 2 * DBOX_BLEED_MM, DBOX_SHEET_H_MM = 572;
+// Fold positions (mm from the top); each fold sits centred in a 3 mm no-print gap.
+const DBOX_FOLDS_MM = [48, 266, 317, 524];
 // CHOKE: the white under-base is pulled IN this many pixels from every art edge
 // so slight press misregistration never shows a white halo past the printed art
 // on the black box. (A "choke" = underprint shrunk relative to the art it sits
@@ -3402,15 +3407,16 @@ export function chokePlane(src: Uint8Array, w: number, h: number, r: number): Ui
   }
   return out;
 }
-// key, label, top offset from the sheet top (mm), print height (mm), and how the
-// white under-base is built: the SMALL panels (A, C) follow the artwork's shape
-// (alpha) so the black box shows through transparent areas; the LARGE panels
-// (B, D) flood the whole panel.
+// key, label, top offset from the sheet top (mm), print height (mm). Panels sit
+// between the 3 mm no-print fold gaps (folds at 48/266/317/524). Widths span the
+// FULL 306 mm sheet so art bleeds 3 mm past the side trims; heights are exact —
+// no top/bottom bleed. Panel E (525.5–572 mm) is no-print and never drawn.
+// W1/V1 mirror each panel's artwork alpha (see spot-plate rules above).
 export const DIVINITY_BOX_PANELS = [
-  { key: 'a', label: 'A', topMm: 0,     hMm: 46.5, wMm: 300, whiteMode: 'shaped' as const },
-  { key: 'b', label: 'B', topMm: 49.5,  hMm: 211,  wMm: 300, whiteMode: 'flood' as const },
-  { key: 'c', label: 'C', topMm: 263.5, hMm: 48,   wMm: 300, whiteMode: 'shaped' as const },
-  { key: 'd', label: 'D', topMm: 314.5, hMm: 208,  wMm: 300, whiteMode: 'flood' as const },
+  { key: 'a', label: 'A', topMm: 0,     hMm: 46.5, wMm: DBOX_SHEET_W_MM },
+  { key: 'b', label: 'B', topMm: 49.5,  hMm: 215,  wMm: DBOX_SHEET_W_MM },
+  { key: 'c', label: 'C', topMm: 267.5, hMm: 48,   wMm: DBOX_SHEET_W_MM },
+  { key: 'd', label: 'D', topMm: 318.5, hMm: 204,  wMm: DBOX_SHEET_W_MM },
 ] as const;
 
 export interface DivinityBoxArt { bytes: Uint8Array; page?: number }

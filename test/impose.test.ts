@@ -236,16 +236,17 @@ test('imposeDivinityBox: builds the 300×572mm flat with panels + white spot', a
   const { imposeDivinityBox } = await import('../src/lib/imposition-toolkit/impose.ts');
   const panel = (w: number, h: number) => pdfOf(1, w * 72 / 25.4, h * 72 / 25.4);
   const out = await imposeDivinityBox({
-    a: { bytes: await panel(300, 46.5) },
-    b: { bytes: await panel(300, 211) },
-    c: { bytes: await panel(300, 48) },
-    d: { bytes: await panel(300, 208) },
+    a: { bytes: await panel(306, 46.5) },
+    b: { bytes: await panel(306, 215) },
+    c: { bytes: await panel(306, 48) },
+    d: { bytes: await panel(306, 204) },
     whiteUnder: true, varnish: true, foldMarks: true,
   });
   const doc = await PDFDocument.load(out);
   assert.equal(doc.getPageCount(), 1);
   const s = doc.getPage(0).getSize();
-  assert.ok(Math.abs(s.width - 300 * 72 / 25.4) < 0.6, `sheet width 300mm (${s.width})`);
+  // 306 mm wide: 300 trim + 3 mm bleed left+right (New_Box_Full template).
+  assert.ok(Math.abs(s.width - 306 * 72 / 25.4) < 0.6, `sheet width 306mm (${s.width})`);
   assert.ok(Math.abs(s.height - 572 * 72 / 25.4) < 0.6, `sheet height 572mm (${s.height})`);
 });
 

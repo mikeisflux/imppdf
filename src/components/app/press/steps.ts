@@ -158,7 +158,8 @@ export function defaultSettings(type: StepType): StepSettings {
       // columns/rows (or tick Replicate) to gang up.
       return nupPreset({ cellWIn: 3, cellHIn: 5 });
     case 'divinitybox':
-      // Fixed 300×572 mm box flat with four printable panels (A–D). Each panel
+      // Fixed 306×572 mm box flat (trim 300 + 3 mm bleed L+R) with four
+      // printable panels (A–D). Each panel
       // takes its own uploaded art; a white under-base (W1) prints behind every
       // panel because the box is black, with optional gloss varnish (V1).
       // foldMarks default OFF: this is a borderless, zero-bleed box — no crop,
