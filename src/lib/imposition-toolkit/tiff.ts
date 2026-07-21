@@ -124,12 +124,9 @@ export function encodeRgbSpotTiff(input: RgbSpotTiffInput): Uint8Array {
   // alpha it consumes as the checkerboard — so the transparency slot must be
   // named too, or it eats "W1" and shifts every spot name off by one
   // (W1→"V1", V1→"Alpha 3").
-  const spotDefs: PsChannelDef[] = spotNames.map((n) => ({
-    name: n, kind: 'spot',
-    // Chip colours: W* (white ink) shows white, V* (varnish) shows yellow —
-    // matching how the shop's Photoshop files display them.
-    rgb: n.toUpperCase().startsWith('W') ? [255, 255, 255] : n.toUpperCase().startsWith('V') ? [255, 255, 0] : [255, 0, 255],
-  }));
+  // SPOT COLOUR — DO NOT CHANGE: every spot channel's colour is BLACK
+  // (100,100,100,100), per the shop's workflow. Never white/yellow/anything else.
+  const spotDefs: PsChannelDef[] = spotNames.map((n) => ({ name: n, kind: 'spot', rgb: [0, 0, 0] }));
   const psResources = photoshopChannelNames(
     hasAlpha ? [{ name: 'Transparency', kind: 'mask', rgb: [255, 0, 0] }, ...spotDefs] : spotDefs,
   );

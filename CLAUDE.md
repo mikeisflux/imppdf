@@ -12,7 +12,8 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    (see `photoshopChannelNames`) or Photoshop shifts the spot names off by one
    (W1 becomes "V1", V1 becomes "Alpha 3").
 3. **W1/V1 are SPOT channels** (Photoshop DisplayInfo resource 1007, kind=2),
-   not anonymous alpha channels. W1 chip = white, V1 chip = yellow.
+   not anonymous alpha channels. **Both channel colours are BLACK
+   100,100,100,100 — never white, yellow, or anything else.**
 4. **TIFF format: 8-bit RGB (Photometric 2), uncompressed, interleaved.**
    NEVER Separated/CMYK (Photometric 5) — that is "unsupported color space"
    in Photoshop and the RIP.
