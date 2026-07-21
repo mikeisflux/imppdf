@@ -3370,6 +3370,11 @@ const DBOX_FOLDS_MM = [48, 262, 313, 524];
 // on the black box. (A "choke" = underprint shrunk relative to the art it sits
 // under; the opposite is a "spread".) DO NOT remove — required for clean edges.
 const DBOX_WHITE_CHOKE_PX = 3;
+// Spot plates are BINARY, full-strength: any pixel at/above this alpha gets
+// SOLID 100% W1/V1 ink (like filling a magic-wand selection with
+// 100,100,100,100); below it gets none. Never scale spot ink by alpha — that
+// starves the white at anti-aliased edges and soft art.
+const DBOX_SPOT_MIN_A = 8;   // ≈3% alpha — skips stray near-invisible pixels
 
 // Erode a single-channel 8-bit plane by `r` px (separable min filter). Any pixel
 // within `r` of a zero pixel — OR within `r` of the plane edge — drops to 0, so
@@ -3569,13 +3574,17 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
           buf[si + 2] = img[pi + 2]!;
         }
         buf[si + 3] = aByte;                          // A: transparency — empty areas stay transparent, never black
-        // White under-base (W1, channel 4) and gloss varnish (V1, channel 5)
-        // follow the artwork's transparency EVERYWHERE: no art → no white, no
-        // varnish → the black box shows through. Stored as INK LEVEL here
-        // (255 = full ink at art); INVERTED to Photoshop spot-channel polarity
-        // (0/black = 100% ink) in one pass at the end — see below.
-        if (opts.whiteUnder !== false) buf[si + 4] = aByte;
-        if (opts.varnish) buf[si + 5] = aByte;
+        // White under-base (W1, channel 4) and gloss varnish (V1, channel 5):
+        // SOLID 100% ink wherever art exists, nothing where it doesn't — exactly
+        // the shop's magic-wand-the-art → fill 100,100,100,100 workflow. NOT
+        // proportional to alpha: scaling ink by alpha starves the plate at
+        // anti-aliased edges/soft art ("not putting down enough white").
+        // DBOX_SPOT_MIN_A keeps near-invisible stray pixels from getting solid
+        // ink. Stored as INK LEVEL here (255 = full ink); INVERTED to Photoshop
+        // spot-channel polarity (0/black = 100% ink) in one pass at the end.
+        const spotInk = aByte >= DBOX_SPOT_MIN_A ? 255 : 0;
+        if (opts.whiteUnder !== false) buf[si + 4] = spotInk;
+        if (opts.varnish) buf[si + 5] = spotInk;
       }
     }
   }

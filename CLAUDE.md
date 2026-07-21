@@ -25,6 +25,10 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    filling a layer mask with 100,100,100,100 black over the art and naming
    the channel W1/V1. Storing 255-at-art (uninverted) reads backwards and
    dumps white/varnish onto every empty space. Applies to BOTH W1 and V1.
+   **And the fill is SOLID/BINARY (`DBOX_SPOT_MIN_A`): 100% ink wherever
+   art alpha ≥ threshold, none below.** Never scale spot ink by alpha —
+   proportional ink starves the white at anti-aliased edges and soft art
+   ("not putting down enough white").
 7. **The box is borderless with zero bleed. No crop, cut, registration, or
    fold marks on the artwork.** Fold ticks default OFF.
 8. **The white plate is choked 3 px** (`DBOX_WHITE_CHOKE_PX`) inside the art
