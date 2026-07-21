@@ -3370,14 +3370,11 @@ const DBOX_FOLDS_MM = [48, 262, 313, 524];
 // on the black box. (A "choke" = underprint shrunk relative to the art it sits
 // under; the opposite is a "spread".) DO NOT remove — required for clean edges.
 const DBOX_WHITE_CHOKE_PX = 3;
-// Spot plates are SOLID, full-strength: 100% W1/V1 ink across the art (like
-// filling a magic-wand selection with 100,100,100,100) — never scaled by alpha,
-// which starves the white at soft art. The plate EDGE is traced like an
-// anti-aliased wand selection: solid at/above SOLID_A, nothing below MIN_A,
-// thin AA ramp between. Tracing solid from ~3% instead follows the OUTER
-// fringe of soft/upscaled edges and fattens/chunks the shapes.
-const DBOX_SPOT_MIN_A = 96;    // below ≈38% alpha: no ink (outside the contour)
-const DBOX_SPOT_SOLID_A = 160; // at/above ≈63% alpha: solid 100% ink
+// Spot plates (W1/V1) mirror the artwork's alpha EXACTLY — no thresholds, no
+// contour tracing, no reprocessing ("treat it like any other image"). Opaque
+// art = solid 100% ink; edges keep the image's own anti-aliasing; transparent
+// = no ink. Re-thresholding the alpha stair-steps soft/upscaled edges.
+// Ink amount on press is the RIP's job (density/Percent/layers), not the file's.
 
 // Erode a single-channel 8-bit plane by `r` px (separable min filter). Any pixel
 // within `r` of a zero pixel — OR within `r` of the plane edge — drops to 0, so
@@ -3577,21 +3574,17 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
           buf[si + 2] = img[pi + 2]!;
         }
         buf[si + 3] = aByte;                          // A: transparency — empty areas stay transparent, never black
-        // White under-base (W1, channel 4) and gloss varnish (V1, channel 5):
-        // SOLID 100% ink wherever art exists, nothing where it doesn't — exactly
-        // the shop's magic-wand-the-art → fill 100,100,100,100 workflow. NOT
-        // proportional to alpha: scaling ink by alpha starves the plate at
-        // anti-aliased edges/soft art ("not putting down enough white").
-        // The EDGE is traced like an anti-aliased wand selection: solid from
-        // DBOX_SPOT_SOLID_A up, zero below DBOX_SPOT_MIN_A, and a thin AA ramp
-        // between — tracing at the visual contour. Tracing everything above ~3%
-        // instead followed the OUTER fringe of soft/upscaled edges and fattened
-        // and chunked the shapes ("pixelated my logo"). Stored as INK LEVEL here
-        // (255 = full ink); INVERTED to Photoshop spot-channel polarity
-        // (0/black = 100% ink) in one pass at the end.
-        const spotInk = aByte >= DBOX_SPOT_SOLID_A ? 255
-          : aByte < DBOX_SPOT_MIN_A ? 0
-          : Math.round(((aByte - DBOX_SPOT_MIN_A) * 255) / (DBOX_SPOT_SOLID_A - DBOX_SPOT_MIN_A));
+        // White under-base (W1, channel 4) and gloss varnish (V1, channel 5)
+        // mirror the artwork's alpha EXACTLY — the same pixels, no thresholds,
+        // no edge tracing, no reprocessing. Treat it like any other image: what
+        // Photoshop gives you when you load the layer transparency as a
+        // selection and fill it 100,100,100,100 — solid over opaque art
+        // (alpha 255 = full ink), smooth anti-aliased edges identical to the
+        // RGB's own edges, nothing where transparent. Ink AMOUNT on press is
+        // the RIP's job (density/Percent/layers), not the file's. Stored as
+        // INK LEVEL here (255 = full ink); INVERTED to Photoshop spot-channel
+        // polarity (0/black = 100% ink) in one pass at the end.
+        const spotInk = aByte;
         if (opts.whiteUnder !== false) buf[si + 4] = spotInk;
         if (opts.varnish) buf[si + 5] = spotInk;
       }

@@ -26,13 +26,13 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    filling a layer mask with 100,100,100,100 black over the art and naming
    the channel W1/V1. Storing 255-at-art (uninverted) reads backwards and
    dumps white/varnish onto every empty space. Applies to BOTH W1 and V1.
-   **And the fill is SOLID: 100% ink across the art, never scaled by
-   alpha** — proportional ink starves the white ("not putting down enough
-   white"). The plate EDGE is traced like an anti-aliased magic-wand
-   selection (`DBOX_SPOT_MIN_A`/`DBOX_SPOT_SOLID_A`): solid from ~63%
-   alpha, nothing below ~38%, thin AA ramp between. Tracing solid from ~3%
-   follows the outer fringe of soft/upscaled edges and fattens/chunks the
-   shapes ("pixelated my logo").
+   **And W1/V1 mirror the artwork's alpha EXACTLY — "treat it like any
+   other image."** No thresholds, no contour tracing, no reprocessing:
+   opaque art = solid 100% ink, edges keep the image's own anti-aliasing
+   (identical to the RGB edges), transparent = nothing. Re-thresholding
+   the alpha stair-steps soft/upscaled edges ("pixelated my logo").
+   Ink AMOUNT on press is set in the RIP (density/Percent/layers), not by
+   the file.
 7. **The box is borderless with zero bleed. No crop, cut, registration, or
    fold marks on the artwork.** Fold ticks default OFF.
 8. **The white plate is choked 3 px** (`DBOX_WHITE_CHOKE_PX`) inside the art
