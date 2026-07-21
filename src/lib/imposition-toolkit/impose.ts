@@ -3620,7 +3620,10 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
   }
 
   // R G B A W1 V1 — alpha:true writes the transparency as the first extra sample.
-  return encodeRgbSpotTiff({ width: W, height: H, interleaved: buf, spotNames: ['W1', 'V1'], alpha: true, dpi });
+  // Tagged sRGB (tag 34675) so Photoshop/RIPs read the colours as-is instead of
+  // assigning the working space to an untagged file (which shifts every colour).
+  const { srgbProfile } = await import('./srgb-profile');
+  return encodeRgbSpotTiff({ width: W, height: H, interleaved: buf, spotNames: ['W1', 'V1'], alpha: true, iccProfile: srgbProfile(), dpi });
 }
 
 // ── Braille (Grade-1) ───────────────────────────────────────────────────────

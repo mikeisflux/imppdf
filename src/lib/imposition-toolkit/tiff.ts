@@ -34,6 +34,10 @@ export interface RgbSpotTiffInput {
   // Photoshop shows this as the checkerboard, not a channel row, so the Channels
   // panel still reads R,G,B + the spot names.
   alpha?: boolean;
+  // ICC profile to embed (tag 34675) so readers interpret the RGB correctly.
+  // Without it, Photoshop assigns the user's working RGB space to the untagged
+  // file — sRGB pixel values read as e.g. Adobe RGB and every colour shifts.
+  iccProfile?: Uint8Array;
   dpi?: number;
 }
 
@@ -146,6 +150,7 @@ export function encodeRgbSpotTiff(input: RgbSpotTiffInput): Uint8Array {
   tags.push({ id: 296, type: TYPE.SHORT, count: 1, value: 2 });               // ResolutionUnit = inch
   if (nExtra > 0) tags.push({ id: 338, type: TYPE.SHORT, count: nExtra, data: extraArr }); // ExtraSamples
   tags.push({ id: 34377, type: TYPE.BYTE, count: psResources.length, data: psResources });  // Photoshop ImageResources (channel names)
+  if (input.iccProfile?.length) tags.push({ id: 34675, type: TYPE.UNDEFINED, count: input.iccProfile.length, data: input.iccProfile }); // ICC profile (InterColorProfile)
 
   const HEADER = 8;
   const ifdSize = 2 + tags.length * 12 + 4;

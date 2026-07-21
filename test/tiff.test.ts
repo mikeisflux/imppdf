@@ -35,7 +35,8 @@ test('encodeSeparatedTiff: valid little-endian header + core tags', () => {
 test('encodeRgbSpotTiff: RGB photometric, 6 samples R G B A W1 V1, alpha + spot names', () => {
   const width = 4, height = 3, spp = 6;                 // R G B + A + W1 + V1
   const interleaved = new Uint8Array(width * height * spp).map((_, i) => i % 256);
-  const out = encodeRgbSpotTiff({ width, height, interleaved, spotNames: ['W1', 'V1'], alpha: true, dpi: 300 });
+  const icc = new Uint8Array([9, 8, 7, 6, 5, 4, 3, 2, 1]);   // stand-in ICC profile blob
+  const out = encodeRgbSpotTiff({ width, height, interleaved, spotNames: ['W1', 'V1'], alpha: true, iccProfile: icc, dpi: 300 });
   assert.equal(out[0], 0x49); assert.equal(out[1], 0x49);   // 'II'
   assert.equal(u16(out, 2), 42);
   const ifd = u32(out, 4);
@@ -53,6 +54,9 @@ test('encodeRgbSpotTiff: RGB photometric, 6 samples R G B A W1 V1, alpha + spot 
   // ExtraSamples out-of-line (3 shorts = 6 bytes): first = 2 (unassociated alpha), rest 0.
   { const eo = tags.get(338)!.v; assert.equal(u16(out, eo), 2, 'first extra sample is unassociated alpha'); assert.equal(u16(out, eo + 2), 0); assert.equal(u16(out, eo + 4), 0); }
   assert.ok(tags.has(34377), 'Photoshop image-resource block (channel names) present');
+  // ICC profile embedded (tag 34675) so the RGB is interpreted correctly, byte-exact.
+  { const t = tags.get(34675)!; assert.equal(t.count, icc.length);
+    for (let i = 0; i < icc.length; i++) assert.equal(out[t.v + i], icc[i]); }
   assert.equal(tags.get(279)!.v, width * height * spp);
   // Pixel data intact at StripOffsets.
   const so = tags.get(273)!.v;
