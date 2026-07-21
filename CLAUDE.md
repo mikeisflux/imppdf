@@ -32,7 +32,11 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    (identical to the RGB edges), transparent = nothing. Re-thresholding
    the alpha stair-steps soft/upscaled edges ("pixelated my logo").
    Ink AMOUNT on press is set in the RIP (density/Percent/layers), not by
-   the file.
+   the file. ONE permitted exception: the seam guard snaps alpha ≥250→255
+   and ≤5→0, and the pdf.js render translate is integer-rounded — browser
+   canvas tile seams otherwise leave ~250-254 alpha rows inside solid art
+   that print as horizontal lines in the white ("tons of lines"). Never
+   widen that guard into a mid-range threshold.
 7. **Geometry follows the owner's New_Box_Full template (2026-07): sheet
    306 × 572 mm = trim 300 × 572 + 3 mm bleed LEFT+RIGHT only** (art spans
    the full 306; no top/bottom bleed). Folds at 48/266/317/524 mm, each in

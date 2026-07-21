@@ -3560,7 +3560,11 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
       // transparent pixel transparent. DO NOT reintroduce a drawImage crop here.
       const pc = mkCanvas(pwPx, phPx);
       const pctx = pc.getContext('2d');
-      const tx = -(vp.width - pwPx) / 2, ty = -(vp.height - phPx) / 2;   // crop-centre
+      // Crop-centre with an INTEGER translate: browser canvases render large
+      // images in tiles, and a fractional offset makes every tile boundary land
+      // between pixels — the smoothing leaves alpha ~250-254 seams that print
+      // as lines in the white plate ("tons of lines in the print").
+      const tx = Math.round(-(vp.width - pwPx) / 2), ty = Math.round(-(vp.height - phPx) / 2);
       await page.render({ canvasContext: pctx, viewport: vp, transform: [1, 0, 0, 1, tx, ty], background: 'rgba(0,0,0,0)' }).promise;
       img = pctx.getImageData(0, 0, pwPx, phPx).data;
     } catch { continue; }
@@ -3571,7 +3575,13 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
       for (let xx = 0; xx < pwPx && xx < W; xx++) {
         const si = (sy * W + xx) * spp;
         const pi = (yy * pwPx + xx) * 4;
-        const aByte = img[pi + 3]!;                  // artwork transparency (0 = transparent)
+        // Artwork transparency, with a SEAM GUARD at the extremes only:
+        // canvas tile seams leave alpha at ~250-254 inside solid art (prints as
+        // lines in the white plate) and stray ~1-5 in empty space. Snap those
+        // slivers to 255/0. Genuine anti-aliased edges sweep the full range and
+        // are untouched — this is NOT edge tracing (see CLAUDE.md rule 6).
+        const rawA = img[pi + 3]!;
+        const aByte = rawA >= 250 ? 255 : rawA <= 5 ? 0 : rawA;
         const a = aByte / 255;
         if (aByte > 0) {
           // RGB straight from the artwork (channels 0,1,2 = R,G,B).
