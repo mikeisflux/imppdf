@@ -3368,8 +3368,12 @@ export async function addWhiteVarnish(bytes: Uint8Array, opts: WhiteVarnishOptio
 // Artwork spans the full 306 so the side trim cuts through ink.
 const DBOX_TRIM_W_MM = 300, DBOX_BLEED_MM = 3;
 const DBOX_SHEET_W_MM = DBOX_TRIM_W_MM + 2 * DBOX_BLEED_MM, DBOX_SHEET_H_MM = 572;
-// Fold positions (mm from the top); each fold sits centred in a 3 mm no-print gap.
-const DBOX_FOLDS_MM = [48, 266, 317, 524];
+// Fold zones (owner spec, 2026-07-21): each fold is 5 mm WIDE, centred at
+// these positions (mm from the top, top = 0). Zones: 45-50, 257.5-262.5,
+// 307.5-312.5, 522.5-527.5. Sections between zones carry 3 mm bleed
+// top+bottom INTO the zones (adjacent bleeds overlap ~1 mm at each fold
+// centre — the TIFF composite is a UNION, opaque pixels only).
+const DBOX_FOLDS_MM = [47.5, 260, 310, 525];
 // CHOKE: the white under-base is pulled IN this many pixels from every art edge
 // so slight press misregistration never shows a white halo past the printed art
 // on the black box. (A "choke" = underprint shrunk relative to the art it sits
@@ -3412,17 +3416,16 @@ export function chokePlane(src: Uint8Array, w: number, h: number, r: number): Ui
 // top/bottom bleed. Panel E (bottom flap) is no-print and never drawn.
 // W1/V1 mirror each panel's artwork alpha (see spot-plate rules above).
 //
-// PRESS COMPENSATION (owner, 2026-07-21, REVERSED direction per owner):
-// positions deviate from the to-spec template in the OPPOSITE direction of
-// the first attempt — B's bottom pulled IN 8 mm, C moved UP 8 mm, D moved UP
-// 5 mm with its bottom extended 2 mm — so the printed result lands on the
-// template spec. Do not "correct" back to template positions without a test
-// print proving the press lands true.
+// SECTIONS (owner spec, 2026-07-21, supersedes the press-compensation
+// experiments): faces A 0-45, B 50-257.5, C 262.5-307.5, D 312.5-522.5,
+// E 527.5-572 (no-print). Art = section + 3 mm bleed top AND bottom into the
+// 5 mm fold zones (A's top is the sheet edge — no bleed above 0). Left/right
+// bleed remains 3 mm via the full 306 mm width.
 export const DIVINITY_BOX_PANELS = [
-  { key: 'a', label: 'A', topMm: 0,     hMm: 46.5, wMm: DBOX_SHEET_W_MM },
-  { key: 'b', label: 'B', topMm: 49.5,  hMm: 207,  wMm: DBOX_SHEET_W_MM },
-  { key: 'c', label: 'C', topMm: 259.5, hMm: 48,   wMm: DBOX_SHEET_W_MM },
-  { key: 'd', label: 'D', topMm: 313.5, hMm: 207,  wMm: DBOX_SHEET_W_MM },
+  { key: 'a', label: 'A', topMm: 0,     hMm: 48,    wMm: DBOX_SHEET_W_MM },
+  { key: 'b', label: 'B', topMm: 47,    hMm: 213.5, wMm: DBOX_SHEET_W_MM },
+  { key: 'c', label: 'C', topMm: 259.5, hMm: 51,    wMm: DBOX_SHEET_W_MM },
+  { key: 'd', label: 'D', topMm: 309.5, hMm: 216,   wMm: DBOX_SHEET_W_MM },
 ] as const;
 
 export interface DivinityBoxArt { bytes: Uint8Array; page?: number }
@@ -3589,12 +3592,14 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
         const rawA = img[pi + 3]!;
         const aByte = rawA >= 250 ? 255 : rawA <= 5 ? 0 : rawA;
         const a = aByte / 255;
-        if (aByte > 0) {
-          // RGB straight from the artwork (channels 0,1,2 = R,G,B).
-          buf[si] = img[pi]!;
-          buf[si + 1] = img[pi + 1]!;
-          buf[si + 2] = img[pi + 2]!;
-        }
+        // UNION compositing: only pixels with ink write. Panels' 3 mm top/bottom
+        // bleeds overlap ~1 mm inside the 5 mm fold zones — a transparent edge
+        // of a later panel must never erase the neighbour's bleed underneath.
+        if (aByte === 0) continue;
+        // RGB straight from the artwork (channels 0,1,2 = R,G,B).
+        buf[si] = img[pi]!;
+        buf[si + 1] = img[pi + 1]!;
+        buf[si + 2] = img[pi + 2]!;
         buf[si + 3] = aByte;                          // A: transparency — empty areas stay transparent, never black
         // White under-base (W1, channel 4) and gloss varnish (V1, channel 5)
         // mirror the artwork's alpha EXACTLY — the same pixels, no thresholds,
