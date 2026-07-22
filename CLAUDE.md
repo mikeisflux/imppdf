@@ -39,13 +39,12 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    widen that guard into a mid-range threshold.
 7. **Geometry: sheet 306 × 572 mm = trim 300 × 572 + 3 mm bleed LEFT+RIGHT
    only** (art spans the full 306; no top/bottom bleed). Template folds at
-   48/266/317/524 mm. **PRESS COMPENSATION (owner, 2026-07-21): the panel
-   positions in `DIVINITY_BOX_PANELS` intentionally deviate from the
-   New_Box_Full template — B 49.5/h223 (+8 bottom), C 275.5/h48 (+8 down),
-   D 323.5/h201 (+5 down, −3 height) — because the press printed the
-   to-spec template off by those amounts (B ~8 short at bottom, C ~8 high, D ~5
-   high, D bottom ~2 short). Do not revert to template positions without
-   a test print proving the press lands true.** No crop, cut,
+   48/266/317/524 mm. **PRESS COMPENSATION (owner, 2026-07-21, reversed
+   direction per owner): the panel positions in `DIVINITY_BOX_PANELS`
+   intentionally deviate from the New_Box_Full template in the OPPOSITE
+   direction of the misprint measurements — B 49.5/h207 (bottom −8),
+   C 259.5/h48 (−8 up), D 313.5/h207 (−5 up, bottom +2). Do not revert to
+   template positions without a test print proving the press lands true.** No crop, cut,
    registration, or fold marks on the artwork. Fold ticks default OFF.
 8. **The white plate is choked 3 px** (`DBOX_WHITE_CHOKE_PX`) inside the art
    edges so misregistration never shows a white halo. Colour/alpha keep full
