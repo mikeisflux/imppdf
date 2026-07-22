@@ -3407,16 +3407,23 @@ export function chokePlane(src: Uint8Array, w: number, h: number, r: number): Ui
   }
   return out;
 }
-// key, label, top offset from the sheet top (mm), print height (mm). Panels sit
-// between the 3 mm no-print fold gaps (folds at 48/266/317/524). Widths span the
-// FULL 306 mm sheet so art bleeds 3 mm past the side trims; heights are exact —
-// no top/bottom bleed. Panel E (525.5–572 mm) is no-print and never drawn.
+// key, label, top offset from the sheet top (mm), print height (mm). Widths
+// span the FULL 306 mm sheet so art bleeds 3 mm past the side trims; no
+// top/bottom bleed. Panel E (bottom flap) is no-print and never drawn.
 // W1/V1 mirror each panel's artwork alpha (see spot-plate rules above).
+//
+// PRESS COMPENSATION (owner, 2026-07-21, measured from a folded test print):
+// the template PDF is to spec but the PRESS lands the art off it — B's bottom
+// prints ~8 mm short, C prints ~8 mm high, D ~5 mm high, D's bottom only ~2 mm short.
+// These positions intentionally deviate from the template (B +8 mm bottom,
+// C +8 mm down, D +5 mm down with 3 mm trimmed off its height) so the PRINTED
+// result lands on the template spec. Do not "correct" them back to the
+// template without a new test print proving the press now lands true.
 export const DIVINITY_BOX_PANELS = [
   { key: 'a', label: 'A', topMm: 0,     hMm: 46.5, wMm: DBOX_SHEET_W_MM },
-  { key: 'b', label: 'B', topMm: 49.5,  hMm: 215,  wMm: DBOX_SHEET_W_MM },
-  { key: 'c', label: 'C', topMm: 267.5, hMm: 48,   wMm: DBOX_SHEET_W_MM },
-  { key: 'd', label: 'D', topMm: 318.5, hMm: 204,  wMm: DBOX_SHEET_W_MM },
+  { key: 'b', label: 'B', topMm: 49.5,  hMm: 223,  wMm: DBOX_SHEET_W_MM },
+  { key: 'c', label: 'C', topMm: 275.5, hMm: 48,   wMm: DBOX_SHEET_W_MM },
+  { key: 'd', label: 'D', topMm: 323.5, hMm: 201,  wMm: DBOX_SHEET_W_MM },
 ] as const;
 
 export interface DivinityBoxArt { bytes: Uint8Array; page?: number }
