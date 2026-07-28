@@ -468,7 +468,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         break;
       }
       case 'cards': case 'grid': case 'cutstack': case 'perfectbound':
-      case 'trading': case 'bookmark': case 'flyer': case 'indexcard': case 'artprint':
+      case 'trading': case 'bookmark': case 'flyer': case 'indexcard':
       case 'business': case 'postcard': case 'rackcard': case 'hangtag': case 'label':
       case 'namebadge': case 'ticket': case 'coupon': case 'placecard': case 'greeting':
       case 'doorhanger': case 'envelope': case 'coaster': case 'contact': case 'compslip':
@@ -478,6 +478,16 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         // Single-sheet gang tools can opt into Replicate (auto-sized sheet +
         // copies + extra art); otherwise the normal fixed-sheet N-up runs.
         b = s.replicate ? await replicateFill(b, replicateOpts(s)) : await imposeNUp(b, nupOpts(s)); break;
+      case 'artprint':
+        // Art print sizes INCLUDE the 0.125" bleed by shop spec, ALWAYS — force
+        // the fixed bleed here so cut marks sit at the trim even on steps whose
+        // stored settings predate the bleedMode fix (step settings persist from
+        // when the step was created; a stale 'doc' mode passed bleed 0 and put
+        // the marks on the art's outer edge).
+        b = s.replicate
+          ? await replicateFill(b, { ...replicateOpts(s), bleedIn: 0.125 })
+          : await imposeNUp(b, { ...nupOpts(s), bleedIn: 0.125 });
+        break;
       case 'replicate': b = await replicateFill(b, replicateOpts(s)); break;
       case 'divinitybox': {
         // Self-contained: builds the box flat from the four uploaded panels and
