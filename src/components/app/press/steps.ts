@@ -12,7 +12,7 @@ import {
   nestPdf, imposeCalendar, insertPages as insertPagesOp, mixPdfs, nudgePdf,
   addBackdropFile, applyColorEffects, applyColorManagement, addBarcodeStamp,
   addDimensions, addWhiteVarnish, addBraille, optimizePdf, repairPdf, decryptPdf, setLayers,
-  replicateFill, imposeDivinityBox,
+  replicateFill, imposeDivinityBox, trimToArtwork,
 } from '@/lib/imposition-toolkit/impose';
 import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/imposition-toolkit/impose';
 
@@ -173,6 +173,10 @@ export function defaultSettings(type: StepType): StepSettings {
         // ONE label, so a single upload fills the sheet. Switch Page Order to
         // Sequential to lay out 30 different labels instead.
         order: 'repeat',
+        // Label art is usually exported from a template at full sheet size with
+        // the design in one slot. Crop to the artwork so the LABEL is ganged,
+        // not the empty sheet around it.
+        trimArt: true,
       }), cols: 3, rows: 10 };
     case 'artprint':
       // Art prints on a 12×18 sheet. Sizes INCLUDE the 0.125" bleed on every
@@ -494,6 +498,9 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       case 'trifold': case 'zfold': case 'gatefold': case 'menu':
       case 'poster': case 'banner': case 'rollbanner': case 'featherflag': case 'yardsign':
       case 'boxcarton': case 'presfolder':
+        // Art exported from a template sits on a full-size sheet; crop to the
+        // artwork first so the gang places the design, not the empty paper.
+        if (s.trimArt) b = await trimToArtwork(b, { page: s.page ?? 1 });
         // Single-sheet gang tools can opt into Replicate (auto-sized sheet +
         // copies + extra art); otherwise the normal fixed-sheet N-up runs.
         b = s.replicate ? await replicateFill(b, replicateOpts(s)) : await imposeNUp(b, nupOpts(s)); break;

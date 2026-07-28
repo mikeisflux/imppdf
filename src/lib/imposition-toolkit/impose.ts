@@ -3647,6 +3647,81 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
   return encodeRgbSpotTiff({ width: W, height: H, interleaved: buf, spotNames: ['W1', 'V1'], alpha: true, iccProfile: srgbProfile(), dpi });
 }
 
+// ── Trim to artwork ─────────────────────────────────────────────────────────
+// Design tools export from a template at FULL SHEET size with the art sitting
+// in one spot, so ganging that page tiles mostly empty paper (the art lands
+// tiny inside its cell). These find the artwork's real bounds and crop the page
+// to them, so the gang tools place the ART, not the sheet.
+
+// Pure pixel scan — exported so the bounds logic is unit-testable without a
+// canvas. Ink = any pixel that is neither transparent nor (near-)white.
+export function inkBoundsFromPixels(
+  data: Uint8ClampedArray | Uint8Array, w: number, h: number, whiteAt = 250,
+): { x0: number; y0: number; x1: number; y1: number } | null {
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (data[i + 3]! <= 4) continue;                                        // transparent
+      if (data[i]! > whiteAt && data[i + 1]! > whiteAt && data[i + 2]! > whiteAt) continue;  // white
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  return x1 < 0 ? null : { x0, y0, x1, y1 };
+}
+
+export interface TrimToArtworkOptions {
+  page?: number;      // 1-based page to measure (default 1)
+  dpi?: number;       // scan resolution (default 150 — plenty for bounds)
+  padIn?: number;     // keep this much paper around the art (default 0)
+}
+
+// Crop every page's boxes to the artwork bounds measured on `page`.
+// Browser-only (pdf.js + canvas); returns the input unchanged if it can't scan.
+export async function trimToArtwork(bytes: Uint8Array, opts?: TrimToArtworkOptions): Promise<Uint8Array> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfjs: any = await import('pdfjs-dist');
+    try { pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default; } catch { /* bundler resolves worker */ }
+    const { PDFDocument } = await import('pdf-lib');
+
+    const dpi = opts?.dpi ?? 150;
+    const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+    const pageNo = Math.min(doc.numPages, Math.max(1, Math.round(opts?.page ?? 1)));
+    const pg = await doc.getPage(pageNo);
+    const scale = dpi / 72;
+    const vp = pg.getViewport({ scale });
+    const w = Math.max(1, Math.ceil(vp.width)), h = Math.max(1, Math.ceil(vp.height));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const canvas: any = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h)
+      : Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const ctx = canvas.getContext('2d');
+    await pg.render({ canvasContext: ctx, viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
+    const b = inkBoundsFromPixels(ctx.getImageData(0, 0, w, h).data, w, h);
+    if (!b) return bytes;                                   // blank page — nothing to trim
+
+    // Canvas px → PDF points (y is flipped), relative to the page's own box.
+    const out = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
+    const pages = out.getPages();
+    const target = pages[pageNo - 1] ?? pages[0]!;
+    const mb = target.getMediaBox();
+    const pad = Math.max(0, opts?.padIn ?? 0) * PT;
+    const left = mb.x + b.x0 / scale - pad;
+    const right = mb.x + (b.x1 + 1) / scale + pad;
+    const top = mb.y + mb.height - b.y0 / scale + pad;
+    const bottom = mb.y + mb.height - (b.y1 + 1) / scale - pad;
+    const cw = right - left, ch = top - bottom;
+    if (!(cw > 1 && ch > 1)) return bytes;
+    // Already essentially the whole page — leave it alone.
+    if (cw >= mb.width - 1 && ch >= mb.height - 1) return bytes;
+    for (const p of pages) { p.setMediaBox(left, bottom, cw, ch); p.setCropBox(left, bottom, cw, ch); }
+    return out.save();
+  } catch { return bytes; }                                  // never break an export
+}
+
 // ── Braille (Grade-1) ───────────────────────────────────────────────────────
 const BRAILLE_G1: Record<string, number[]> = {
   a: [1], b: [1, 2], c: [1, 4], d: [1, 4, 5], e: [1, 5], f: [1, 2, 4], g: [1, 2, 4, 5], h: [1, 2, 5], i: [2, 4], j: [2, 4, 5],

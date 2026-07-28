@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane, inkBoundsFromPixels } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -339,4 +339,21 @@ test('replicateFill: art too big to gang natively falls back to the tool cell si
   const native = replicateGrid({ sheetWIn: 8.5, sheetHIn: 11, cellWIn: 3.5, cellHIn: 2, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125 });
   assert.ok(native.fits, 'card-size art fits natively');
   assert.ok((await replicateFill(cardArt, { sheetWIn: 8.5, sheetHIn: 11, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125, addMarks: false, fallbackCellWIn: 2.625, fallbackCellHIn: 1 })).length > 0);
+});
+
+test('inkBoundsFromPixels: finds the artwork box, ignores white and transparent paper', () => {
+  const w = 20, h = 10;
+  const px = new Uint8Array(w * h * 4);
+  // Fill with opaque white "paper".
+  for (let i = 0; i < w * h; i++) { px[i*4] = 255; px[i*4+1] = 255; px[i*4+2] = 255; px[i*4+3] = 255; }
+  // Draw a dark block from x 4..7, y 2..5 (inclusive).
+  for (let y = 2; y <= 5; y++) for (let x = 4; x <= 7; x++) {
+    const i = (y * w + x) * 4; px[i] = 10; px[i+1] = 20; px[i+2] = 30; px[i+3] = 255;
+  }
+  assert.deepEqual(inkBoundsFromPixels(px, w, h), { x0: 4, y0: 2, x1: 7, y1: 5 });
+  // A transparent page with no ink returns null (nothing to trim).
+  assert.equal(inkBoundsFromPixels(new Uint8Array(w * h * 4), w, h), null);
+  // An all-white opaque page is also "blank" — never crop to nothing.
+  const white = new Uint8Array(w * h * 4).fill(255);
+  assert.equal(inkBoundsFromPixels(white, w, h), null);
 });

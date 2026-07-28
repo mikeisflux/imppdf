@@ -337,6 +337,9 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
         </Section>
       )}
       <PaperSize {...p} />
+      <Section label="// ARTWORK" help="Crop the uploaded page down to the artwork itself. Design tools export from a template at full sheet size with the design in one slot — without this the gang tiles the whole sheet and the art lands tiny inside its cell.">
+        <Check icon="crop" label="Trim to artwork" sub="Ignore the empty paper around the design" checked={!!s.trimArt} onChange={(v) => up({ trimArt: v })} />
+      </Section>
       <Section label="// IMAGE FIT" help="How each page/image fills its cell. Contain (default) keeps the whole graphic and its proportions; Cover fills the cell and crops the overflow.">
         <div className="pe-row" style={{ gap: 8 }}>
           <select className="pe-select" value={s.fit ?? 'contain'} onChange={(e) => up({ fit: e.target.value })} style={{ flex: 1 }}>
