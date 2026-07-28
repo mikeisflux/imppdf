@@ -31,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'divinitybox';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'divinitybox';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -157,6 +157,14 @@ export function defaultSettings(type: StepType): StepSettings {
       // Index cards (3×5") on Letter. Starts as a single 1×1 copy; raise
       // columns/rows (or tick Replicate) to gang up.
       return nupPreset({ cellWIn: 3, cellHIn: 5 });
+    case 'artprint':
+      // Art prints on a 12×18 sheet. Sizes INCLUDE the 0.125" bleed on every
+      // side: comic book 6.88×10.5 (trim 6.63×10.25) or 11×17 with standard
+      // bleed (11.25×17.25). Cut marks sit at the trim (inset by the bleed).
+      // Replicate is ON by owner spec: comic-size art prints 2-up on 12×18
+      // (rotated, stacked); 11×17 art yields 1-up. The fill is calculated from
+      // the art's native size with margins/marks reserved — never assumed.
+      return { ...nupPreset({ sheetWIn: 12, sheetHIn: 18, cellWIn: 6.88, cellHIn: 10.5 }), replicate: true };
     case 'divinitybox':
       // Fixed 306×572 mm box flat (trim 300 + 3 mm bleed L+R) with four
       // printable panels (A–D). Each panel
@@ -458,7 +466,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         break;
       }
       case 'cards': case 'grid': case 'cutstack': case 'perfectbound':
-      case 'trading': case 'bookmark': case 'flyer': case 'indexcard':
+      case 'trading': case 'bookmark': case 'flyer': case 'indexcard': case 'artprint':
       case 'business': case 'postcard': case 'rackcard': case 'hangtag': case 'label':
       case 'namebadge': case 'ticket': case 'coupon': case 'placecard': case 'greeting':
       case 'doorhanger': case 'envelope': case 'coaster': case 'contact': case 'compslip':

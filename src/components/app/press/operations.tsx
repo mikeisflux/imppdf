@@ -124,6 +124,7 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'cards', label: 'Cards', icon: 'cards', tip: 'Use Cards to tile identical copies of your pages onto larger sheets for efficient cutting.' },
     { id: 'replicate', label: 'Replicate', icon: 'replicateIc', tip: 'Fill the selected sheet with as many copies of one image as safely fit. Add extra images/PDFs to take some cells. Single-sheet items only.' },
     { id: 'indexcard', label: 'Index Cards', icon: 'cards', tip: 'Index cards (3×5") on Letter. Starts as one copy — raise columns/rows or tick Replicate to gang up.' },
+    { id: 'artprint', label: 'Art Prints', icon: 'fillbg', tip: 'Comic-size (6.88×10.5" incl. bleed) prints 2-up on 12×18; 11×17 (11.25×17.25 w/ bleed) prints 1-up. Replicate fills the sheet automatically.' },
     { id: 'booklet', label: 'Booklet', icon: 'booklet', tip: 'Use Booklet for orders pages so a folded, center-stapled stack reads correctly.' },
     { id: 'fierybooklet', label: 'Fiery Booklet', icon: 'fieryBookletIc', tip: 'Single-page output for a Fiery/DFE booklet maker: trims the spine-side bleed on each page so the RIP folds a clean booklet.' },
     { id: 'fieryserial', label: 'Fiery Serial Booklet', icon: 'fierySerialIc', tip: 'Fiery Booklet plus a limited-edition serial number (1/200, 2/200 …) stamped on page 1. Exports one numbered file per copy.' },

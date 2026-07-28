@@ -309,6 +309,16 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
   const rep = replicateSheet(s, p.pageSizes ?? []);
   return (
     <>
+      {p.type === 'artprint' && (
+        <Section label="// PRINT SIZE" help="Sizes INCLUDE the 0.125&quot; bleed on every side — upload art at the full bleed size. Cut marks sit at the trim.">
+          <div className="pe-row" style={{ gap: 8 }}>
+            <button className="pe-btn" style={Math.abs((s.cellWIn ?? 0) - 6.88) < 0.01 ? { outline: '2px solid currentColor' } : undefined}
+              onClick={() => up({ cellWIn: 6.88, cellHIn: 10.5 })}>Comic 6.88 × 10.5&quot;</button>
+            <button className="pe-btn" style={Math.abs((s.cellWIn ?? 0) - 11.25) < 0.01 ? { outline: '2px solid currentColor' } : undefined}
+              onClick={() => up({ cellWIn: 11.25, cellHIn: 17.25 })}>11 × 17&quot; (11.25 × 17.25 w/ bleed)</button>
+          </div>
+        </Section>
+      )}
       {canReplicate && (
         <Section label="// REPLICATE" help="Fill the selected sheet with as many copies of the image as safely fit inside your margins. Add extra images/PDFs to take some of the cells.">
           <Check icon="replicateIc" label="Replicate — fill the sheet with copies" checked={!!s.replicate} onChange={(v) => up({ replicate: v })} />
@@ -730,7 +740,7 @@ const WORK_STYLES = [
 // Excludes anything bound (booklet/comic/perfectbound), folded, large-format
 // or packaging — replicate only makes sense for gang-on-a-sheet items.
 export const REPLICABLE_SINGLE_SHEET = new Set<StepType>([
-  'cards', 'grid', 'cutstack', 'trading', 'bookmark', 'flyer', 'indexcard',
+  'cards', 'grid', 'cutstack', 'trading', 'bookmark', 'flyer', 'indexcard', 'artprint',
   'business', 'postcard', 'rackcard', 'hangtag', 'label', 'namebadge', 'ticket',
   'coupon', 'placecard', 'greeting', 'doorhanger', 'envelope', 'coaster', 'contact', 'compslip',
 ]);
@@ -2050,7 +2060,7 @@ function PreflightPanel({ sourceBytes, pageSizes = [], pageCount = 0, onApplyFix
 
 // N-Up-driven layout tools (generic + domain presets) all use the N-Up panel.
 const NUP_TOOLS = new Set<StepType>([
-  'cards', 'grid', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer', 'indexcard',
+  'cards', 'grid', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer', 'indexcard', 'artprint',
   'business', 'postcard', 'rackcard', 'hangtag', 'label', 'namebadge', 'ticket', 'coupon', 'placecard', 'greeting',
   'doorhanger', 'envelope', 'coaster', 'contact', 'compslip',
   'trifold', 'zfold', 'gatefold', 'menu',

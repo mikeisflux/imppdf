@@ -278,3 +278,15 @@ test('chokePlane: white under-base pulls in by r px from every edge (choke trap)
   // r <= 0 is a no-op (returns the same reference).
   assert.equal(chokePlane(src, w, h, 0), src);
 });
+
+test('art prints: comic (6.88x10.5 incl bleed) packs 2-up rotated on 12x18; 11x17 packs 1-up', () => {
+  // Comic-size portrait: upright only 1 fits; rotated (10.5x6.88) stacks 2 rows.
+  const upright = replicateGrid({ sheetWIn: 12, sheetHIn: 18, cellWIn: 6.88, cellHIn: 10.5, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125 });
+  const rotated = replicateGrid({ sheetWIn: 12, sheetHIn: 18, cellWIn: 10.5, cellHIn: 6.88, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125 });
+  assert.equal(upright.cols * upright.rows, 1, 'upright comic: 1 fits');
+  assert.equal(rotated.cols * rotated.rows, 2, 'rotated comic: 2 fit (replicate auto-rotates)');
+  // 11x17 with standard bleed (11.25x17.25): exactly 1 per 12x18 either way.
+  const eleven = replicateGrid({ sheetWIn: 12, sheetHIn: 18, cellWIn: 11.25, cellHIn: 17.25, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125 });
+  assert.equal(eleven.cols * eleven.rows, 1, '11x17+bleed: 1 fits');
+  assert.ok(eleven.fits, '11x17+bleed physically fits the 12x18 sheet');
+});
