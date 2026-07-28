@@ -169,6 +169,10 @@ export function defaultSettings(type: StepType): StepSettings {
         sheetWIn: 8.5, sheetHIn: 11, cellWIn: 2.625, cellHIn: 1,
         marginIn: 0.19, gutterIn: 0.1181, gutterYIn: 0,
         addMarks: false, bleedMode: 'none', bleedIn: 0,
+        // Repeat page 1 into all 30 cells: a proof-label sheet is 30 copies of
+        // ONE label, so a single upload fills the sheet. Switch Page Order to
+        // Sequential to lay out 30 different labels instead.
+        order: 'repeat',
       }), cols: 3, rows: 10 };
     case 'artprint':
       // Art prints on a 12×18 sheet. Sizes INCLUDE the 0.125" bleed on every
@@ -389,6 +393,8 @@ function replicateOpts(s: StepSettings) {
     gutterXIn: s.gutterXIn ?? s.gutterIn ?? 0,
     gutterYIn: s.gutterYIn ?? s.gutterIn ?? 0,
     fit: (s.fit ?? 'contain') as 'contain' | 'cover' | 'stretch',
+    // Only used when the art is too big to gang natively (see replicateFill).
+    fallbackCellWIn: s.cellWIn || undefined, fallbackCellHIn: s.cellHIn || undefined,
     extras: ((s.extras ?? []) as { bytes: Uint8Array; page?: number; qty?: number }[])
       .filter((e) => e && e.bytes),
     addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,

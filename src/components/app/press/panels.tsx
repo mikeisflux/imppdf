@@ -328,8 +328,10 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
             </div>
           ) : (
             <div className="pe-note" style={{ marginTop: 8 }}>
-              {rep.hasImage ? <>Your image is <b>{rep.cellWIn.toFixed(2)}×{rep.cellHIn.toFixed(2)}&quot;</b>. </> : null}
-              At its native size{rep.rotated ? ' (rotated 90° to fit more)' : ''}, <b>{rep.N}</b> safely fit ({rep.cols}×{rep.rows}) on the <b>{s.sheetWIn}×{s.sheetHIn}&quot;</b> sheet with room for the margins and cut marks{rep.extraCells > 0 ? ` (${rep.extraCells} replaced by extra art)` : ''}. Set the sheet size and margins below.
+              {rep.scaled
+                ? <>Your image is too big to gang at its native size, so it is scaled to this tool&apos;s <b>{rep.cellWIn.toFixed(3)}×{rep.cellHIn.toFixed(3)}&quot;</b> cell. </>
+                : rep.hasImage ? <>Your image is <b>{rep.cellWIn.toFixed(2)}×{rep.cellHIn.toFixed(2)}&quot;</b>. </> : null}
+              {rep.scaled ? 'At that size' : `At its native size${rep.rotated ? ' (rotated 90° to fit more)' : ''}`}, <b>{rep.N}</b> safely fit ({rep.cols}×{rep.rows}) on the <b>{s.sheetWIn}×{s.sheetHIn}&quot;</b> sheet with room for the margins and cut marks{rep.extraCells > 0 ? ` (${rep.extraCells} replaced by extra art)` : ''}. Set the sheet size and margins below.
             </div>
           ))}
         </Section>
@@ -751,15 +753,23 @@ export const REPLICABLE_SINGLE_SHEET = new Set<StepType>([
 function replicateSheet(s: StepSettings, pageSizes: { wPt: number; hPt: number }[]) {
   const src = pageSizes[0];
   // Replicate tiles the image at its OWN native size — that's the whole point.
-  const cellWIn = src ? src.wPt / 72 : 3.5;
-  const cellHIn = src ? src.hPt / 72 : 5;
+  let cellWIn = src ? src.wPt / 72 : 3.5;
+  let cellHIn = src ? src.hPt / 72 : 5;
+  let scaled = false;
   const markAllowIn = s.addMarks ? ((s.markOffIn ?? 0.125) + (s.markLenIn ?? 0.43)) : 0;
   const base = {
     sheetWIn: s.sheetWIn ?? 8.5, sheetHIn: s.sheetHIn ?? 11, marginIn: s.marginIn ?? 0,
     gutterXIn: s.gutterXIn ?? s.gutterIn ?? 0, gutterYIn: s.gutterYIn ?? s.gutterIn ?? 0, markAllowIn,
   };
-  const upright = replicateGrid({ ...base, cellWIn, cellHIn });
-  const turned = replicateGrid({ ...base, cellWIn: cellHIn, cellHIn: cellWIn });
+  let upright = replicateGrid({ ...base, cellWIn, cellHIn });
+  let turned = replicateGrid({ ...base, cellWIn: cellHIn, cellHIn: cellWIn });
+  // Engine mirror: art too big to gang natively falls back to the tool's own
+  // cell size (label/card presets) rather than placing nothing.
+  if (!upright.fits && !turned.fits && s.cellWIn && s.cellHIn) {
+    cellWIn = s.cellWIn; cellHIn = s.cellHIn; scaled = true;
+    upright = replicateGrid({ ...base, cellWIn, cellHIn });
+    turned = replicateGrid({ ...base, cellWIn: cellHIn, cellHIn: cellWIn });
+  }
   // Rotate the image 90° if that packs more copies onto the sheet (engine mirror).
   const rotated = turned.cols * turned.rows > upright.cols * upright.rows;
   const grid = rotated ? turned : upright;
@@ -767,7 +777,7 @@ function replicateSheet(s: StepSettings, pageSizes: { wPt: number; hPt: number }
   const extras = (s.extras ?? []) as { qty?: number }[];
   const extraCells = extras.reduce((n, e) => n + Math.max(1, Math.round(e.qty ?? 1)), 0);
   const N = cols * rows;
-  return { cols, rows, N, cellWIn, cellHIn, rotated, extraCells, primaryCopies: Math.max(0, N - extraCells), fits, hasImage: !!src };
+  return { cols, rows, N, cellWIn, cellHIn, rotated, scaled, extraCells, primaryCopies: Math.max(0, N - extraCells), fits, hasImage: !!src };
 }
 
 // Uploader + list for the additional images/PDFs that fill leftover cells.

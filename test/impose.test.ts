@@ -315,3 +315,28 @@ test('30-up proof labels: 3x10 of 2.625x1" fits Letter and matches the template 
   });
   assert.ok(withMarks.cols * withMarks.rows < 30, 'crop marks reduce the count below 30');
 });
+
+test('replicateFill: art too big to gang natively falls back to the tool cell size', async () => {
+  // A Letter-size upload on a Letter sheet: nothing fits at native size, so
+  // without a fallback the sheet comes back with a single copy. With the tool's
+  // own 2.625x1" label cell it fills 30-up instead.
+  const letterArt = await pdfOf(1, 8.5 * 72, 11 * 72);
+  const base = {
+    sheetWIn: 8.5, sheetHIn: 11, marginIn: 0.19,
+    gutterXIn: 0.1181, gutterYIn: 0, addMarks: false,
+  };
+  const without = await replicateFill(letterArt, base);
+  const withFallback = await replicateFill(letterArt, { ...base, fallbackCellWIn: 2.625, fallbackCellHIn: 1 });
+  for (const out of [without, withFallback]) {
+    const s = (await PDFDocument.load(out)).getPage(0).getSize();
+    assert.ok(Math.abs(s.width - 8.5 * PT) < 0.5 && Math.abs(s.height - 11 * PT) < 0.5, 'sheet stays 8.5x11');
+  }
+  // The fallback grid is the 30-up label layout.
+  const g = replicateGrid({ ...base, cellWIn: 2.625, cellHIn: 1 });
+  assert.equal(g.cols * g.rows, 30, 'fallback cell gangs 30-up');
+  // Art that DOES fit natively is untouched by the fallback (native wins).
+  const cardArt = await pdfOf(1, 3.5 * 72, 2 * 72);
+  const native = replicateGrid({ sheetWIn: 8.5, sheetHIn: 11, cellWIn: 3.5, cellHIn: 2, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125 });
+  assert.ok(native.fits, 'card-size art fits natively');
+  assert.ok((await replicateFill(cardArt, { sheetWIn: 8.5, sheetHIn: 11, marginIn: 0.25, gutterXIn: 0.125, gutterYIn: 0.125, addMarks: false, fallbackCellWIn: 2.625, fallbackCellHIn: 1 })).length > 0);
+});

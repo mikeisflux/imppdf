@@ -4168,6 +4168,11 @@ export interface ReplicateOptions {
   autoOrient?: boolean;   // orient an explicit cell to the artwork (default on)
   autoRotate?: boolean;   // rotate the image 90° if that packs more onto the sheet (default on)
   extras?: ReplicateExtra[];
+  // Cell size to fall back to when the art is too big to gang at its native
+  // size (e.g. a Letter-size upload on a Letter sheet). Preset gang tools pass
+  // their own card/label size, so Replicate fills the sheet instead of placing
+  // nothing. Native size still wins whenever it actually fits.
+  fallbackCellWIn?: number; fallbackCellHIn?: number;
   addMarks?: boolean; markLenIn?: number; markOffIn?: number; centerMarks?: boolean; markWeightPt?: number;
   // Bleed INCLUDED in the artwork (e.g. art prints sized 6.88×10.5 with 0.125"
   // bleed all round). Cut marks are inset by this so they sit at the TRIM, not
@@ -4225,8 +4230,16 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
     sheetWIn: opts.sheetWIn, sheetHIn: opts.sheetHIn, cellWIn: w, cellHIn: h,
     marginIn: opts.marginIn, gutterXIn: opts.gutterXIn, gutterYIn: opts.gutterYIn, markAllowIn: markAllow,
   });
-  const upright = gridOf(cellWIn, cellHIn);
-  const turned = gridOf(cellHIn, cellWIn);
+  let upright = gridOf(cellWIn, cellHIn);
+  let turned = gridOf(cellHIn, cellWIn);
+  // The art doesn't fit the sheet at its native size in EITHER orientation, so
+  // ganging it as-is would place nothing. If the tool supplied its own cell size
+  // (a label/card preset), gang at that instead and let the fit scale the art in.
+  if (!upright.fits && !turned.fits && opts.fallbackCellWIn && opts.fallbackCellHIn) {
+    cellWIn = opts.fallbackCellWIn; cellHIn = opts.fallbackCellHIn;
+    upright = gridOf(cellWIn, cellHIn);
+    turned = gridOf(cellHIn, cellWIn);
+  }
   // If rotating the image 90° packs more copies onto the sheet, do it.
   const rotate = opts.autoRotate !== false && turned.cols * turned.rows > upright.cols * upright.rows;
   const grid = rotate ? turned : upright;
