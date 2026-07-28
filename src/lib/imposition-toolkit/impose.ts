@@ -4169,6 +4169,10 @@ export interface ReplicateOptions {
   autoRotate?: boolean;   // rotate the image 90° if that packs more onto the sheet (default on)
   extras?: ReplicateExtra[];
   addMarks?: boolean; markLenIn?: number; markOffIn?: number; centerMarks?: boolean; markWeightPt?: number;
+  // Bleed INCLUDED in the artwork (e.g. art prints sized 6.88×10.5 with 0.125"
+  // bleed all round). Cut marks are inset by this so they sit at the TRIM, not
+  // at the art's outer (bleed) edge.
+  bleedIn?: number;
 }
 
 // How many copies safely fit the selected sheet, and the centred grid geometry.
@@ -4293,13 +4297,17 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
     }
     if (needClip) pg.pushOperators(popGraphicsState());
     if (opts.addMarks) {
+      // Marks sit at the TRIM: inset by the bleed the artwork carries. The
+      // reach clamp grows by the same amount (the mark may cross its own bleed
+      // strip, which is cut away — never a neighbour's art).
+      const bl = (opts.bleedIn ?? 0) * PT;
       const reach = {
-        l: col === 0 ? leftGap : gx / 2,
-        r: col === cols - 1 ? leftGap : gx / 2,
-        t: row === 0 ? topGap : gy / 2,
-        b: row === rows - 1 ? topGap : gy / 2,
+        l: (col === 0 ? leftGap : gx / 2) + bl,
+        r: (col === cols - 1 ? leftGap : gx / 2) + bl,
+        t: (row === 0 ? topGap : gy / 2) + bl,
+        b: (row === rows - 1 ? topGap : gy / 2) + bl,
       };
-      drawCropMarks(pg, rgb, cellX, cellY, cellW, cellH, off, len, { ...markStyle, reach });
+      drawCropMarks(pg, rgb, cellX + bl, cellY + bl, cellW - 2 * bl, cellH - 2 * bl, off, len, { ...markStyle, reach });
     }
   }
 

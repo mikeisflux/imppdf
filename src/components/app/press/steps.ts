@@ -164,7 +164,7 @@ export function defaultSettings(type: StepType): StepSettings {
       // Replicate is ON by owner spec: comic-size art prints 2-up on 12×18
       // (rotated, stacked); 11×17 art yields 1-up. The fill is calculated from
       // the art's native size with margins/marks reserved — never assumed.
-      return { ...nupPreset({ sheetWIn: 12, sheetHIn: 18, cellWIn: 6.88, cellHIn: 10.5 }), replicate: true };
+      return { ...nupPreset({ sheetWIn: 12, sheetHIn: 18, cellWIn: 6.88, cellHIn: 10.5, bleedMode: 'fixed' }), replicate: true };
     case 'divinitybox':
       // Fixed 306×572 mm box flat (trim 300 + 3 mm bleed L+R) with four
       // printable panels (A–D). Each panel
@@ -380,6 +380,8 @@ function replicateOpts(s: StepSettings) {
       .filter((e) => e && e.bytes),
     addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,
     centerMarks: !!s.centerMarks, markWeightPt: s.markWeightPt,
+    // Same semantics as nupOpts: only a FIXED bleed insets the marks to trim.
+    bleedIn: s.bleedMode === 'fixed' ? (s.bleedIn ?? 0) : 0,
   };
 }
 
