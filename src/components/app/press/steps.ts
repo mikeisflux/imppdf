@@ -177,6 +177,11 @@ export function defaultSettings(type: StepType): StepSettings {
         // the design in one slot. Crop to the artwork so the LABEL is ganged,
         // not the empty sheet around it.
         trimArt: true,
+        // OWNER SPEC: fill the label cell — stretch the artwork to the sticker's
+        // 2.625 x 1" cell rather than preserving its proportions and leaving
+        // white space. This tool deliberately overrides the app-wide CONTAIN
+        // default (the die-cut label is the target size, not the art).
+        fit: 'stretch',
       }), cols: 3, rows: 10 };
     case 'artprint':
       // Art prints on a 12×18 sheet. Sizes INCLUDE the 0.125" bleed on every

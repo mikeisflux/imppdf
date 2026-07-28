@@ -67,6 +67,11 @@ by explicit owner instruction — do not "fix" it to combine pages.
 
 - All N-up tools default to 1 column × 1 row unless the tool is specifically
   designed otherwise, and default image fit is CONTAIN (never crop/stretch).
+  EXCEPTION (owner): **30-Up Proof Labels** defaults to 1×1-overriding 3×10 AND
+  to STRETCH — the die-cut label cell is the target size, so the art fills the
+  cell instead of sitting proportionally inside it. It also defaults to
+  `trimArt` (crop the upload to its artwork) because label art is exported from
+  a template at full sheet size.
 - Never assume how many items fit a sheet: always run the fit calculation
   accounting for margins, gutters, crop marks, and bleed before placing.
 - If rotating an item 90° lets more fit, rotate it.
