@@ -290,3 +290,28 @@ test('art prints: comic (6.88x10.5 incl bleed) packs 2-up rotated on 12x18; 11x1
   assert.equal(eleven.cols * eleven.rows, 1, '11x17+bleed: 1 fits');
   assert.ok(eleven.fits, '11x17+bleed physically fits the 12x18 sheet');
 });
+
+test('30-up proof labels: 3x10 of 2.625x1" fits Letter and matches the template margins', () => {
+  // Geometry read from the shop's 8.5x11in30up template: 2.625x1" labels,
+  // column pitch 2.7431" (0.1181" gutter), row pitch 1" (no gutter).
+  const g = computeNUpGrid({
+    ...baseNUp, sheetWIn: 8.5, sheetHIn: 11, cols: 3, rows: 10,
+    cellWIn: 2.625, cellHIn: 1, marginIn: 0.19, gutterIn: 0.1181, gutterYIn: 0,
+    addMarks: false,
+  });
+  assert.equal(g.cols, 3, '3 columns fit');
+  assert.equal(g.rows, 10, '10 rows fit');
+  assert.equal(g.cols * g.rows, 30, '30 labels per sheet');
+  // Centring must reproduce the template's own margins (0.1956/0.1932 sides,
+  // 0.4958/0.5042 top/bottom) to within a rounding hair.
+  assert.ok(Math.abs(g.leftGapPt / PT - 0.1944) < 0.005, `side margin ~0.194" (${(g.leftGapPt / PT).toFixed(4)})`);
+  assert.ok(Math.abs(g.topGapPt / PT - 0.5) < 0.005, `top margin ~0.5" (${(g.topGapPt / PT).toFixed(4)})`);
+  // Turning marks on must NOT silently keep claiming 30 — the engine reserves
+  // mark clearance and drops the count (CLAUDE.md: never assume the fit).
+  const withMarks = computeNUpGrid({
+    ...baseNUp, sheetWIn: 8.5, sheetHIn: 11, cols: 3, rows: 10,
+    cellWIn: 2.625, cellHIn: 1, marginIn: 0.19, gutterIn: 0.1181, gutterYIn: 0,
+    addMarks: true, markOffIn: 0.125, markLenIn: 0.43,
+  });
+  assert.ok(withMarks.cols * withMarks.rows < 30, 'crop marks reduce the count below 30');
+});

@@ -740,7 +740,7 @@ const WORK_STYLES = [
 // Excludes anything bound (booklet/comic/perfectbound), folded, large-format
 // or packaging — replicate only makes sense for gang-on-a-sheet items.
 export const REPLICABLE_SINGLE_SHEET = new Set<StepType>([
-  'cards', 'grid', 'cutstack', 'trading', 'bookmark', 'flyer', 'indexcard', 'artprint',
+  'cards', 'grid', 'cutstack', 'trading', 'bookmark', 'flyer', 'indexcard', 'artprint', 'prooflabel',
   'business', 'postcard', 'rackcard', 'hangtag', 'label', 'namebadge', 'ticket',
   'coupon', 'placecard', 'greeting', 'doorhanger', 'envelope', 'coaster', 'contact', 'compslip',
 ]);
@@ -2060,7 +2060,7 @@ function PreflightPanel({ sourceBytes, pageSizes = [], pageCount = 0, onApplyFix
 
 // N-Up-driven layout tools (generic + domain presets) all use the N-Up panel.
 const NUP_TOOLS = new Set<StepType>([
-  'cards', 'grid', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer', 'indexcard', 'artprint',
+  'cards', 'grid', 'cutstack', 'perfectbound', 'trading', 'bookmark', 'flyer', 'indexcard', 'artprint', 'prooflabel',
   'business', 'postcard', 'rackcard', 'hangtag', 'label', 'namebadge', 'ticket', 'coupon', 'placecard', 'greeting',
   'doorhanger', 'envelope', 'coaster', 'contact', 'compslip',
   'trifold', 'zfold', 'gatefold', 'menu',

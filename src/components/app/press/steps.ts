@@ -31,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'divinitybox';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'divinitybox';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -157,6 +157,19 @@ export function defaultSettings(type: StepType): StepSettings {
       // Index cards (3×5") on Letter. Starts as a single 1×1 copy; raise
       // columns/rows (or tick Replicate) to gang up.
       return nupPreset({ cellWIn: 3, cellHIn: 5 });
+    case 'prooflabel':
+      // 30-up proof labels, measured from the shop's 8.5x11in30up template:
+      // 2.625 x 1" labels, 3 cols x 10 rows, column pitch 2.7431" (0.1181"
+      // gutter), row pitch 1" (no gutter). Centring the block reproduces the
+      // template's margins (0.194" sides, 0.5" top/bottom) within 0.004".
+      // This tool is DESIGNED to gang 30-up, so it overrides the usual 1x1
+      // default. Marks are OFF: the stock is die-cut, and mark clearance would
+      // grow the gutters and push the count below 30.
+      return { ...nupPreset({
+        sheetWIn: 8.5, sheetHIn: 11, cellWIn: 2.625, cellHIn: 1,
+        marginIn: 0.19, gutterIn: 0.1181, gutterYIn: 0,
+        addMarks: false, bleedMode: 'none', bleedIn: 0,
+      }), cols: 3, rows: 10 };
     case 'artprint':
       // Art prints on a 12×18 sheet. Sizes INCLUDE the 0.125" bleed on every
       // side: comic book 6.88×10.5 (trim 6.63×10.25) or 11×17 with standard
@@ -468,7 +481,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         break;
       }
       case 'cards': case 'grid': case 'cutstack': case 'perfectbound':
-      case 'trading': case 'bookmark': case 'flyer': case 'indexcard':
+      case 'trading': case 'bookmark': case 'flyer': case 'indexcard': case 'prooflabel':
       case 'business': case 'postcard': case 'rackcard': case 'hangtag': case 'label':
       case 'namebadge': case 'ticket': case 'coupon': case 'placecard': case 'greeting':
       case 'doorhanger': case 'envelope': case 'coaster': case 'contact': case 'compslip':

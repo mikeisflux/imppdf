@@ -157,6 +157,7 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'rackcard', label: 'Rack Cards', icon: 'columns', tip: 'Gang rack cards (4×9") 2-up on tabloid with cut marks.' },
     { id: 'hangtag', label: 'Hang Tags', icon: 'duplicate', tip: 'Gang hang tags (2.5×4") 8-up on tabloid for die-cutting.' },
     { id: 'label', label: 'Labels', icon: 'stickers', tip: 'Gang labels (4×3.33") 6-up on Letter.' },
+    { id: 'prooflabel', label: '30-Up Proof Labels', icon: 'grid', tip: 'Standard 30-up label sheet: 2.625×1" labels, 3 × 10 on Letter. Matches the 8.5x11 30-up template; marks off for die-cut stock.' },
     { id: 'namebadge', label: 'Name Badges', icon: 'user', tip: 'Gang name badges (3.5×2.25") 8-up on Letter.' },
     { id: 'ticket', label: 'Tickets', icon: 'hash', tip: 'Gang event tickets (4×2.5") 8-up on Letter.' },
     { id: 'coupon', label: 'Coupons', icon: 'pagenumbers', tip: 'Gang coupons (3.5×2") 10-up on Letter.' },
