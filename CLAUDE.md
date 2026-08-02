@@ -36,7 +36,11 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    and ≤5→0, and the pdf.js render translate is integer-rounded — browser
    canvas tile seams otherwise leave ~250-254 alpha rows inside solid art
    that print as horizontal lines in the white ("tons of lines"). Never
-   widen that guard into a mid-range threshold.
+   widen that guard into a mid-range threshold. Owner-requested BLACK
+   KNOCKOUT (`blackKnockoutAlpha`, default ON) also scales alpha down for
+   near-black art so the substrate shows and no ink is wasted — it is a
+   smooth luminance RAMP (full at ≤10, none at ≥34), never a hard
+   threshold, so edges stay anti-aliased.
 7. **Geometry (owner spec, 2026-07-21, supersedes the New_Box_Full template
    PDF and the press-compensation experiments): sheet 306 × 572 mm = trim
    300 × 572 + 3 mm bleed LEFT+RIGHT. Folds are 5 mm WIDE zones centred at

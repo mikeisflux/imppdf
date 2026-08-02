@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane, inkBoundsFromPixels } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane, inkBoundsFromPixels, blackKnockoutAlpha } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -356,4 +356,28 @@ test('inkBoundsFromPixels: finds the artwork box, ignores white and transparent 
   // An all-white opaque page is also "blank" — never crop to nothing.
   const white = new Uint8Array(w * h * 4).fill(255);
   assert.equal(inkBoundsFromPixels(white, w, h), null);
+});
+
+test('blackKnockoutAlpha: substrate black drops out, light art untouched, edges ramp', () => {
+  // Pure black art → no ink at all (the box's own black shows through).
+  assert.equal(blackKnockoutAlpha(0, 0, 0, 255), 0);
+  assert.equal(blackKnockoutAlpha(8, 8, 8, 255), 0, 'near-black still knocks out');
+  // Light/coloured art is untouched — full alpha preserved.
+  assert.equal(blackKnockoutAlpha(255, 255, 255, 255), 255);
+  assert.equal(blackKnockoutAlpha(200, 30, 30, 255), 255, 'saturated red prints normally');
+  assert.equal(blackKnockoutAlpha(60, 60, 60, 255), 255, 'dark grey above the ramp still prints');
+  // Between the thresholds it RAMPS (never a hard cliff), so anti-aliased
+  // edges and shadow gradients stay smooth.
+  const mid = blackKnockoutAlpha(22, 22, 22, 255);
+  assert.ok(mid > 0 && mid < 255, `mid-ramp is partial (${mid})`);
+  // Monotonic: darker never prints MORE ink than lighter.
+  let prev = -1;
+  for (let v = 0; v <= 40; v += 2) {
+    const cur = blackKnockoutAlpha(v, v, v, 255);
+    assert.ok(cur >= prev, `ramp is monotonic at ${v}`);
+    prev = cur;
+  }
+  // Already-transparent stays transparent; partial alpha scales, never grows.
+  assert.equal(blackKnockoutAlpha(0, 0, 0, 0), 0);
+  assert.ok(blackKnockoutAlpha(22, 22, 22, 128) <= 128);
 });

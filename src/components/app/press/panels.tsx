@@ -923,6 +923,9 @@ function DivinityBoxPanel(p: PanelProps) {
         <Check icon="droplet" label="White under-base (W1)" sub="Prints white behind every panel — required on black stock" checked={s.whiteUnder !== false} onChange={(v) => up({ whiteUnder: v })} />
         <Check icon="droplet" label="Gloss varnish (V1)" sub="Spot gloss over each panel" checked={!!s.varnish} onChange={(v) => up({ varnish: v })} />
       </Section>
+      <Section label="// BLACK KNOCKOUT" help="Artwork that is already black needs no ink on a black box: knocking it out lets the substrate show through, saves white and colour ink, and gives a deeper black than printing over a white base. Ramped, so anti-aliased edges stay smooth.">
+        <Check icon="droplet" label="Knock black out of the plate" sub="Black art prints as bare box — no colour, no W1, no V1" checked={s.knockoutBlack !== false} onChange={(v) => up({ knockoutBlack: v })} />
+      </Section>
       <Section label="// MARKS" help="Off by default — this is a borderless, zero-bleed box, so no marks touch the artwork. Enable only if your finisher wants tiny fold ticks in the no-print gaps.">
         <Check icon="foldmarks" label="Fold ticks (off = no marks at all)" sub="Tiny guides in the panel gaps only — never over the art" checked={!!s.foldMarks} onChange={(v) => up({ foldMarks: v })} />
       </Section>
@@ -945,7 +948,7 @@ function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSet
       const tiff = await divinityBoxTiff({
         a: art(s.a), b: art(s.b), c: art(s.c), d: art(s.d),
         fit: (s.fit ?? 'cover') as 'cover' | 'contain' | 'stretch',
-        whiteUnder: s.whiteUnder !== false, varnish: !!s.varnish, dpi,
+        whiteUnder: s.whiteUnder !== false, varnish: !!s.varnish, knockoutBlack: s.knockoutBlack !== false, dpi,
       });
       downloadFile(tiff, 'divinity-box.tif', 'image/tiff');
     } catch (e) { setErr(e instanceof Error ? e.message : 'TIFF export failed.'); }

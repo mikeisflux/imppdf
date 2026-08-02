@@ -3385,6 +3385,26 @@ const DBOX_WHITE_CHOKE_PX = 3;
 // = no ink. Re-thresholding the alpha stair-steps soft/upscaled edges.
 // Ink amount on press is the RIP's job (density/Percent/layers), not the file's.
 
+// BLACK KNOCKOUT (owner): the box substrate IS black, so artwork that is
+// already black needs no ink — knocking it out saves white and colour, and the
+// substrate's own black reads deeper than black printed over a white base.
+// A RAMP, never a hard threshold: fully knocked out at/below DBOX_KO_FULL
+// luminance, untouched at/above DBOX_KO_NONE, scaled smoothly between, so
+// anti-aliased edges and shadow gradients never stair-step (CLAUDE.md rule 6).
+const DBOX_KO_FULL = 10;   // ≈4% luminance — treat as the substrate's black
+const DBOX_KO_NONE = 34;   // ≈13% — at/above this the art prints normally
+
+// Alpha after knockout for one pixel. Exported so the ramp is unit-testable.
+export function blackKnockoutAlpha(
+  r: number, g: number, b: number, a: number, full = DBOX_KO_FULL, none = DBOX_KO_NONE,
+): number {
+  if (a <= 0) return 0;
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b;      // Rec.601 luminance
+  if (lum >= none) return a;                           // light enough — print it
+  if (lum <= full) return 0;                           // substrate black — no ink
+  return Math.round(a * ((lum - full) / (none - full)));
+}
+
 // Erode a single-channel 8-bit plane by `r` px (separable min filter). Any pixel
 // within `r` of a zero pixel — OR within `r` of the plane edge — drops to 0, so
 // bright (255 = full ink) regions shrink inward by `r`. This is the choke.
@@ -3433,6 +3453,9 @@ export interface DivinityBoxOptions {
   a?: DivinityBoxArt | null; b?: DivinityBoxArt | null; c?: DivinityBoxArt | null; d?: DivinityBoxArt | null;
   fit?: 'cover' | 'contain' | 'stretch';   // how each panel's art fills its panel (default cover)
   whiteUnder?: boolean;    // spot "W1" white under-base behind each panel (default true — black box)
+  // Knock artwork that is already black out of the plate so the box's own black
+  // shows through and no white/colour is wasted there (default ON).
+  knockoutBlack?: boolean;
   varnish?: boolean;       // spot "V1" gloss varnish on top of each panel (default false)
   foldMarks?: boolean;     // fold ticks in the no-print gaps (default true)
 }
@@ -3590,8 +3613,12 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
         // slivers to 255/0. Genuine anti-aliased edges sweep the full range and
         // are untouched — this is NOT edge tracing (see CLAUDE.md rule 6).
         const rawA = img[pi + 3]!;
-        const aByte = rawA >= 250 ? 255 : rawA <= 5 ? 0 : rawA;
-        const a = aByte / 255;
+        let aByte = rawA >= 250 ? 255 : rawA <= 5 ? 0 : rawA;
+        // Black knockout: art that is already black prints as bare substrate —
+        // no colour, no W1, no V1 (they mirror this alpha). Ramped, see above.
+        if (opts.knockoutBlack !== false && aByte > 0) {
+          aByte = blackKnockoutAlpha(img[pi]!, img[pi + 1]!, img[pi + 2]!, aByte);
+        }
         // UNION compositing: only pixels with ink write. Panels' 3 mm top/bottom
         // bleeds overlap ~1 mm inside the 5 mm fold zones — a transparent edge
         // of a later panel must never erase the neighbour's bleed underneath.

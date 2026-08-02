@@ -198,7 +198,7 @@ export function defaultSettings(type: StepType): StepSettings {
       // panel because the box is black, with optional gloss varnish (V1).
       // foldMarks default OFF: this is a borderless, zero-bleed box — no crop,
       // cut, registration, or fold marks on the artwork unless explicitly asked.
-      return { a: null, b: null, c: null, d: null, fit: 'cover', whiteUnder: true, varnish: false, foldMarks: false };
+      return { a: null, b: null, c: null, d: null, fit: 'cover', whiteUnder: true, varnish: false, foldMarks: false, knockoutBlack: true };
     case 'editpdf':
       return {};
     case 'booklet':
