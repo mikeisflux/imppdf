@@ -31,3 +31,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# MobileSAM weights + ONNX runtime wasm (~77MB) — scripts/fetch-sam.sh
+/public/models/
+/public/ort/

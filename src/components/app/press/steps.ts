@@ -12,7 +12,7 @@ import {
   nestPdf, imposeCalendar, insertPages as insertPagesOp, mixPdfs, nudgePdf,
   addBackdropFile, applyColorEffects, applyColorManagement, addBarcodeStamp,
   addDimensions, addWhiteVarnish, addBraille, optimizePdf, repairPdf, decryptPdf, setLayers,
-  replicateFill, imposeDivinityBox, trimToArtwork,
+  replicateFill, imposeDivinityBox, trimToArtwork, removeBackground,
 } from '@/lib/imposition-toolkit/impose';
 import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/imposition-toolkit/impose';
 
@@ -31,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'divinitybox';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'divinitybox';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -122,6 +122,11 @@ export function defaultSettings(type: StepType): StepSettings {
       return { text: 'Hello World', symbology: 'qr', scale: 3, quietZone: 4, barHeightMm: 15, position: 'br', marginPt: 18, xOffsetPt: 18, yOffsetPt: 18, rotationDeg: 0, transparent: false, showText: true, pages: 'all' };
     case 'dimensions':
       return {};
+    case 'removebg':
+      // Cut the subject out of the artwork and drop everything else to
+      // transparent (MobileSAM, in-browser). Falls through untouched when the
+      // models aren't installed — see scripts/fetch-sam.sh.
+      return { dpi: 300, featherPx: 1, page: 1 };
     case 'whitevarnish':
       return { layerType: 'white', spotName: 'White', coverage: 'trim', tint: 1, pages: 'all' };
     case 'braille':
@@ -198,7 +203,7 @@ export function defaultSettings(type: StepType): StepSettings {
       // panel because the box is black, with optional gloss varnish (V1).
       // foldMarks default OFF: this is a borderless, zero-bleed box — no crop,
       // cut, registration, or fold marks on the artwork unless explicitly asked.
-      return { a: null, b: null, c: null, d: null, fit: 'cover', whiteUnder: true, varnish: false, foldMarks: false, knockoutBlack: true };
+      return { a: null, b: null, c: null, d: null, fit: 'cover', whiteUnder: true, varnish: false, foldMarks: false, knockoutBlack: true, knockoutMinAreaFrac: 0.02, protectSubject: true };
     case 'editpdf':
       return {};
     case 'booklet':
@@ -520,6 +525,9 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           : await imposeNUp(b, { ...nupOpts(s), bleedIn: 0.125 });
         break;
       case 'replicate': b = await replicateFill(b, replicateOpts(s)); break;
+      case 'removebg': b = await removeBackground(b, {
+        page: s.page ?? 1, dpi: s.dpi ?? 300, featherPx: s.featherPx ?? 1,
+      }); break;
       case 'divinitybox': {
         // Self-contained: builds the box flat from the four uploaded panels and
         // ignores the pipeline input entirely.

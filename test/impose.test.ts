@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane, inkBoundsFromPixels, blackKnockoutAlpha } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane, inkBoundsFromPixels, blackKnockoutAlpha, blackSwathKeepMask, featherMask, applyMaskAlpha } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -380,4 +380,67 @@ test('blackKnockoutAlpha: substrate black drops out, light art untouched, edges 
   // Already-transparent stays transparent; partial alpha scales, never grows.
   assert.equal(blackKnockoutAlpha(0, 0, 0, 0), 0);
   assert.ok(blackKnockoutAlpha(22, 22, 22, 128) <= 128);
+});
+
+// Build an RGBA buffer: white paper, with painted rects.
+function canvasOf(w: number, h: number, rects: { x: number; y: number; w: number; h: number; c: [number, number, number] }[]) {
+  const px = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) { px[i*4] = 255; px[i*4+1] = 255; px[i*4+2] = 255; px[i*4+3] = 255; }
+  for (const r of rects) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) {
+    const i = (y * w + x) * 4; px[i] = r.c[0]; px[i+1] = r.c[1]; px[i+2] = r.c[2]; px[i+3] = 255;
+  }
+  return px;
+}
+
+test('blackSwathKeepMask: knocks out a large black expanse, spares small black details', () => {
+  const w = 200, h = 200;
+  const px = canvasOf(w, h, [
+    { x: 0, y: 0, w: 200, h: 80, c: [0, 0, 0] },        // 32% of the panel — a swath
+    { x: 20, y: 120, w: 10, h: 10, c: [0, 0, 0] },      // 0.25% — a detail (eye, line art)
+    { x: 100, y: 120, w: 40, h: 40, c: [180, 40, 40] }, // coloured element
+  ]);
+  const keep = blackSwathKeepMask(px, w, h, { minAreaFrac: 0.02, step: 1 });
+  const at = (x: number, y: number) => keep[y * w + x];
+  assert.equal(at(100, 40), 0, 'inside the big black swath → knocked out');
+  assert.equal(at(25, 125), 255, 'small black detail → kept');
+  assert.equal(at(120, 140), 255, 'coloured element → kept');
+  assert.equal(at(150, 180), 255, 'white paper → kept');
+});
+
+test('blackSwathKeepMask: a subject mask shields the character black costume', () => {
+  const w = 200, h = 200;
+  // One big black region that spans both "background" and "character".
+  const px = canvasOf(w, h, [{ x: 0, y: 0, w: 200, h: 120, c: [0, 0, 0] }]);
+  const protect = new Uint8Array(w * h);
+  for (let y = 0; y < 120; y++) for (let x = 120; x < 200; x++) protect[y * w + x] = 255;  // right side = subject
+  const keep = blackSwathKeepMask(px, w, h, { minAreaFrac: 0.02, step: 1, protect });
+  assert.equal(keep[40 * w + 40], 0, 'background black → knocked out');
+  assert.equal(keep[40 * w + 160], 255, 'the same black inside the subject → kept');
+});
+
+test('blackSwathKeepMask: no swath at all is a no-op', () => {
+  const w = 100, h = 100;
+  const px = canvasOf(w, h, [{ x: 10, y: 10, w: 6, h: 6, c: [0, 0, 0] }]);
+  const keep = blackSwathKeepMask(px, w, h, { minAreaFrac: 0.02, step: 1 });
+  assert.ok(keep.every((v) => v === 255), 'nothing is knocked out');
+});
+
+test('featherMask / applyMaskAlpha: soft edges, alpha only ever scales down', () => {
+  const w = 9, h = 9;
+  const m = new Uint8Array(w * h);
+  for (let y = 3; y <= 5; y++) for (let x = 3; x <= 5; x++) m[y * w + x] = 1;
+  const cov = featherMask(m, w, h, 1);
+  assert.equal(cov[4 * w + 4], 255, 'centre fully covered');
+  assert.equal(cov[0], 0, 'far corner empty');
+  const edge = cov[3 * w + 2]!;
+  assert.ok(edge > 0 && edge < 255, `edge is a soft ramp (${edge})`);
+  // r = 0 is a plain binary expansion.
+  const hard = featherMask(m, w, h, 0);
+  assert.equal(hard[4 * w + 4], 255);
+  assert.equal(hard[3 * w + 2], 0);
+  // applyMaskAlpha multiplies, never increases.
+  const rgba = new Uint8Array(w * h * 4).fill(200);
+  applyMaskAlpha(rgba, cov);
+  assert.equal(rgba[(4 * w + 4) * 4 + 3], 200, 'full coverage keeps alpha');
+  assert.equal(rgba[3], 0, 'no coverage zeroes alpha');
 });

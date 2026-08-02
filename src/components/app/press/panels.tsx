@@ -923,8 +923,23 @@ function DivinityBoxPanel(p: PanelProps) {
         <Check icon="droplet" label="White under-base (W1)" sub="Prints white behind every panel — required on black stock" checked={s.whiteUnder !== false} onChange={(v) => up({ whiteUnder: v })} />
         <Check icon="droplet" label="Gloss varnish (V1)" sub="Spot gloss over each panel" checked={!!s.varnish} onChange={(v) => up({ varnish: v })} />
       </Section>
-      <Section label="// BLACK KNOCKOUT" help="Artwork that is already black needs no ink on a black box: knocking it out lets the substrate show through, saves white and colour ink, and gives a deeper black than printing over a white base. Ramped, so anti-aliased edges stay smooth.">
-        <Check icon="droplet" label="Knock black out of the plate" sub="Black art prints as bare box — no colour, no W1, no V1" checked={s.knockoutBlack !== false} onChange={(v) => up({ knockoutBlack: v })} />
+      <Section label="// BLACK KNOCKOUT" help="Large open expanses of black need no ink on a black box: knocking them out lets the substrate show through, saves white and colour, and reads deeper than black printed over a white base. ONLY big swaths qualify — blacks on the character, line art and bounded background elements are left alone.">
+        <Check icon="droplet" label="Knock large black areas out of the plate" sub="Big black expanses print as bare box — no colour, no W1, no V1" checked={s.knockoutBlack !== false} onChange={(v) => up({ knockoutBlack: v })} />
+        {s.knockoutBlack !== false && (
+          <>
+            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+              <span className="pe-label" style={{ flex: 1 }}>Smallest area to knock out</span>
+              <select className="pe-select" value={s.knockoutMinAreaFrac ?? 0.02} onChange={(e) => up({ knockoutMinAreaFrac: Number(e.target.value) })} style={{ width: 150 }}>
+                <option value={0.005}>0.5% of the panel</option>
+                <option value={0.01}>1%</option>
+                <option value={0.02}>2% (recommended)</option>
+                <option value={0.05}>5%</option>
+                <option value={0.1}>10% — only huge areas</option>
+              </select>
+            </div>
+            <Check icon="crop" label="Protect the subject" sub="Segment the artwork so a black costume is never read as background (needs the segmentation models)" checked={s.protectSubject !== false} onChange={(v) => up({ protectSubject: v })} />
+          </>
+        )}
       </Section>
       <Section label="// MARKS" help="Off by default — this is a borderless, zero-bleed box, so no marks touch the artwork. Enable only if your finisher wants tiny fold ticks in the no-print gaps.">
         <Check icon="foldmarks" label="Fold ticks (off = no marks at all)" sub="Tiny guides in the panel gaps only — never over the art" checked={!!s.foldMarks} onChange={(v) => up({ foldMarks: v })} />
@@ -948,7 +963,8 @@ function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSet
       const tiff = await divinityBoxTiff({
         a: art(s.a), b: art(s.b), c: art(s.c), d: art(s.d),
         fit: (s.fit ?? 'cover') as 'cover' | 'contain' | 'stretch',
-        whiteUnder: s.whiteUnder !== false, varnish: !!s.varnish, knockoutBlack: s.knockoutBlack !== false, dpi,
+        whiteUnder: s.whiteUnder !== false, varnish: !!s.varnish, knockoutBlack: s.knockoutBlack !== false,
+        knockoutMinAreaFrac: s.knockoutMinAreaFrac ?? 0.02, protectSubject: s.protectSubject !== false, dpi,
       });
       downloadFile(tiff, 'divinity-box.tif', 'image/tiff');
     } catch (e) { setErr(e instanceof Error ? e.message : 'TIFF export failed.'); }
@@ -2084,8 +2100,36 @@ const NUP_TOOLS = new Set<StepType>([
   'boxcarton', 'presfolder',
 ]);
 
+function RemoveBgPanel({ s, up }: PanelProps) {
+  return (
+    <>
+      <div className="pe-note" style={{ marginBottom: 12 }}>
+        Finds the subject and makes everything around it transparent — a clean cutout for stickers, die-cuts, or art that has to sit on a coloured stock. Runs <b>entirely in your browser</b>; the artwork never leaves your machine.
+      </div>
+      <Section label="// QUALITY" help="Resolution of the cut-out image and how softly the cut edge blends. The result is a raster image at this DPI.">
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
+          <span className="pe-label" style={{ width: 70 }}>DPI</span>
+          <select className="pe-select" value={s.dpi ?? 300} onChange={(e) => up({ dpi: Number(e.target.value) })} style={{ width: 120 }}>
+            <option value={150}>150</option><option value={300}>300 (recommended)</option><option value={600}>600</option>
+          </select>
+        </div>
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+          <span className="pe-label" style={{ width: 70 }}>Edge</span>
+          <select className="pe-select" value={s.featherPx ?? 1} onChange={(e) => up({ featherPx: Number(e.target.value) })} style={{ width: 120 }}>
+            <option value={0}>Hard</option><option value={1}>Soft (recommended)</option><option value={2}>Softer</option><option value={4}>Softest</option>
+          </select>
+        </div>
+      </Section>
+      <div className="pe-note">
+        If the segmentation models aren&apos;t installed on the server this step passes the artwork through unchanged (run <code>scripts/fetch-sam.sh</code>).
+      </div>
+    </>
+  );
+}
+
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
+  if (type === 'removebg') return <RemoveBgPanel {...props} />;
   if (type === 'preflight') return <PreflightPanel {...props} />;
   if (type === 'booklet' || type === 'comic' || type === 'magazine' || type === 'catalog'
     || type === 'program' || type === 'notebook' || type === 'hymnal') return <BookletPanel {...props} />;

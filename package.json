@@ -12,7 +12,8 @@
     "db:init": "node scripts/init-db.mjs",
     "seed:superuser": "node scripts/seed-superuser.mjs",
     "indexnow": "node scripts/indexnow.mjs",
-    "test": "node --experimental-strip-types --test 'test/**/*.test.ts'"
+    "test": "node --experimental-strip-types --test 'test/**/*.test.ts'",
+    "fetch-sam": "bash scripts/fetch-sam.sh"
   },
   "dependencies": {
     "@neslinesli93/qpdf-wasm": "^0.3.0",
@@ -22,6 +23,7 @@
     "lcms-wasm": "^1.0.5",
     "next": "^15.5.20",
     "nodemailer": "^9.0.3",
+    "onnxruntime-web": "^1.27.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.1.200",
     "qrcode-generator": "^1.4.4",

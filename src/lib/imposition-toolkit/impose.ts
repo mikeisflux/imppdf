@@ -3394,6 +3394,80 @@ const DBOX_WHITE_CHOKE_PX = 3;
 const DBOX_KO_FULL = 10;   // ≈4% luminance — treat as the substrate's black
 const DBOX_KO_NONE = 34;   // ≈13% — at/above this the art prints normally
 
+// Which pixels belong to a LARGE SWATH of black — a big open black expanse,
+// NOT the blacks on a character, a prop, a shadow or any other bounded element.
+// Near-black pixels are grouped into connected regions on a coarse grid and a
+// region only counts if it covers at least `minAreaFrac` of the panel; small or
+// bounded black areas are left alone entirely.
+//
+// Returns per-pixel KEEP strength (255 = print normally, 0 = knock out), so the
+// swath's own edges still ramp softly instead of stair-stepping.
+// `protect` (0..255 subject coverage, e.g. from MobileSAM) is never knocked out.
+export function blackSwathKeepMask(
+  rgba: Uint8ClampedArray | Uint8Array, w: number, h: number,
+  opts?: { minAreaFrac?: number; full?: number; none?: number; protect?: Uint8Array | null; step?: number },
+): Uint8Array {
+  const full = opts?.full ?? DBOX_KO_FULL, none = opts?.none ?? DBOX_KO_NONE;
+  const minAreaFrac = opts?.minAreaFrac ?? 0.02;          // ≥2% of the panel
+  const protect = opts?.protect ?? null;
+  const keep = new Uint8Array(w * h).fill(255);
+  // Coarse analysis grid — "large swath" doesn't need per-pixel connectivity,
+  // and this keeps the labelling cheap on a 9-megapixel panel.
+  const step = Math.max(1, opts?.step ?? (Math.round(Math.min(w, h) / 512) || 1));
+  const gw = Math.ceil(w / step), gh = Math.ceil(h / step);
+  const dark = new Uint8Array(gw * gh);
+  for (let gy = 0; gy < gh; gy++) {
+    for (let gx = 0; gx < gw; gx++) {
+      const x = Math.min(w - 1, gx * step + (step >> 1)), y = Math.min(h - 1, gy * step + (step >> 1));
+      const i = (y * w + x) * 4;
+      if (rgba[i + 3]! <= 4) continue;                     // already transparent
+      if (protect && protect[y * w + x]! >= 128) continue; // subject — hands off
+      const lum = 0.299 * rgba[i]! + 0.587 * rgba[i + 1]! + 0.114 * rgba[i + 2]!;
+      if (lum < none) dark[gy * gw + gx] = 1;
+    }
+  }
+  // Label connected dark regions (4-connectivity, iterative flood fill).
+  const label = new Int32Array(gw * gh).fill(-1);
+  const stack = new Int32Array(gw * gh);
+  const areas: number[] = [];
+  for (let start = 0; start < dark.length; start++) {
+    if (!dark[start] || label[start] >= 0) continue;
+    const id = areas.length;
+    let sp = 0, area = 0;
+    stack[sp++] = start; label[start] = id;
+    while (sp > 0) {
+      const c = stack[--sp]!; area++;
+      const cx = c % gw, cy = (c / gw) | 0;
+      if (cx > 0 && dark[c - 1] && label[c - 1] < 0) { label[c - 1] = id; stack[sp++] = c - 1; }
+      if (cx < gw - 1 && dark[c + 1] && label[c + 1] < 0) { label[c + 1] = id; stack[sp++] = c + 1; }
+      if (cy > 0 && dark[c - gw] && label[c - gw] < 0) { label[c - gw] = id; stack[sp++] = c - gw; }
+      if (cy < gh - 1 && dark[c + gw] && label[c + gw] < 0) { label[c + gw] = id; stack[sp++] = c + gw; }
+    }
+    areas.push(area);
+  }
+  const minCells = (minAreaFrac * w * h) / (step * step);
+  const big = areas.map((a) => a >= minCells);
+  if (!big.some(Boolean)) return keep;                     // no swath — nothing to do
+  // Apply the luminance ramp, but only inside a big region.
+  for (let y = 0; y < h; y++) {
+    const gy = Math.min(gh - 1, (y / step) | 0);
+    for (let x = 0; x < w; x++) {
+      const gi = gy * gw + Math.min(gw - 1, (x / step) | 0);
+      const id = label[gi]!;
+      if (id < 0 || !big[id]) continue;
+      const idx = y * w + x, i = idx * 4;
+      if (rgba[i + 3]! <= 4) continue;
+      if (protect && protect[idx]! >= 128) continue;
+      const lum = 0.299 * rgba[i]! + 0.587 * rgba[i + 1]! + 0.114 * rgba[i + 2]!;
+      if (lum >= none) continue;
+      const k = lum <= full ? 0 : (lum - full) / (none - full);
+      const scaled = Math.round(k * 255);
+      if (scaled < keep[idx]!) keep[idx] = scaled;
+    }
+  }
+  return keep;
+}
+
 // Alpha after knockout for one pixel. Exported so the ramp is unit-testable.
 export function blackKnockoutAlpha(
   r: number, g: number, b: number, a: number, full = DBOX_KO_FULL, none = DBOX_KO_NONE,
@@ -3453,9 +3527,13 @@ export interface DivinityBoxOptions {
   a?: DivinityBoxArt | null; b?: DivinityBoxArt | null; c?: DivinityBoxArt | null; d?: DivinityBoxArt | null;
   fit?: 'cover' | 'contain' | 'stretch';   // how each panel's art fills its panel (default cover)
   whiteUnder?: boolean;    // spot "W1" white under-base behind each panel (default true — black box)
-  // Knock artwork that is already black out of the plate so the box's own black
-  // shows through and no white/colour is wasted there (default ON).
+  // Knock LARGE swaths of black out of the plate so the box's own black shows
+  // through and no white/colour is wasted there (default ON). Only big open
+  // black expanses qualify — never the blacks on the subject or in bounded
+  // background elements.
   knockoutBlack?: boolean;
+  knockoutMinAreaFrac?: number;   // how big a black region must be (default 0.02 = 2% of the panel)
+  protectSubject?: boolean;       // use MobileSAM to shield the subject (default ON when models are installed)
   varnish?: boolean;       // spot "V1" gloss varnish on top of each panel (default false)
   foldMarks?: boolean;     // fold ticks in the no-print gaps (default true)
 }
@@ -3576,6 +3654,7 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
     const art = opts[panel.key];
     if (!art?.bytes) continue;
     let img: Uint8ClampedArray, pwPx: number, phPx: number;
+    let keepMask: Uint8Array | null = null;
     try {
       const doc = await pdfjs.getDocument({ data: art.bytes.slice() }).promise;
       const page = await doc.getPage(Math.max(1, Math.round(art.page ?? 1)));
@@ -3599,6 +3678,16 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
       const tx = Math.round(-(vp.width - pwPx) / 2), ty = Math.round(-(vp.height - phPx) / 2);
       await page.render({ canvasContext: pctx, viewport: vp, transform: [1, 0, 0, 1, tx, ty], background: 'rgba(0,0,0,0)' }).promise;
       img = pctx.getImageData(0, 0, pwPx, phPx).data;
+      if (opts.knockoutBlack !== false) {
+        // Protect the subject first when the segmentation models are deployed,
+        // so a character's black costume is never mistaken for a background
+        // swath. Without them we still only knock out large regions.
+        const protect = opts.protectSubject === false ? null
+          : await subjectMask(pc, pwPx, phPx, img, `dbox:${panel.key}:${pwPx}x${phPx}`);
+        keepMask = blackSwathKeepMask(img, pwPx, phPx, {
+          minAreaFrac: opts.knockoutMinAreaFrac ?? 0.02, protect,
+        });
+      }
     } catch { continue; }
 
     const topPx = Math.round(panel.topMm * pxPerMm);
@@ -3614,10 +3703,13 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
         // are untouched — this is NOT edge tracing (see CLAUDE.md rule 6).
         const rawA = img[pi + 3]!;
         let aByte = rawA >= 250 ? 255 : rawA <= 5 ? 0 : rawA;
-        // Black knockout: art that is already black prints as bare substrate —
-        // no colour, no W1, no V1 (they mirror this alpha). Ramped, see above.
-        if (opts.knockoutBlack !== false && aByte > 0) {
-          aByte = blackKnockoutAlpha(img[pi]!, img[pi + 1]!, img[pi + 2]!, aByte);
+        // Black knockout: LARGE swaths of black print as bare substrate — no
+        // colour, no W1, no V1 (they mirror this alpha). Only big open black
+        // expanses qualify; blacks on the subject or in bounded elements are
+        // untouched (see blackSwathKeepMask).
+        if (keepMask && aByte > 0) {
+          const k = keepMask[yy * pwPx + xx]!;
+          if (k < 255) aByte = Math.round((aByte * k) / 255);
         }
         // UNION compositing: only pixels with ink write. Panels' 3 mm top/bottom
         // bleeds overlap ~1 mm inside the 5 mm fold zones — a transparent edge
@@ -3747,6 +3839,126 @@ export async function trimToArtwork(bytes: Uint8Array, opts?: TrimToArtworkOptio
     for (const p of pages) { p.setMediaBox(left, bottom, cw, ch); p.setCropBox(left, bottom, cw, ch); }
     return out.save();
   } catch { return bytes; }                                  // never break an export
+}
+
+// ── Background removal (MobileSAM) ──────────────────────────────────────────
+// Isolate the subject and drop everything else to transparent. On a black box
+// that means the subject floats on the substrate's own black; on a sticker it
+// means a clean die-cut. Runs entirely in the browser (see src/lib/sam.ts) and
+// degrades gracefully to a no-op when the models are not deployed.
+
+// Soften a binary mask into 0..255 coverage with a separable box blur, so the
+// cut edge is anti-aliased instead of stair-stepped (the same reason we never
+// re-threshold artwork alpha — CLAUDE.md rule 6). Exported for testing.
+export function featherMask(mask: Uint8Array, w: number, h: number, r = 1): Uint8Array {
+  const out = new Uint8Array(w * h);
+  if (r <= 0) { for (let i = 0; i < out.length; i++) out[i] = mask[i] ? 255 : 0; return out; }
+  const tmp = new Float32Array(w * h);
+  const win = 2 * r + 1;
+  for (let y = 0; y < h; y++) {                       // horizontal pass
+    const row = y * w;
+    let sum = 0;
+    for (let k = -r; k <= r; k++) sum += mask[row + Math.min(w - 1, Math.max(0, k))] ? 1 : 0;
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = sum / win;
+      const drop = mask[row + Math.min(w - 1, Math.max(0, x - r))] ? 1 : 0;
+      const add2 = mask[row + Math.min(w - 1, Math.max(0, x + r + 1))] ? 1 : 0;
+      sum += add2 - drop;
+    }
+  }
+  for (let x = 0; x < w; x++) {                       // vertical pass
+    let sum = 0;
+    for (let k = -r; k <= r; k++) sum += tmp[Math.min(h - 1, Math.max(0, k)) * w + x];
+    for (let y = 0; y < h; y++) {
+      out[y * w + x] = Math.round(Math.min(1, Math.max(0, sum / win)) * 255);
+      const drop = tmp[Math.min(h - 1, Math.max(0, y - r)) * w + x];
+      const add2 = tmp[Math.min(h - 1, Math.max(0, y + r + 1)) * w + x];
+      sum += add2 - drop;
+    }
+  }
+  return out;
+}
+
+// Multiply an RGBA buffer's alpha by mask coverage, in place. Exported for testing.
+export function applyMaskAlpha(rgba: Uint8ClampedArray | Uint8Array, coverage: Uint8Array): void {
+  for (let i = 0, p = 3; i < coverage.length; i++, p += 4) {
+    rgba[p] = Math.round((rgba[p]! * coverage[i]!) / 255);
+  }
+}
+
+// Segment the subject of an already-rendered canvas. Returns 0..255 coverage
+// (255 = subject) at w×h, or null when the models aren't deployed. Shared by
+// the standalone cutout and the Divinity Box's subject-aware black knockout.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function subjectMask(
+  canvas: any, w: number, h: number, pixels: Uint8ClampedArray | Uint8Array,
+  cacheKey?: string, featherPx = 1,
+): Promise<Uint8Array | null> {
+  try {
+    const { loadSam, encodeImage, segmentBox } = await import('../sam');
+    if (!(await loadSam())) return null;
+    const emb = await encodeImage(cacheKey ?? `sam:${w}x${h}`, canvas);
+    if (!emb) return null;
+    const b = inkBoundsFromPixels(pixels, w, h);
+    const mask = await segmentBox(emb, b?.x0 ?? 0, b?.y0 ?? 0, b?.x1 ?? w - 1, b?.y1 ?? h - 1);
+    if (!mask || mask.w !== w || mask.h !== h) return null;
+    let on = 0;
+    for (let i = 0; i < mask.data.length; i++) on += mask.data[i]!;
+    // Nothing found, or the "subject" is the whole frame — no usable split.
+    if (on === 0 || on >= mask.data.length * 0.995) return null;
+    return featherMask(mask.data, w, h, featherPx);
+  } catch { return null; }
+}
+
+export interface RemoveBackgroundOptions {
+  page?: number;        // 1-based page to cut out (default 1)
+  dpi?: number;         // raster resolution of the result (default 300)
+  // Subject prompt in page-fraction coords (0..1). Omitted = the artwork's own
+  // bounding box, which is what makes this "automatic": SAM reads a box as
+  // "the main object in here".
+  box?: { x0: number; y0: number; x1: number; y1: number };
+  featherPx?: number;   // edge softening (default 1)
+  cacheKey?: string;    // reuse an embedding across retries of the same art
+}
+
+// Cut the subject out of `bytes` and return a single-page PDF at the original
+// page size containing just the masked artwork. Returns the input unchanged if
+// the models are unavailable or nothing could be segmented.
+export async function removeBackground(bytes: Uint8Array, opts?: RemoveBackgroundOptions): Promise<Uint8Array> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfjs: any = await import('pdfjs-dist');
+    try { pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default; } catch { /* bundler resolves worker */ }
+    const { PDFDocument } = await import('pdf-lib');
+
+    const dpi = opts?.dpi ?? 300;
+    const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+    const pageNo = Math.min(doc.numPages, Math.max(1, Math.round(opts?.page ?? 1)));
+    const pg = await doc.getPage(pageNo);
+    const vp1 = pg.getViewport({ scale: 1 });
+    const vp = pg.getViewport({ scale: dpi / 72 });
+    const w = Math.max(1, Math.ceil(vp.width)), h = Math.max(1, Math.ceil(vp.height));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const canvas: any = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h)
+      : Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    await pg.render({ canvasContext: ctx, viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
+    const img = ctx.getImageData(0, 0, w, h);
+
+    const coverage = await subjectMask(canvas, w, h, img.data, opts?.cacheKey, opts?.featherPx ?? 1);
+    if (!coverage) return bytes;
+    applyMaskAlpha(img.data, coverage);
+    ctx.putImageData(img, 0, 0);
+
+    const blob: Blob = canvas.convertToBlob ? await canvas.convertToBlob({ type: 'image/png' })
+      : await new Promise<Blob>((res) => canvas.toBlob(res, 'image/png'));
+    const png = new Uint8Array(await blob.arrayBuffer());
+
+    const out = await PDFDocument.create();
+    const page = out.addPage([vp1.width, vp1.height]);
+    page.drawImage(await out.embedPng(png), { x: 0, y: 0, width: vp1.width, height: vp1.height });
+    return out.save();
+  } catch { return bytes; }                              // never break an export
 }
 
 // ── Braille (Grade-1) ───────────────────────────────────────────────────────

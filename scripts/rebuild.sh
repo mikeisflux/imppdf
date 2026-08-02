@@ -64,6 +64,11 @@ else
   say "Dependencies already up to date — skipping install."
 fi
 
+# MobileSAM weights + ONNX runtime wasm for background removal (~77MB, not in
+# git). No-ops once present; without them the cutout tools fall back cleanly.
+say "Checking segmentation models…"
+bash scripts/fetch-sam.sh || echo "  (segmentation models unavailable — cutout tools will be disabled)"
+
 say "Building…"
 npm run build
 
