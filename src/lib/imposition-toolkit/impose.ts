@@ -3627,13 +3627,17 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
 // panel, the gaps between panels, the non-printable flap, around a logo — prints
 // NOTHING and the black box shows through (never a black or white block). The
 // white is choked 3 px. Browser-only (pdf.js + canvas).
-export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number }): Promise<Uint8Array> {
-  const { encodeRgbSpotTiff } = await import('./tiff');
+// Shared compositor for BOTH box outputs: the production TIFF and the proof
+// PDF. Returns interleaved R,G,B,A,W1,V1 at `dpi` with the spots as INK LEVEL
+// (255 = full ink) — the TIFF inverts them to Photoshop spot polarity, the PDF
+// uses them as Separation tints directly.
+async function composeDivinityBox(
+  opts: DivinityBoxOptions, dpi: number,
+): Promise<{ W: number; H: number; spp: number; buf: Uint8Array }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdfjs: any = await import('pdfjs-dist');
   try { pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default; } catch { /* bundler resolves worker */ }
 
-  const dpi = opts.dpi ?? 300;
   const pxPerMm = dpi / 25.4;
   const W = Math.max(1, Math.round(DBOX_SHEET_W_MM * pxPerMm));
   const H = Math.max(1, Math.round(DBOX_SHEET_H_MM * pxPerMm));
@@ -3747,6 +3751,14 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
     const choked = chokePlane(plane, W, H, DBOX_WHITE_CHOKE_PX);
     for (let i = 0, p = 4; i < W * H; i++, p += spp) buf[p] = choked[i]!;
   }
+
+  return { W, H, spp, buf };
+}
+
+export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number }): Promise<Uint8Array> {
+  const { encodeRgbSpotTiff } = await import('./tiff');
+  const dpi = opts.dpi ?? 300;
+  const { W, H, spp, buf } = await composeDivinityBox(opts, dpi);
 
   // SPOT-CHANNEL POLARITY — DO NOT CHANGE: Photoshop spot channels are like a
   // layer mask filled with black where ink prints: 0 (black) = 100% ink,
@@ -3959,6 +3971,96 @@ export async function removeBackground(bytes: Uint8Array, opts?: RemoveBackgroun
     page.drawImage(await out.embedPng(png), { x: 0, y: 0, width: vp1.width, height: vp1.height });
     return out.save();
   } catch { return bytes; }                              // never break an export
+}
+
+// Proof PDF that reflects the REAL plates: the artwork as rendered plus true
+// W1/V1 Separation images built from the same compositor the production TIFF
+// uses — so knockout, the artwork's own alpha and the 3px white choke all show
+// up in the proof instead of the old solid panel rectangles. Rasterised by
+// nature (a spot plate that follows artwork alpha cannot be vector), so this is
+// a separate deliverable from the fast vector layout PDF.
+export async function divinityBoxProof(opts: DivinityBoxOptions & { dpi?: number }): Promise<Uint8Array> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const PL: any = await import('pdf-lib');
+  const { PDFDocument, PDFName, PDFRawStream, PDFDict, rgb } = PL;
+  const dpi = opts.dpi ?? 150;                 // a proof doesn't need press res
+  const MM = PT / 25.4;
+  const sheetW = DBOX_SHEET_W_MM * MM, sheetH = DBOX_SHEET_H_MM * MM;
+  const { W, H, spp, buf } = await composeDivinityBox(opts, dpi);
+
+  const out = await PDFDocument.create();
+  const pg = out.addPage([sheetW, sheetH]);
+  const ctx = out.context;
+
+  const deflate = async (u8: Uint8Array): Promise<Uint8Array | null> => {
+    try {
+      if (typeof CompressionStream === 'undefined') return null;
+      const cs = new CompressionStream('deflate');       // zlib wrapper = /FlateDecode
+      const st = new Blob([u8 as BlobPart]).stream().pipeThrough(cs);
+      return new Uint8Array(await new Response(st).arrayBuffer());
+    } catch { return null; }
+  };
+  // Put an XObject in the page's /XObject resources and return its name.
+  const putXObject = (name: string, ref: unknown): string => {
+    pg.node.normalize();
+    let res = pg.node.Resources();
+    if (!res) { res = ctx.obj({}); pg.node.set(PDFName.of('Resources'), res); }
+    let xo = res.lookupMaybe(PDFName.of('XObject'), PDFDict);
+    if (!xo) { xo = ctx.obj({}); res.set(PDFName.of('XObject'), xo); }
+    xo.set(PDFName.of(name), ref);
+    return name;
+  };
+
+  const cache: SepCache = new Map();
+  // One 8-bit Separation image per spot, drawn over the whole sheet.
+  const drawSeparation = async (chan: number, spot: string, preview: { r: number; g: number; b: number }) => {
+    const plane = new Uint8Array(W * H);
+    let ink = 0;
+    for (let i = 0, p = chan; i < W * H; i++, p += spp) { plane[i] = buf[p]!; if (plane[i]) ink++; }
+    if (!ink) return;                                     // plate is empty
+    const csName = ensureSeparation(PL, out, pg, spot, preview, cache);
+    const packed = await deflate(plane);
+    const dict: Record<string, unknown> = {
+      Type: 'XObject', Subtype: 'Image', Width: W, Height: H,
+      BitsPerComponent: 8, ColorSpace: PDFName.of(csName),
+    };
+    if (packed) dict.Filter = 'FlateDecode';
+    const ref = ctx.register(PDFRawStream.of(ctx.obj(dict), packed ?? plane));
+    const nm = putXObject(`Sep${spot.replace(/[^A-Za-z0-9]/g, '')}`, ref);
+    addContentStream(PL, ctx, pg, `\nq\n${F(sheetW)} 0 0 ${F(sheetH)} 0 0 cm\n/${nm} Do\nQ\n`, false);
+  };
+
+  // W1 first (under the art), then the artwork, then V1 on top.
+  if (opts.whiteUnder !== false) await drawSeparation(4, 'W1', { r: 1, g: 1, b: 1 });
+
+  // Artwork RGBA → PNG, drawn at full sheet size.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const canvas: any = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(W, H)
+    : Object.assign(document.createElement('canvas'), { width: W, height: H });
+  const c2d = canvas.getContext('2d');
+  const id = c2d.createImageData(W, H);
+  for (let i = 0, p = 0; i < W * H; i++, p += spp) {
+    const q = i * 4;
+    id.data[q] = buf[p]!; id.data[q + 1] = buf[p + 1]!; id.data[q + 2] = buf[p + 2]!; id.data[q + 3] = buf[p + 3]!;
+  }
+  c2d.putImageData(id, 0, 0);
+  const blob: Blob = canvas.convertToBlob ? await canvas.convertToBlob({ type: 'image/png' })
+    : await new Promise<Blob>((res) => canvas.toBlob(res, 'image/png'));
+  const art = await out.embedPng(new Uint8Array(await blob.arrayBuffer()));
+  pg.drawImage(art, { x: 0, y: 0, width: sheetW, height: sheetH });
+
+  if (opts.varnish) await drawSeparation(5, 'V1', { r: 0.85, g: 0.86, b: 0.92 });
+
+  // Fold ticks in the no-print gaps, same as the layout PDF.
+  if (opts.foldMarks) {
+    const tick = 0.22 * PT, wgt = 0.5;
+    for (const f of DBOX_FOLDS_MM) {
+      const y = sheetH - f * MM;
+      pg.drawLine({ start: { x: 0, y }, end: { x: tick, y }, thickness: wgt, color: rgb(0, 0, 0) });
+      pg.drawLine({ start: { x: sheetW - tick, y }, end: { x: sheetW, y }, thickness: wgt, color: rgb(0, 0, 0) });
+    }
+  }
+  return out.save();
 }
 
 // ── Braille (Grade-1) ───────────────────────────────────────────────────────

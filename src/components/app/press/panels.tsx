@@ -970,6 +970,25 @@ function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSet
     } catch (e) { setErr(e instanceof Error ? e.message : 'TIFF export failed.'); }
     finally { setBusy(false); }
   }
+  // Proof PDF built from the SAME compositor as the TIFF, so its W1/V1 are real
+  // Separation plates that follow the artwork (and the knockout and choke) —
+  // unlike the fast vector layout PDF, whose spots are solid panel rectangles.
+  async function downloadProof() {
+    setBusy(true); setErr('');
+    try {
+      const { divinityBoxProof, downloadPdf } = await import('@/lib/imposition-toolkit/impose');
+      const art = (v: { bytes?: Uint8Array } | null | undefined) => (v?.bytes ? { bytes: v.bytes } : null);
+      const pdf = await divinityBoxProof({
+        a: art(s.a), b: art(s.b), c: art(s.c), d: art(s.d),
+        fit: (s.fit ?? 'cover') as 'cover' | 'contain' | 'stretch',
+        whiteUnder: s.whiteUnder !== false, varnish: !!s.varnish, knockoutBlack: s.knockoutBlack !== false,
+        knockoutMinAreaFrac: s.knockoutMinAreaFrac ?? 0.02, protectSubject: s.protectSubject !== false,
+        foldMarks: !!s.foldMarks, dpi: s.proofDpi ?? 150,
+      });
+      downloadPdf(pdf, 'divinity-box-proof.pdf');
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Proof export failed.'); }
+    finally { setBusy(false); }
+  }
   return (
     <Section label="// TIFF EXPORT" help="Uncompressed, interleaved RGB TIFF with the W1 (white) and V1 (varnish) spot channels after it — the file your RIP opens for a black box.">
       <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
@@ -979,6 +998,17 @@ function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSet
         </select>
         <span style={{ flex: 1 }} />
         <button className="pe-btn" onClick={download} disabled={busy || !hasArt}>{busy ? 'Rendering…' : 'Download TIFF'}</button>
+      </div>
+      <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+        <span className="pe-label" style={{ width: 56 }}>Proof</span>
+        <select className="pe-select" value={s.proofDpi ?? 150} onChange={(e) => up({ proofDpi: Number(e.target.value) })} style={{ width: 130 }}>
+          <option value={100}>100 dpi</option><option value={150}>150 dpi</option><option value={300}>300 dpi</option>
+        </select>
+        <span style={{ flex: 1 }} />
+        <button className="pe-btn" onClick={downloadProof} disabled={busy || !hasArt}>{busy ? 'Rendering…' : 'Download Proof PDF'}</button>
+      </div>
+      <div className="pe-note" style={{ marginTop: 8 }}>
+        The proof carries <b>real W1/V1 separation plates</b> built by the same compositor as the TIFF, so the knockout, the artwork&apos;s own transparency and the 3&nbsp;px white choke all show up when you check separations. (The step&apos;s own PDF output stays vector for fast previewing; its spots are panel rectangles, not the real plates.)
       </div>
       <div className="pe-note" style={{ marginTop: 8 }}>
         Channels, in order: <b>R G B + transparency + W1 + V1</b> — 8-bit RGB with an alpha and the white/varnish spots, no compression, interleaved. (RGB, not CMYK, so it opens.) Transparency is respected everywhere: any area with no art — an empty panel, the gaps, around a logo — stays transparent and prints nothing, so the black box shows through. White & varnish follow the artwork, choked <b>3&nbsp;px</b> so no white halo shows past the art.
