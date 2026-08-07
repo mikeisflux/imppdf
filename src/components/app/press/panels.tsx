@@ -2453,13 +2453,16 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const i = y * w + x, q = i * 4, v = m[i]!;
         if (mode === 'plate') {
-          // V1 EXACTLY as the RIP gets it on pass 1: ink shown light on black.
-          out.data[q] = v; out.data[q + 1] = v; out.data[q + 2] = v; out.data[q + 3] = 255;
+          // V1 exactly as the FILE stores it — spot polarity is INVERTED:
+          // BLACK = 100% ink, white = none (CLAUDE.md rule 6). This is what
+          // you see opening the channel in Photoshop.
+          const iv = 255 - v;
+          out.data[q] = iv; out.data[q + 1] = iv; out.data[q + 2] = iv; out.data[q + 3] = 255;
         } else if (mode === 'white') {
-          // W1 EXACTLY as the RIP gets it on pass 2 — the white under-base,
-          // which mirrors the artwork's own transparency.
-          const a = art.data[q + 3]!;
-          out.data[q] = a; out.data[q + 1] = a; out.data[q + 2] = a; out.data[q + 3] = 255;
+          // W1 the same way: black where the white under-base lays. It mirrors
+          // the artwork's alpha, so opaque art reads solid black here.
+          const ia = 255 - art.data[q + 3]!;
+          out.data[q] = ia; out.data[q + 1] = ia; out.data[q + 2] = ia; out.data[q + 3] = 255;
         } else if (mode === 'overlay') {
           // Artwork with the plate flagged in red.
           const t = v / 255;
@@ -2496,7 +2499,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then print the <b>colour file</b> (artwork + {s.whiteName || 'W1'} white) on top of the cured varnish.
       </div>
-      <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show EXACTLY what each spot channel carries — light = ink. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art. Auto-detected raised regions aren't previewed — they only apply on export.">
+      <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show each spot channel exactly as the file stores it — BLACK = 100% ink, white = none, the same inverted polarity you see opening the channel in Photoshop. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art. Auto-detected raised regions aren't previewed — they only apply on export.">
         <div className="pe-row" style={{ gap: 8 }}>
           {([['plate', `${s.spotName || 'V1'} plate`], ['white', `${s.whiteName || 'W1'} plate`], ['relief', 'Relief'], ['overlay', 'Overlay']] as const).map(([mdl, label]) => (
             <button key={mdl} className="pe-btn" style={{ flex: 1, padding: '6px 4px', ...(mode === mdl ? { outline: '2px solid currentColor' } : {}) }}
