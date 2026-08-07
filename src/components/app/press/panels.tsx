@@ -2453,8 +2453,13 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const i = y * w + x, q = i * 4, v = m[i]!;
         if (mode === 'plate') {
-          // The varnish channel as the RIP sees it: ink = light on black.
+          // V1 EXACTLY as the RIP gets it on pass 1: ink shown light on black.
           out.data[q] = v; out.data[q + 1] = v; out.data[q + 2] = v; out.data[q + 3] = 255;
+        } else if (mode === 'white') {
+          // W1 EXACTLY as the RIP gets it on pass 2 — the white under-base,
+          // which mirrors the artwork's own transparency.
+          const a = art.data[q + 3]!;
+          out.data[q] = a; out.data[q + 1] = a; out.data[q + 2] = a; out.data[q + 3] = 255;
         } else if (mode === 'overlay') {
           // Artwork with the plate flagged in red.
           const t = v / 255;
@@ -2491,11 +2496,11 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then print the <b>colour file</b> (artwork + {s.whiteName || 'W1'} white) on top of the cured varnish.
       </div>
-      <Section label="// PREVIEW" help="Live, from the loaded artwork. Relief lights the plate as a height map on a neutral ground — the artwork colour is hidden so you can judge the height; Plate is the raw varnish channel; Overlay flags it on the art. Auto-detected raised regions aren't previewed — they only apply on export.">
+      <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show EXACTLY what each spot channel carries — light = ink. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art. Auto-detected raised regions aren't previewed — they only apply on export.">
         <div className="pe-row" style={{ gap: 8 }}>
-          {(['relief', 'plate', 'overlay'] as const).map((mdl) => (
-            <button key={mdl} className="pe-btn" style={{ flex: 1, ...(mode === mdl ? { outline: '2px solid currentColor' } : {}) }}
-              onClick={() => up({ previewMode: mdl })}>{mdl === 'relief' ? 'Relief' : mdl === 'plate' ? 'Plate' : 'Overlay'}</button>
+          {([['plate', `${s.spotName || 'V1'} plate`], ['white', `${s.whiteName || 'W1'} plate`], ['relief', 'Relief'], ['overlay', 'Overlay']] as const).map(([mdl, label]) => (
+            <button key={mdl} className="pe-btn" style={{ flex: 1, padding: '6px 4px', ...(mode === mdl ? { outline: '2px solid currentColor' } : {}) }}
+              onClick={() => up({ previewMode: mdl })}>{label}</button>
           ))}
         </div>
         <div style={{ marginTop: 8, background: '#111', borderRadius: 6, padding: 6, textAlign: 'center' }}>
