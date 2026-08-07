@@ -133,7 +133,7 @@ export function defaultSettings(type: StepType): StepSettings {
         markLenIn: 0.25, markOffIn: 0.125, markWeightPt: 0.25,
         front: null, back: null, spineArt: null,
         insideFront: null, insideBack: null, mirrorInside: true, spineGlueClearIn: 0,
-        trimSpineBleed: true, spineHasBleed: false,
+        trimSpineBleed: true, spineHasBleed: false, spineFromArt: true,
       };
     case 'removebg':
       // Cut the subject out of the artwork and drop everything else to
@@ -560,7 +560,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         insideFront: s.insideFront?.bytes ? { bytes: s.insideFront.bytes } : null,
         insideBack: s.insideBack?.bytes ? { bytes: s.insideBack.bytes } : null,
         insidePage: s.insidePage, mirrorInside: s.mirrorInside !== false,
-        spineGlueClearIn: s.spineGlueClearIn ?? 0, trimSpineBleed: s.trimSpineBleed !== false, spineHasBleed: !!s.spineHasBleed,
+        spineGlueClearIn: s.spineGlueClearIn ?? 0, trimSpineBleed: s.trimSpineBleed !== false, spineHasBleed: !!s.spineHasBleed, spineFromArt: s.spineFromArt !== false,
         trimWIn: s.trimWIn ?? 6, trimHIn: s.trimHIn ?? 9, pages: s.pages ?? 0,
         caliperPerPageIn: s.caliperPerPageIn ?? 0.0025, coverAllowanceIn: s.coverAllowanceIn ?? 0,
         bleedIn: s.bleedIn ?? 0.125, frontPage: s.frontPage ?? 1, backPage: s.backPage ?? 2,

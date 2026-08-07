@@ -2201,7 +2201,13 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
   const block = Math.max(0, Math.round(pages)) * Math.max(0, cal);
   const spine = block + Math.max(0, allowance);
   const ppi = cal > 0 ? Math.round(1 / cal) : 0;
-  const sheetW = 2 * trimW + spine + 2 * bleed, sheetH = trimH + 2 * bleed;
+  // A supplied spine file IS the authored spine width and wins by default.
+  const spineArtInfo = s.spineArt as { wPt?: number; hPt?: number } | null;
+  const spineFromFile = (spineArtInfo?.wPt ?? 0) / 72;
+  const useFile = s.spineFromArt !== false && spineFromFile > 0;
+  const effSpine = useFile ? spineFromFile : spine;
+  const spineArtH = (spineArtInfo?.hPt ?? 0) / 72;
+  const sheetW = 2 * trimW + effSpine + 2 * bleed, sheetH = trimH + 2 * bleed;
   type CoverArtKey = 'front' | 'back' | 'spineArt' | 'insideFront' | 'insideBack';
   const pickCoverArt = (key: CoverArtKey) => {
     const inp = document.createElement('input');
@@ -2213,7 +2219,16 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
         const { imageToPdf } = await import('@/lib/imposition-toolkit/impose');
         bytes = new Uint8Array(await imageToPdf(bytes, f.type));
       }
-      up({ [key]: { name: f.name, bytes } });
+      // Record the real page size so the panel can report it (and so a spine
+      // file can drive the spine width instead of the calculator).
+      let wPt = 0, hPt = 0;
+      try {
+        const { PDFDocument } = await import('pdf-lib');
+        const d = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
+        const p0 = d.getPages()[0];
+        if (p0) { wPt = p0.getSize().width; hPt = p0.getSize().height; }
+      } catch { /* size is a nicety, not a requirement */ }
+      up({ [key]: { name: f.name, bytes, wPt, hPt } });
       // This tool builds the wrap from its OWN uploads, so the editor would
       // otherwise sit on "Drop a PDF to start" and never preview or export.
       // Arm it with the first thing uploaded (the pipeline still prefers the
@@ -2254,6 +2269,12 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
         {artRow('back', 'Back')}
         {artRow('spineArt', 'Spine')}
         <Check icon="crop" label="Trim bleed at the spine" sub="Front/back art stops at the fold instead of running into the spine" checked={s.trimSpineBleed !== false} onChange={(v) => up({ trimSpineBleed: v })} />
+        <Check icon="crop" label="Use the spine file's width" sub="A spine file is the authored, measured spine — it overrides the calculator" checked={s.spineFromArt !== false} onChange={(v) => up({ spineFromArt: v })} />
+        {spineArtH > 0 && Math.abs(spineArtH - trimH) > 0.02 && (
+          <div className="pe-gang-warn" style={{ marginTop: 8 }}>
+            ⚠ The spine file is {spineArtH.toFixed(3)}&quot; tall but the trim height is {trimH.toFixed(3)}&quot;. Set the trim height to match, or the spine art won&apos;t line up.
+          </div>
+        )}
         <Check icon="file" label="Spine file has bleed" sub="Off (normal): the spine file is the exact spine size, so it isn't stretched into the bleed" checked={!!s.spineHasBleed} onChange={(v) => up({ spineHasBleed: v })} />
         <div className="pe-note" style={{ marginTop: 8 }}>
           Each panel bleeds off its <b>outer</b> and top/bottom edges only — the spine-facing bleed is dropped so the art ends exactly at the fold: the back cover&apos;s right edge, the front cover&apos;s left, the inside front&apos;s right and the inside back&apos;s left. Leave the spine empty to use the spine text (or nothing) instead.
@@ -2316,14 +2337,20 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
           <div>{pages} pages × {cal.toFixed(4)}&quot;{ppi ? ` (${ppi} PPI)` : ''} = <b>{block.toFixed(4)}&quot;</b> book block</div>
           <div>+ cover allowance <b>{allowance.toFixed(4)}&quot;</b></div>
           <div style={{ borderTop: '1px solid currentColor', opacity: 0.9, marginTop: 4, paddingTop: 4 }}>
-            = spine <b>{spine.toFixed(3)}&quot;</b> ({(spine * 25.4).toFixed(2)} mm)
+            = calculated spine <b>{spine.toFixed(3)}&quot;</b> ({(spine * 25.4).toFixed(2)} mm)
           </div>
+          {spineFromFile > 0 && (
+            <div style={{ marginTop: 4 }}>
+              Spine file measures <b>{spineFromFile.toFixed(3)}&quot;</b> ({(spineFromFile * 25.4).toFixed(2)} mm)
+              {s.spineFromArt !== false ? <> — <b>using this</b> for the wrap.</> : <> — not used (toggle below).</>}
+            </div>
+          )}
           <div style={{ marginTop: 4 }}>Cover sheet <b>{sheetW.toFixed(3)} × {sheetH.toFixed(3)}&quot;</b> ({(sheetW * 25.4).toFixed(1)} × {(sheetH * 25.4).toFixed(1)} mm) including {bleed}&quot; bleed</div>
         </div>
         {pages % 2 !== 0 && (
           <div className="pe-gang-warn" style={{ marginTop: 8 }}>⚠ Perfect binding needs an even page count — add one blank.</div>
         )}
-        {spine < 0.125 && pages > 0 && (
+        {effSpine < 0.125 && pages > 0 && (
           <div className="pe-gang-warn" style={{ marginTop: 8 }}>⚠ Under 0.125&quot; most binders can&apos;t hold a perfect-bound spine — consider saddle stitch.</div>
         )}
       </Section>

@@ -4103,6 +4103,10 @@ export interface PerfectCoverOptions {
   // the art occupies the TRIM band only and is never stretched into the bleed.
   // Set this when the spine file does carry top/bottom bleed.
   spineHasBleed?: boolean;
+  // When a spine file is supplied it IS the measured spine width (that is how
+  // spines are authored), so it wins over the calculator by default. Turn off
+  // to force the calculated width instead.
+  spineFromArt?: boolean;
   trimWIn: number; trimHIn: number;      // the finished book's trim size
   pages: number;                          // interior page count (not leaves)
   caliperPerPageIn?: number;              // default 0.0025" (60# offset ≈ 400 PPI)
@@ -4123,7 +4127,17 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   const { PDFDocument, rgb, degrees } = PL;
   const bleed = (opts.bleedIn ?? 0.125) * PT;
   const trimW = opts.trimWIn * PT, trimH = opts.trimHIn * PT;
-  const spine = spineWidthIn(opts.pages, opts.caliperPerPageIn ?? 0.0025, opts.coverAllowanceIn ?? 0) * PT;
+  let spine = spineWidthIn(opts.pages, opts.caliperPerPageIn ?? 0.0025, opts.coverAllowanceIn ?? 0) * PT;
+  // A supplied spine file is the authored, measured spine — trust its width
+  // over the calculator. Without this a mismatch magnifies a sliver of the
+  // spine art across the panel (it reads as a solid black bar).
+  if (opts.spineFromArt !== false && opts.spineArt?.bytes) {
+    try {
+      const d = await PDFDocument.load(opts.spineArt.bytes.slice(), { ignoreEncryption: true });
+      const p0 = d.getPages()[Math.max(0, Math.round(opts.spineArt.page ?? 1) - 1)];
+      if (p0 && p0.getSize().width > 0) spine = p0.getSize().width;
+    } catch { /* unreadable — keep the calculated width */ }
+  }
   const shW = 2 * trimW + spine + 2 * bleed, shH = trimH + 2 * bleed;
 
   const out = await PDFDocument.create();
