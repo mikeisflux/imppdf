@@ -31,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'divinitybox';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -134,6 +134,15 @@ export function defaultSettings(type: StepType): StepSettings {
         front: null, back: null, spineArt: null,
         insideFront: null, insideBack: null, mirrorInside: true, spineGlueClearIn: 0,
         trimSpineBleed: true, spineHasBleed: false, spineFromArt: true,
+      };
+    case 'raisedmetal':
+      // Two-pass raised metal: a varnish-only plate built from the artwork's
+      // line art plus a slight grey tone, then the colour + white printed on
+      // top of the cured relief.
+      return {
+        dpi: 300, edgeGain: 1, highlightGain: 0.6, highlightFrom: 200,
+        toneGain: 0.18, floor: 24, gamma: 1,
+        spotName: 'V1', whiteName: 'W1', subjectOnly: false,
       };
     case 'removebg':
       // Cut the subject out of the artwork and drop everything else to

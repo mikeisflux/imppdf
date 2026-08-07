@@ -2371,8 +2371,70 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
   );
 }
 
+function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const run = async (pass: 'varnish' | 'colour') => {
+    setBusy(pass); setErr('');
+    try {
+      const { raisedMetalTiff, downloadFile } = await import('@/lib/imposition-toolkit/impose');
+      const src = sourceBytes;
+      if (!src) { setErr('Load the artwork first.'); return; }
+      const tiff = await raisedMetalTiff(src, {
+        dpi: s.dpi ?? 300, edgeGain: s.edgeGain ?? 1, highlightGain: s.highlightGain ?? 0.6,
+        highlightFrom: s.highlightFrom ?? 200, toneGain: s.toneGain ?? 0.18,
+        floor: s.floor ?? 24, gamma: s.gamma ?? 1, subjectOnly: !!s.subjectOnly,
+        spotName: s.spotName || 'V1', whiteName: s.whiteName || 'W1', pass,
+      });
+      downloadFile(tiff, pass === 'varnish' ? 'raised-metal-1-varnish.tif' : 'raised-metal-2-colour.tif', 'image/tiff');
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Export failed.'); }
+    finally { setBusy(''); }
+  };
+  const rng = (label: string, key: string, val: number, min: number, max: number, step: number, hint: string) => (
+    <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 6 }}>
+      <span className="pe-label" style={{ flex: 1 }}>{label}<span className="pe-label-sm"> · {hint}</span></span>
+      <input type="range" min={min} max={max} step={step} value={val} style={{ width: 120 }}
+        onChange={(e) => up({ [key]: Number(e.target.value) })} />
+      <span className="pe-label-sm" style={{ width: 40, textAlign: 'right' }}>{val}</span>
+    </div>
+  );
+  return (
+    <>
+      <div className="pe-note" style={{ marginBottom: 12 }}>
+        Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then print the <b>colour file</b> (artwork + {s.whiteName || 'W1'} white) on top of the cured varnish.
+      </div>
+      <Section label="// PLATE" help="How the varnish plate is derived from the artwork. Edges give you the linework, highlights catch the speculars, and the grey tone modulates the relief with the art's own shading.">
+        {rng('Line art', 'edgeGain', s.edgeGain ?? 1, 0, 3, 0.1, 'edge strength')}
+        {rng('Highlights', 'highlightGain', s.highlightGain ?? 0.6, 0, 2, 0.1, 'speculars')}
+        {rng('Highlight point', 'highlightFrom', s.highlightFrom ?? 200, 120, 250, 5, 'luminance')}
+        {rng('Grey tone', 'toneGain', s.toneGain ?? 0.18, 0, 1, 0.02, 'slight, from shading')}
+        {rng('Noise floor', 'floor', s.floor ?? 24, 0, 128, 2, 'drop weak specks')}
+        {rng('Line weight', 'gamma', s.gamma ?? 1, 0.4, 2, 0.05, '<1 fatter, >1 thinner')}
+        <Check icon="crop" label="Subject only" sub="Segment the art so the background stays flat (needs the models)" checked={!!s.subjectOnly} onChange={(v) => up({ subjectOnly: v })} />
+      </Section>
+      <Section label="// OUTPUT" help="Both files come out at the same pixel size so the two passes register on press.">
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
+          <span className="pe-label" style={{ width: 56 }}>DPI</span>
+          <select className="pe-select" value={s.dpi ?? 300} onChange={(e) => up({ dpi: Number(e.target.value) })} style={{ width: 120 }}>
+            <option value={300}>300</option><option value={600}>600</option>
+          </select>
+          <span style={{ flex: 1 }} />
+          <input className="pe-input" value={s.spotName ?? 'V1'} style={{ width: 60 }} onChange={(e) => up({ spotName: e.target.value })} />
+          <input className="pe-input" value={s.whiteName ?? 'W1'} style={{ width: 60 }} onChange={(e) => up({ whiteName: e.target.value })} />
+        </div>
+        <div className="pe-row" style={{ gap: 8, marginTop: 8 }}>
+          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('varnish')}>{busy === 'varnish' ? 'Rendering…' : '1 · Varnish plate'}</button>
+          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('colour')}>{busy === 'colour' ? 'Rendering…' : '2 · Colour + white'}</button>
+        </div>
+        {err && <div className="form-error" style={{ marginTop: 8 }}>{err}</div>}
+      </Section>
+    </>
+  );
+}
+
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
+  if (type === 'raisedmetal') return <RaisedMetalPanel {...props} />;
   if (type === 'pbcover') return <PerfectCoverPanel {...props} />;
   if (type === 'removebg') return <RemoveBgPanel {...props} />;
   if (type === 'preflight') return <PreflightPanel {...props} />;

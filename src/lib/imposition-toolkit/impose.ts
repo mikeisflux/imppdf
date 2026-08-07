@@ -4286,6 +4286,142 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   return out.save();
 }
 
+// ── Raised metal ────────────────────────────────────────────────────────────
+// A spot plate for raised metallic/foil finishing. On a UV flatbed the relief
+// is built by laying the spot repeatedly, so this emits COVERAGE (how much
+// metal a pixel gets), not a hard on/off — the plate follows the artwork's
+// linework and specular highlights, which is where foil actually reads.
+
+export interface RaisedMetalTuning {
+  edgeGain?: number;        // weight of the linework (default 1)
+  highlightGain?: number;   // weight of specular highlights (default 0.6)
+  highlightFrom?: number;   // luminance where a highlight starts (default 200)
+  floor?: number;           // drop coverage below this — kills sensor/JPEG noise (default 24)
+  gamma?: number;           // <1 fattens the lines, >1 thins them (default 1)
+  // A slight grey tone under the linework so the relief modulates with the art
+  // instead of being flat lines. Small by design (default 0.18); darker art
+  // gets more varnish, which is where the shading and metal mass sits.
+  toneGain?: number;
+}
+
+// Sobel edge magnitude + specular highlights → 0..255 metal coverage.
+// Pure, so the look is unit-testable without a canvas.
+export function metalMaskFromPixels(
+  rgba: Uint8ClampedArray | Uint8Array, w: number, h: number, t?: RaisedMetalTuning,
+): Uint8Array {
+  const edgeGain = t?.edgeGain ?? 1, hlGain = t?.highlightGain ?? 0.6;
+  const hlFrom = t?.highlightFrom ?? 200, floor = t?.floor ?? 24, gamma = t?.gamma ?? 1;
+  const toneGain = t?.toneGain ?? 0.18;
+  const lum = new Float32Array(w * h);
+  for (let i = 0, p = 0; i < w * h; i++, p += 4) {
+    // Transparent artwork gets no metal at all.
+    lum[i] = rgba[p + 3]! <= 4 ? -1 : 0.299 * rgba[p]! + 0.587 * rgba[p + 1]! + 0.114 * rgba[p + 2]!;
+  }
+  const out = new Uint8Array(w * h);
+  const at = (x: number, y: number) => lum[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))]!;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const c = lum[y * w + x]!;
+      if (c < 0) continue;                                   // transparent
+      // Sobel over luminance — the artwork's own linework.
+      const gx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1))
+               - (at(x - 1, y - 1) + 2 * at(x - 1, y) + at(x - 1, y + 1));
+      const gy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1))
+               - (at(x - 1, y - 1) + 2 * at(x, y - 1) + at(x + 1, y - 1));
+      const edge = Math.min(255, Math.hypot(gx, gy) / 4) * edgeGain;
+      // Specular highlight: how far above the highlight point this pixel sits.
+      const hl = c > hlFrom ? ((c - hlFrom) / (255 - hlFrom)) * 255 * hlGain : 0;
+      // Linework/highlights, plus a slight grey tone from the art's own shading.
+      const tone = toneGain > 0 ? (1 - c / 255) * 255 * toneGain : 0;
+      let v = Math.min(255, Math.max(edge, hl) + tone);
+      if (v < floor) continue;
+      if (gamma !== 1) v = 255 * Math.pow(Math.min(1, v / 255), gamma);
+      out[y * w + x] = Math.max(0, Math.min(255, Math.round(v)));
+    }
+  }
+  return out;
+}
+
+export interface RaisedMetalOptions extends RaisedMetalTuning {
+  page?: number;
+  dpi?: number;             // plate resolution (default 300)
+  spotName?: string;        // varnish channel name (default 'V1')
+  whiteName?: string;       // white channel name on the colour pass (default 'W1')
+  subjectOnly?: boolean;    // gate to the SAM subject so the background stays flat
+  // TWO-PASS BUILD, printed in this order:
+  //  'varnish' — the raised plate ONLY: line art + slight grey tone on the
+  //              varnish channel, no colour and no white. Print and cure this
+  //              first; the repeated varnish passes build the relief.
+  //  'colour'  — the artwork with its white under-base, overprinted on the
+  //              cured varnish so the finish reads as raised metal.
+  // Both come out the same pixel size, so they register.
+  pass?: 'varnish' | 'colour';
+}
+
+// RGB + (transparency) + the metal spot channel, in the same uncompressed,
+// interleaved TIFF the RIP already takes for W1/V1 — including their INVERTED
+// spot polarity (0 = full ink). See CLAUDE.md rules 2/4/6.
+export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions): Promise<Uint8Array> {
+  const { encodeRgbSpotTiff } = await import('./tiff');
+  const { srgbProfile } = await import('./srgb-profile');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfjs: any = await import('pdfjs-dist');
+  try { pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default; } catch { /* bundler resolves worker */ }
+
+  const dpi = opts?.dpi ?? 300;
+  const doc = await pdfjs.getDocument({ data: src.slice() }).promise;
+  const pageNo = Math.min(doc.numPages, Math.max(1, Math.round(opts?.page ?? 1)));
+  const pg = await doc.getPage(pageNo);
+  const vp = pg.getViewport({ scale: dpi / 72 });
+  const W = Math.max(1, Math.ceil(vp.width)), H = Math.max(1, Math.ceil(vp.height));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const canvas: any = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(W, H)
+    : Object.assign(document.createElement('canvas'), { width: W, height: H });
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  await pg.render({ canvasContext: ctx, viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
+  const img = ctx.getImageData(0, 0, W, H).data;
+
+  const metal = metalMaskFromPixels(img, W, H, opts);
+  if (opts?.subjectOnly) {
+    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`);
+    if (subj) for (let i = 0; i < metal.length; i++) if (subj[i]! < 128) metal[i] = 0;
+  }
+
+  const spot = opts?.spotName || 'V1';
+  const white = opts?.whiteName || 'W1';
+  const pass = opts?.pass ?? 'varnish';
+
+  if (pass === 'varnish') {
+    // Pass 1 — varnish ONLY. RGB is left white so no colour ink lays, and
+    // there is no white channel: this run exists purely to build relief.
+    const spp = 4;                                   // R G B V
+    const buf = new Uint8Array(W * H * spp);
+    for (let i = 0, q = 0; i < W * H; i++, q += spp) {
+      buf[q] = 255; buf[q + 1] = 255; buf[q + 2] = 255;
+      buf[q + 3] = 255 - metal[i]!;                  // INVERTED, as W1/V1 are
+    }
+    return encodeRgbSpotTiff({
+      width: W, height: H, interleaved: buf, spotNames: [spot],
+      alpha: false, iccProfile: srgbProfile(), dpi,
+    });
+  }
+
+  // Pass 2 — the artwork and its white under-base, overprinted on the cured
+  // varnish. Same pixel dimensions as pass 1 so the two register.
+  const spp = 5;                                     // R G B A W
+  const buf = new Uint8Array(W * H * spp);
+  for (let i = 0, p = 0, q = 0; i < W * H; i++, p += 4, q += spp) {
+    const a = img[p + 3]!;
+    buf[q] = img[p]!; buf[q + 1] = img[p + 1]!; buf[q + 2] = img[p + 2]!;
+    buf[q + 3] = a;
+    buf[q + 4] = 255 - a;                            // white mirrors the alpha
+  }
+  return encodeRgbSpotTiff({
+    width: W, height: H, interleaved: buf, spotNames: [white],
+    alpha: true, iccProfile: srgbProfile(), dpi,
+  });
+}
+
 // ── Braille (Grade-1) ───────────────────────────────────────────────────────
 const BRAILLE_G1: Record<string, number[]> = {
   a: [1], b: [1, 2], c: [1, 4], d: [1, 4, 5], e: [1, 5], f: [1, 2, 4], g: [1, 2, 4, 5], h: [1, 2, 5], i: [2, 4], j: [2, 4, 5],

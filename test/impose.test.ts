@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane, inkBoundsFromPixels, blackKnockoutAlpha, blackSwathKeepMask, featherMask, applyMaskAlpha, spineWidthIn } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane, inkBoundsFromPixels, blackKnockoutAlpha, blackSwathKeepMask, featherMask, applyMaskAlpha, spineWidthIn, metalMaskFromPixels } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -498,4 +498,29 @@ test('perfect bound cut-and-stack: leaf N is page N front / page N+1 back', asyn
     cellWIn: 6, cellHIn: 9, marginIn: 0, gutterIn: 0, gutterYIn: 0, addMarks: false,
   });
   assert.equal(g.cols * g.rows, 2, 'two 6x9 leaves per 17x11 sheet');
+});
+
+test('metalMaskFromPixels: plates the linework and highlights, not flat fills', () => {
+  const w = 40, h = 40;
+  const px = new Uint8Array(w * h * 4);
+  // Left half mid-grey, right half near-white → a hard edge down the middle,
+  // and the right half also reads as a specular highlight.
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, v = x < 20 ? 120 : 245;
+    px[i] = v; px[i + 1] = v; px[i + 2] = v; px[i + 3] = 255;
+  }
+  const m = metalMaskFromPixels(px, w, h, { toneGain: 0, highlightGain: 0, floor: 24 });
+  const at = (x: number, y: number) => m[y * w + x]!;
+  assert.ok(at(19, 20) > 100 || at(20, 20) > 100, 'the edge is plated');
+  assert.equal(at(5, 20), 0, 'flat mid-grey gets no metal without tone');
+  assert.equal(at(35, 20), 0, 'flat white gets none either with highlights off');
+  // Highlights on: the bright side now plates even though it is flat.
+  const hl = metalMaskFromPixels(px, w, h, { toneGain: 0, highlightGain: 1, highlightFrom: 200, floor: 1 });
+  assert.ok(hl[20 * w + 35]! > 0, 'specular highlight is plated when enabled');
+  // A slight grey tone lifts the darker side (more varnish where the art is dark).
+  const tone = metalMaskFromPixels(px, w, h, { toneGain: 0.5, highlightGain: 0, floor: 1 });
+  assert.ok(tone[20 * w + 5]! > tone[20 * w + 35]!, 'darker art carries more tone');
+  // Transparent artwork never plates.
+  const clear = new Uint8Array(w * h * 4);
+  assert.ok(metalMaskFromPixels(clear, w, h).every((v) => v === 0), 'transparent gets no metal');
 });
