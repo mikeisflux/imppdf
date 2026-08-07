@@ -4398,7 +4398,10 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   //  'colour'  — the artwork with its white under-base, overprinted on the
   //              cured varnish so the finish reads as raised metal.
   // Both come out the same pixel size, so they register.
-  pass?: 'varnish' | 'colour';
+  //  'regions' — a THIRD plate carrying ONLY the selected/detected regions,
+  //              for dropping the bed a level and laying an extra finish on
+  //              top of the cured stack. Same pixel size as the other passes.
+  pass?: 'varnish' | 'colour' | 'regions';
   // Lift specific regions higher than the rest of the plate. Boxes are in
   // 0..1 page fractions; each is refined by MobileSAM so the extra varnish
   // follows the actual shape rather than a rectangle.
@@ -4449,6 +4452,8 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
       for (const d of hits) if (want.has(d.label)) boxes.push(d);
     } catch { /* no detector — hand-drawn regions still apply */ }
   }
+  // Region coverage is kept SEPARATE so the third pass can emit it alone.
+  const regionCov = new Uint8Array(W * H);
   if (boxes.length) {
     const boost = Math.max(0, Math.min(1, opts?.boostAmount ?? 0.5));
     const { loadSam, encodeImage, segmentBox } = await import('../sam');
@@ -4460,6 +4465,7 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
         const cov = featherMask(mask.data, W, H, 2);       // soft so relief blends
         for (let i = 0; i < metal.length; i++) {
           if (!cov[i]) continue;
+          if (cov[i]! > regionCov[i]!) regionCov[i] = cov[i]!;
           const add = boost * 255 * (cov[i]! / 255);
           metal[i] = Math.min(255, Math.round(metal[i]! + add));
         }
@@ -4469,6 +4475,7 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
         const y0 = Math.max(0, Math.floor(b.y0)), y1 = Math.min(H - 1, Math.ceil(b.y1));
         for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
           const i = y * W + x;
+          regionCov[i] = 255;
           metal[i] = Math.min(255, Math.round(metal[i]! + boost * 255));
         }
       }
@@ -4476,7 +4483,9 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   }
   if (opts?.subjectOnly) {
     const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`);
-    if (subj) for (let i = 0; i < metal.length; i++) if (subj[i]! < 128) metal[i] = 0;
+    if (subj) for (let i = 0; i < metal.length; i++) {
+      if (subj[i]! < 128) { metal[i] = 0; regionCov[i] = 0; }
+    }
   }
 
   const spot = opts?.spotName || 'V1';
@@ -4492,9 +4501,17 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   const spp = 6;                                     // R G B A W1 V1
   const buf = new Uint8Array(W * H * spp);
   const isVarnish = pass === 'varnish';
+  const isRegions = pass === 'regions';
   for (let i = 0, p = 0, q = 0; i < W * H; i++, p += 4, q += spp) {
     const a = img[p + 3]!;
-    if (isVarnish) {
+    if (isRegions) {
+      // Pass 3 — ONLY the selected regions, for the extra finish laid after
+      // the bed drops a level. No colour, no white.
+      buf[q] = 255; buf[q + 1] = 255; buf[q + 2] = 255;
+      buf[q + 3] = 255;
+      buf[q + 4] = 255;                              // W1 empty
+      buf[q + 5] = 255 - regionCov[i]!;              // INVERTED
+    } else if (isVarnish) {
       // Pass 1 — relief only: no colour, no white, just the varnish plate.
       buf[q] = 255; buf[q + 1] = 255; buf[q + 2] = 255;
       buf[q + 3] = 255;                              // opaque, so the RIP keeps it

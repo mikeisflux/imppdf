@@ -2374,7 +2374,7 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
 function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
-  const run = async (pass: 'varnish' | 'colour') => {
+  const run = async (pass: 'varnish' | 'colour' | 'regions') => {
     setBusy(pass); setErr('');
     try {
       const { raisedMetalTiff, downloadFile } = await import('@/lib/imposition-toolkit/impose');
@@ -2386,7 +2386,8 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         floor: s.floor ?? 24, gamma: s.gamma ?? 1, subjectOnly: !!s.subjectOnly,
         spotName: s.spotName || 'V1', whiteName: s.whiteName || 'W1', pass,
       });
-      downloadFile(tiff, pass === 'varnish' ? 'raised-metal-1-varnish.tif' : 'raised-metal-2-colour.tif', 'image/tiff');
+      downloadFile(tiff, pass === 'varnish' ? 'raised-metal-1-varnish.tif'
+        : pass === 'colour' ? 'raised-metal-2-colour.tif' : 'raised-metal-3-regions.tif', 'image/tiff');
     } catch (e) { setErr(e instanceof Error ? e.message : 'Export failed.'); }
     finally { setBusy(''); }
   };
@@ -2556,6 +2557,10 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         <div className="pe-row" style={{ gap: 8, marginTop: 8 }}>
           <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('varnish')}>{busy === 'varnish' ? 'Rendering…' : '1 · Varnish plate'}</button>
           <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('colour')}>{busy === 'colour' ? 'Rendering…' : '2 · Colour + white'}</button>
+          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('regions')}>{busy === 'regions' ? 'Rendering…' : '3 · Regions'}</button>
+        </div>
+        <div className="pe-note" style={{ marginTop: 8 }}>
+          Pass 3 carries <b>only the raised regions</b> on {s.spotName || 'V1'} — drop the bed a level after pass 2 and lay the extra finish. Same pixel size as the other two, so it registers on the vacuum bed.
         </div>
         {err && <div className="form-error" style={{ marginTop: 8 }}>{err}</div>}
       </Section>
