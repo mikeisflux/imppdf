@@ -4094,6 +4094,15 @@ export interface PerfectCoverOptions {
   // The spine on the INSIDE is masked back to white: perfect-binding glue will
   // not bond through ink or coating. Widen the clear zone past the spine here.
   spineGlueClearIn?: number;
+  // Cover art is authored with bleed on all four sides, but the SPINE-facing
+  // edge must stop at the fold — its bleed would otherwise run into the spine
+  // panel (and over the glue zone). Trimmed per panel: back cover's right,
+  // front cover's left, inside front's right, inside back's left. Default ON.
+  trimSpineBleed?: boolean;
+  // Spine files are normally authored at the exact spine size with NO bleed, so
+  // the art occupies the TRIM band only and is never stretched into the bleed.
+  // Set this when the spine file does carry top/bottom bleed.
+  spineHasBleed?: boolean;
   trimWIn: number; trimHIn: number;      // the finished book's trim size
   pages: number;                          // interior page count (not leaves)
   caliperPerPageIn?: number;              // default 0.0025" (60# offset ≈ 400 PPI)
@@ -4128,22 +4137,41 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
     srcPages = srcDoc.getPages();
   } catch { /* no source — separate files may still supply everything */ }
 
+  // Drop the bleed from the spine-facing edge so the art ends exactly at the
+  // fold. Art authored as (trim + 2*bleed) then cropped on one side is exactly
+  // the panel's own (bleed + trim) width, so it lands 1:1.
+  const trimSpine = opts.trimSpineBleed !== false && bleed > 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const boxFor = (page: any, side: 'left' | 'right' | null) => {
+    if (!side || !trimSpine) return undefined;
+    const sz = page.getSize();
+    return side === 'left'
+      ? { left: bleed, bottom: 0, right: sz.width, top: sz.height }
+      : { left: 0, bottom: 0, right: Math.max(1, sz.width - bleed), top: sz.height };
+  };
   // Prefer a dedicated file; fall back to a page of the source document.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const embedArt = async (art: PerfectCoverArt | null | undefined, fallbackPage?: number): Promise<any> => {
+  const embedArt = async (art: PerfectCoverArt | null | undefined, fallbackPage?: number, side: 'left' | 'right' | null = null): Promise<any> => {
     if (art?.bytes) {
       try {
         const d = await PDFDocument.load(art.bytes.slice(), { ignoreEncryption: true });
         const pages = d.getPages();
         const i = Math.min(pages.length, Math.max(1, Math.round(art.page ?? 1))) - 1;
-        if (pages[i]) { if (!srcDoc) srcDoc = d; return (await out.embedPages([pages[i]!]))[0]; }
+        if (pages[i]) {
+          if (!srcDoc) srcDoc = d;
+          const bb = boxFor(pages[i]!, side);
+          return (await out.embedPages([pages[i]!], bb ? [bb] : undefined))[0];
+        }
       } catch { /* unreadable file — fall through to the source */ }
     }
-    if (fallbackPage && srcPages[fallbackPage - 1]) return (await out.embedPages([srcPages[fallbackPage - 1]!]))[0];
+    const fp = fallbackPage ? srcPages[fallbackPage - 1] : null;
+    if (fp) { const bb = boxFor(fp, side); return (await out.embedPages([fp], bb ? [bb] : undefined))[0]; }
     return null;
   };
-  const frontEmb = await embedArt(opts.front, Math.max(1, Math.round(opts.frontPage ?? 1)));
-  const backEmb = await embedArt(opts.back, Math.max(1, Math.round(opts.backPage ?? 2)));
+  // Spine side per panel: back sits left of the spine so its RIGHT edge folds;
+  // front sits right of it so its LEFT edge folds.
+  const frontEmb = await embedArt(opts.front, Math.max(1, Math.round(opts.frontPage ?? 1)), 'left');
+  const backEmb = await embedArt(opts.back, Math.max(1, Math.round(opts.backPage ?? 2)), 'right');
   const spineEmb = await embedArt(opts.spineArt);
 
   // Cover-fit art into a rect, clipped to it.
@@ -4160,8 +4188,10 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   drawInto(backEmb, 0, 0, bleed + trimW, shH);
   // Front cover on the right, including the right + top/bottom bleed.
   drawInto(frontEmb, bleed + trimW + spine, 0, bleed + trimW, shH);
-  // Spine art (if supplied) fills the spine panel and bleeds top/bottom.
-  drawInto(spineEmb, bleed + trimW, 0, spine, shH);
+  // Spine art fills the spine panel. With no bleed on the file (the norm) it
+  // sits in the trim band at its true height rather than being stretched the
+  // extra 2*bleed — the bleed strips above and below are trimmed off anyway.
+  drawInto(spineEmb, bleed + trimW, opts.spineHasBleed ? 0 : bleed, spine, opts.spineHasBleed ? shH : trimH);
 
   if (opts.spineText && spine > 2) {
     const font = await out.embedFont(PL.StandardFonts.HelveticaBold);
@@ -4204,12 +4234,15 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   };
   if (opts.addMarks !== false) drawCoverMarks(pg);
   // ── Inside of the wrap (page 2) ──────────────────────────────────────────
-  const insideFrontEmb = await embedArt(opts.insideFront);
-  const insideBackEmb = await embedArt(opts.insideBack);
+  const mirrorIn = opts.mirrorInside !== false;
+  // Mirrored: inside front prints on the LEFT of the inside, so ITS right edge
+  // meets the spine; inside back prints on the right, so its left edge does.
+  const insideFrontEmb = await embedArt(opts.insideFront, undefined, mirrorIn ? 'right' : 'left');
+  const insideBackEmb = await embedArt(opts.insideBack, undefined, mirrorIn ? 'left' : 'right');
   const wantInside = opts.insidePage ?? !!(insideFrontEmb || insideBackEmb);
   if (wantInside) {
     const ip = out.addPage([shW, shH]);
-    const mirror = opts.mirrorInside !== false;
+    const mirror = mirrorIn;
     // Turning the sheet over swaps left and right, so the inside FRONT sits on
     // the left of the inside when the outside front is on the right.
     const leftEmb = mirror ? insideFrontEmb : insideBackEmb;

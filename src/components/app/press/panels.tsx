@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
@@ -887,7 +887,16 @@ function ReplicatePanel(p: PanelProps) {
 
 // ── Divinity Box (four-panel box flat with white/varnish spots) ─────────────
 function DivinityBoxPanel(p: PanelProps) {
-  const { s, up, onLoadSource } = p;
+  const { s, up, onLoadSource, sourceBytes } = p;
+  // Self-heal, same as the cover tool: panels attached in an earlier session
+  // with no armed source leave the editor stuck on "Drop a PDF to start".
+  const armed = useRef(false);
+  useEffect(() => {
+    if (armed.current || sourceBytes) return;
+    const first = (['a', 'b', 'c', 'd'] as const)
+      .map((k) => s[k] as { bytes?: Uint8Array } | null).find((a) => a?.bytes)?.bytes;
+    if (first) { armed.current = true; onLoadSource?.(new Uint8Array(first), 'divinity-box'); }
+  }, [sourceBytes, s, onLoadSource]);
   const pickArt = (key: 'a' | 'b' | 'c' | 'd') => {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = 'application/pdf,image/*';
@@ -2173,7 +2182,17 @@ function RemoveBgPanel({ s, up }: PanelProps) {
   );
 }
 
-function PerfectCoverPanel({ s, up }: PanelProps) {
+function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
+  // Self-heal: art may already be attached from a previous session while the
+  // editor still has no source, which leaves the canvas on "Drop a PDF to
+  // start" and blocks preview/export. Arm it from whatever art is present.
+  const armed = useRef(false);
+  useEffect(() => {
+    if (armed.current || sourceBytes) return;
+    const first = (['front', 'back', 'spineArt', 'insideFront', 'insideBack'] as const)
+      .map((k) => s[k] as { bytes?: Uint8Array } | null).find((a) => a?.bytes)?.bytes;
+    if (first) { armed.current = true; onLoadSource?.(new Uint8Array(first), 'perfect-cover'); }
+  }, [sourceBytes, s, onLoadSource]);
   const trimW = s.trimWIn ?? 6, trimH = s.trimHIn ?? 9;
   const pages = s.pages ?? 0, cal = s.caliperPerPageIn ?? 0.0025;
   const bleed = s.bleedIn ?? 0.125;
@@ -2195,6 +2214,11 @@ function PerfectCoverPanel({ s, up }: PanelProps) {
         bytes = new Uint8Array(await imageToPdf(bytes, f.type));
       }
       up({ [key]: { name: f.name, bytes } });
+      // This tool builds the wrap from its OWN uploads, so the editor would
+      // otherwise sit on "Drop a PDF to start" and never preview or export.
+      // Arm it with the first thing uploaded (the pipeline still prefers the
+      // per-panel files; the source is only a fallback for front/back).
+      onLoadSource?.(new Uint8Array(bytes), 'perfect-cover');
     };
     inp.click();
   };
@@ -2229,8 +2253,10 @@ function PerfectCoverPanel({ s, up }: PanelProps) {
         {artRow('front', 'Front')}
         {artRow('back', 'Back')}
         {artRow('spineArt', 'Spine')}
+        <Check icon="crop" label="Trim bleed at the spine" sub="Front/back art stops at the fold instead of running into the spine" checked={s.trimSpineBleed !== false} onChange={(v) => up({ trimSpineBleed: v })} />
+        <Check icon="file" label="Spine file has bleed" sub="Off (normal): the spine file is the exact spine size, so it isn't stretched into the bleed" checked={!!s.spineHasBleed} onChange={(v) => up({ spineHasBleed: v })} />
         <div className="pe-note" style={{ marginTop: 8 }}>
-          Front and back bleed off their outer and top/bottom edges; spine art fills the spine panel. Leave the spine empty to use the spine text (or nothing) instead.
+          Each panel bleeds off its <b>outer</b> and top/bottom edges only — the spine-facing bleed is dropped so the art ends exactly at the fold: the back cover&apos;s right edge, the front cover&apos;s left, the inside front&apos;s right and the inside back&apos;s left. Leave the spine empty to use the spine text (or nothing) instead.
         </div>
       </Section>
       <Section label="// INSIDE COVERS" help="The reverse of the wrap, printed as page 2. Left and right are mirrored so the inside front lands behind the front cover once the sheet is turned over.">
