@@ -2385,6 +2385,11 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         highlightFrom: s.highlightFrom ?? 200, toneGain: s.toneGain ?? 0.18,
         floor: s.floor ?? 24, gamma: s.gamma ?? 1, subjectOnly: !!s.subjectOnly,
         spotName: s.spotName || 'V1', whiteName: s.whiteName || 'W1', pass,
+        // The region settings MUST match what the preview showed — without
+        // these the exported pass 2 detects nothing and comes out empty.
+        autoDetect: s.autoDetect !== false, detectMinScore: s.detectMinScore ?? 0.25,
+        regionTighten: s.regionTighten ?? 1, boostAmount: s.boostAmount ?? 0.5,
+        boostRegions: s.boostRegions ?? [],
       });
       downloadFile(tiff, pass === 'varnish' ? 'raised-metal-1-varnish.tif'
         : pass === 'regions' ? 'raised-metal-2-regions-varnish.tif'
@@ -2412,6 +2417,12 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   const regRef = useRef<Uint8Array | null>(null);
   const [ready, setReady] = useState(0);
   const mode = s.previewMode ?? 'relief';
+
+  // The region cache is keyed on the artwork, so the detection settings have to
+  // drop it by hand — otherwise moving Confidence or Tightness redraws the
+  // stale mask and looks like the sliders do nothing.
+  useEffect(() => { regRef.current = null; },
+    [s.autoDetect, s.detectMinScore, s.regionTighten, s.subjectOnly]);
 
   useEffect(() => {
     let dead = false;
@@ -2463,7 +2474,10 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         regRef.current = await regionCoverage(art.canvas, w, h, art.data,
           (s.boostRegions ?? []).map((r: { x0: number; y0: number; x1: number; y1: number }) =>
             ({ x0: r.x0 * w, y0: r.y0 * h, x1: r.x1 * w, y1: r.y1 * h })),
-          { autoDetect: s.autoDetect !== false, detectMinScore: s.detectMinScore ?? 0.25, cacheKey: `metalprev:${w}x${h}` });
+          {
+            autoDetect: s.autoDetect !== false, detectMinScore: s.detectMinScore ?? 0.25,
+            tighten: s.regionTighten ?? 1, cacheKey: `metalprev:${w}x${h}`,
+          });
         if (cancelled) return;
       }
       const reg = regRef.current;
@@ -2527,7 +2541,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       ctx.putImageData(out, 0, 0);
     }, 60);                                         // debounce the slider drag
     return () => { cancelled = true; clearTimeout(id); };
-  }, [ready, mode, s.subjectOnly, s.autoDetect, s.detectMinScore, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
+  }, [ready, mode, s.subjectOnly, s.autoDetect, s.detectMinScore, s.regionTighten, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
@@ -2559,8 +2573,9 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         <Check icon="droplet" label="Auto-detect regions to raise" sub="Exposed anatomy, detected locally — nothing is uploaded" checked={s.autoDetect !== false} onChange={(v) => up({ autoDetect: v })} />
         {rng('Extra relief', 'boostAmount', s.boostAmount ?? 0.5, 0, 1, 0.05, 'added coverage in a region')}
         {rng('Confidence', 'detectMinScore', s.detectMinScore ?? 0.25, 0.05, 0.9, 0.05, 'lower finds more')}
+        {rng('Tightness', 'regionTighten', s.regionTighten ?? 1, 0, 2, 0.1, '1 = default, higher = smaller')}
         <div className="pe-note" style={{ marginTop: 8 }}>
-          The detector is trained mostly on photographic material, so on stylised art treat it as a starting point — lower the confidence to catch more, raise it if it plates the wrong areas. If the model isn&apos;t installed this falls back to no boost and the base plate still exports.
+          The detector is trained mostly on photographic material, so on stylised art treat it as a starting point — lower the confidence to catch more, raise it if it plates the wrong areas. The genital classes score much lower than breasts on painted art, so they get their own, lower floor automatically; one Confidence setting covers both. <b>Tightness</b> pulls each detected box in toward its centre before segmentation, which is what keeps a breast box on the nipple and stops a crotch box grabbing the skirt behind it — raise it if a region plates too wide, drop it toward 0 for the raw box. Hand-drawn boxes are never tightened. Open the browser console for a <code>[detect]</code> line listing every class and its best score, so you can set the threshold from what the model actually saw.
         </div>
       </Section>
       <Section label="// OUTPUT" help="Both files come out at the same pixel size so the two passes register on press.">

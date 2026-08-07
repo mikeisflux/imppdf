@@ -72,6 +72,53 @@ export const DEFAULT_RAISE_CLASSES = new Set([
   'BUTTOCKS_EXPOSED', 'ANUS_EXPOSED', 'MALE_GENITALIA_EXPOSED',
 ]);
 
+/* Per-class confidence, as a MULTIPLIER of the operator's threshold.
+   The model was trained on photographs; on painted/inked art the genital
+   classes score far lower than breasts do (small in frame, stylised, often
+   partly shadowed), so a single global floor either misses them entirely or
+   floods the plate with junk once you drop it far enough to catch them.
+   Giving those classes their own, lower floor catches them without loosening
+   anything else. 1 = exactly the operator's threshold. */
+export const CLASS_SCORE_SCALE: Record<string, number> = {
+  FEMALE_GENITALIA_EXPOSED: 0.4,
+  FEMALE_GENITALIA_COVERED: 0.4,
+  MALE_GENITALIA_EXPOSED: 0.45,
+  ANUS_EXPOSED: 0.5,
+};
+
+/* How far a class's box is pulled in toward its own centre before it is handed
+   to SAM, as a fraction of the box's width/height per side.
+
+   Two reasons. (1) The wanted feature sits at the CENTRE of the box — the
+   nipple inside the breast box, the vulva inside the genital box — and the
+   detector's box is the whole anatomy, so raising all of it is too much.
+   (2) SAM takes a box as "segment the object in here"; when the box is loose
+   the nearest whole object wins, which on a figure in clothing is the
+   GARMENT — you ask for the crotch and get the skirt. A tight prompt lands on
+   the skin instead. */
+export const CLASS_INSET: Record<string, { x: number; y: number }> = {
+  FEMALE_BREAST_EXPOSED: { x: 0.30, y: 0.30 },   // → areola/nipple, not the whole breast
+  FEMALE_BREAST_COVERED: { x: 0.30, y: 0.30 },
+  FEMALE_GENITALIA_EXPOSED: { x: 0.22, y: 0.18 },
+  FEMALE_GENITALIA_COVERED: { x: 0.22, y: 0.18 },
+  MALE_GENITALIA_EXPOSED: { x: 0.15, y: 0.10 },
+  ANUS_EXPOSED: { x: 0.20, y: 0.20 },
+  BUTTOCKS_EXPOSED: { x: 0.12, y: 0.12 },
+};
+const DEFAULT_INSET = { x: 0.12, y: 0.12 };
+
+/** Pull a detected box in toward its centre. `strength` 1 = the class default,
+ *  0 = the raw box; capped so a box can never collapse to nothing. */
+export function tightenBox<T extends { x0: number; y0: number; x1: number; y1: number; label?: string }>(
+  b: T, strength = 1,
+): T {
+  const base = (b.label && CLASS_INSET[b.label]) || DEFAULT_INSET;
+  const fx = Math.max(0, Math.min(0.45, base.x * strength));
+  const fy = Math.max(0, Math.min(0.45, base.y * strength));
+  const w = b.x1 - b.x0, h = b.y1 - b.y0;
+  return { ...b, x0: b.x0 + w * fx, x1: b.x1 - w * fx, y0: b.y0 + h * fy, y1: b.y1 - h * fy };
+}
+
 export interface DetectedRegion {
   /** Pixel box in the SOURCE image's coordinates. */
   x0: number; y0: number; x1: number; y1: number;
@@ -115,13 +162,22 @@ export async function detectRegions(
     const rows = dims[1] ?? 0, n = dims[2] ?? 0;
     const numCls = Math.max(0, rows - 4);
     const hits: DetectedRegion[] = [];
+    const peak: number[] = new Array(numCls).fill(0);   // best raw score per class, for tuning
+    // Each class is judged against its OWN floor, and the winner is the class
+    // that clears its floor by the widest margin — not simply the top raw
+    // score. Otherwise a confident FACE or BELLY on the same box would always
+    // outrank the low-scoring genital hit we are specifically trying to catch.
     for (let i = 0; i < n; i++) {
-      let best = -1, bestScore = 0;
+      let best = -1, bestScore = 0, bestMargin = 0;
       for (let c = 0; c < numCls; c++) {
         const sc = data[(4 + c) * n + i]!;
-        if (sc > bestScore) { bestScore = sc; best = c; }
+        if (sc > (peak[c] ?? 0)) peak[c] = sc;
+        const floor = minScore * (CLASS_SCORE_SCALE[CLASSES[c] ?? ''] ?? 1);
+        if (sc < floor) continue;
+        const margin = sc / Math.max(1e-6, floor);
+        if (margin > bestMargin) { bestMargin = margin; bestScore = sc; best = c; }
       }
-      if (best < 0 || bestScore < minScore) continue;
+      if (best < 0) continue;
       const cx = data[i]!, cy = data[n + i]!, bw = data[2 * n + i]!, bh = data[3 * n + i]!;
       // Undo the letterbox back into source pixels.
       const x0 = (cx - bw / 2 - padX) / scale, y0 = (cy - bh / 2 - padY) / scale;
@@ -136,6 +192,12 @@ export async function detectRegions(
     // Makes a class-order or head-shape mismatch obvious instead of silent.
     console.info('[detect]', dims.join('x'), `${numCls} classes,`,
       kept.length ? kept.map((k) => `${k.label} ${k.score.toFixed(2)}`).join(', ') : 'nothing above threshold');
+    // What the model saw but did NOT keep — set the threshold from this rather
+    // than by guesswork when a region is being missed.
+    console.info('[detect] best per class:', peak
+      .map((v, c) => ({ label: CLASSES[c] ?? `class_${c}`, v }))
+      .filter((e) => e.v > 0.02).sort((a, b) => b.v - a.v).slice(0, 8)
+      .map((e) => `${e.label} ${e.v.toFixed(2)}`).join(', '));
     return kept;
   } catch (err) { lastError = String(err); return []; }
 }

@@ -4392,12 +4392,18 @@ export function metalMaskFromPixels(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function regionCoverage(
   canvas: any, W: number, H: number, pixels: Uint8ClampedArray | Uint8Array,
-  boxes: { x0: number; y0: number; x1: number; y1: number }[] = [],
-  opts?: { autoDetect?: boolean; detectMinScore?: number; detectClasses?: string[]; cacheKey?: string },
+  boxes: { x0: number; y0: number; x1: number; y1: number; label?: string }[] = [],
+  opts?: {
+    autoDetect?: boolean; detectMinScore?: number; detectClasses?: string[];
+    tighten?: number;      // 0 = raw detector boxes, 1 = the class defaults, up to 2
+    cacheKey?: string;
+  },
 ): Promise<Uint8Array> {
   void pixels;
   const cov = new Uint8Array(W * H);
   const all = [...boxes];
+  const { tightenBox } = await import('../nsfw-detect');
+  const tighten = Math.max(0, Math.min(2, opts?.tighten ?? 1));
   if (opts?.autoDetect) {
     try {
       const { detectRegions, DEFAULT_RAISE_CLASSES } = await import('../nsfw-detect');
@@ -4411,14 +4417,48 @@ export async function regionCoverage(
   const { loadSam, encodeImage, segmentBox } = await import('../sam');
   const emb = (await loadSam()) ? await encodeImage(opts?.cacheKey ?? `region:${W}x${H}`, canvas) : null;
   for (const b of all) {
-    const mask = emb ? await segmentBox(emb, b.x0, b.y0, b.x1, b.y1) : null;
+    // Detected boxes are the whole anatomy; what we want raised is the middle
+    // of it (the nipple, not the breast). Hand-drawn boxes are left alone —
+    // the operator drew exactly the area they meant.
+    const p = b.label ? tightenBox(b, tighten) : b;
+    // SAM may follow the shape a little past the prompt, but not off onto the
+    // next object. Without this gate a crotch prompt returns the SKIRT.
+    const gw = (b.x1 - b.x0) * 0.15, gh = (b.y1 - b.y0) * 0.15;
+    const gx0 = Math.max(0, Math.floor(b.x0 - gw)), gx1 = Math.min(W - 1, Math.ceil(b.x1 + gw));
+    const gy0 = Math.max(0, Math.floor(b.y0 - gh)), gy1 = Math.min(H - 1, Math.ceil(b.y1 + gh));
+    const mask = emb ? await segmentBox(emb, p.x0, p.y0, p.x1, p.y1) : null;
+    let used = false;
     if (mask && mask.w === W && mask.h === H) {
-      const f = featherMask(mask.data, W, H, 2);
-      for (let i = 0; i < cov.length; i++) if (f[i]! > cov[i]!) cov[i] = f[i]!;
-    } else {
-      const x0 = Math.max(0, Math.floor(b.x0)), x1 = Math.min(W - 1, Math.ceil(b.x1));
-      const y0 = Math.max(0, Math.floor(b.y0)), y1 = Math.min(H - 1, Math.ceil(b.y1));
-      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) cov[y * W + x] = 255;
+      let inside = 0, total = 0;
+      for (let i = 0; i < mask.data.length; i++) if (mask.data[i]) total++;
+      const clipped = new Uint8Array(W * H);
+      for (let y = gy0; y <= gy1; y++) {
+        const row = y * W;
+        for (let x = gx0; x <= gx1; x++) if (mask.data[row + x]) { clipped[row + x] = 1; inside++; }
+      }
+      // Mostly outside the box means SAM latched onto the wrong object; the
+      // clipped remnant would be a meaningless sliver, so use the shape below.
+      if (total > 0 && inside / total >= 0.5 && inside > 16) {
+        const f = featherMask(clipped, W, H, 2);
+        for (let i = 0; i < cov.length; i++) if (f[i]! > cov[i]!) cov[i] = f[i]!;
+        used = true;
+      }
+    }
+    if (!used) {
+      // No segmentation: an elliptical falloff inside the box rather than a
+      // hard rectangle, so a missed region still lifts without a visible edge.
+      const x0 = Math.max(0, Math.floor(p.x0)), x1 = Math.min(W - 1, Math.ceil(p.x1));
+      const y0 = Math.max(0, Math.floor(p.y0)), y1 = Math.min(H - 1, Math.ceil(p.y1));
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      const rx = Math.max(1, (x1 - x0) / 2), ry = Math.max(1, (y1 - y0) / 2);
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+        const dx = (x - cx) / rx, dy = (y - cy) / ry;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d >= 1) continue;
+        const v = d <= 0.75 ? 255 : Math.round(255 * (1 - (d - 0.75) / 0.25));
+        const i = y * W + x;
+        if (v > cov[i]!) cov[i] = v;
+      }
     }
   }
   return cov;
@@ -4451,6 +4491,7 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   autoDetect?: boolean;      // find the regions automatically
   detectMinScore?: number;   // detector confidence floor (default 0.25)
   detectClasses?: string[];  // override which detected labels get raised
+  regionTighten?: number;    // 0 = raw boxes, 1 = class defaults, 2 = twice as tight
 }
 
 // RGB + (transparency) + the metal spot channel, in the same uncompressed,
@@ -4481,7 +4522,11 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   // Raise chosen regions above the rest of the plate (shared with the preview).
   const regionCov = await regionCoverage(canvas, W, H, img,
     (opts?.boostRegions ?? []).map((r) => ({ x0: r.x0 * W, y0: r.y0 * H, x1: r.x1 * W, y1: r.y1 * H })),
-    { autoDetect: opts?.autoDetect, detectMinScore: opts?.detectMinScore, detectClasses: opts?.detectClasses, cacheKey: `metal:${W}x${H}` });
+    {
+      autoDetect: opts?.autoDetect, detectMinScore: opts?.detectMinScore,
+      detectClasses: opts?.detectClasses, tighten: opts?.regionTighten,
+      cacheKey: `metal:${W}x${H}`,
+    });
   {
     const boost = Math.max(0, Math.min(1, opts?.boostAmount ?? 0.5));
     for (let i = 0; i < metal.length; i++) {

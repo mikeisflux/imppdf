@@ -541,3 +541,23 @@ test('nonMaxSuppress: keeps the strongest of overlapping hits, per label', async
   assert.equal(kept[0]!.score, 0.9, 'strongest survives its cluster');
   assert.ok(!kept.some((k) => k.score === 0.6), 'the weaker overlapping duplicate is dropped');
 });
+
+test('tightenBox: pulls a detected box toward its centre, per class', async () => {
+  const { tightenBox, CLASS_INSET, CLASS_SCORE_SCALE } = await import('../src/lib/nsfw-detect.ts');
+  const box = { x0: 0, y0: 0, x1: 100, y1: 100, label: 'FEMALE_BREAST_EXPOSED' };
+  const t = tightenBox(box, 1);
+  const ins = CLASS_INSET.FEMALE_BREAST_EXPOSED!;
+  assert.equal(t.x0, 100 * ins.x, 'inset by the class fraction');
+  assert.equal(t.x1, 100 - 100 * ins.x);
+  assert.ok((t.x1 - t.x0) < 50, 'the breast box lands on the middle, not the whole breast');
+  // Stays centred, whatever the strength.
+  for (const k of [0, 0.5, 1, 2]) {
+    const q = tightenBox(box, k);
+    assert.equal((q.x0 + q.x1) / 2, 50, `centre held at strength ${k}`);
+    assert.ok(q.x1 > q.x0, `never collapses at strength ${k}`);
+  }
+  assert.deepEqual(tightenBox(box, 0), box, 'strength 0 is the raw box');
+  // Genitalia are harder to detect on painted art, so they get a lower floor.
+  assert.ok(CLASS_SCORE_SCALE.FEMALE_GENITALIA_EXPOSED! < 1, 'genital floor is below the operator threshold');
+  assert.equal(CLASS_SCORE_SCALE.FEMALE_BREAST_EXPOSED, undefined, 'breasts use the threshold as given');
+});
