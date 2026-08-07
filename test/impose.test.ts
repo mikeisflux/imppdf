@@ -511,7 +511,10 @@ test('metalMaskFromPixels: plates the linework and highlights, not flat fills', 
   }
   const m = metalMaskFromPixels(px, w, h, { toneGain: 0, highlightGain: 0, floor: 24 });
   const at = (x: number, y: number) => m[y * w + x]!;
-  assert.ok(at(19, 20) > 100 || at(20, 20) > 100, 'the edge is plated');
+  // XDoG puts the line just inside the DARKER side of the boundary, so check
+  // the edge region rather than one exact pixel (that was Sobel's position).
+  const edgeBand = [15, 16, 17, 18, 19, 20].map((x) => at(x, 20));
+  assert.ok(Math.max(...edgeBand) > 200, `the edge is plated (${edgeBand.join(',')})`);
   assert.equal(at(5, 20), 0, 'flat mid-grey gets no metal without tone');
   assert.equal(at(35, 20), 0, 'flat white gets none either with highlights off');
   // Highlights on: the bright side now plates even though it is flat.

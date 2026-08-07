@@ -4304,8 +4304,38 @@ export interface RaisedMetalTuning {
   toneGain?: number;
 }
 
-// Sobel edge magnitude + specular highlights → 0..255 metal coverage.
-// Pure, so the look is unit-testable without a canvas.
+// Fast separable Gaussian (three box passes ≈ a true Gaussian).
+function blurPlane(src: Float32Array, w: number, h: number, radius: number): Float32Array {
+  if (radius < 1) return src.slice();
+  let a = src.slice(), b = new Float32Array(w * h);
+  for (let pass = 0; pass < 3; pass++) {
+    const win = 2 * radius + 1;
+    for (let y = 0; y < h; y++) {                       // horizontal
+      const row = y * w; let sum = 0;
+      for (let k = -radius; k <= radius; k++) sum += a[row + Math.min(w - 1, Math.max(0, k))]!;
+      for (let x = 0; x < w; x++) {
+        b[row + x] = sum / win;
+        sum += a[row + Math.min(w - 1, x + radius + 1)]! - a[row + Math.min(w - 1, Math.max(0, x - radius))]!;
+      }
+    }
+    for (let x = 0; x < w; x++) {                       // vertical
+      let sum = 0;
+      for (let k = -radius; k <= radius; k++) sum += b[Math.min(h - 1, Math.max(0, k)) * w + x]!;
+      for (let y = 0; y < h; y++) {
+        a[y * w + x] = sum / win;
+        sum += b[Math.min(h - 1, y + radius + 1) * w + x]! - b[Math.min(h - 1, Math.max(0, y - radius)) * w + x]!;
+      }
+    }
+    const t = a; a = b === t ? a : a; b = new Float32Array(w * h);
+  }
+  return a;
+}
+
+// XDoG (extended difference-of-Gaussians) + specular highlights → 0..255 metal
+// coverage. XDoG, not Sobel: painted/airbrushed art has soft gradients that a
+// gradient operator barely registers, leaving an almost-empty plate. DoG
+// responds to the STRUCTURE instead, so it pulls real ink-like linework out of
+// fully rendered art. Pure, so the look is unit-testable without a canvas.
 export function metalMaskFromPixels(
   rgba: Uint8ClampedArray | Uint8Array, w: number, h: number, t?: RaisedMetalTuning,
 ): Uint8Array {
@@ -4318,17 +4348,22 @@ export function metalMaskFromPixels(
     lum[i] = rgba[p + 3]! <= 4 ? -1 : 0.299 * rgba[p]! + 0.587 * rgba[p + 1]! + 0.114 * rgba[p + 2]!;
   }
   const out = new Uint8Array(w * h);
-  const at = (x: number, y: number) => lum[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))]!;
+  // XDoG: blur at two scales, subtract, then soft-threshold. `radius` scales
+  // with the image so the line weight is consistent at any resolution.
+  const flat = new Float32Array(w * h);
+  for (let i = 0; i < flat.length; i++) flat[i] = lum[i]! < 0 ? 255 : lum[i]!;
+  const r1 = Math.max(1, Math.round(Math.min(w, h) / 400));
+  const g1 = blurPlane(flat, w, h, r1);
+  const g2 = blurPlane(flat, w, h, Math.max(r1 + 1, Math.round(r1 * 1.6)));
+  const TAU = 0.985, PHI = 0.045;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const c = lum[y * w + x]!;
       if (c < 0) continue;                                   // transparent
-      // Sobel over luminance — the artwork's own linework.
-      const gx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1))
-               - (at(x - 1, y - 1) + 2 * at(x - 1, y) + at(x - 1, y + 1));
-      const gy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1))
-               - (at(x - 1, y - 1) + 2 * at(x, y - 1) + at(x + 1, y - 1));
-      const edge = Math.min(255, Math.hypot(gx, gy) / 4) * edgeGain;
+      // Positive where the pixel is darker than its surroundings — i.e. a line.
+      const dog = g1[y * w + x]! - TAU * g2[y * w + x]!;
+      // Soft ramp so the line keeps its anti-aliasing instead of stair-stepping.
+      const edge = Math.min(255, Math.max(0, -dog) * PHI * 255) * edgeGain;
       // Specular highlight: how far above the highlight point this pixel sits.
       const hl = c > hlFrom ? ((c - hlFrom) / (255 - hlFrom)) * 255 * hlGain : 0;
       // Linework/highlights, plus a slight grey tone from the art's own shading.
@@ -4338,6 +4373,14 @@ export function metalMaskFromPixels(
       if (gamma !== 1) v = 255 * Math.pow(Math.min(1, v / 255), gamma);
       out[y * w + x] = Math.max(0, Math.min(255, Math.round(v)));
     }
+  }
+  // Auto-normalise: without it a softly painted page plates at ~20% and the
+  // varnish "doesn't do much". Scale so the strongest linework reaches full ink.
+  let peak = 0;
+  for (let i = 0; i < out.length; i++) if (out[i]! > peak) peak = out[i]!;
+  if (peak > 0 && peak < 255) {
+    const k = 255 / peak;
+    for (let i = 0; i < out.length; i++) out[i] = Math.min(255, Math.round(out[i]! * k));
   }
   return out;
 }

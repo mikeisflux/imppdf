@@ -2398,11 +2398,109 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       <span className="pe-label-sm" style={{ width: 40, textAlign: 'right' }}>{val}</span>
     </div>
   );
+
+  // ── Live preview ─────────────────────────────────────────────────────────
+  // The artwork is rendered ONCE at preview size and cached; only the (cheap)
+  // mask is recomputed as sliders move, so dragging stays responsive.
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const artRef = useRef<{ data: Uint8ClampedArray; w: number; h: number } | null>(null);
+  const [ready, setReady] = useState(0);
+  const mode = s.previewMode ?? 'relief';
+
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      artRef.current = null; setReady((n) => n + 1);
+      if (!sourceBytes) return;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pdfjs: any = await import('pdfjs-dist');
+        try { pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default; } catch { /* bundled */ }
+        const doc = await pdfjs.getDocument({ data: sourceBytes.slice() }).promise;
+        const pg = await doc.getPage(1);
+        const v1 = pg.getViewport({ scale: 1 });
+        const scale = Math.min(1, 460 / v1.width);
+        const vp = pg.getViewport({ scale });
+        const w = Math.max(1, Math.ceil(vp.width)), h = Math.max(1, Math.ceil(vp.height));
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const cx = c.getContext('2d', { willReadFrequently: true })!;
+        await pg.render({ canvasContext: cx, viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
+        if (dead) return;
+        artRef.current = { data: cx.getImageData(0, 0, w, h).data, w, h };
+        setReady((n) => n + 1);
+      } catch { /* preview is a nicety */ }
+    })();
+    return () => { dead = true; };
+  }, [sourceBytes]);
+
+  useEffect(() => {
+    const art = artRef.current, cv = canvasRef.current;
+    if (!art || !cv) return;
+    const { w, h } = art;
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d')!;
+    let cancelled = false;
+    const id = setTimeout(async () => {
+      const { metalMaskFromPixels } = await import('@/lib/imposition-toolkit/impose');
+      if (cancelled) return;
+      const m = metalMaskFromPixels(art.data, w, h, {
+        edgeGain: s.edgeGain ?? 1, highlightGain: s.highlightGain ?? 0.6,
+        highlightFrom: s.highlightFrom ?? 200, toneGain: s.toneGain ?? 0.18,
+        floor: s.floor ?? 24, gamma: s.gamma ?? 1,
+      });
+      const out = ctx.createImageData(w, h);
+      const at = (x: number, y: number) => m[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))]!;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x, q = i * 4, v = m[i]!;
+        if (mode === 'plate') {
+          // The varnish channel as the RIP sees it: ink = light on black.
+          out.data[q] = v; out.data[q + 1] = v; out.data[q + 2] = v; out.data[q + 3] = 255;
+        } else if (mode === 'overlay') {
+          // Artwork with the plate flagged in red.
+          const t = v / 255;
+          out.data[q] = Math.round(art.data[q]! * (1 - t) + 255 * t);
+          out.data[q + 1] = Math.round(art.data[q + 1]! * (1 - t) * 1);
+          out.data[q + 2] = Math.round(art.data[q + 2]! * (1 - t) * 1);
+          out.data[q + 3] = 255;
+        } else {
+          // RELIEF: treat the plate as a height map, light it, and lay the
+          // metallic sheen over the art — what the cured varnish will look like.
+          const dx = (at(x + 1, y) - at(x - 1, y)) / 255;
+          const dy = (at(x, y + 1) - at(x, y - 1)) / 255;
+          const nz = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+          const nx = -dx * nz, ny = -dy * nz;
+          const lx = -0.55, ly = -0.55, lz = 0.63;             // raking light
+          const diff = Math.max(0, nx * lx + ny * ly + nz * lz);
+          const spec = Math.pow(diff, 28) * (v / 255);
+          const sheen = (0.35 * diff + 0.9 * spec) * (v / 255);
+          out.data[q] = Math.min(255, Math.round(art.data[q]! + sheen * 235));
+          out.data[q + 1] = Math.min(255, Math.round(art.data[q + 1]! + sheen * 225));
+          out.data[q + 2] = Math.min(255, Math.round(art.data[q + 2]! + sheen * 200));
+          out.data[q + 3] = 255;
+        }
+      }
+      ctx.putImageData(out, 0, 0);
+    }, 60);                                         // debounce the slider drag
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [ready, mode, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then print the <b>colour file</b> (artwork + {s.whiteName || 'W1'} white) on top of the cured varnish.
       </div>
+      <Section label="// PREVIEW" help="Live, from the loaded artwork. Relief lights the plate as a height map so you can see how much the varnish is actually doing; Plate is the raw varnish channel; Overlay flags it on the art. Auto-detected raised regions aren't previewed — they only apply on export.">
+        <div className="pe-row" style={{ gap: 8 }}>
+          {(['relief', 'plate', 'overlay'] as const).map((mdl) => (
+            <button key={mdl} className="pe-btn" style={{ flex: 1, ...(mode === mdl ? { outline: '2px solid currentColor' } : {}) }}
+              onClick={() => up({ previewMode: mdl })}>{mdl === 'relief' ? 'Relief' : mdl === 'plate' ? 'Plate' : 'Overlay'}</button>
+          ))}
+        </div>
+        <div style={{ marginTop: 8, background: '#111', borderRadius: 6, padding: 6, textAlign: 'center' }}>
+          {sourceBytes
+            ? <canvas ref={canvasRef} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} />
+            : <div className="pe-note" style={{ margin: 0, padding: 12 }}>Load the artwork to preview.</div>}
+        </div>
+      </Section>
       <Section label="// PLATE" help="How the varnish plate is derived from the artwork. Edges give you the linework, highlights catch the speculars, and the grey tone modulates the relief with the art's own shading.">
         {rng('Line art', 'edgeGain', s.edgeGain ?? 1, 0, 3, 0.1, 'edge strength')}
         {rng('Highlights', 'highlightGain', s.highlightGain ?? 0.6, 0, 2, 0.1, 'speculars')}
