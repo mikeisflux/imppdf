@@ -2177,8 +2177,41 @@ function PerfectCoverPanel({ s, up }: PanelProps) {
   const trimW = s.trimWIn ?? 6, trimH = s.trimHIn ?? 9;
   const pages = s.pages ?? 0, cal = s.caliperPerPageIn ?? 0.0025;
   const bleed = s.bleedIn ?? 0.125;
-  const spine = Math.max(0, pages) * cal + (s.coverAllowanceIn ?? 0);
+  const allowance = s.coverAllowanceIn ?? 0;
+  // The calculator, matching the engine's spineWidthIn() exactly.
+  const block = Math.max(0, Math.round(pages)) * Math.max(0, cal);
+  const spine = block + Math.max(0, allowance);
+  const ppi = cal > 0 ? Math.round(1 / cal) : 0;
   const sheetW = 2 * trimW + spine + 2 * bleed, sheetH = trimH + 2 * bleed;
+  const pickCoverArt = (key: 'front' | 'back' | 'spineArt') => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/pdf,image/*';
+    inp.onchange = async () => {
+      const f = inp.files?.[0]; if (!f) return;
+      let bytes = new Uint8Array(await f.arrayBuffer());
+      if (f.type.startsWith('image/')) {
+        const { imageToPdf } = await import('@/lib/imposition-toolkit/impose');
+        bytes = new Uint8Array(await imageToPdf(bytes, f.type));
+      }
+      up({ [key]: { name: f.name, bytes } });
+    };
+    inp.click();
+  };
+  const artRow = (key: 'front' | 'back' | 'spineArt', label: string) => {
+    const art = s[key] as { name?: string } | null;
+    return (
+      <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 6 }}>
+        <span className="pe-label" style={{ width: 76 }}>{label}</span>
+        {art?.name
+          ? <div className="pe-note" style={{ margin: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              ✓ {art.name}
+              <button className="pe-chipbtn" style={{ marginLeft: 8 }} onClick={() => pickCoverArt(key)}>Replace</button>
+              <button className="pe-chipbtn" style={{ marginLeft: 4 }} onClick={() => up({ [key]: null })}>Remove</button>
+            </div>
+          : <button className="pe-btn" style={{ flex: 1 }} onClick={() => pickCoverArt(key)}>Upload {label.toLowerCase()}…</button>}
+      </div>
+    );
+  };
   const num = (label: string, key: string, val: number, step = 0.125, hint?: string) => (
     <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 6 }}>
       <span className="pe-label" style={{ flex: 1 }}>{label}{hint ? <span className="pe-label-sm"> · {hint}</span> : null}</span>
@@ -2189,8 +2222,16 @@ function PerfectCoverPanel({ s, up }: PanelProps) {
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        The wrap-around softcover: <b>back cover · spine · front cover</b> on one sheet. Source page 1 is the front, page 2 the back.
+        The wrap-around softcover: <b>back cover · spine · front cover</b> on one sheet.
       </div>
+      <Section label="// ARTWORK" help="Front, back and spine are usually separate files. Anything you don't upload falls back to a page of the step's source PDF (page 1 front, page 2 back).">
+        {artRow('front', 'Front')}
+        {artRow('back', 'Back')}
+        {artRow('spineArt', 'Spine')}
+        <div className="pe-note" style={{ marginTop: 8 }}>
+          Front and back bleed off their outer and top/bottom edges; spine art fills the spine panel. Leave the spine empty to use the spine text (or nothing) instead.
+        </div>
+      </Section>
       <Section label="// BOOK" help="Trim size of the finished book and how many interior pages it has. Spine width is calculated from these.">
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
           {([[6, 9, '6×9'], [5.5, 8.5, '5.5×8.5'], [6.625, 10.25, 'Comic 6.625×10.25'], [8.5, 11, '8.5×11']] as [number, number, string][]).map(([tw, th, label]) => (
@@ -2205,21 +2246,48 @@ function PerfectCoverPanel({ s, up }: PanelProps) {
       </Section>
       <Section label="// SPINE" help="Spine width = interior pages × the thickness one page contributes (1 ÷ PPI). Most binders want at least 0.125&quot; of spine for the glue to hold.">
         <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
-          <span className="pe-label" style={{ flex: 1 }}>Paper</span>
+          <span className="pe-label" style={{ flex: 1 }}>Interior paper<span className="pe-label-sm"> · the book block</span></span>
           <select className="pe-select" value={cal} onChange={(e) => up({ caliperPerPageIn: Number(e.target.value) })} style={{ width: 210 }}>
             <option value={0.002252}>50# white uncoated (444 PPI)</option>
             <option value={0.0025}>60# offset / cream (400 PPI)</option>
             <option value={0.0029}>70# offset (345 PPI)</option>
             <option value={0.0022}>80# gloss text (455 PPI)</option>
             <option value={0.0027}>100# gloss text (370 PPI)</option>
+            <option value={0.0032}>80# uncoated cover (312 PPI)</option>
           </select>
         </div>
         {num('Thickness per page', 'caliperPerPageIn', cal, 0.0001, 'inches')}
-        {num('Cover stock allowance', 'coverAllowanceIn', s.coverAllowanceIn ?? 0, 0.005, 'inches')}
-        <div className={spine < 0.125 ? 'pe-gang-warn' : 'pe-note'} style={{ marginTop: 8 }}>
-          Spine <b>{spine.toFixed(3)}&quot;</b> ({(spine * 25.4).toFixed(1)} mm) → cover sheet <b>{sheetW.toFixed(3)} × {sheetH.toFixed(3)}&quot;</b> including bleed.
-          {spine < 0.125 && <> ⚠ Under 0.125&quot; most binders can&apos;t hold a perfect-bound spine — consider saddle stitch.</>}
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
+          <span className="pe-label" style={{ flex: 1 }}>Cover stock<span className="pe-label-sm"> · the wrap</span></span>
+          <select className="pe-select" value={s.coverAllowanceIn ?? 0} onChange={(e) => up({ coverAllowanceIn: Number(e.target.value) })} style={{ width: 210 }}>
+            <option value={0}>Self-cover / none</option>
+            <option value={0.018}>80# gloss cover (0.009&quot; ea)</option>
+            <option value={0.022}>80# uncoated cover (0.011&quot; ea)</option>
+            <option value={0.021}>100# gloss cover (0.0105&quot; ea)</option>
+            <option value={0.024}>12pt C1S (0.012&quot; ea)</option>
+            <option value={0.028}>14pt C1S (0.014&quot; ea)</option>
+            <option value={0.03}>Laminated cover (typical)</option>
+          </select>
         </div>
+        {num('Cover allowance', 'coverAllowanceIn', s.coverAllowanceIn ?? 0, 0.001, 'inches')}
+        <div className="pe-note" style={{ marginTop: 6 }}>
+          The wrap adds its own thickness at the spine, so the allowance is <b>2 × the cover&apos;s caliper</b> (it folds round the front and the back). Set it to zero for a self-cover.
+        </div>
+        <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>
+          <div><b>Spine calculator</b></div>
+          <div>{pages} pages × {cal.toFixed(4)}&quot;{ppi ? ` (${ppi} PPI)` : ''} = <b>{block.toFixed(4)}&quot;</b> book block</div>
+          <div>+ cover allowance <b>{allowance.toFixed(4)}&quot;</b></div>
+          <div style={{ borderTop: '1px solid currentColor', opacity: 0.9, marginTop: 4, paddingTop: 4 }}>
+            = spine <b>{spine.toFixed(3)}&quot;</b> ({(spine * 25.4).toFixed(2)} mm)
+          </div>
+          <div style={{ marginTop: 4 }}>Cover sheet <b>{sheetW.toFixed(3)} × {sheetH.toFixed(3)}&quot;</b> ({(sheetW * 25.4).toFixed(1)} × {(sheetH * 25.4).toFixed(1)} mm) including {bleed}&quot; bleed</div>
+        </div>
+        {pages % 2 !== 0 && (
+          <div className="pe-gang-warn" style={{ marginTop: 8 }}>⚠ Perfect binding needs an even page count — add one blank.</div>
+        )}
+        {spine < 0.125 && pages > 0 && (
+          <div className="pe-gang-warn" style={{ marginTop: 8 }}>⚠ Under 0.125&quot; most binders can&apos;t hold a perfect-bound spine — consider saddle stitch.</div>
+        )}
       </Section>
       <Section label="// FINISHING" help="Bleed around the wrap, plus the hinge scores that let the cover open without cracking the spine glue.">
         {num('Bleed', 'bleedIn', bleed, 0.0625, 'inches')}

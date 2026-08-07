@@ -131,6 +131,7 @@ export function defaultSettings(type: StepType): StepSettings {
         coverAllowanceIn: 0, bleedIn: 0.125, frontPage: 1, backPage: 2,
         spineText: '', addMarks: true, hingeIn: 0.1875,
         markLenIn: 0.25, markOffIn: 0.125, markWeightPt: 0.25,
+        front: null, back: null, spineArt: null,
       };
     case 'removebg':
       // Cut the subject out of the artwork and drop everything else to
@@ -551,6 +552,9 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         break;
       case 'replicate': b = await replicateFill(b, replicateOpts(s)); break;
       case 'pbcover': b = await imposePerfectCover(b, {
+        front: s.front?.bytes ? { bytes: s.front.bytes } : null,
+        back: s.back?.bytes ? { bytes: s.back.bytes } : null,
+        spineArt: s.spineArt?.bytes ? { bytes: s.spineArt.bytes } : null,
         trimWIn: s.trimWIn ?? 6, trimHIn: s.trimHIn ?? 9, pages: s.pages ?? 0,
         caliperPerPageIn: s.caliperPerPageIn ?? 0.0025, coverAllowanceIn: s.coverAllowanceIn ?? 0,
         bleedIn: s.bleedIn ?? 0.125, frontPage: s.frontPage ?? 1, backPage: s.backPage ?? 2,
@@ -819,7 +823,7 @@ function stripBytes(s: StepSettings): StepSettings {
   if (Array.isArray(c.files)) c.files = [];
   if (Array.isArray(c.extras)) c.extras = [];
   if (c.stamp) { c.stamp = null; c.stampName = ''; }
-  for (const k of ['a', 'b', 'c', 'd'] as const) if (c[k] && (c[k] as { bytes?: Uint8Array }).bytes) c[k] = null;
+  for (const k of ['a', 'b', 'c', 'd', 'front', 'back', 'spineArt'] as const) if (c[k] && (c[k] as { bytes?: Uint8Array }).bytes) c[k] = null;
   return c;
 }
 

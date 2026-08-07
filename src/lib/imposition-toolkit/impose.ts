@@ -4077,7 +4077,14 @@ export function spineWidthIn(pages: number, caliperPerPageIn: number, coverAllow
   return p * Math.max(0, caliperPerPageIn) + Math.max(0, coverAllowanceIn);
 }
 
+export interface PerfectCoverArt { bytes: Uint8Array; page?: number }
+
 export interface PerfectCoverOptions {
+  // Front, back and spine are usually authored as SEPARATE files. Any that is
+  // omitted falls back to a page of the pipeline's source PDF.
+  front?: PerfectCoverArt | null;
+  back?: PerfectCoverArt | null;
+  spineArt?: PerfectCoverArt | null;
   trimWIn: number; trimHIn: number;      // the finished book's trim size
   pages: number;                          // interior page count (not leaves)
   caliperPerPageIn?: number;              // default 0.0025" (60# offset ≈ 400 PPI)
@@ -4106,14 +4113,29 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let srcDoc: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const embeds: any[] = [];
+  let srcPages: any[] = [];
   try {
     srcDoc = await PDFDocument.load(src.slice(), { ignoreEncryption: true });
-    const pages = srcDoc.getPages();
-    const want = [Math.max(1, Math.round(opts.frontPage ?? 1)), Math.max(1, Math.round(opts.backPage ?? 2))];
-    for (const n of want) embeds.push(pages[n - 1] ? (await out.embedPages([pages[n - 1]!]))[0] : null);
-  } catch { /* no art — still emit a correctly sized, marked-up wrap */ }
-  const [frontEmb, backEmb] = embeds;
+    srcPages = srcDoc.getPages();
+  } catch { /* no source — separate files may still supply everything */ }
+
+  // Prefer a dedicated file; fall back to a page of the source document.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const embedArt = async (art: PerfectCoverArt | null | undefined, fallbackPage?: number): Promise<any> => {
+    if (art?.bytes) {
+      try {
+        const d = await PDFDocument.load(art.bytes.slice(), { ignoreEncryption: true });
+        const pages = d.getPages();
+        const i = Math.min(pages.length, Math.max(1, Math.round(art.page ?? 1))) - 1;
+        if (pages[i]) { if (!srcDoc) srcDoc = d; return (await out.embedPages([pages[i]!]))[0]; }
+      } catch { /* unreadable file — fall through to the source */ }
+    }
+    if (fallbackPage && srcPages[fallbackPage - 1]) return (await out.embedPages([srcPages[fallbackPage - 1]!]))[0];
+    return null;
+  };
+  const frontEmb = await embedArt(opts.front, Math.max(1, Math.round(opts.frontPage ?? 1)));
+  const backEmb = await embedArt(opts.back, Math.max(1, Math.round(opts.backPage ?? 2)));
+  const spineEmb = await embedArt(opts.spineArt);
 
   // Cover-fit art into a rect, clipped to it.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -4129,6 +4151,8 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   drawInto(backEmb, 0, 0, bleed + trimW, shH);
   // Front cover on the right, including the right + top/bottom bleed.
   drawInto(frontEmb, bleed + trimW + spine, 0, bleed + trimW, shH);
+  // Spine art (if supplied) fills the spine panel and bleeds top/bottom.
+  drawInto(spineEmb, bleed + trimW, 0, spine, shH);
 
   if (opts.spineText && spine > 2) {
     const font = await out.embedFont(PL.StandardFonts.HelveticaBold);
