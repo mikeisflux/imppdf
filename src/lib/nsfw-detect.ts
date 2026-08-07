@@ -59,15 +59,17 @@ export const detectorError = () => lastError;
 // NudeNet's class order. Only the ones worth raising are mapped; the rest are
 // ignored so a stray hit never drives the plate.
 const CLASSES: Record<number, string> = {
-  0: 'anus', 1: 'armpits', 2: 'belly', 3: 'buttocks', 4: 'feet',
-  5: 'breast_covered', 6: 'genitalia_covered', 7: 'face',
-  8: 'breast_exposed', 9: 'genitalia_exposed', 10: 'anus_exposed',
-  11: 'belly_exposed', 12: 'buttocks_exposed', 13: 'feet_exposed',
-  14: 'armpits_exposed', 15: 'nipple_male', 16: 'face_male', 17: 'face_female',
+  0: 'FEMALE_GENITALIA_COVERED', 1: 'FACE_FEMALE', 2: 'BUTTOCKS_EXPOSED',
+  3: 'FEMALE_BREAST_EXPOSED', 4: 'FEMALE_GENITALIA_EXPOSED', 5: 'MALE_BREAST_EXPOSED',
+  6: 'ANUS_EXPOSED', 7: 'FEET_EXPOSED', 8: 'BELLY_COVERED', 9: 'FEET_COVERED',
+  10: 'ARMPITS_COVERED', 11: 'ARMPITS_EXPOSED', 12: 'FACE_MALE', 13: 'BELLY_EXPOSED',
+  14: 'MALE_GENITALIA_EXPOSED', 15: 'ANUS_COVERED', 16: 'FEMALE_BREAST_COVERED',
+  17: 'BUTTOCKS_COVERED',
 };
 // Raised by default: the exposed anatomy an adult title would want lifted.
 export const DEFAULT_RAISE_CLASSES = new Set([
-  'breast_exposed', 'genitalia_exposed', 'buttocks_exposed', 'anus_exposed',
+  'FEMALE_BREAST_EXPOSED', 'FEMALE_GENITALIA_EXPOSED',
+  'BUTTOCKS_EXPOSED', 'ANUS_EXPOSED', 'MALE_GENITALIA_EXPOSED',
 ]);
 
 export interface DetectedRegion {
@@ -130,7 +132,11 @@ export async function detectRegions(
         label: CLASSES[best] ?? `class_${best}`, score: bestScore,
       });
     }
-    return nonMaxSuppress(hits, 0.45);
+    const kept = nonMaxSuppress(hits, 0.45);
+    // Makes a class-order or head-shape mismatch obvious instead of silent.
+    console.info('[detect]', dims.join('x'), `${numCls} classes,`,
+      kept.length ? kept.map((k) => `${k.label} ${k.score.toFixed(2)}`).join(', ') : 'nothing above threshold');
+    return kept;
   } catch (err) { lastError = String(err); return []; }
 }
 
