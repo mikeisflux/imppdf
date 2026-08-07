@@ -12,7 +12,7 @@ import {
   nestPdf, imposeCalendar, insertPages as insertPagesOp, mixPdfs, nudgePdf,
   addBackdropFile, applyColorEffects, applyColorManagement, addBarcodeStamp,
   addDimensions, addWhiteVarnish, addBraille, optimizePdf, repairPdf, decryptPdf, setLayers,
-  replicateFill, imposeDivinityBox, trimToArtwork, removeBackground, imposePerfectCover,
+  replicateFill, imposeDivinityBox, trimToArtwork, removeBackground, imposePerfectCover, computeNUpGrid,
 } from '@/lib/imposition-toolkit/impose';
 import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/imposition-toolkit/impose';
 
@@ -513,7 +513,19 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         });
         break;
       }
-      case 'cards': case 'grid': case 'cutstack': case 'perfectbound':
+      case 'perfectbound': {
+        // STRUCTURAL to this tool — never read from stored settings:
+        //  * cut-and-stack ordering (pile n = cellIdx*numSheets + sheet)
+        //  * duplex, so a leaf is page N front / page N+1 back
+        //  * as many up as SAFELY fit the sheet once marks and bleed are
+        //    reserved. A stale 1x1 (or an old sheet size) must never quietly
+        //    turn a book block into one page per sheet.
+        const o = nupOpts(s);
+        const g = computeNUpGrid({ ...o, cols: 99, rows: 99 });
+        b = await imposeNUp(b, { ...o, cols: g.cols, rows: g.rows, cutStack: true, repeatFirst: false, duplex: true });
+        break;
+      }
+      case 'cards': case 'grid': case 'cutstack':
       case 'trading': case 'bookmark': case 'flyer': case 'indexcard': case 'prooflabel':
       case 'business': case 'postcard': case 'rackcard': case 'hangtag': case 'label':
       case 'namebadge': case 'ticket': case 'coupon': case 'placecard': case 'greeting':

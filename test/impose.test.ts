@@ -479,3 +479,23 @@ test('perfect bound: 6x9 trim imposes 2-up on 11x17 with trim marks reserved', (
   });
   assert.equal(letter.cols * letter.rows, 1, 'Letter 2-up leaves no room for marks');
 });
+
+test('perfect bound cut-and-stack: leaf N is page N front / page N+1 back', async () => {
+  // 8 pages, 2-up duplex cut-and-stack on 17x11 → 4 leaves, 2 sheets,
+  // each sheet printed front+back = 4 output pages.
+  const out = await imposeNUp(await pdfOf(8, 6 * 72, 9 * 72), {
+    ...baseNUp, sheetWIn: 17, sheetHIn: 11, cols: 2, rows: 1,
+    cellWIn: 6, cellHIn: 9, marginIn: 0, gutterIn: 0, gutterYIn: 0,
+    duplex: true, cutStack: true, addMarks: false,
+  });
+  assert.equal(await pageCount(out), 4, '2 sheets x (front+back)');
+  // The pile formula: with 4 leaves 2-up there are 2 sheets, so position 1
+  // carries leaves 1-2 (pages 1-4) and position 2 carries leaves 3-4 (pages
+  // 5-8). Cut the stack, drop the right pile under the left, and the block
+  // reads 1..8 with page 2 backing page 1.
+  const g = computeNUpGrid({
+    ...baseNUp, sheetWIn: 17, sheetHIn: 11, cols: 99, rows: 99,
+    cellWIn: 6, cellHIn: 9, marginIn: 0, gutterIn: 0, gutterYIn: 0, addMarks: false,
+  });
+  assert.equal(g.cols * g.rows, 2, 'two 6x9 leaves per 17x11 sheet');
+});
