@@ -133,6 +133,7 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'grid', label: 'Grid', icon: 'grid', tip: 'Use Grid to arrange pages in an N-up grid layout.' },
     { id: 'nupbook', label: 'N-up Book', icon: 'nupbook', tip: 'Use N-up Book for multi-up signature imposition (folio / quarto).' },
     { id: 'cutstack', label: 'Cut and Stack', icon: 'cutstack', tip: 'Use Cut & Stack so sequential pages fall into order after guillotining.' },
+    { id: 'pbcover', label: 'Perfect Bound Cover', icon: 'nupbook', tip: 'Softcover wrap: back cover | spine | front cover on one sheet, with the spine width calculated from your page count and paper caliper, plus trim, fold and hinge marks.' },
     { id: 'perfectbound', label: 'Perfect Bound', icon: 'nupbook', tip: 'Use Perfect Bound for trade paperbacks: sequential 2-up, printed duplex and cut-and-stacked so page 2 backs page 1.' },
     { id: 'comic', label: 'Comic Book', icon: 'spreads', tip: 'Saddle-stitch a single-issue comic: 2-up per side on tabloid, pages centered for duplex registration.' },
     { id: 'magazine', label: 'Magazine', icon: 'booklet', tip: 'Saddle-stitch or signature-bound magazine on large sheets with press marks.' },

@@ -319,6 +319,22 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
           </div>
         </Section>
       )}
+      {p.type === 'perfectbound' && (
+        <Section label="// BOOK SIZE" help="The finished trim size of the book. Picking one re-runs the fit for the current sheet — the columns/rows below are clamped to what actually fits once trim marks and bleed are reserved.">
+          <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            {([[6, 9, 'US trade 6×9'], [5.5, 8.5, 'Digest 5.5×8.5'], [5, 8, '5×8'], [6.14, 9.21, 'Royal 6.14×9.21'], [6.625, 10.25, 'Comic TPB 6.625×10.25'], [7, 10, '7×10'], [8.5, 11, 'Letter 8.5×11']] as [number, number, string][]).map(([tw, th, label]) => (
+              <button key={label} className="pe-btn"
+                style={Math.abs((s.cellWIn ?? 0) - tw) < 0.01 && Math.abs((s.cellHIn ?? 0) - th) < 0.01 ? { outline: '2px solid currentColor' } : undefined}
+                // Ask for "as many as possible"; the clamp below reduces it to
+                // what genuinely fits. Never assume a count.
+                onClick={() => up({ cellWIn: tw, cellHIn: th, cols: 99, rows: 99 })}>{label}</button>
+            ))}
+          </div>
+          <div className="pe-note" style={{ marginTop: 8 }}>
+            Pages are imposed <b>cut-and-stack</b>: print duplex, guillotine the stack into piles, then stack the piles in order — the book block reads sequentially. Page count should be a multiple of {(s.cols ?? 1) * (s.rows ?? 1) * 2 || 4}; short files get blanks at the back.
+          </div>
+        </Section>
+      )}
       {canReplicate && (
         <Section label="// REPLICATE" help="Fill the selected sheet with as many copies of the image as safely fit inside your margins. Add extra images/PDFs to take some of the cells.">
           <Check icon="replicateIc" label="Replicate — fill the sheet with copies" checked={!!s.replicate} onChange={(v) => up({ replicate: v })} />
@@ -2157,8 +2173,74 @@ function RemoveBgPanel({ s, up }: PanelProps) {
   );
 }
 
+function PerfectCoverPanel({ s, up }: PanelProps) {
+  const trimW = s.trimWIn ?? 6, trimH = s.trimHIn ?? 9;
+  const pages = s.pages ?? 0, cal = s.caliperPerPageIn ?? 0.0025;
+  const bleed = s.bleedIn ?? 0.125;
+  const spine = Math.max(0, pages) * cal + (s.coverAllowanceIn ?? 0);
+  const sheetW = 2 * trimW + spine + 2 * bleed, sheetH = trimH + 2 * bleed;
+  const num = (label: string, key: string, val: number, step = 0.125, hint?: string) => (
+    <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 6 }}>
+      <span className="pe-label" style={{ flex: 1 }}>{label}{hint ? <span className="pe-label-sm"> · {hint}</span> : null}</span>
+      <input className="pe-input" type="number" step={step} value={val} style={{ width: 110 }}
+        onChange={(e) => up({ [key]: Number(e.target.value) })} />
+    </div>
+  );
+  return (
+    <>
+      <div className="pe-note" style={{ marginBottom: 12 }}>
+        The wrap-around softcover: <b>back cover · spine · front cover</b> on one sheet. Source page 1 is the front, page 2 the back.
+      </div>
+      <Section label="// BOOK" help="Trim size of the finished book and how many interior pages it has. Spine width is calculated from these.">
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {([[6, 9, '6×9'], [5.5, 8.5, '5.5×8.5'], [6.625, 10.25, 'Comic 6.625×10.25'], [8.5, 11, '8.5×11']] as [number, number, string][]).map(([tw, th, label]) => (
+            <button key={label} className="pe-btn"
+              style={Math.abs(trimW - tw) < 0.01 && Math.abs(trimH - th) < 0.01 ? { outline: '2px solid currentColor' } : undefined}
+              onClick={() => up({ trimWIn: tw, trimHIn: th })}>{label}</button>
+          ))}
+        </div>
+        {num('Trim width', 'trimWIn', trimW)}
+        {num('Trim height', 'trimHIn', trimH)}
+        {num('Interior pages', 'pages', pages, 2, 'not leaves')}
+      </Section>
+      <Section label="// SPINE" help="Spine width = interior pages × the thickness one page contributes (1 ÷ PPI). Most binders want at least 0.125&quot; of spine for the glue to hold.">
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
+          <span className="pe-label" style={{ flex: 1 }}>Paper</span>
+          <select className="pe-select" value={cal} onChange={(e) => up({ caliperPerPageIn: Number(e.target.value) })} style={{ width: 210 }}>
+            <option value={0.002252}>50# white uncoated (444 PPI)</option>
+            <option value={0.0025}>60# offset / cream (400 PPI)</option>
+            <option value={0.0029}>70# offset (345 PPI)</option>
+            <option value={0.0022}>80# gloss text (455 PPI)</option>
+            <option value={0.0027}>100# gloss text (370 PPI)</option>
+          </select>
+        </div>
+        {num('Thickness per page', 'caliperPerPageIn', cal, 0.0001, 'inches')}
+        {num('Cover stock allowance', 'coverAllowanceIn', s.coverAllowanceIn ?? 0, 0.005, 'inches')}
+        <div className={spine < 0.125 ? 'pe-gang-warn' : 'pe-note'} style={{ marginTop: 8 }}>
+          Spine <b>{spine.toFixed(3)}&quot;</b> ({(spine * 25.4).toFixed(1)} mm) → cover sheet <b>{sheetW.toFixed(3)} × {sheetH.toFixed(3)}&quot;</b> including bleed.
+          {spine < 0.125 && <> ⚠ Under 0.125&quot; most binders can&apos;t hold a perfect-bound spine — consider saddle stitch.</>}
+        </div>
+      </Section>
+      <Section label="// FINISHING" help="Bleed around the wrap, plus the hinge scores that let the cover open without cracking the spine glue.">
+        {num('Bleed', 'bleedIn', bleed, 0.0625, 'inches')}
+        {num('Hinge from spine', 'hingeIn', s.hingeIn ?? 0.1875, 0.0625, 'inches')}
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 6 }}>
+          <span className="pe-label" style={{ flex: 1 }}>Spine text</span>
+          <input className="pe-input" value={s.spineText ?? ''} placeholder="Title / author" style={{ width: 180 }}
+            onChange={(e) => up({ spineText: e.target.value })} />
+        </div>
+        <Check icon="crop" label="Trim, fold & hinge marks" checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />
+      </Section>
+      <div className="pe-note">
+        Keep titles and logos clear of the hinge zone either side of the spine — that area gets scored and creased.
+      </div>
+    </>
+  );
+}
+
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
+  if (type === 'pbcover') return <PerfectCoverPanel {...props} />;
   if (type === 'removebg') return <RemoveBgPanel {...props} />;
   if (type === 'preflight') return <PreflightPanel {...props} />;
   if (type === 'booklet' || type === 'comic' || type === 'magazine' || type === 'catalog'

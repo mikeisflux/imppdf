@@ -4063,6 +4063,114 @@ export async function divinityBoxProof(opts: DivinityBoxOptions & { dpi?: number
   return out.save();
 }
 
+// ── Perfect-bound cover ─────────────────────────────────────────────────────
+// A softcover wrap: BACK cover | SPINE | FRONT cover on one sheet, printed and
+// wrapped round the glued book block. Spine width comes from the page count and
+// the stock's caliper — get it wrong and the cover art lands off the spine.
+
+// Spine thickness in inches. caliperPerPageIn is the thickness ONE PAGE
+// contributes (a leaf is two pages, so this is half the sheet caliper);
+// equivalently 1/PPI. Perfect binding needs a page count divisible by 2, and
+// most binders want ≥0.125" of spine for the glue to hold.
+export function spineWidthIn(pages: number, caliperPerPageIn: number, coverAllowanceIn = 0): number {
+  const p = Math.max(0, Math.round(pages));
+  return p * Math.max(0, caliperPerPageIn) + Math.max(0, coverAllowanceIn);
+}
+
+export interface PerfectCoverOptions {
+  trimWIn: number; trimHIn: number;      // the finished book's trim size
+  pages: number;                          // interior page count (not leaves)
+  caliperPerPageIn?: number;              // default 0.0025" (60# offset ≈ 400 PPI)
+  coverAllowanceIn?: number;              // extra for the cover stock itself
+  bleedIn?: number;                       // default 0.125"
+  frontPage?: number;                     // 1-based source page for the front (default 1)
+  backPage?: number;                      // default 2 when present
+  spineText?: string;
+  addMarks?: boolean;                     // trim marks + spine/hinge ticks
+  markLenIn?: number; markOffIn?: number; markWeightPt?: number;
+  hingeIn?: number;                       // score guides this far off each spine edge (default 0.1875")
+}
+
+// Build the wrap. Front/back art each bleed off their outer and top/bottom
+// edges; the spine keeps its own clear width so nothing important creeps in.
+export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOptions): Promise<Uint8Array> {
+  const PL = await import('pdf-lib');
+  const { PDFDocument, rgb, degrees } = PL;
+  const bleed = (opts.bleedIn ?? 0.125) * PT;
+  const trimW = opts.trimWIn * PT, trimH = opts.trimHIn * PT;
+  const spine = spineWidthIn(opts.pages, opts.caliperPerPageIn ?? 0.0025, opts.coverAllowanceIn ?? 0) * PT;
+  const shW = 2 * trimW + spine + 2 * bleed, shH = trimH + 2 * bleed;
+
+  const out = await PDFDocument.create();
+  const pg = out.addPage([shW, shH]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let srcDoc: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const embeds: any[] = [];
+  try {
+    srcDoc = await PDFDocument.load(src.slice(), { ignoreEncryption: true });
+    const pages = srcDoc.getPages();
+    const want = [Math.max(1, Math.round(opts.frontPage ?? 1)), Math.max(1, Math.round(opts.backPage ?? 2))];
+    for (const n of want) embeds.push(pages[n - 1] ? (await out.embedPages([pages[n - 1]!]))[0] : null);
+  } catch { /* no art — still emit a correctly sized, marked-up wrap */ }
+  const [frontEmb, backEmb] = embeds;
+
+  // Cover-fit art into a rect, clipped to it.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const drawInto = (emb: any, x: number, y: number, w: number, h: number) => {
+    if (!emb) return;
+    const s = Math.max(w / emb.width, h / emb.height);
+    const dw = emb.width * s, dh = emb.height * s;
+    pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(x, y, w, h), PL.clip(), PL.endPath());
+    pg.drawPage(emb, { x: x + (w - dw) / 2, y: y + (h - dh) / 2, width: dw, height: dh });
+    pg.pushOperators(PL.popGraphicsState());
+  };
+  // Back cover occupies the left, including the left + top/bottom bleed.
+  drawInto(backEmb, 0, 0, bleed + trimW, shH);
+  // Front cover on the right, including the right + top/bottom bleed.
+  drawInto(frontEmb, bleed + trimW + spine, 0, bleed + trimW, shH);
+
+  if (opts.spineText && spine > 2) {
+    const font = await out.embedFont(PL.StandardFonts.HelveticaBold);
+    const size = Math.min(spine * 0.62, 14);
+    const tw = font.widthOfTextAtSize(opts.spineText, size);
+    // Read top-to-bottom when the book stands upright on a shelf.
+    pg.drawText(opts.spineText, {
+      x: bleed + trimW + spine / 2 + size * 0.36, y: shH / 2 + tw / 2,
+      size, font, color: rgb(1, 1, 1), rotate: degrees(-90),
+    });
+  }
+
+  if (opts.addMarks !== false) {
+    const off = (opts.markOffIn ?? 0.125) * PT, len = (opts.markLenIn ?? 0.25) * PT;
+    const w0 = opts.markWeightPt ?? 0.25;
+    const line = (x1: number, y1: number, x2: number, y2: number, dash?: number[]) =>
+      pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w0, color: rgb(0, 0, 0), ...(dash ? { dashArray: dash } : {}) });
+    // Trim marks at the wrap's corners (the whole cover trims as one piece).
+    for (const x of [bleed, shW - bleed]) {
+      line(x, 0, x, Math.max(0, bleed - off));
+      line(x, shH, x, shH - Math.max(0, bleed - off));
+    }
+    for (const y of [bleed, shH - bleed]) {
+      line(0, y, Math.max(0, bleed - off), y);
+      line(shW, y, shW - Math.max(0, bleed - off), y);
+    }
+    // Spine folds, plus the hinge scores a binder needs so the cover opens
+    // without cracking the glue. Ticks only — never across the artwork.
+    const hinge = (opts.hingeIn ?? 0.1875) * PT;
+    for (const x of [bleed + trimW, bleed + trimW + spine]) {
+      line(x, 0, x, Math.max(0, bleed - off));
+      line(x, shH, x, shH - Math.max(0, bleed - off));
+    }
+    for (const x of [bleed + trimW - hinge, bleed + trimW + spine + hinge]) {
+      line(x, 0, x, Math.max(0, (bleed - off) * 0.6), [2, 2]);
+      line(x, shH, x, shH - Math.max(0, (bleed - off) * 0.6), [2, 2]);
+    }
+  }
+  if (srcDoc) await carryColorContext(srcDoc, out);
+  return out.save();
+}
+
 // ── Braille (Grade-1) ───────────────────────────────────────────────────────
 const BRAILLE_G1: Record<string, number[]> = {
   a: [1], b: [1, 2], c: [1, 4], d: [1, 4, 5], e: [1, 5], f: [1, 2, 4], g: [1, 2, 4, 5], h: [1, 2, 5], i: [2, 4], j: [2, 4, 5],

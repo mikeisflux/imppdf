@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
-import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane, inkBoundsFromPixels, blackKnockoutAlpha, blackSwathKeepMask, featherMask, applyMaskAlpha } from '../src/lib/imposition-toolkit/impose.ts';
+import { computeNUpGrid, imposeNUp, imposeBooklet, replicateFill, replicateGrid, orientCell, stampSerialNumber, serialLabel, chokePlane, inkBoundsFromPixels, blackKnockoutAlpha, blackSwathKeepMask, featherMask, applyMaskAlpha, spineWidthIn } from '../src/lib/imposition-toolkit/impose.ts';
 
 const PT = 72;
 const baseNUp = {
@@ -443,4 +443,39 @@ test('featherMask / applyMaskAlpha: soft edges, alpha only ever scales down', ()
   applyMaskAlpha(rgba, cov);
   assert.equal(rgba[(4 * w + 4) * 4 + 3], 200, 'full coverage keeps alpha');
   assert.equal(rgba[3], 0, 'no coverage zeroes alpha');
+});
+
+test('spineWidthIn: pages x per-page caliper, plus optional cover allowance', () => {
+  // 200pp on 60# offset (0.0025"/page ≈ 400 PPI) → half an inch.
+  assert.ok(Math.abs(spineWidthIn(200, 0.0025) - 0.5) < 1e-9);
+  // 50# white (KDP's 0.002252) — the usual trade-paperback stock.
+  assert.ok(Math.abs(spineWidthIn(300, 0.002252) - 0.6756) < 1e-9);
+  // PPI and caliper agree: spine = pages / PPI.
+  const ppi = 400;
+  assert.ok(Math.abs(spineWidthIn(240, 1 / ppi) - 240 / ppi) < 1e-9);
+  // Cover stock allowance is added on top.
+  assert.ok(Math.abs(spineWidthIn(200, 0.0025, 0.03) - 0.53) < 1e-9);
+  // Degenerate input never produces a negative spine.
+  assert.equal(spineWidthIn(0, 0.0025), 0);
+  assert.equal(spineWidthIn(-50, 0.0025), 0);
+  assert.equal(spineWidthIn(100, -1), 0);
+});
+
+test('perfect bound: 6x9 trim imposes 2-up on 11x17 with trim marks reserved', () => {
+  // Two 6x9 pages fall on a 17x11 sheet even after mark clearance is reserved.
+  const g = computeNUpGrid({
+    ...baseNUp, sheetWIn: 17, sheetHIn: 11, cols: 99, rows: 99,
+    cellWIn: 6, cellHIn: 9, marginIn: 0, gutterIn: 0, gutterYIn: 0,
+    addMarks: true, markOffIn: 0.125, markLenIn: 0.43,
+  });
+  assert.equal(g.cols, 2, '2 across');
+  assert.equal(g.rows, 1, '1 down');
+  // Letter pages (the old hardcoded cell) are NOT a trade paperback: 2-up 8.5x11
+  // only fits with zero mark clearance, which is why the default was wrong.
+  const letter = computeNUpGrid({
+    ...baseNUp, sheetWIn: 17, sheetHIn: 11, cols: 99, rows: 99,
+    cellWIn: 8.5, cellHIn: 11, marginIn: 0, gutterIn: 0, gutterYIn: 0,
+    addMarks: true, markOffIn: 0.125, markLenIn: 0.43,
+  });
+  assert.equal(letter.cols * letter.rows, 1, 'Letter 2-up leaves no room for marks');
 });

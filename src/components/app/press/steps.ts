@@ -12,7 +12,7 @@ import {
   nestPdf, imposeCalendar, insertPages as insertPagesOp, mixPdfs, nudgePdf,
   addBackdropFile, applyColorEffects, applyColorManagement, addBarcodeStamp,
   addDimensions, addWhiteVarnish, addBraille, optimizePdf, repairPdf, decryptPdf, setLayers,
-  replicateFill, imposeDivinityBox, trimToArtwork, removeBackground,
+  replicateFill, imposeDivinityBox, trimToArtwork, removeBackground, imposePerfectCover,
 } from '@/lib/imposition-toolkit/impose';
 import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/imposition-toolkit/impose';
 
@@ -31,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'divinitybox';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'divinitybox';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -122,6 +122,16 @@ export function defaultSettings(type: StepType): StepSettings {
       return { text: 'Hello World', symbology: 'qr', scale: 3, quietZone: 4, barHeightMm: 15, position: 'br', marginPt: 18, xOffsetPt: 18, yOffsetPt: 18, rotationDeg: 0, transparent: false, showText: true, pages: 'all' };
     case 'dimensions':
       return {};
+    case 'pbcover':
+      // Softcover wrap: back | spine | front on one sheet. Spine width comes
+      // from the page count and the stock's caliper (0.0025"/page ≈ 60# offset,
+      // 400 PPI). Binders want at least ~0.125" of spine for the glue to hold.
+      return {
+        trimWIn: 6, trimHIn: 9, pages: 200, caliperPerPageIn: 0.0025,
+        coverAllowanceIn: 0, bleedIn: 0.125, frontPage: 1, backPage: 2,
+        spineText: '', addMarks: true, hingeIn: 0.1875,
+        markLenIn: 0.25, markOffIn: 0.125, markWeightPt: 0.25,
+      };
     case 'removebg':
       // Cut the subject out of the artwork and drop everything else to
       // transparent (MobileSAM, in-browser). Falls through untouched when the
@@ -228,8 +238,11 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'perfectbound':
       // Perfect-bound trade paperback: sequential 2-up, printed duplex and laid
       // out cut-and-stack so leaves fall into reading order (page 2 backs page 1).
+      // Trim defaults to 6x9 (US trade paperback) — NOT Letter. Two 6x9 pages
+      // fall on a 17x11 sheet with room for trim marks; the Book Size picker
+      // re-runs the fit whenever the trim or sheet changes.
       return {
-        sheetWIn: 17, sheetHIn: 11, cols: 2, rows: 1, cellWIn: 8.5, cellHIn: 11,
+        sheetWIn: 17, sheetHIn: 11, cols: 2, rows: 1, cellWIn: 6, cellHIn: 9,
         marginIn: 0, gutterIn: 0, gutterYIn: 0, order: 'cutstack', duplex: true,
         duplexFlip: 'long', autoscale: true, preserveAspect: true, ...MARKS,
         bleedMode: 'doc', bleedIn: 0.125,
@@ -525,6 +538,14 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           : await imposeNUp(b, { ...nupOpts(s), bleedIn: 0.125 });
         break;
       case 'replicate': b = await replicateFill(b, replicateOpts(s)); break;
+      case 'pbcover': b = await imposePerfectCover(b, {
+        trimWIn: s.trimWIn ?? 6, trimHIn: s.trimHIn ?? 9, pages: s.pages ?? 0,
+        caliperPerPageIn: s.caliperPerPageIn ?? 0.0025, coverAllowanceIn: s.coverAllowanceIn ?? 0,
+        bleedIn: s.bleedIn ?? 0.125, frontPage: s.frontPage ?? 1, backPage: s.backPage ?? 2,
+        spineText: s.spineText || undefined, addMarks: s.addMarks !== false,
+        markLenIn: s.markLenIn, markOffIn: s.markOffIn, markWeightPt: s.markWeightPt,
+        hingeIn: s.hingeIn ?? 0.1875,
+      }); break;
       case 'removebg': b = await removeBackground(b, {
         page: s.page ?? 1, dpi: s.dpi ?? 300, featherPx: s.featherPx ?? 1,
       }); break;
