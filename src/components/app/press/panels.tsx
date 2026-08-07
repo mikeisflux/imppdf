@@ -2387,9 +2387,9 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         spotName: s.spotName || 'V1', whiteName: s.whiteName || 'W1', pass,
       });
       downloadFile(tiff, pass === 'varnish' ? 'raised-metal-1-varnish.tif'
-        : pass === 'colour' ? 'raised-metal-2-colour.tif'
-        : pass === 'regions' ? 'raised-metal-3-regions-varnish.tif'
-        : 'raised-metal-4-regions-colour.tif', 'image/tiff');
+        : pass === 'regions' ? 'raised-metal-2-regions-varnish.tif'
+        : pass === 'colour' ? 'raised-metal-3-colour.tif'
+        : 'raised-metal-regions-colour.tif', 'image/tiff');
     } catch (e) { setErr(e instanceof Error ? e.message : 'Export failed.'); }
     finally { setBusy(''); }
   };
@@ -2514,7 +2514,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then print the <b>colour file</b> — the artwork, with {s.whiteName || 'W1'} white laid <b>only under the raised metal</b> so those areas read reflective and no white is wasted elsewhere.
+        Raised metal in <b>three passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then the <b>regions varnish</b> adds height on the detected areas, and finally one <b>colour pass</b> caps everything — the artwork with {s.whiteName || 'W1'} white laid <b>only under the raised metal</b>, so no white is wasted and no varnish is left exposed.
       </div>
       <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show each spot channel exactly as the file stores it — BLACK = 100% ink, white = none, the same inverted polarity you see opening the channel in Photoshop. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art. Auto-detected raised regions aren't previewed — they only apply on export.">
         <div className="pe-row" style={{ gap: 8 }}>
@@ -2557,15 +2557,12 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
           <input className="pe-input" value={s.whiteName ?? 'W1'} style={{ width: 60 }} onChange={(e) => up({ whiteName: e.target.value })} />
         </div>
         <div className="pe-row" style={{ gap: 8, marginTop: 8 }}>
-          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('varnish')}>{busy === 'varnish' ? 'Rendering…' : '1 · Varnish plate'}</button>
-          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('colour')}>{busy === 'colour' ? 'Rendering…' : '2 · Colour + white'}</button>
-        </div>
-        <div className="pe-row" style={{ gap: 8, marginTop: 8 }}>
-          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('regions')}>{busy === 'regions' ? 'Rendering…' : '3 · Regions varnish'}</button>
-          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('regionsColour')}>{busy === 'regionsColour' ? 'Rendering…' : '4 · Regions colour'}</button>
+          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('varnish')}>{busy === 'varnish' ? 'Rendering…' : '1 · Varnish'}</button>
+          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('regions')}>{busy === 'regions' ? 'Rendering…' : '2 · Regions varnish'}</button>
+          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('colour')}>{busy === 'colour' ? 'Rendering…' : '3 · Colour + white'}</button>
         </div>
         <div className="pe-note" style={{ marginTop: 8 }}>
-          Drop the bed a level after pass 2, then run <b>3</b> ({s.spotName || 'V1'} on the regions only) and <b>4</b> (colour + {s.whiteName || 'W1'} on those same regions) — so the varnish is never left as the exposed top surface. All four files are the same pixel size.
+          All the varnish goes down first, then one colour pass caps the lot — so nothing is left as bare varnish and there is no fourth run. <b>1</b> builds the base relief, <b>2</b> adds height on the regions only (drop the bed a level), <b>3</b> prints the artwork with {s.whiteName || 'W1'} under the raised areas. All three files are the same pixel size.
         </div>
         {err && <div className="form-error" style={{ marginTop: 8 }}>{err}</div>}
       </Section>
