@@ -4085,6 +4085,15 @@ export interface PerfectCoverOptions {
   front?: PerfectCoverArt | null;
   back?: PerfectCoverArt | null;
   spineArt?: PerfectCoverArt | null;
+  // Reverse of the wrap (page 2). Left/right are MIRRORED from the outside, so
+  // the inside front lands behind the front cover once the sheet is turned.
+  insideFront?: PerfectCoverArt | null;
+  insideBack?: PerfectCoverArt | null;
+  insidePage?: boolean;        // force the inside sheet even with no art on it
+  mirrorInside?: boolean;      // flip left<->right on the inside (default true)
+  // The spine on the INSIDE is masked back to white: perfect-binding glue will
+  // not bond through ink or coating. Widen the clear zone past the spine here.
+  spineGlueClearIn?: number;
   trimWIn: number; trimHIn: number;      // the finished book's trim size
   pages: number;                          // interior page count (not leaves)
   caliperPerPageIn?: number;              // default 0.0025" (60# offset ≈ 400 PPI)
@@ -4165,11 +4174,12 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
     });
   }
 
-  if (opts.addMarks !== false) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const drawCoverMarks = (page: any) => {
     const off = (opts.markOffIn ?? 0.125) * PT, len = (opts.markLenIn ?? 0.25) * PT;
     const w0 = opts.markWeightPt ?? 0.25;
     const line = (x1: number, y1: number, x2: number, y2: number, dash?: number[]) =>
-      pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w0, color: rgb(0, 0, 0), ...(dash ? { dashArray: dash } : {}) });
+      page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w0, color: rgb(0, 0, 0), ...(dash ? { dashArray: dash } : {}) });
     // Trim marks at the wrap's corners (the whole cover trims as one piece).
     for (const x of [bleed, shW - bleed]) {
       line(x, 0, x, Math.max(0, bleed - off));
@@ -4190,7 +4200,41 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
       line(x, 0, x, Math.max(0, (bleed - off) * 0.6), [2, 2]);
       line(x, shH, x, shH - Math.max(0, (bleed - off) * 0.6), [2, 2]);
     }
+    void len;
+  };
+  if (opts.addMarks !== false) drawCoverMarks(pg);
+  // ── Inside of the wrap (page 2) ──────────────────────────────────────────
+  const insideFrontEmb = await embedArt(opts.insideFront);
+  const insideBackEmb = await embedArt(opts.insideBack);
+  const wantInside = opts.insidePage ?? !!(insideFrontEmb || insideBackEmb);
+  if (wantInside) {
+    const ip = out.addPage([shW, shH]);
+    const mirror = opts.mirrorInside !== false;
+    // Turning the sheet over swaps left and right, so the inside FRONT sits on
+    // the left of the inside when the outside front is on the right.
+    const leftEmb = mirror ? insideFrontEmb : insideBackEmb;
+    const rightEmb = mirror ? insideBackEmb : insideFrontEmb;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const drawOn = (page: any, emb: any, x: number, y: number, w: number, h: number) => {
+      if (!emb) return;
+      const sc = Math.max(w / emb.width, h / emb.height);
+      const dw = emb.width * sc, dh = emb.height * sc;
+      page.pushOperators(PL.pushGraphicsState(), PL.rectangle(x, y, w, h), PL.clip(), PL.endPath());
+      page.drawPage(emb, { x: x + (w - dw) / 2, y: y + (h - dh) / 2, width: dw, height: dh });
+      page.pushOperators(PL.popGraphicsState());
+    };
+    drawOn(ip, leftEmb, 0, 0, bleed + trimW, shH);
+    drawOn(ip, rightEmb, bleed + trimW + spine, 0, bleed + trimW, shH);
+    // GLUE ZONE — the exact spine strip, knocked back to white on top of any
+    // inside art. Ink or coating here stops the adhesive bonding to the block.
+    const clear = Math.max(0, opts.spineGlueClearIn ?? 0) * PT;
+    ip.drawRectangle({
+      x: bleed + trimW - clear, y: 0, width: spine + 2 * clear, height: shH,
+      color: rgb(1, 1, 1), borderWidth: 0,
+    });
+    if (opts.addMarks !== false) drawCoverMarks(ip);
   }
+
   if (srcDoc) await carryColorContext(srcDoc, out);
   return out.save();
 }

@@ -132,6 +132,7 @@ export function defaultSettings(type: StepType): StepSettings {
         spineText: '', addMarks: true, hingeIn: 0.1875,
         markLenIn: 0.25, markOffIn: 0.125, markWeightPt: 0.25,
         front: null, back: null, spineArt: null,
+        insideFront: null, insideBack: null, mirrorInside: true, spineGlueClearIn: 0,
       };
     case 'removebg':
       // Cut the subject out of the artwork and drop everything else to
@@ -555,6 +556,10 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         front: s.front?.bytes ? { bytes: s.front.bytes } : null,
         back: s.back?.bytes ? { bytes: s.back.bytes } : null,
         spineArt: s.spineArt?.bytes ? { bytes: s.spineArt.bytes } : null,
+        insideFront: s.insideFront?.bytes ? { bytes: s.insideFront.bytes } : null,
+        insideBack: s.insideBack?.bytes ? { bytes: s.insideBack.bytes } : null,
+        insidePage: s.insidePage, mirrorInside: s.mirrorInside !== false,
+        spineGlueClearIn: s.spineGlueClearIn ?? 0,
         trimWIn: s.trimWIn ?? 6, trimHIn: s.trimHIn ?? 9, pages: s.pages ?? 0,
         caliperPerPageIn: s.caliperPerPageIn ?? 0.0025, coverAllowanceIn: s.coverAllowanceIn ?? 0,
         bleedIn: s.bleedIn ?? 0.125, frontPage: s.frontPage ?? 1, backPage: s.backPage ?? 2,
@@ -823,7 +828,7 @@ function stripBytes(s: StepSettings): StepSettings {
   if (Array.isArray(c.files)) c.files = [];
   if (Array.isArray(c.extras)) c.extras = [];
   if (c.stamp) { c.stamp = null; c.stampName = ''; }
-  for (const k of ['a', 'b', 'c', 'd', 'front', 'back', 'spineArt'] as const) if (c[k] && (c[k] as { bytes?: Uint8Array }).bytes) c[k] = null;
+  for (const k of ['a', 'b', 'c', 'd', 'front', 'back', 'spineArt', 'insideFront', 'insideBack'] as const) if (c[k] && (c[k] as { bytes?: Uint8Array }).bytes) c[k] = null;
   return c;
 }
 

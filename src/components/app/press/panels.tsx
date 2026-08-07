@@ -2183,7 +2183,8 @@ function PerfectCoverPanel({ s, up }: PanelProps) {
   const spine = block + Math.max(0, allowance);
   const ppi = cal > 0 ? Math.round(1 / cal) : 0;
   const sheetW = 2 * trimW + spine + 2 * bleed, sheetH = trimH + 2 * bleed;
-  const pickCoverArt = (key: 'front' | 'back' | 'spineArt') => {
+  type CoverArtKey = 'front' | 'back' | 'spineArt' | 'insideFront' | 'insideBack';
+  const pickCoverArt = (key: CoverArtKey) => {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = 'application/pdf,image/*';
     inp.onchange = async () => {
@@ -2197,7 +2198,7 @@ function PerfectCoverPanel({ s, up }: PanelProps) {
     };
     inp.click();
   };
-  const artRow = (key: 'front' | 'back' | 'spineArt', label: string) => {
+  const artRow = (key: CoverArtKey, label: string) => {
     const art = s[key] as { name?: string } | null;
     return (
       <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 6 }}>
@@ -2232,6 +2233,16 @@ function PerfectCoverPanel({ s, up }: PanelProps) {
           Front and back bleed off their outer and top/bottom edges; spine art fills the spine panel. Leave the spine empty to use the spine text (or nothing) instead.
         </div>
       </Section>
+      <Section label="// INSIDE COVERS" help="The reverse of the wrap, printed as page 2. Left and right are mirrored so the inside front lands behind the front cover once the sheet is turned over.">
+        {artRow('insideFront', 'Inside front')}
+        {artRow('insideBack', 'Inside back')}
+        <Check icon="flip" label="Mirror inside left ↔ right" sub="Off if your press duplexes the other way" checked={s.mirrorInside !== false} onChange={(v) => up({ mirrorInside: v })} />
+        <Check icon="file" label="Always add the inside sheet" sub="Even with no inside art — gives you the white glue zone" checked={!!s.insidePage} onChange={(v) => up({ insidePage: v || undefined })} />
+        {num('Extra glue clearance', 'spineGlueClearIn', s.spineGlueClearIn ?? 0, 0.0625, 'inches past the spine')}
+        <div className="pe-note" style={{ marginTop: 8 }}>
+          The spine strip on the inside is masked back to <b>white</b> — exactly the spine&apos;s width{(s.spineGlueClearIn ?? 0) > 0 ? <> plus {s.spineGlueClearIn}&quot; each side</> : null} — because perfect-binding glue will not bond through ink or coating. It is knocked out on top of whatever inside art you upload.
+        </div>
+      </Section>
       <Section label="// BOOK" help="Trim size of the finished book and how many interior pages it has. Spine width is calculated from these.">
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
           {([[6, 9, '6×9'], [5.5, 8.5, '5.5×8.5'], [6.625, 10.25, 'Comic 6.625×10.25'], [8.5, 11, '8.5×11']] as [number, number, string][]).map(([tw, th, label]) => (
@@ -2252,8 +2263,9 @@ function PerfectCoverPanel({ s, up }: PanelProps) {
             <option value={0.0025}>60# offset / cream (400 PPI)</option>
             <option value={0.0029}>70# offset (345 PPI)</option>
             <option value={0.0022}>80# gloss text (455 PPI)</option>
+            <option value={0.00425}>80# gloss cover (235 PPI)</option>
+            <option value={0.0052}>80# uncoated cover (192 PPI) — sketch covers</option>
             <option value={0.0027}>100# gloss text (370 PPI)</option>
-            <option value={0.0032}>80# uncoated cover (312 PPI)</option>
           </select>
         </div>
         {num('Thickness per page', 'caliperPerPageIn', cal, 0.0001, 'inches')}
@@ -2261,9 +2273,9 @@ function PerfectCoverPanel({ s, up }: PanelProps) {
           <span className="pe-label" style={{ flex: 1 }}>Cover stock<span className="pe-label-sm"> · the wrap</span></span>
           <select className="pe-select" value={s.coverAllowanceIn ?? 0} onChange={(e) => up({ coverAllowanceIn: Number(e.target.value) })} style={{ width: 210 }}>
             <option value={0}>Self-cover / none</option>
-            <option value={0.018}>80# gloss cover (0.009&quot; ea)</option>
-            <option value={0.022}>80# uncoated cover (0.011&quot; ea)</option>
-            <option value={0.021}>100# gloss cover (0.0105&quot; ea)</option>
+            <option value={0.017}>80# gloss cover (0.0085&quot; ea)</option>
+            <option value={0.0208}>80# uncoated cover (0.0104&quot; ea)</option>
+            <option value={0.020}>100# gloss cover (0.010&quot; ea)</option>
             <option value={0.024}>12pt C1S (0.012&quot; ea)</option>
             <option value={0.028}>14pt C1S (0.014&quot; ea)</option>
             <option value={0.03}>Laminated cover (typical)</option>
