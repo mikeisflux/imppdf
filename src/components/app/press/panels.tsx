@@ -2470,10 +2470,12 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
           const iv = 255 - v;
           out.data[q] = iv; out.data[q + 1] = iv; out.data[q + 2] = iv; out.data[q + 3] = 255;
         } else if (mode === 'white') {
-          // W1 the same way: black where the white under-base lays. It mirrors
-          // the artwork's alpha, so opaque art reads solid black here.
+          // W1 the same way: black where the white lays.
+          // W1 follows the RAISED METAL, not the whole artwork — white only
+          // goes under the relief so it reads reflective there.
           const dropped = subj ? subj[i]! < 128 : false;
-          const ia = dropped ? 255 : 255 - art.data[q + 3]!;
+          const wInk = dropped || art.data[q + 3]! === 0 ? 0 : v;
+          const ia = 255 - wInk;
           out.data[q] = ia; out.data[q + 1] = ia; out.data[q + 2] = ia; out.data[q + 3] = 255;
         } else if (mode === 'overlay') {
           // Artwork with the plate flagged in red.
@@ -2509,7 +2511,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then print the <b>colour file</b> (artwork + {s.whiteName || 'W1'} white) on top of the cured varnish.
+        Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then print the <b>colour file</b> — the artwork, with {s.whiteName || 'W1'} white laid <b>only under the raised metal</b> so those areas read reflective and no white is wasted elsewhere.
       </div>
       <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show each spot channel exactly as the file stores it — BLACK = 100% ink, white = none, the same inverted polarity you see opening the channel in Photoshop. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art. Auto-detected raised regions aren't previewed — they only apply on export.">
         <div className="pe-row" style={{ gap: 8 }}>

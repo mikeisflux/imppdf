@@ -4501,10 +4501,14 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
       buf[q + 4] = 255;                              // W1 empty (INVERTED: 255 = no ink)
       buf[q + 5] = 255 - metal[i]!;                  // V1 carries the plate
     } else {
-      // Pass 2 — artwork + white under-base, over the cured varnish.
+      // Pass 2 — artwork over the cured varnish, with white ONLY under the
+      // raised metal so those areas sit on an opaque base and read reflective.
+      // Everything else prints straight onto the stock: no white is wasted, and
+      // a full-bleed opaque cover no longer floods the white head.
       buf[q] = img[p]!; buf[q + 1] = img[p + 1]!; buf[q + 2] = img[p + 2]!;
       buf[q + 3] = a;
-      buf[q + 4] = 255 - a;                          // white mirrors the alpha
+      const wInk = a > 0 ? metal[i]! : 0;            // never white on transparent art
+      buf[q + 4] = 255 - wInk;                       // INVERTED: 0 = full white
       buf[q + 5] = 255;                              // V1 empty this pass
     }
   }
