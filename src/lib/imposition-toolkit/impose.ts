@@ -4395,6 +4395,7 @@ export async function regionCoverage(
   boxes: { x0: number; y0: number; x1: number; y1: number }[] = [],
   opts?: { autoDetect?: boolean; detectMinScore?: number; detectClasses?: string[]; cacheKey?: string },
 ): Promise<Uint8Array> {
+  void pixels;
   const cov = new Uint8Array(W * H);
   const all = [...boxes];
   if (opts?.autoDetect) {
@@ -4404,7 +4405,7 @@ export async function regionCoverage(
       for (const d of await detectRegions(canvas, W, H, opts.detectMinScore ?? 0.25)) {
         if (want.has(d.label)) all.push(d);
       }
-    } catch { /* no detector — hand-drawn boxes still apply */ }
+    } catch { /* no detector — the fallback below still finds candidates */ }
   }
   if (!all.length) return cov;
   const { loadSam, encodeImage, segmentBox } = await import('../sam');
@@ -4420,7 +4421,6 @@ export async function regionCoverage(
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) cov[y * W + x] = 255;
     }
   }
-  void pixels;
   return cov;
 }
 
