@@ -2403,14 +2403,16 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   // The artwork is rendered ONCE at preview size and cached; only the (cheap)
   // mask is recomputed as sliders move, so dragging stays responsive.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const artRef = useRef<{ data: Uint8ClampedArray; w: number; h: number } | null>(null);
+  const artRef = useRef<{ data: Uint8ClampedArray; w: number; h: number; canvas: HTMLCanvasElement } | null>(null);
+  // Cached so dragging a slider never re-runs segmentation.
+  const subjRef = useRef<Uint8Array | null>(null);
   const [ready, setReady] = useState(0);
   const mode = s.previewMode ?? 'relief';
 
   useEffect(() => {
     let dead = false;
     (async () => {
-      artRef.current = null; setReady((n) => n + 1);
+      artRef.current = null; subjRef.current = null; setReady((n) => n + 1);
       if (!sourceBytes) return;
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2426,7 +2428,8 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         const cx = c.getContext('2d', { willReadFrequently: true })!;
         await pg.render({ canvasContext: cx, viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
         if (dead) return;
-        artRef.current = { data: cx.getImageData(0, 0, w, h).data, w, h };
+        subjRef.current = null;
+        artRef.current = { data: cx.getImageData(0, 0, w, h).data, w, h, canvas: c };
         setReady((n) => n + 1);
       } catch { /* preview is a nicety */ }
     })();
@@ -2441,13 +2444,21 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
     const ctx = cv.getContext('2d')!;
     let cancelled = false;
     const id = setTimeout(async () => {
-      const { metalMaskFromPixels } = await import('@/lib/imposition-toolkit/impose');
+      const { metalMaskFromPixels, subjectMask } = await import('@/lib/imposition-toolkit/impose');
       if (cancelled) return;
+      // Background drop: segment once per artwork, then reuse. Applies to BOTH
+      // plates — the varnish and the white must agree on what the subject is.
+      if (s.subjectOnly && !subjRef.current) {
+        subjRef.current = await subjectMask(art.canvas, w, h, art.data, `metalprev:${w}x${h}`);
+        if (cancelled) return;
+      }
+      const subj = s.subjectOnly ? subjRef.current : null;
       const m = metalMaskFromPixels(art.data, w, h, {
         edgeGain: s.edgeGain ?? 1, highlightGain: s.highlightGain ?? 0.6,
         highlightFrom: s.highlightFrom ?? 200, toneGain: s.toneGain ?? 0.18,
         floor: s.floor ?? 24, gamma: s.gamma ?? 1,
       });
+      if (subj) for (let i = 0; i < m.length; i++) if (subj[i]! < 128) m[i] = 0;
       const out = ctx.createImageData(w, h);
       const at = (x: number, y: number) => m[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))]!;
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -2461,7 +2472,8 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         } else if (mode === 'white') {
           // W1 the same way: black where the white under-base lays. It mirrors
           // the artwork's alpha, so opaque art reads solid black here.
-          const ia = 255 - art.data[q + 3]!;
+          const dropped = subj ? subj[i]! < 128 : false;
+          const ia = dropped ? 255 : 255 - art.data[q + 3]!;
           out.data[q] = ia; out.data[q + 1] = ia; out.data[q + 2] = ia; out.data[q + 3] = 255;
         } else if (mode === 'overlay') {
           // Artwork with the plate flagged in red.
@@ -2493,7 +2505,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       ctx.putImageData(out, 0, 0);
     }, 60);                                         // debounce the slider drag
     return () => { cancelled = true; clearTimeout(id); };
-  }, [ready, mode, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
+  }, [ready, mode, s.subjectOnly, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
