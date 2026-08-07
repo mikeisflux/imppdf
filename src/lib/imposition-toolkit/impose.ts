@@ -4398,10 +4398,12 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   //  'colour'  — the artwork with its white under-base, overprinted on the
   //              cured varnish so the finish reads as raised metal.
   // Both come out the same pixel size, so they register.
-  //  'regions' — a THIRD plate carrying ONLY the selected/detected regions,
-  //              for dropping the bed a level and laying an extra finish on
-  //              top of the cured stack. Same pixel size as the other passes.
-  pass?: 'varnish' | 'colour' | 'regions';
+  //  'regions'       — THIRD plate: varnish on ONLY the selected regions,
+  //                     after dropping the bed a level.
+  //  'regionsColour' — FOURTH plate: colour + white on those same regions, so
+  //                     the varnish is never left as the exposed top surface.
+  // All four come out at the same pixel size.
+  pass?: 'varnish' | 'colour' | 'regions' | 'regionsColour';
   // Lift specific regions higher than the rest of the plate. Boxes are in
   // 0..1 page fractions; each is refined by MobileSAM so the extra varnish
   // follows the actual shape rather than a rectangle.
@@ -4502,9 +4504,18 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   const buf = new Uint8Array(W * H * spp);
   const isVarnish = pass === 'varnish';
   const isRegions = pass === 'regions';
+  const isRegionsColour = pass === 'regionsColour';
   for (let i = 0, p = 0, q = 0; i < W * H; i++, p += 4, q += spp) {
     const a = img[p + 3]!;
-    if (isRegions) {
+    if (isRegionsColour) {
+      // Pass 4 — colour + white on the regions ONLY, covering pass 3's varnish
+      // so no varnish is left exposed. Alpha masks everything else out.
+      const rc = regionCov[i]!;
+      buf[q] = img[p]!; buf[q + 1] = img[p + 1]!; buf[q + 2] = img[p + 2]!;
+      buf[q + 3] = rc;                               // print only on the regions
+      buf[q + 4] = 255 - rc;                         // white under that colour
+      buf[q + 5] = 255;                              // V1 empty
+    } else if (isRegions) {
       // Pass 3 — ONLY the selected regions, for the extra finish laid after
       // the bed drops a level. No colour, no white.
       buf[q] = 255; buf[q + 1] = 255; buf[q + 2] = 255;
