@@ -524,3 +524,17 @@ test('metalMaskFromPixels: plates the linework and highlights, not flat fills', 
   const clear = new Uint8Array(w * h * 4);
   assert.ok(metalMaskFromPixels(clear, w, h).every((v) => v === 0), 'transparent gets no metal');
 });
+
+test('nonMaxSuppress: keeps the strongest of overlapping hits, per label', async () => {
+  const { nonMaxSuppress } = await import('../src/lib/nsfw-detect.ts');
+  const boxes = [
+    { x0: 0, y0: 0, x1: 10, y1: 10, label: 'a', score: 0.9 },
+    { x0: 1, y0: 1, x1: 11, y1: 11, label: 'a', score: 0.6 },   // overlaps the above
+    { x0: 0, y0: 0, x1: 10, y1: 10, label: 'b', score: 0.5 },   // different label: kept
+    { x0: 50, y0: 50, x1: 60, y1: 60, label: 'a', score: 0.4 }, // no overlap: kept
+  ];
+  const kept = nonMaxSuppress(boxes, 0.45);
+  assert.equal(kept.length, 3);
+  assert.equal(kept[0]!.score, 0.9, 'strongest survives its cluster');
+  assert.ok(!kept.some((k) => k.score === 0.6), 'the weaker overlapping duplicate is dropped');
+});

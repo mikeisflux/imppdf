@@ -9,6 +9,10 @@ mkdir -p public/models public/ort
 BASE=https://raw.githubusercontent.com/Kazuhito00/MobileSAM-ONNX-Sample/main/onnx_model
 [ -f public/models/mobilesam-encoder.onnx ] || curl -fL --progress-bar -o public/models/mobilesam-encoder.onnx "$BASE/vit_t_encoder.onnx"
 [ -f public/models/mobilesam-decoder.onnx ] || curl -fL --progress-bar -o public/models/mobilesam-decoder.onnx "$BASE/vit_t_decoder.onnx"
+# Region detector for Raised Metal's auto-boost (NudeNet, MIT). Optional: if the
+# download fails the tool just falls back to manually drawn boost regions.
+NUDE=https://huggingface.co/deepghs/nudenet_onnx/resolve/main/320n.onnx
+[ -f public/models/nudenet-320n.onnx ] || curl -fL --progress-bar -o public/models/nudenet-320n.onnx "$NUDE" || echo "  (region detector unavailable — manual boost regions still work)"
 for f in ort-wasm-simd-threaded.wasm ort-wasm-simd-threaded.mjs \
          ort-wasm-simd-threaded.jsep.wasm ort-wasm-simd-threaded.jsep.mjs; do
   cp -f "node_modules/onnxruntime-web/dist/$f" "public/ort/$f"

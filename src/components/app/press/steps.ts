@@ -143,6 +143,7 @@ export function defaultSettings(type: StepType): StepSettings {
         dpi: 300, edgeGain: 1, highlightGain: 0.6, highlightFrom: 200,
         toneGain: 0.18, floor: 24, gamma: 1,
         spotName: 'V1', whiteName: 'W1', subjectOnly: false,
+        autoDetect: true, detectMinScore: 0.25, boostAmount: 0.5, boostRegions: [],
       };
     case 'removebg':
       // Cut the subject out of the artwork and drop everything else to

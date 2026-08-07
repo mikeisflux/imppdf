@@ -4356,6 +4356,14 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   //              cured varnish so the finish reads as raised metal.
   // Both come out the same pixel size, so they register.
   pass?: 'varnish' | 'colour';
+  // Lift specific regions higher than the rest of the plate. Boxes are in
+  // 0..1 page fractions; each is refined by MobileSAM so the extra varnish
+  // follows the actual shape rather than a rectangle.
+  boostRegions?: { x0: number; y0: number; x1: number; y1: number }[];
+  boostAmount?: number;      // 0..1 extra coverage inside a region (default 0.5)
+  autoDetect?: boolean;      // find the regions automatically
+  detectMinScore?: number;   // detector confidence floor (default 0.25)
+  detectClasses?: string[];  // override which detected labels get raised
 }
 
 // RGB + (transparency) + the metal spot channel, in the same uncompressed,
@@ -4382,6 +4390,47 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   const img = ctx.getImageData(0, 0, W, H).data;
 
   const metal = metalMaskFromPixels(img, W, H, opts);
+
+  // Raise chosen regions above the rest of the plate. Detected boxes and
+  // hand-drawn ones go through the same path; SAM turns each box into a real
+  // mask so the extra varnish follows the shape, not a rectangle.
+  const boxes: { x0: number; y0: number; x1: number; y1: number }[] =
+    (opts?.boostRegions ?? []).map((r) => ({
+      x0: r.x0 * W, y0: r.y0 * H, x1: r.x1 * W, y1: r.y1 * H,
+    }));
+  if (opts?.autoDetect) {
+    try {
+      const { detectRegions, DEFAULT_RAISE_CLASSES } = await import('../nsfw-detect');
+      const want = opts.detectClasses?.length ? new Set(opts.detectClasses) : DEFAULT_RAISE_CLASSES;
+      const hits = await detectRegions(canvas, W, H, opts.detectMinScore ?? 0.25);
+      for (const d of hits) if (want.has(d.label)) boxes.push(d);
+    } catch { /* no detector — hand-drawn regions still apply */ }
+  }
+  if (boxes.length) {
+    const boost = Math.max(0, Math.min(1, opts?.boostAmount ?? 0.5));
+    const { loadSam, encodeImage, segmentBox } = await import('../sam');
+    const haveSam = await loadSam();
+    const emb = haveSam ? await encodeImage(`metal:${W}x${H}`, canvas) : null;
+    for (const b of boxes) {
+      const mask = emb ? await segmentBox(emb, b.x0, b.y0, b.x1, b.y1) : null;
+      if (mask && mask.w === W && mask.h === H) {
+        const cov = featherMask(mask.data, W, H, 2);       // soft so relief blends
+        for (let i = 0; i < metal.length; i++) {
+          if (!cov[i]) continue;
+          const add = boost * 255 * (cov[i]! / 255);
+          metal[i] = Math.min(255, Math.round(metal[i]! + add));
+        }
+      } else {
+        // No segmentation available — lift the box itself.
+        const x0 = Math.max(0, Math.floor(b.x0)), x1 = Math.min(W - 1, Math.ceil(b.x1));
+        const y0 = Math.max(0, Math.floor(b.y0)), y1 = Math.min(H - 1, Math.ceil(b.y1));
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          const i = y * W + x;
+          metal[i] = Math.min(255, Math.round(metal[i]! + boost * 255));
+        }
+      }
+    }
+  }
   if (opts?.subjectOnly) {
     const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`);
     if (subj) for (let i = 0; i < metal.length; i++) if (subj[i]! < 128) metal[i] = 0;

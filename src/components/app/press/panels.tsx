@@ -2412,6 +2412,14 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         {rng('Line weight', 'gamma', s.gamma ?? 1, 0.4, 2, 0.05, '<1 fatter, >1 thinner')}
         <Check icon="crop" label="Subject only" sub="Segment the art so the background stays flat (needs the models)" checked={!!s.subjectOnly} onChange={(v) => up({ subjectOnly: v })} />
       </Section>
+      <Section label="// RAISED REGIONS" help="Lift chosen anatomy above the rest of the plate. Detected boxes are refined by MobileSAM so the extra varnish follows the actual shape, not a rectangle.">
+        <Check icon="droplet" label="Auto-detect regions to raise" sub="Exposed anatomy, detected locally — nothing is uploaded" checked={s.autoDetect !== false} onChange={(v) => up({ autoDetect: v })} />
+        {rng('Extra relief', 'boostAmount', s.boostAmount ?? 0.5, 0, 1, 0.05, 'added coverage in a region')}
+        {rng('Confidence', 'detectMinScore', s.detectMinScore ?? 0.25, 0.05, 0.9, 0.05, 'lower finds more')}
+        <div className="pe-note" style={{ marginTop: 8 }}>
+          The detector is trained mostly on photographic material, so on stylised art treat it as a starting point — lower the confidence to catch more, raise it if it plates the wrong areas. If the model isn&apos;t installed this falls back to no boost and the base plate still exports.
+        </div>
+      </Section>
       <Section label="// OUTPUT" help="Both files come out at the same pixel size so the two passes register on press.">
         <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
           <span className="pe-label" style={{ width: 56 }}>DPI</span>
