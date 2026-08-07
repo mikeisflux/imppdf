@@ -2409,13 +2409,14 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   const artRef = useRef<{ data: Uint8ClampedArray; w: number; h: number; canvas: HTMLCanvasElement } | null>(null);
   // Cached so dragging a slider never re-runs segmentation.
   const subjRef = useRef<Uint8Array | null>(null);
+  const regRef = useRef<Uint8Array | null>(null);
   const [ready, setReady] = useState(0);
   const mode = s.previewMode ?? 'relief';
 
   useEffect(() => {
     let dead = false;
     (async () => {
-      artRef.current = null; subjRef.current = null; setReady((n) => n + 1);
+      artRef.current = null; subjRef.current = null; regRef.current = null; setReady((n) => n + 1);
       if (!sourceBytes) return;
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2431,7 +2432,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         const cx = c.getContext('2d', { willReadFrequently: true })!;
         await pg.render({ canvasContext: cx, viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
         if (dead) return;
-        subjRef.current = null;
+        subjRef.current = null; regRef.current = null;
         artRef.current = { data: cx.getImageData(0, 0, w, h).data, w, h, canvas: c };
         setReady((n) => n + 1);
       } catch { /* preview is a nicety */ }
@@ -2447,7 +2448,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
     const ctx = cv.getContext('2d')!;
     let cancelled = false;
     const id = setTimeout(async () => {
-      const { metalMaskFromPixels, subjectMask } = await import('@/lib/imposition-toolkit/impose');
+      const { metalMaskFromPixels, subjectMask, regionCoverage } = await import('@/lib/imposition-toolkit/impose');
       if (cancelled) return;
       // Background drop: segment once per artwork, then reuse. Applies to BOTH
       // plates — the varnish and the white must agree on what the subject is.
@@ -2456,6 +2457,16 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         if (cancelled) return;
       }
       const subj = s.subjectOnly ? subjRef.current : null;
+      // Regions are the slow part (detector + segmentation), so only compute
+      // them when that view is asked for, then cache like the subject mask.
+      if (mode === 'regions' && !regRef.current) {
+        regRef.current = await regionCoverage(art.canvas, w, h, art.data,
+          (s.boostRegions ?? []).map((r: { x0: number; y0: number; x1: number; y1: number }) =>
+            ({ x0: r.x0 * w, y0: r.y0 * h, x1: r.x1 * w, y1: r.y1 * h })),
+          { autoDetect: s.autoDetect !== false, detectMinScore: s.detectMinScore ?? 0.25, cacheKey: `metalprev:${w}x${h}` });
+        if (cancelled) return;
+      }
+      const reg = regRef.current;
       const m = metalMaskFromPixels(art.data, w, h, {
         edgeGain: s.edgeGain ?? 1, highlightGain: s.highlightGain ?? 0.6,
         highlightFrom: s.highlightFrom ?? 200, toneGain: s.toneGain ?? 0.18,
@@ -2466,7 +2477,13 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       const at = (x: number, y: number) => m[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))]!;
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const i = y * w + x, q = i * 4, v = m[i]!;
-        if (mode === 'plate') {
+        if (mode === 'regions') {
+          // Pass 2 exactly as the file stores it: black where the extra
+          // varnish lays on the raised regions, white everywhere else.
+          const rv = reg ? (subj && subj[i]! < 128 ? 0 : reg[i]!) : 0;
+          const ir = 255 - rv;
+          out.data[q] = ir; out.data[q + 1] = ir; out.data[q + 2] = ir; out.data[q + 3] = 255;
+        } else if (mode === 'plate') {
           // V1 exactly as the FILE stores it — spot polarity is INVERTED:
           // BLACK = 100% ink, white = none (CLAUDE.md rule 6). This is what
           // you see opening the channel in Photoshop.
@@ -2510,15 +2527,15 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       ctx.putImageData(out, 0, 0);
     }, 60);                                         // debounce the slider drag
     return () => { cancelled = true; clearTimeout(id); };
-  }, [ready, mode, s.subjectOnly, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
+  }, [ready, mode, s.subjectOnly, s.autoDetect, s.detectMinScore, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Raised metal in <b>three passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then the <b>regions varnish</b> adds height on the detected areas, and finally one <b>colour pass</b> caps everything — the artwork with {s.whiteName || 'W1'} white laid <b>only under the raised metal</b>, so no white is wasted and no varnish is left exposed.
       </div>
-      <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show each spot channel exactly as the file stores it — BLACK = 100% ink, white = none, the same inverted polarity you see opening the channel in Photoshop. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art. Auto-detected raised regions aren't previewed — they only apply on export.">
+      <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show each spot channel exactly as the file stores it — BLACK = 100% ink, white = none, the same inverted polarity you see opening the channel in Photoshop. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art. Regions shows pass 2 — the extra varnish on the detected areas (it runs the detector, so it takes a moment the first time).">
         <div className="pe-row" style={{ gap: 8 }}>
-          {([['plate', `${s.spotName || 'V1'} plate`], ['white', `${s.whiteName || 'W1'} plate`], ['relief', 'Relief'], ['overlay', 'Overlay']] as const).map(([mdl, label]) => (
+          {([['plate', `${s.spotName || 'V1'} plate`], ['regions', 'Regions'], ['white', `${s.whiteName || 'W1'} plate`], ['relief', 'Relief'], ['overlay', 'Overlay']] as const).map(([mdl, label]) => (
             <button key={mdl} className="pe-btn" style={{ flex: 1, padding: '6px 4px', ...(mode === mdl ? { outline: '2px solid currentColor' } : {}) }}
               onClick={() => up({ previewMode: mdl })}>{label}</button>
           ))}
