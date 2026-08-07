@@ -2463,19 +2463,22 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
           out.data[q + 2] = Math.round(art.data[q + 2]! * (1 - t) * 1);
           out.data[q + 3] = 255;
         } else {
-          // RELIEF: treat the plate as a height map, light it, and lay the
-          // metallic sheen over the art — what the cured varnish will look like.
+          // RELIEF: the plate as lit geometry on a NEUTRAL ground — the artwork
+          // colour is deliberately hidden. Composited over the art you cannot
+          // judge the height at all: the picture just looks like the picture.
           const dx = (at(x + 1, y) - at(x - 1, y)) / 255;
           const dy = (at(x, y + 1) - at(x, y - 1)) / 255;
           const nz = 1 / Math.sqrt(dx * dx + dy * dy + 1);
           const nx = -dx * nz, ny = -dy * nz;
           const lx = -0.55, ly = -0.55, lz = 0.63;             // raking light
           const diff = Math.max(0, nx * lx + ny * ly + nz * lz);
-          const spec = Math.pow(diff, 28) * (v / 255);
-          const sheen = (0.35 * diff + 0.9 * spec) * (v / 255);
-          out.data[q] = Math.min(255, Math.round(art.data[q]! + sheen * 235));
-          out.data[q + 1] = Math.min(255, Math.round(art.data[q + 1]! + sheen * 225));
-          out.data[q + 2] = Math.min(255, Math.round(art.data[q + 2]! + sheen * 200));
+          const spec = Math.pow(diff, 26);
+          const t = v / 255;
+          // Dark substrate where there is no varnish; lit metal where there is.
+          const val = 26 + t * (0.22 + 0.78 * diff) * 180 + t * spec * 255;
+          out.data[q] = Math.min(255, Math.round(val * 1.02));
+          out.data[q + 1] = Math.min(255, Math.round(val));
+          out.data[q + 2] = Math.min(255, Math.round(val * 0.93));
           out.data[q + 3] = 255;
         }
       }
@@ -2488,7 +2491,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then print the <b>colour file</b> (artwork + {s.whiteName || 'W1'} white) on top of the cured varnish.
       </div>
-      <Section label="// PREVIEW" help="Live, from the loaded artwork. Relief lights the plate as a height map so you can see how much the varnish is actually doing; Plate is the raw varnish channel; Overlay flags it on the art. Auto-detected raised regions aren't previewed — they only apply on export.">
+      <Section label="// PREVIEW" help="Live, from the loaded artwork. Relief lights the plate as a height map on a neutral ground — the artwork colour is hidden so you can judge the height; Plate is the raw varnish channel; Overlay flags it on the art. Auto-detected raised regions aren't previewed — they only apply on export.">
         <div className="pe-row" style={{ gap: 8 }}>
           {(['relief', 'plate', 'overlay'] as const).map((mdl) => (
             <button key={mdl} className="pe-btn" style={{ flex: 1, ...(mode === mdl ? { outline: '2px solid currentColor' } : {}) }}
