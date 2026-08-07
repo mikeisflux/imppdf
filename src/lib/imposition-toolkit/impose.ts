@@ -4440,33 +4440,33 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   const white = opts?.whiteName || 'W1';
   const pass = opts?.pass ?? 'varnish';
 
-  if (pass === 'varnish') {
-    // Pass 1 — varnish ONLY. RGB is left white so no colour ink lays, and
-    // there is no white channel: this run exists purely to build relief.
-    const spp = 4;                                   // R G B V
-    const buf = new Uint8Array(W * H * spp);
-    for (let i = 0, q = 0; i < W * H; i++, q += spp) {
-      buf[q] = 255; buf[q + 1] = 255; buf[q + 2] = 255;
-      buf[q + 3] = 255 - metal[i]!;                  // INVERTED, as W1/V1 are
-    }
-    return encodeRgbSpotTiff({
-      width: W, height: H, interleaved: buf, spotNames: [spot],
-      alpha: false, iccProfile: srgbProfile(), dpi,
-    });
-  }
-
-  // Pass 2 — the artwork and its white under-base, overprinted on the cured
-  // varnish. Same pixel dimensions as pass 1 so the two register.
-  const spp = 5;                                     // R G B A W
+  // BOTH passes carry BOTH spot channels in the fixed order W1 then V1, with
+  // the unused plate left empty. A RIP mapping by CHANNEL ORDER assigns
+  // Spot1 -> W1 and Spot2 -> V1, so a file with only the varnish channel lands
+  // in Spot1 and prints WHITE. Keeping the order also satisfies CLAUDE.md
+  // rule 2 and matches the Divinity Box's layout.
+  const spots = [white, spot];
+  const spp = 6;                                     // R G B A W1 V1
   const buf = new Uint8Array(W * H * spp);
+  const isVarnish = pass === 'varnish';
   for (let i = 0, p = 0, q = 0; i < W * H; i++, p += 4, q += spp) {
     const a = img[p + 3]!;
-    buf[q] = img[p]!; buf[q + 1] = img[p + 1]!; buf[q + 2] = img[p + 2]!;
-    buf[q + 3] = a;
-    buf[q + 4] = 255 - a;                            // white mirrors the alpha
+    if (isVarnish) {
+      // Pass 1 — relief only: no colour, no white, just the varnish plate.
+      buf[q] = 255; buf[q + 1] = 255; buf[q + 2] = 255;
+      buf[q + 3] = 255;                              // opaque, so the RIP keeps it
+      buf[q + 4] = 255;                              // W1 empty (INVERTED: 255 = no ink)
+      buf[q + 5] = 255 - metal[i]!;                  // V1 carries the plate
+    } else {
+      // Pass 2 — artwork + white under-base, over the cured varnish.
+      buf[q] = img[p]!; buf[q + 1] = img[p + 1]!; buf[q + 2] = img[p + 2]!;
+      buf[q + 3] = a;
+      buf[q + 4] = 255 - a;                          // white mirrors the alpha
+      buf[q + 5] = 255;                              // V1 empty this pass
+    }
   }
   return encodeRgbSpotTiff({
-    width: W, height: H, interleaved: buf, spotNames: [white],
+    width: W, height: H, interleaved: buf, spotNames: spots,
     alpha: true, iccProfile: srgbProfile(), dpi,
   });
 }
