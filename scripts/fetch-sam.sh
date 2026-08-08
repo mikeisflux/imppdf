@@ -18,11 +18,15 @@ BASE=https://raw.githubusercontent.com/Kazuhito00/MobileSAM-ONNX-Sample/main/onn
 # model is best; the "p" variant is 4.7MB and is a fine fallback. VERIFIES the
 # download is real ONNX — a silent HTML error page would "succeed" here and
 # then fail at load time.
-MATTE_OUT=public/models/matte.onnx
+# ISNet mattes at 1024 where U2-Net does 320, and that resolution IS the
+# difference around hair — at 320 one matte pixel covers ~10 print pixels, so
+# curls smear and the plate takes the background with them. u2net stays as the
+# fallback for an install that already has it.
+MATTE_OUT=public/models/matte-isnet.onnx
 if [ ! -s "$MATTE_OUT" ]; then
   for u in \
+    "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx" \
     "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx" \
-    "https://huggingface.co/tomjackson2023/rembg/resolve/main/u2net.onnx?download=true" \
     "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx" ; do
     echo "  trying $u"
     if curl -fL --progress-bar -o "$MATTE_OUT.part" "$u"; then

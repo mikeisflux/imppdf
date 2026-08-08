@@ -3927,11 +3927,9 @@ export function orientSubjectMask(mask: Uint8Array, w: number, h: number): Uint8
 export async function subjectMask(
   canvas: any, w: number, h: number, pixels: Uint8ClampedArray | Uint8Array,
   cacheKey?: string, featherPx = 1,
-  // Subject box in 0..1 page fractions. A box round the WHOLE page is the
-  // problem — it describes the setting as well as the subject — so when the
-  // operator draws one round the figure, SAM has an unambiguous prompt and
-  // this stops being a guess.
-  box?: { x0: number; y0: number; x1: number; y1: number },
+  // Pulls the matte's soft fringe in — see matteAlpha. 1 = the model's own
+  // edge, higher tightens it.
+  tighten = 1,
 ): Promise<Uint8Array | null> {
   try {
     /* U2-Net first: salient-object matting takes no prompt, so it cannot come
@@ -3940,9 +3938,9 @@ export async function subjectMask(
        SAM is the fallback, and is genuinely better when the operator has drawn
        a box, because then the prompt is unambiguous and it outlines precisely
        what was asked for. */
-    if (!box) {
+    {
       const { matteAlpha } = await import('../matte');
-      const cov = await matteAlpha(canvas, w, h);
+      const cov = await matteAlpha(canvas, w, h, tighten);
       if (cov) {
         let on = 0;
         for (let i = 0; i < cov.length; i++) if (cov[i]! > 8) on++;
@@ -3954,10 +3952,7 @@ export async function subjectMask(
     const emb = await encodeImage(cacheKey ?? `sam:${w}x${h}`, canvas);
     if (!emb) return null;
     const b = inkBoundsFromPixels(pixels, w, h);
-    const p = box
-      ? { x0: box.x0 * w, y0: box.y0 * h, x1: box.x1 * w, y1: box.y1 * h }
-      : { x0: b?.x0 ?? 0, y0: b?.y0 ?? 0, x1: b?.x1 ?? w - 1, y1: b?.y1 ?? h - 1 };
-    const mask = await segmentBox(emb, p.x0, p.y0, p.x1, p.y1);
+    const mask = await segmentBox(emb, b?.x0 ?? 0, b?.y0 ?? 0, b?.x1 ?? w - 1, b?.y1 ?? h - 1);
     if (!mask || mask.w !== w || mask.h !== h) return null;
     orientSubjectMask(mask.data, w, h);
     let on = 0;
@@ -4442,7 +4437,7 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   spotName?: string;        // varnish channel name (default 'V1')
   whiteName?: string;       // white channel name on the colour pass (default 'W1')
   subjectOnly?: boolean;    // gate to the SAM subject so the background stays flat
-  subjectBox?: { x0: number; y0: number; x1: number; y1: number };  // 0..1, drawn by hand
+  matteTighten?: number;    // pull the matte's soft fringe in (1 = as the model gives it)
   // TWO-PASS BUILD, printed in this order:
   //  'varnish' — the raised plate ONLY: line art + slight grey tone on the
   //              varnish channel, no colour and no white. Print and cure this
@@ -4484,7 +4479,7 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
     // jagged line. Multiplying keeps a soft ramp across the boundary, the same
     // rule the Divinity Box works under (CLAUDE.md 6): no thresholds, keep the
     // anti-aliasing.
-    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`, 2, opts?.subjectBox);
+    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`, 2, opts?.matteTighten ?? 1);
     if (subj) for (let i = 0; i < metal.length; i++) {
       metal[i] = Math.round((metal[i]! * subj[i]!) / 255);
     }
