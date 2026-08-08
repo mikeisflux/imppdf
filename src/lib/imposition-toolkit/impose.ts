@@ -3898,6 +3898,117 @@ export function applyMaskAlpha(rgba: Uint8ClampedArray | Uint8Array, coverage: U
   }
 }
 
+// Separable min filter that REPLICATES the border rather than treating outside
+// as empty — the erosion half of a morphological close, where the frame edge
+// must not act like a hole.
+function minFilterClamped(src: Uint8Array, w: number, h: number, r: number): Uint8Array {
+  if (r <= 0) return src;
+  const tmp = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      let mn = 255;
+      for (let k = x - r; k <= x + r && mn > 0; k++) {
+        const v = src[row + Math.min(w - 1, Math.max(0, k))]!;
+        if (v < mn) mn = v;
+      }
+      tmp[row + x] = mn;
+    }
+  }
+  const out = new Uint8Array(w * h);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      let mn = 255;
+      for (let k = y - r; k <= y + r && mn > 0; k++) {
+        const v = tmp[Math.min(h - 1, Math.max(0, k)) * w + x]!;
+        if (v < mn) mn = v;
+      }
+      out[y * w + x] = mn;
+    }
+  }
+  return out;
+}
+
+// Label the 4-connected runs of `on`/`off` pixels in a binary mask. Returns the
+// per-pixel label (0 = not in this phase) and each label's area.
+function labelComponents(
+  mask: Uint8Array, w: number, h: number, phase: 0 | 1,
+): { label: Int32Array; area: number[]; touchesEdge: boolean[] } {
+  const label = new Int32Array(w * h);
+  const area: number[] = [0];
+  const touchesEdge: boolean[] = [false];
+  const queue = new Int32Array(w * h);
+  let next = 1;
+  for (let s = 0; s < label.length; s++) {
+    if (label[s] || (mask[s] ? 1 : 0) !== phase) continue;
+    const id = next++;
+    let head = 0, tail = 0, n = 0, edge = false;
+    queue[tail++] = s; label[s] = id;
+    while (head < tail) {
+      const i = queue[head++]!;
+      n++;
+      const x = i % w, y = (i / w) | 0;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) edge = true;
+      if (x > 0 && !label[i - 1] && (mask[i - 1] ? 1 : 0) === phase) { label[i - 1] = id; queue[tail++] = i - 1; }
+      if (x < w - 1 && !label[i + 1] && (mask[i + 1] ? 1 : 0) === phase) { label[i + 1] = id; queue[tail++] = i + 1; }
+      if (y > 0 && !label[i - w] && (mask[i - w] ? 1 : 0) === phase) { label[i - w] = id; queue[tail++] = i - w; }
+      if (y < h - 1 && !label[i + w] && (mask[i + w] ? 1 : 0) === phase) { label[i + w] = id; queue[tail++] = i + w; }
+    }
+    area.push(n); touchesEdge.push(edge);
+  }
+  return { label, area, touchesEdge };
+}
+
+/* Tidy a raw segmentation into something you can print against.
+
+   SAM's output on illustrated art is honest but ragged: speckle off in the
+   background, pinholes and torn patches inside the subject where a highlight
+   or a dark costume confused it. Left alone those become bare white blobs in
+   the middle of the plate. Three passes, in order:
+
+     1. close  — dilate then erode, bridging the tears without moving the edge
+     2. islands — drop specks far smaller than the main body
+     3. holes  — fill enclosed gaps, but only small ones, so a real see-through
+                 gap (between an arm and the body) is left alone           */
+export function cleanSubjectMask(
+  mask: Uint8Array, w: number, h: number,
+  opts?: { closeRadius?: number; minIslandFrac?: number; maxHoleFrac?: number },
+): Uint8Array {
+  const r = Math.max(0, Math.round(opts?.closeRadius ?? 2));
+  const minIsland = opts?.minIslandFrac ?? 0.05;
+  const maxHole = opts?.maxHoleFrac ?? 0.2;
+  let p: Uint8Array = new Uint8Array(w * h);
+  for (let i = 0; i < p.length; i++) p[i] = mask[i] ? 255 : 0;
+
+  if (r > 0) {
+    // dilate = complement(erode(complement)). NOT chokePlane: that counts
+    // off-sheet as empty (correct for the white choke, which must pull in from
+    // the trim) and would eat a subject that runs off the page — which a
+    // full-bleed cover always does.
+    for (let i = 0; i < p.length; i++) p[i] = 255 - p[i]!;
+    p = minFilterClamped(p, w, h, r);
+    for (let i = 0; i < p.length; i++) p[i] = 255 - p[i]!;
+    p = minFilterClamped(p, w, h, r);
+  }
+
+  const fg = labelComponents(p, w, h, 1);
+  let biggest = 0;
+  for (let i = 1; i < fg.area.length; i++) if (fg.area[i]! > biggest) biggest = fg.area[i]!;
+  if (biggest > 0) {
+    const floor = biggest * minIsland;
+    for (let i = 0; i < p.length; i++) if (p[i] && fg.area[fg.label[i]!]! < floor) p[i] = 0;
+  }
+
+  const bg = labelComponents(p, w, h, 0);
+  const holeCap = Math.max(1, biggest * maxHole);
+  for (let i = 0; i < p.length; i++) {
+    if (p[i]) continue;
+    const id = bg.label[i]!;
+    if (!bg.touchesEdge[id] && bg.area[id]! <= holeCap) p[i] = 255;
+  }
+  return p;
+}
+
 // Segment the subject of an already-rendered canvas. Returns 0..255 coverage
 // (255 = subject) at w×h, or null when the models aren't deployed. Shared by
 // the standalone cutout and the Divinity Box's subject-aware black knockout.
@@ -3905,20 +4016,55 @@ export function applyMaskAlpha(rgba: Uint8ClampedArray | Uint8Array, coverage: U
 export async function subjectMask(
   canvas: any, w: number, h: number, pixels: Uint8ClampedArray | Uint8Array,
   cacheKey?: string, featherPx = 1,
+  clean?: { closeRadius?: number; minIslandFrac?: number; maxHoleFrac?: number },
 ): Promise<Uint8Array | null> {
   try {
-    const { loadSam, encodeImage, segmentBox } = await import('../sam');
+    const { loadSam, encodeImage, segment } = await import('../sam');
     if (!(await loadSam())) return null;
     const emb = await encodeImage(cacheKey ?? `sam:${w}x${h}`, canvas);
     if (!emb) return null;
     const b = inkBoundsFromPixels(pixels, w, h);
-    const mask = await segmentBox(emb, b?.x0 ?? 0, b?.y0 ?? 0, b?.x1 ?? w - 1, b?.y1 ?? h - 1);
+    let box = { x0: b?.x0 ?? 0, y0: b?.y0 ?? 0, x1: b?.x1 ?? w - 1, y1: b?.y1 ?? h - 1 };
+
+    /* On a full-bleed cover the artwork's own bounds ARE the whole page, which
+       tells SAM nothing — "segment the object in this rectangle" where the
+       rectangle is everything comes back as everything, or as a ragged guess.
+       So find the figure first: the anatomy detector fires on faces, bellies,
+       breasts, feet and so on, and the union of its hits is a tight box round
+       the person, with a foreground click on each hit to say which side of the
+       edge we want. That is a prompt SAM can actually act on. */
+    const points: { x: number; y: number; fg?: boolean }[] = [];
+    try {
+      const { detectRegions } = await import('../nsfw-detect');
+      const hits = await detectRegions(canvas, w, h, 0.2);
+      if (hits.length) {
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const d of hits) {
+          x0 = Math.min(x0, d.x0); y0 = Math.min(y0, d.y0);
+          x1 = Math.max(x1, d.x1); y1 = Math.max(y1, d.y1);
+          points.push({ x: (d.x0 + d.x1) / 2, y: (d.y0 + d.y1) / 2, fg: true });
+        }
+        // The detector only boxes bare anatomy, so grow generously — the rest
+        // of the figure (hair, boots, costume) hangs outside those hits.
+        const px = (x1 - x0) * 0.35, py = (y1 - y0) * 0.35;
+        box = {
+          x0: Math.max(0, x0 - px), y0: Math.max(0, y0 - py),
+          x1: Math.min(w - 1, x1 + px), y1: Math.min(h - 1, y1 + py),
+        };
+      }
+    } catch { /* no detector — fall back to the artwork bounds */ }
+
+    // With clicks to anchor it, take the biggest candidate: that is the whole
+    // figure rather than one limb. Without them the box is all SAM has, so
+    // trust its own quality score instead.
+    const mask = await segment(emb, { box, points, pick: points.length ? 'largest' : 'score' });
     if (!mask || mask.w !== w || mask.h !== h) return null;
+    const cleaned = cleanSubjectMask(mask.data, w, h, clean);
     let on = 0;
-    for (let i = 0; i < mask.data.length; i++) on += mask.data[i]!;
+    for (let i = 0; i < cleaned.length; i++) if (cleaned[i]) on++;
     // Nothing found, or the "subject" is the whole frame — no usable split.
-    if (on === 0 || on >= mask.data.length * 0.995) return null;
-    return featherMask(mask.data, w, h, featherPx);
+    if (on === 0 || on >= cleaned.length * 0.995) return null;
+    return featherMask(cleaned, w, h, featherPx);
   } catch { return null; }
 }
 
@@ -4470,6 +4616,7 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   spotName?: string;        // varnish channel name (default 'V1')
   whiteName?: string;       // white channel name on the colour pass (default 'W1')
   subjectOnly?: boolean;    // gate to the SAM subject so the background stays flat
+  bgClean?: number;         // close radius used to tidy that mask (default 2 px)
   // TWO-PASS BUILD, printed in this order:
   //  'varnish' — the raised plate ONLY: line art + slight grey tone on the
   //              varnish channel, no colour and no white. Print and cure this
@@ -4536,7 +4683,8 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   }
 
   if (opts?.subjectOnly) {
-    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`);
+    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`, 1,
+      { closeRadius: opts?.bgClean ?? 2 });
     if (subj) for (let i = 0; i < metal.length; i++) {
       if (subj[i]! < 128) { metal[i] = 0; regionCov[i] = 0; }
     }

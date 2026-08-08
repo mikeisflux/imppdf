@@ -142,7 +142,7 @@ export function defaultSettings(type: StepType): StepSettings {
       return {
         dpi: 300, edgeGain: 1, highlightGain: 0.6, highlightFrom: 200,
         toneGain: 0.18, floor: 24, gamma: 1,
-        spotName: 'V1', whiteName: 'W1', subjectOnly: false,
+        spotName: 'V1', whiteName: 'W1', subjectOnly: false, bgClean: 2,
         autoDetect: true, detectMinScore: 0.25, regionTighten: 1,
         boostAmount: 0.5, boostRegions: [],
       };

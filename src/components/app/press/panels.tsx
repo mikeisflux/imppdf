@@ -2384,6 +2384,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         dpi: s.dpi ?? 300, edgeGain: s.edgeGain ?? 1, highlightGain: s.highlightGain ?? 0.6,
         highlightFrom: s.highlightFrom ?? 200, toneGain: s.toneGain ?? 0.18,
         floor: s.floor ?? 24, gamma: s.gamma ?? 1, subjectOnly: !!s.subjectOnly,
+        bgClean: s.bgClean ?? 2,
         spotName: s.spotName || 'V1', whiteName: s.whiteName || 'W1', pass,
         // The region settings MUST match what the preview showed — without
         // these the exported pass 2 detects nothing and comes out empty.
@@ -2423,6 +2424,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   // stale mask and looks like the sliders do nothing.
   useEffect(() => { regRef.current = null; },
     [s.autoDetect, s.detectMinScore, s.regionTighten, s.subjectOnly]);
+  useEffect(() => { subjRef.current = null; }, [s.bgClean]);
 
   useEffect(() => {
     let dead = false;
@@ -2464,7 +2466,8 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       // Background drop: segment once per artwork, then reuse. Applies to BOTH
       // plates — the varnish and the white must agree on what the subject is.
       if (s.subjectOnly && !subjRef.current) {
-        subjRef.current = await subjectMask(art.canvas, w, h, art.data, `metalprev:${w}x${h}`);
+        subjRef.current = await subjectMask(art.canvas, w, h, art.data, `metalprev:${w}x${h}`, 1,
+          { closeRadius: s.bgClean ?? 2 });
         if (cancelled) return;
       }
       const subj = s.subjectOnly ? subjRef.current : null;
@@ -2541,7 +2544,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       ctx.putImageData(out, 0, 0);
     }, 60);                                         // debounce the slider drag
     return () => { cancelled = true; clearTimeout(id); };
-  }, [ready, mode, s.subjectOnly, s.autoDetect, s.detectMinScore, s.regionTighten, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
+  }, [ready, mode, s.subjectOnly, s.bgClean, s.autoDetect, s.detectMinScore, s.regionTighten, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
@@ -2568,6 +2571,12 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         {rng('Noise floor', 'floor', s.floor ?? 24, 0, 128, 2, 'drop weak specks')}
         {rng('Line weight', 'gamma', s.gamma ?? 1, 0.4, 2, 0.05, '<1 fatter, >1 thinner')}
         <Check icon="crop" label="Subject only" sub="Segment the art so the background stays flat (needs the models)" checked={!!s.subjectOnly} onChange={(v) => up({ subjectOnly: v })} />
+        {s.subjectOnly ? <>
+          {rng('Dropout cleanup', 'bgClean', s.bgClean ?? 2, 0, 6, 1, 'close torn edges')}
+          <div className="pe-note" style={{ marginTop: 8 }}>
+            The figure is located with the anatomy detector and segmented from there, then the mask is tidied: torn edges closed, specks dropped, small enclosed gaps filled. Raise <b>cleanup</b> if the cut-out still has ragged holes; drop it to 0 to see the raw segmentation.
+          </div>
+        </> : null}
       </Section>
       <Section label="// RAISED REGIONS" help="Lift chosen anatomy above the rest of the plate. Detected boxes are refined by MobileSAM so the extra varnish follows the actual shape, not a rectangle.">
         <Check icon="droplet" label="Auto-detect regions to raise" sub="Exposed anatomy, detected locally — nothing is uploaded" checked={s.autoDetect !== false} onChange={(v) => up({ autoDetect: v })} />
