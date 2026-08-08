@@ -4024,40 +4024,31 @@ export async function subjectMask(
     const emb = await encodeImage(cacheKey ?? `sam:${w}x${h}`, canvas);
     if (!emb) return null;
     const b = inkBoundsFromPixels(pixels, w, h);
-    let box = { x0: b?.x0 ?? 0, y0: b?.y0 ?? 0, x1: b?.x1 ?? w - 1, y1: b?.y1 ?? h - 1 };
+    const box = { x0: b?.x0 ?? 0, y0: b?.y0 ?? 0, x1: b?.x1 ?? w - 1, y1: b?.y1 ?? h - 1 };
 
-    /* On a full-bleed cover the artwork's own bounds ARE the whole page, which
-       tells SAM nothing — "segment the object in this rectangle" where the
-       rectangle is everything comes back as everything, or as a ragged guess.
-       So find the figure first: the anatomy detector fires on faces, bellies,
-       breasts, feet and so on, and the union of its hits is a tight box round
-       the person, with a foreground click on each hit to say which side of the
-       edge we want. That is a prompt SAM can actually act on. */
+    /* On a full-bleed cover the artwork's own bounds ARE the whole page, and
+       "segment the object in this rectangle" where the rectangle is everything
+       tells SAM nothing — it comes back as everything, or as a ragged guess.
+       So say which side of the edge we want as well as where to look: clicks
+       down the middle of the box mark the subject, clicks in the corners mark
+       the background. A cover puts its subject in the middle of the frame and
+       its setting behind — that is the whole assumption, and it is a safe one
+       for cover art. Anything else, draw the box by hand. */
     const points: { x: number; y: number; fg?: boolean }[] = [];
-    try {
-      const { detectRegions } = await import('../nsfw-detect');
-      const hits = await detectRegions(canvas, w, h, 0.2);
-      if (hits.length) {
-        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-        for (const d of hits) {
-          x0 = Math.min(x0, d.x0); y0 = Math.min(y0, d.y0);
-          x1 = Math.max(x1, d.x1); y1 = Math.max(y1, d.y1);
-          points.push({ x: (d.x0 + d.x1) / 2, y: (d.y0 + d.y1) / 2, fg: true });
-        }
-        // The detector only boxes bare anatomy, so grow generously — the rest
-        // of the figure (hair, boots, costume) hangs outside those hits.
-        const px = (x1 - x0) * 0.35, py = (y1 - y0) * 0.35;
-        box = {
-          x0: Math.max(0, x0 - px), y0: Math.max(0, y0 - py),
-          x1: Math.min(w - 1, x1 + px), y1: Math.min(h - 1, y1 + py),
-        };
+    {
+      const cx = (box.x0 + box.x1) / 2;
+      const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
+      for (const f of [0.3, 0.5, 0.7]) points.push({ x: cx, y: box.y0 + bh * f, fg: true });
+      const ix = bw * 0.06, iy = bh * 0.06;
+      for (const [x, y] of [[box.x0 + ix, box.y0 + iy], [box.x1 - ix, box.y0 + iy],
+        [box.x0 + ix, box.y1 - iy], [box.x1 - ix, box.y1 - iy]]) {
+        points.push({ x: x!, y: y!, fg: false });
       }
-    } catch { /* no detector — fall back to the artwork bounds */ }
+    }
 
-    // With clicks to anchor it, take the biggest candidate: that is the whole
-    // figure rather than one limb. Without them the box is all SAM has, so
-    // trust its own quality score instead.
-    const mask = await segment(emb, { box, points, pick: points.length ? 'largest' : 'score' });
+    // The clicks anchor it, so take the biggest candidate: that is the whole
+    // figure rather than one limb.
+    const mask = await segment(emb, { box, points, pick: 'largest' });
     if (!mask || mask.w !== w || mask.h !== h) return null;
     const cleaned = cleanSubjectMask(mask.data, w, h, clean);
     let on = 0;
@@ -4531,85 +4522,6 @@ export function metalMaskFromPixels(
   return out;
 }
 
-// Coverage of the regions to raise: hand-supplied boxes plus (optionally) the
-// detected ones, each refined by MobileSAM so the extra varnish follows the
-// shape rather than a rectangle. Shared by the export and the live preview so
-// the two can never disagree about what pass 2 lays down.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function regionCoverage(
-  canvas: any, W: number, H: number, pixels: Uint8ClampedArray | Uint8Array,
-  boxes: { x0: number; y0: number; x1: number; y1: number; label?: string }[] = [],
-  opts?: {
-    autoDetect?: boolean; detectMinScore?: number; detectClasses?: string[];
-    tighten?: number;      // 0 = raw detector boxes, 1 = the class defaults, up to 2
-    cacheKey?: string;
-  },
-): Promise<Uint8Array> {
-  void pixels;
-  const cov = new Uint8Array(W * H);
-  const all = [...boxes];
-  const { tightenBox } = await import('../nsfw-detect');
-  const tighten = Math.max(0, Math.min(2, opts?.tighten ?? 1));
-  if (opts?.autoDetect) {
-    try {
-      const { detectRegions, DEFAULT_RAISE_CLASSES } = await import('../nsfw-detect');
-      const want = opts.detectClasses?.length ? new Set(opts.detectClasses) : DEFAULT_RAISE_CLASSES;
-      for (const d of await detectRegions(canvas, W, H, opts.detectMinScore ?? 0.25)) {
-        if (want.has(d.label)) all.push(d);
-      }
-    } catch { /* no detector — the fallback below still finds candidates */ }
-  }
-  if (!all.length) return cov;
-  const { loadSam, encodeImage, segmentBox } = await import('../sam');
-  const emb = (await loadSam()) ? await encodeImage(opts?.cacheKey ?? `region:${W}x${H}`, canvas) : null;
-  for (const b of all) {
-    // Detected boxes are the whole anatomy; what we want raised is the middle
-    // of it (the nipple, not the breast). Hand-drawn boxes are left alone —
-    // the operator drew exactly the area they meant.
-    const p = b.label ? tightenBox(b, tighten) : b;
-    // SAM may follow the shape a little past the prompt, but not off onto the
-    // next object. Without this gate a crotch prompt returns the SKIRT.
-    const gw = (b.x1 - b.x0) * 0.15, gh = (b.y1 - b.y0) * 0.15;
-    const gx0 = Math.max(0, Math.floor(b.x0 - gw)), gx1 = Math.min(W - 1, Math.ceil(b.x1 + gw));
-    const gy0 = Math.max(0, Math.floor(b.y0 - gh)), gy1 = Math.min(H - 1, Math.ceil(b.y1 + gh));
-    const mask = emb ? await segmentBox(emb, p.x0, p.y0, p.x1, p.y1) : null;
-    let used = false;
-    if (mask && mask.w === W && mask.h === H) {
-      let inside = 0, total = 0;
-      for (let i = 0; i < mask.data.length; i++) if (mask.data[i]) total++;
-      const clipped = new Uint8Array(W * H);
-      for (let y = gy0; y <= gy1; y++) {
-        const row = y * W;
-        for (let x = gx0; x <= gx1; x++) if (mask.data[row + x]) { clipped[row + x] = 1; inside++; }
-      }
-      // Mostly outside the box means SAM latched onto the wrong object; the
-      // clipped remnant would be a meaningless sliver, so use the shape below.
-      if (total > 0 && inside / total >= 0.5 && inside > 16) {
-        const f = featherMask(clipped, W, H, 2);
-        for (let i = 0; i < cov.length; i++) if (f[i]! > cov[i]!) cov[i] = f[i]!;
-        used = true;
-      }
-    }
-    if (!used) {
-      // No segmentation: an elliptical falloff inside the box rather than a
-      // hard rectangle, so a missed region still lifts without a visible edge.
-      const x0 = Math.max(0, Math.floor(p.x0)), x1 = Math.min(W - 1, Math.ceil(p.x1));
-      const y0 = Math.max(0, Math.floor(p.y0)), y1 = Math.min(H - 1, Math.ceil(p.y1));
-      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-      const rx = Math.max(1, (x1 - x0) / 2), ry = Math.max(1, (y1 - y0) / 2);
-      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-        const dx = (x - cx) / rx, dy = (y - cy) / ry;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        if (d >= 1) continue;
-        const v = d <= 0.75 ? 255 : Math.round(255 * (1 - (d - 0.75) / 0.25));
-        const i = y * W + x;
-        if (v > cov[i]!) cov[i] = v;
-      }
-    }
-  }
-  return cov;
-}
-
 export interface RaisedMetalOptions extends RaisedMetalTuning {
   page?: number;
   dpi?: number;             // plate resolution (default 300)
@@ -4624,21 +4536,7 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   //  'colour'  — the artwork with its white under-base, overprinted on the
   //              cured varnish so the finish reads as raised metal.
   // Both come out the same pixel size, so they register.
-  //  'regions'       — THIRD plate: varnish on ONLY the selected regions,
-  //                     after dropping the bed a level.
-  //  'regionsColour' — FOURTH plate: colour + white on those same regions, so
-  //                     the varnish is never left as the exposed top surface.
-  // All four come out at the same pixel size.
-  pass?: 'varnish' | 'colour' | 'regions' | 'regionsColour';
-  // Lift specific regions higher than the rest of the plate. Boxes are in
-  // 0..1 page fractions; each is refined by MobileSAM so the extra varnish
-  // follows the actual shape rather than a rectangle.
-  boostRegions?: { x0: number; y0: number; x1: number; y1: number }[];
-  boostAmount?: number;      // 0..1 extra coverage inside a region (default 0.5)
-  autoDetect?: boolean;      // find the regions automatically
-  detectMinScore?: number;   // detector confidence floor (default 0.25)
-  detectClasses?: string[];  // override which detected labels get raised
-  regionTighten?: number;    // 0 = raw boxes, 1 = class defaults, 2 = twice as tight
+  pass?: 'varnish' | 'colour';
 }
 
 // RGB + (transparency) + the metal spot channel, in the same uncompressed,
@@ -4666,28 +4564,10 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
 
   const metal = metalMaskFromPixels(img, W, H, opts);
 
-  // Raise chosen regions above the rest of the plate (shared with the preview).
-  const regionCov = await regionCoverage(canvas, W, H, img,
-    (opts?.boostRegions ?? []).map((r) => ({ x0: r.x0 * W, y0: r.y0 * H, x1: r.x1 * W, y1: r.y1 * H })),
-    {
-      autoDetect: opts?.autoDetect, detectMinScore: opts?.detectMinScore,
-      detectClasses: opts?.detectClasses, tighten: opts?.regionTighten,
-      cacheKey: `metal:${W}x${H}`,
-    });
-  {
-    const boost = Math.max(0, Math.min(1, opts?.boostAmount ?? 0.5));
-    for (let i = 0; i < metal.length; i++) {
-      if (!regionCov[i]) continue;
-      metal[i] = Math.min(255, Math.round(metal[i]! + boost * 255 * (regionCov[i]! / 255)));
-    }
-  }
-
   if (opts?.subjectOnly) {
     const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`, 1,
       { closeRadius: opts?.bgClean ?? 2 });
-    if (subj) for (let i = 0; i < metal.length; i++) {
-      if (subj[i]! < 128) { metal[i] = 0; regionCov[i] = 0; }
-    }
+    if (subj) for (let i = 0; i < metal.length; i++) if (subj[i]! < 128) metal[i] = 0;
   }
 
   const spot = opts?.spotName || 'V1';
@@ -4703,26 +4583,9 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   const spp = 6;                                     // R G B A W1 V1
   const buf = new Uint8Array(W * H * spp);
   const isVarnish = pass === 'varnish';
-  const isRegions = pass === 'regions';
-  const isRegionsColour = pass === 'regionsColour';
   for (let i = 0, p = 0, q = 0; i < W * H; i++, p += 4, q += spp) {
     const a = img[p + 3]!;
-    if (isRegionsColour) {
-      // Pass 4 — colour + white on the regions ONLY, covering pass 3's varnish
-      // so no varnish is left exposed. Alpha masks everything else out.
-      const rc = regionCov[i]!;
-      buf[q] = img[p]!; buf[q + 1] = img[p + 1]!; buf[q + 2] = img[p + 2]!;
-      buf[q + 3] = rc;                               // print only on the regions
-      buf[q + 4] = 255 - rc;                         // white under that colour
-      buf[q + 5] = 255;                              // V1 empty
-    } else if (isRegions) {
-      // Pass 3 — ONLY the selected regions, for the extra finish laid after
-      // the bed drops a level. No colour, no white.
-      buf[q] = 255; buf[q + 1] = 255; buf[q + 2] = 255;
-      buf[q + 3] = 255;
-      buf[q + 4] = 255;                              // W1 empty
-      buf[q + 5] = 255 - regionCov[i]!;              // INVERTED
-    } else if (isVarnish) {
+    if (isVarnish) {
       // Pass 1 — relief only: no colour, no white, just the varnish plate.
       buf[q] = 255; buf[q + 1] = 255; buf[q + 2] = 255;
       buf[q + 3] = 255;                              // opaque, so the RIP keeps it

@@ -2374,7 +2374,7 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
 function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
-  const run = async (pass: 'varnish' | 'colour' | 'regions' | 'regionsColour') => {
+  const run = async (pass: 'varnish' | 'colour') => {
     setBusy(pass); setErr('');
     try {
       const { raisedMetalTiff, downloadFile } = await import('@/lib/imposition-toolkit/impose');
@@ -2386,16 +2386,9 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         floor: s.floor ?? 24, gamma: s.gamma ?? 1, subjectOnly: !!s.subjectOnly,
         bgClean: s.bgClean ?? 2,
         spotName: s.spotName || 'V1', whiteName: s.whiteName || 'W1', pass,
-        // The region settings MUST match what the preview showed — without
-        // these the exported pass 2 detects nothing and comes out empty.
-        autoDetect: s.autoDetect !== false, detectMinScore: s.detectMinScore ?? 0.25,
-        regionTighten: s.regionTighten ?? 1, boostAmount: s.boostAmount ?? 0.5,
-        boostRegions: s.boostRegions ?? [],
       });
       downloadFile(tiff, pass === 'varnish' ? 'raised-metal-1-varnish.tif'
-        : pass === 'regions' ? 'raised-metal-2-regions-varnish.tif'
-        : pass === 'colour' ? 'raised-metal-3-colour.tif'
-        : 'raised-metal-regions-colour.tif', 'image/tiff');
+        : 'raised-metal-2-colour.tif', 'image/tiff');
     } catch (e) { setErr(e instanceof Error ? e.message : 'Export failed.'); }
     finally { setBusy(''); }
   };
@@ -2415,21 +2408,18 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   const artRef = useRef<{ data: Uint8ClampedArray; w: number; h: number; canvas: HTMLCanvasElement } | null>(null);
   // Cached so dragging a slider never re-runs segmentation.
   const subjRef = useRef<Uint8Array | null>(null);
-  const regRef = useRef<Uint8Array | null>(null);
   const [ready, setReady] = useState(0);
   const mode = s.previewMode ?? 'relief';
 
-  // The region cache is keyed on the artwork, so the detection settings have to
-  // drop it by hand — otherwise moving Confidence or Tightness redraws the
-  // stale mask and looks like the sliders do nothing.
-  useEffect(() => { regRef.current = null; },
-    [s.autoDetect, s.detectMinScore, s.regionTighten, s.subjectOnly]);
-  useEffect(() => { subjRef.current = null; }, [s.bgClean]);
+  // The subject cache is keyed on the artwork, so its own settings have to drop
+  // it by hand — otherwise moving the cleanup slider redraws the stale mask and
+  // looks like it does nothing.
+  useEffect(() => { subjRef.current = null; }, [s.bgClean, s.subjectOnly]);
 
   useEffect(() => {
     let dead = false;
     (async () => {
-      artRef.current = null; subjRef.current = null; regRef.current = null; setReady((n) => n + 1);
+      artRef.current = null; subjRef.current = null; setReady((n) => n + 1);
       if (!sourceBytes) return;
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2445,7 +2435,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         const cx = c.getContext('2d', { willReadFrequently: true })!;
         await pg.render({ canvasContext: cx, viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
         if (dead) return;
-        subjRef.current = null; regRef.current = null;
+        subjRef.current = null;
         artRef.current = { data: cx.getImageData(0, 0, w, h).data, w, h, canvas: c };
         setReady((n) => n + 1);
       } catch { /* preview is a nicety */ }
@@ -2461,7 +2451,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
     const ctx = cv.getContext('2d')!;
     let cancelled = false;
     const id = setTimeout(async () => {
-      const { metalMaskFromPixels, subjectMask, regionCoverage } = await import('@/lib/imposition-toolkit/impose');
+      const { metalMaskFromPixels, subjectMask } = await import('@/lib/imposition-toolkit/impose');
       if (cancelled) return;
       // Background drop: segment once per artwork, then reuse. Applies to BOTH
       // plates — the varnish and the white must agree on what the subject is.
@@ -2471,19 +2461,6 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         if (cancelled) return;
       }
       const subj = s.subjectOnly ? subjRef.current : null;
-      // Regions are the slow part (detector + segmentation), so only compute
-      // them when that view is asked for, then cache like the subject mask.
-      if (mode === 'regions' && !regRef.current) {
-        regRef.current = await regionCoverage(art.canvas, w, h, art.data,
-          (s.boostRegions ?? []).map((r: { x0: number; y0: number; x1: number; y1: number }) =>
-            ({ x0: r.x0 * w, y0: r.y0 * h, x1: r.x1 * w, y1: r.y1 * h })),
-          {
-            autoDetect: s.autoDetect !== false, detectMinScore: s.detectMinScore ?? 0.25,
-            tighten: s.regionTighten ?? 1, cacheKey: `metalprev:${w}x${h}`,
-          });
-        if (cancelled) return;
-      }
-      const reg = regRef.current;
       const m = metalMaskFromPixels(art.data, w, h, {
         edgeGain: s.edgeGain ?? 1, highlightGain: s.highlightGain ?? 0.6,
         highlightFrom: s.highlightFrom ?? 200, toneGain: s.toneGain ?? 0.18,
@@ -2494,13 +2471,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       const at = (x: number, y: number) => m[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))]!;
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const i = y * w + x, q = i * 4, v = m[i]!;
-        if (mode === 'regions') {
-          // Pass 2 exactly as the file stores it: black where the extra
-          // varnish lays on the raised regions, white everywhere else.
-          const rv = reg ? (subj && subj[i]! < 128 ? 0 : reg[i]!) : 0;
-          const ir = 255 - rv;
-          out.data[q] = ir; out.data[q + 1] = ir; out.data[q + 2] = ir; out.data[q + 3] = 255;
-        } else if (mode === 'plate') {
+        if (mode === 'plate') {
           // V1 exactly as the FILE stores it — spot polarity is INVERTED:
           // BLACK = 100% ink, white = none (CLAUDE.md rule 6). This is what
           // you see opening the channel in Photoshop.
@@ -2544,15 +2515,15 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       ctx.putImageData(out, 0, 0);
     }, 60);                                         // debounce the slider drag
     return () => { cancelled = true; clearTimeout(id); };
-  }, [ready, mode, s.subjectOnly, s.bgClean, s.autoDetect, s.detectMinScore, s.regionTighten, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
+  }, [ready, mode, s.subjectOnly, s.bgClean, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Raised metal in <b>three passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief. Then the <b>regions varnish</b> adds height on the detected areas, and finally one <b>colour pass</b> caps everything — the artwork with {s.whiteName || 'W1'} white laid <b>only under the raised metal</b>, so no white is wasted and no varnish is left exposed.
+        Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief as high as you want it. Then the <b>colour pass</b> caps it — the artwork with {s.whiteName || 'W1'} white laid <b>only under the raised metal</b>, so no white is wasted and no varnish is left exposed.
       </div>
-      <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show each spot channel exactly as the file stores it — BLACK = 100% ink, white = none, the same inverted polarity you see opening the channel in Photoshop. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art. Regions shows pass 2 — the extra varnish on the detected areas (it runs the detector, so it takes a moment the first time).">
+      <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show each spot channel exactly as the file stores it — BLACK = 100% ink, white = none, the same inverted polarity you see opening the channel in Photoshop. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art.">
         <div className="pe-row" style={{ gap: 8 }}>
-          {([['plate', `${s.spotName || 'V1'} plate`], ['regions', 'Regions'], ['white', `${s.whiteName || 'W1'} plate`], ['relief', 'Relief'], ['overlay', 'Overlay']] as const).map(([mdl, label]) => (
+          {([['plate', `${s.spotName || 'V1'} plate`], ['white', `${s.whiteName || 'W1'} plate`], ['relief', 'Relief'], ['overlay', 'Overlay']] as const).map(([mdl, label]) => (
             <button key={mdl} className="pe-btn" style={{ flex: 1, padding: '6px 4px', ...(mode === mdl ? { outline: '2px solid currentColor' } : {}) }}
               onClick={() => up({ previewMode: mdl })}>{label}</button>
           ))}
@@ -2574,18 +2545,9 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         {s.subjectOnly ? <>
           {rng('Dropout cleanup', 'bgClean', s.bgClean ?? 2, 0, 6, 1, 'close torn edges')}
           <div className="pe-note" style={{ marginTop: 8 }}>
-            The figure is located with the anatomy detector and segmented from there, then the mask is tidied: torn edges closed, specks dropped, small enclosed gaps filled. Raise <b>cleanup</b> if the cut-out still has ragged holes; drop it to 0 to see the raw segmentation.
+            The subject is segmented on the assumption that it sits in the middle of the frame and the setting is behind it, then the mask is tidied: torn edges closed, specks dropped, small enclosed gaps filled. Raise <b>cleanup</b> if the cut-out still has ragged holes; drop it to 0 to see the raw segmentation.
           </div>
         </> : null}
-      </Section>
-      <Section label="// RAISED REGIONS" help="Lift chosen anatomy above the rest of the plate. Detected boxes are refined by MobileSAM so the extra varnish follows the actual shape, not a rectangle.">
-        <Check icon="droplet" label="Auto-detect regions to raise" sub="Exposed anatomy, detected locally — nothing is uploaded" checked={s.autoDetect !== false} onChange={(v) => up({ autoDetect: v })} />
-        {rng('Extra relief', 'boostAmount', s.boostAmount ?? 0.5, 0, 1, 0.05, 'added coverage in a region')}
-        {rng('Confidence', 'detectMinScore', s.detectMinScore ?? 0.25, 0.05, 0.9, 0.05, 'lower finds more')}
-        {rng('Tightness', 'regionTighten', s.regionTighten ?? 1, 0, 2, 0.1, '1 = default, higher = smaller')}
-        <div className="pe-note" style={{ marginTop: 8 }}>
-          The detector is trained mostly on photographic material, so on stylised art treat it as a starting point — lower the confidence to catch more, raise it if it plates the wrong areas. The genital classes score much lower than breasts on painted art, so they get their own, lower floor automatically; one Confidence setting covers both. <b>Tightness</b> pulls each detected box in toward its centre before segmentation, which is what keeps a breast box on the nipple and stops a crotch box grabbing the skirt behind it — raise it if a region plates too wide, drop it toward 0 for the raw box. Hand-drawn boxes are never tightened. Open the browser console for a <code>[detect]</code> line listing every class and its best score, so you can set the threshold from what the model actually saw.
-        </div>
       </Section>
       <Section label="// OUTPUT" help="Both files come out at the same pixel size so the two passes register on press.">
         <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
@@ -2599,11 +2561,10 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         </div>
         <div className="pe-row" style={{ gap: 8, marginTop: 8 }}>
           <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('varnish')}>{busy === 'varnish' ? 'Rendering…' : '1 · Varnish'}</button>
-          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('regions')}>{busy === 'regions' ? 'Rendering…' : '2 · Regions varnish'}</button>
-          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('colour')}>{busy === 'colour' ? 'Rendering…' : '3 · Colour + white'}</button>
+          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('colour')}>{busy === 'colour' ? 'Rendering…' : '2 · Colour + white'}</button>
         </div>
         <div className="pe-note" style={{ marginTop: 8 }}>
-          All the varnish goes down first, then one colour pass caps the lot — so nothing is left as bare varnish and there is no fourth run. <b>1</b> builds the base relief, <b>2</b> adds height on the regions only (drop the bed a level), <b>3</b> prints the artwork with {s.whiteName || 'W1'} under the raised areas. All three files are the same pixel size.
+The varnish goes down first, then the colour pass caps it, so nothing is left as bare varnish. <b>1</b> builds the relief — run it as many times as the height needs. <b>2</b> prints the artwork with {s.whiteName || 'W1'} under the raised areas. Both files are the same pixel size, so they register.
         </div>
         {err && <div className="form-error" style={{ marginTop: 8 }}>{err}</div>}
       </Section>
