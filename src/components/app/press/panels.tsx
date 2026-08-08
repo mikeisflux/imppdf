@@ -2371,6 +2371,9 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
   );
 }
 
+// A cut-out correction click, in 0..1 page fractions. fg=false = background.
+type PressPoint = { x: number; y: number; fg: boolean };
+
 function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
@@ -2386,6 +2389,8 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         floor: s.floor ?? 24, gamma: s.gamma ?? 1, subjectOnly: !!s.subjectOnly,
         bgClean: s.bgClean ?? 2,
         spotName: s.spotName || 'V1', whiteName: s.whiteName || 'W1', pass,
+        // The cut-out MUST match the preview, clicks and all.
+        subjectPoints: s.subjectPoints ?? [],
       });
       downloadFile(tiff, pass === 'varnish' ? 'raised-metal-1-varnish.tif'
         : 'raised-metal-2-colour.tif', 'image/tiff');
@@ -2414,7 +2419,20 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   // The subject cache is keyed on the artwork, so its own settings have to drop
   // it by hand — otherwise moving the cleanup slider redraws the stale mask and
   // looks like it does nothing.
-  useEffect(() => { subjRef.current = null; }, [s.bgClean, s.subjectOnly]);
+  useEffect(() => { subjRef.current = null; }, [s.bgClean, s.subjectOnly, s.subjectPoints]);
+
+  // Click the preview to correct the cut-out: plain click marks subject,
+  // shift-click (or right-click) marks background. Coordinates are stored as
+  // page fractions so they survive the preview being a different size to the
+  // exported plate.
+  const addPoint = (e: React.MouseEvent<HTMLCanvasElement>, fg: boolean) => {
+    if (!s.subjectOnly) return;
+    e.preventDefault();
+    const cv = e.currentTarget, r = cv.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    if (x < 0 || y < 0 || x > 1 || y > 1) return;
+    up({ subjectPoints: [...((s.subjectPoints ?? []) as PressPoint[]), { x, y, fg }] });
+  };
 
   useEffect(() => {
     let dead = false;
@@ -2457,7 +2475,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       // plates — the varnish and the white must agree on what the subject is.
       if (s.subjectOnly && !subjRef.current) {
         subjRef.current = await subjectMask(art.canvas, w, h, art.data, `metalprev:${w}x${h}`, 1,
-          { closeRadius: s.bgClean ?? 2 });
+          { closeRadius: s.bgClean ?? 2 }, s.subjectPoints ?? []);
         if (cancelled) return;
       }
       const subj = s.subjectOnly ? subjRef.current : null;
@@ -2513,9 +2531,17 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         }
       }
       ctx.putImageData(out, 0, 0);
+      // Show the clicks on top of the result: green = subject, red = background.
+      if (s.subjectOnly) for (const p of (s.subjectPoints ?? []) as PressPoint[]) {
+        ctx.beginPath();
+        ctx.arc(p.x * w, p.y * h, 5, 0, Math.PI * 2);
+        ctx.fillStyle = p.fg === false ? 'rgba(255,64,64,0.9)' : 'rgba(64,255,128,0.9)';
+        ctx.fill();
+        ctx.lineWidth = 1.5; ctx.strokeStyle = '#000'; ctx.stroke();
+      }
     }, 60);                                         // debounce the slider drag
     return () => { cancelled = true; clearTimeout(id); };
-  }, [ready, mode, s.subjectOnly, s.bgClean, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
+  }, [ready, mode, s.subjectOnly, s.bgClean, s.subjectPoints, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
@@ -2530,7 +2556,10 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         </div>
         <div style={{ marginTop: 8, background: '#111', borderRadius: 6, padding: 6, textAlign: 'center' }}>
           {sourceBytes
-            ? <canvas ref={canvasRef} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} />
+            ? <canvas ref={canvasRef}
+                onClick={(e) => addPoint(e, !e.shiftKey)}
+                onContextMenu={(e) => addPoint(e, false)}
+                style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto', cursor: s.subjectOnly ? 'crosshair' : 'default' }} />
             : <div className="pe-note" style={{ margin: 0, padding: 12 }}>Load the artwork to preview.</div>}
         </div>
       </Section>
@@ -2544,8 +2573,19 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         <Check icon="crop" label="Subject only" sub="Segment the art so the background stays flat (needs the models)" checked={!!s.subjectOnly} onChange={(v) => up({ subjectOnly: v })} />
         {s.subjectOnly ? <>
           {rng('Dropout cleanup', 'bgClean', s.bgClean ?? 2, 0, 6, 1, 'close torn edges')}
+          <div className="pe-row" style={{ gap: 8, marginTop: 8, alignItems: 'center' }}>
+            <span className="pe-label" style={{ flex: 1 }}>
+              Cut-out clicks<span className="pe-label-sm"> · {((s.subjectPoints ?? []) as PressPoint[]).length || 'none'}</span>
+            </span>
+            <button className="pe-btn" style={{ padding: '4px 10px' }}
+              disabled={!((s.subjectPoints ?? []) as PressPoint[]).length}
+              onClick={() => up({ subjectPoints: ((s.subjectPoints ?? []) as PressPoint[]).slice(0, -1) })}>Undo</button>
+            <button className="pe-btn" style={{ padding: '4px 10px' }}
+              disabled={!((s.subjectPoints ?? []) as PressPoint[]).length}
+              onClick={() => up({ subjectPoints: [] })}>Clear</button>
+          </div>
           <div className="pe-note" style={{ marginTop: 8 }}>
-            The subject is segmented on the assumption that it sits in the middle of the frame and the setting is behind it, then the mask is tidied: torn edges closed, specks dropped, small enclosed gaps filled. Raise <b>cleanup</b> if the cut-out still has ragged holes; drop it to 0 to see the raw segmentation.
+            Left alone it segments the picture all over and keeps the pieces that do not reach the frame corners — a wall or a floor does, a figure does not — so hair, boots and props come along with the body. When it still gets it wrong, <b>click the preview to correct it</b>: a plain click marks <b>subject</b> (green), shift-click or right-click marks <b>background</b> (red). One click of each is usually enough, and your clicks replace the automatic guess entirely rather than nudging it. <b>Cleanup</b> tidies whatever comes back — torn edges closed, specks dropped, small enclosed gaps filled; drop it to 0 to see the raw segmentation.
           </div>
         </> : null}
       </Section>

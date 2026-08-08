@@ -4009,6 +4009,67 @@ export function cleanSubjectMask(
   return p;
 }
 
+/** A click the operator placed on the artwork, in 0..1 page fractions.
+ *  fg=false marks background. */
+export interface SubjectPoint { x: number; y: number; fg?: boolean }
+
+// Nearest-neighbour upscale of a binary mask. The segmentation is computed
+// small (see below) and blown back up; the edge is softened afterwards by the
+// close and the feather, so nothing here needs to interpolate.
+function upscaleMask(src: Uint8Array, sw: number, sh: number, dw: number, dh: number): Uint8Array {
+  if (sw === dw && sh === dh) return src;
+  const out = new Uint8Array(dw * dh);
+  for (let y = 0; y < dh; y++) {
+    const sy = Math.min(sh - 1, (y * sh / dh) | 0) * sw;
+    const row = y * dw;
+    for (let x = 0; x < dw; x++) out[row + x] = src[sy + Math.min(sw - 1, (x * sw / dw) | 0)]!;
+  }
+  return out;
+}
+
+/* Automatic subject: prompt SAM at a grid of points across the artwork, keep
+   the pieces that behave like subject, and union them.
+
+   One box prompt is not enough on illustrated art. A cover's subject is not a
+   single "object" to SAM — it is a figure plus hair plus boots plus whatever
+   she is holding, and one prompt returns whichever of those the model likes
+   best. That is how you get a clean body with the hair missing. Prompting all
+   over the picture and unioning the survivors recovers those parts.
+
+   What separates subject from setting is the frame: a background — a wall, a
+   floor, the sky through a window — reaches the corners of the picture, and a
+   subject does not. So any candidate covering two or more corners, or most of
+   the frame, is thrown out. That is the only assumption, and it is far weaker
+   than "the subject is in the middle". */
+async function autoSubject(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  emb: any, W: number, H: number,
+  box: { x0: number; y0: number; x1: number; y1: number },
+): Promise<Uint8Array> {
+  const { segment } = await import('../sam');
+  const acc = new Uint8Array(W * H);
+  const corners = [0, W - 1, (H - 1) * W, (H - 1) * W + W - 1];
+  const COLS = 5, ROWS = 7;
+  const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const x = box.x0 + bw * ((c + 0.5) / COLS);
+      const y = box.y0 + bh * ((r + 0.5) / ROWS);
+      const m = await segment(emb, { points: [{ x, y, fg: true }], out: { w: W, h: H } });
+      if (!m || m.w !== W || m.h !== H) continue;
+      let cornersHit = 0;
+      for (const i of corners) if (m.data[i]) cornersHit++;
+      if (cornersHit >= 2) continue;                       // background plane
+      let on = 0;
+      for (let i = 0; i < m.data.length; i++) if (m.data[i]) on++;
+      if (on > acc.length * 0.55) continue;                // the whole picture
+      if (on < acc.length * 0.002) continue;               // a speck
+      for (let i = 0; i < acc.length; i++) if (m.data[i]) acc[i] = 1;
+    }
+  }
+  return acc;
+}
+
 // Segment the subject of an already-rendered canvas. Returns 0..255 coverage
 // (255 = subject) at w×h, or null when the models aren't deployed. Shared by
 // the standalone cutout and the Divinity Box's subject-aware black knockout.
@@ -4017,6 +4078,7 @@ export async function subjectMask(
   canvas: any, w: number, h: number, pixels: Uint8ClampedArray | Uint8Array,
   cacheKey?: string, featherPx = 1,
   clean?: { closeRadius?: number; minIslandFrac?: number; maxHoleFrac?: number },
+  points?: SubjectPoint[],
 ): Promise<Uint8Array | null> {
   try {
     const { loadSam, encodeImage, segment } = await import('../sam');
@@ -4026,31 +4088,27 @@ export async function subjectMask(
     const b = inkBoundsFromPixels(pixels, w, h);
     const box = { x0: b?.x0 ?? 0, y0: b?.y0 ?? 0, x1: b?.x1 ?? w - 1, y1: b?.y1 ?? h - 1 };
 
-    /* On a full-bleed cover the artwork's own bounds ARE the whole page, and
-       "segment the object in this rectangle" where the rectangle is everything
-       tells SAM nothing — it comes back as everything, or as a ragged guess.
-       So say which side of the edge we want as well as where to look: clicks
-       down the middle of the box mark the subject, clicks in the corners mark
-       the background. A cover puts its subject in the middle of the frame and
-       its setting behind — that is the whole assumption, and it is a safe one
-       for cover art. Anything else, draw the box by hand. */
-    const points: { x: number; y: number; fg?: boolean }[] = [];
-    {
-      const cx = (box.x0 + box.x1) / 2;
-      const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
-      for (const f of [0.3, 0.5, 0.7]) points.push({ x: cx, y: box.y0 + bh * f, fg: true });
-      const ix = bw * 0.06, iy = bh * 0.06;
-      for (const [x, y] of [[box.x0 + ix, box.y0 + iy], [box.x1 - ix, box.y0 + iy],
-        [box.x0 + ix, box.y1 - iy], [box.x1 - ix, box.y1 - iy]]) {
-        points.push({ x: x!, y: y!, fg: false });
-      }
-    }
+    /* Work small. The decoder upsamples a 256×256 logit map, so a full-size
+       mask carries no more information than a 768-px one — but at 300 dpi it
+       is ~17M floats per call, and the automatic path makes dozens of calls. */
+    const k = Math.min(1, 640 / Math.max(w, h));
+    const W = Math.max(1, Math.round(w * k)), H = Math.max(1, Math.round(h * k));
 
-    // The clicks anchor it, so take the biggest candidate: that is the whole
-    // figure rather than one limb.
-    const mask = await segment(emb, { box, points, pick: 'largest' });
-    if (!mask || mask.w !== w || mask.h !== h) return null;
-    const cleaned = cleanSubjectMask(mask.data, w, h, clean);
+    let raw: Uint8Array | null = null;
+    if (points?.length) {
+      // Operator clicks win outright: exactly what was clicked, nothing added.
+      const m = await segment(emb, {
+        points: points.map((p) => ({ x: p.x * w, y: p.y * h, fg: p.fg !== false })),
+        out: { w: W, h: H },
+      });
+      if (m && m.w === W && m.h === H) raw = m.data;
+    } else {
+      raw = await autoSubject(emb, W, H,
+        { x0: box.x0 * k, y0: box.y0 * k, x1: box.x1 * k, y1: box.y1 * k });
+    }
+    if (!raw) return null;
+
+    const cleaned = cleanSubjectMask(upscaleMask(raw, W, H, w, h), w, h, clean);
     let on = 0;
     for (let i = 0; i < cleaned.length; i++) if (cleaned[i]) on++;
     // Nothing found, or the "subject" is the whole frame — no usable split.
@@ -4067,6 +4125,7 @@ export interface RemoveBackgroundOptions {
   // "the main object in here".
   box?: { x0: number; y0: number; x1: number; y1: number };
   featherPx?: number;   // edge softening (default 1)
+  points?: SubjectPoint[];  // operator clicks, in 0..1 page fractions
   cacheKey?: string;    // reuse an embedding across retries of the same art
 }
 
@@ -4094,7 +4153,8 @@ export async function removeBackground(bytes: Uint8Array, opts?: RemoveBackgroun
     await pg.render({ canvasContext: ctx, viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
     const img = ctx.getImageData(0, 0, w, h);
 
-    const coverage = await subjectMask(canvas, w, h, img.data, opts?.cacheKey, opts?.featherPx ?? 1);
+    const coverage = await subjectMask(canvas, w, h, img.data, opts?.cacheKey,
+      opts?.featherPx ?? 1, undefined, opts?.points);
     if (!coverage) return bytes;
     applyMaskAlpha(img.data, coverage);
     ctx.putImageData(img, 0, 0);
@@ -4529,6 +4589,7 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   whiteName?: string;       // white channel name on the colour pass (default 'W1')
   subjectOnly?: boolean;    // gate to the SAM subject so the background stays flat
   bgClean?: number;         // close radius used to tidy that mask (default 2 px)
+  subjectPoints?: SubjectPoint[];  // operator clicks that override the auto guess
   // TWO-PASS BUILD, printed in this order:
   //  'varnish' — the raised plate ONLY: line art + slight grey tone on the
   //              varnish channel, no colour and no white. Print and cure this
@@ -4566,7 +4627,7 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
 
   if (opts?.subjectOnly) {
     const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`, 1,
-      { closeRadius: opts?.bgClean ?? 2 });
+      { closeRadius: opts?.bgClean ?? 2 }, opts?.subjectPoints);
     if (subj) for (let i = 0; i < metal.length; i++) if (subj[i]! < 128) metal[i] = 0;
   }
 

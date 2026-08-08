@@ -169,6 +169,12 @@ export interface SamPrompt {
    *  whole subject and the highest-scoring candidate keeps coming back as a
    *  sleeve or a boot. */
   pick?: "score" | "largest";
+  /** Decode the mask at this size instead of the full image. The decoder just
+   *  upsamples a 256×256 logit map, so a smaller size loses no real detail —
+   *  and at 300 dpi a full-size mask is tens of megabytes per call, which
+   *  matters when a prompt is run dozens of times. Points are unaffected:
+   *  they are always given in original-image pixels. */
+  out?: { w: number; h: number };
 }
 
 /** Turn a prompt (box and/or clicks, in original image pixels) into a mask.
@@ -198,7 +204,8 @@ export async function segment(emb: Embedding, prompt: SamPrompt): Promise<SamMas
       point_labels: new ort.Tensor("float32", Float32Array.from(labels), [1, labels.length]),
       mask_input: new ort.Tensor("float32", new Float32Array(256 * 256), [1, 1, 256, 256]),
       has_mask_input: new ort.Tensor("float32", Float32Array.from([0]), [1]),
-      orig_im_size: new ort.Tensor("float32", Float32Array.from([emb.origH, emb.origW]), [2]),
+      orig_im_size: new ort.Tensor("float32",
+        Float32Array.from([prompt.out?.h ?? emb.origH, prompt.out?.w ?? emb.origW]), [2]),
     });
     const masks = out.masks as Tensor;
     const dims = masks.dims as number[];

@@ -559,3 +559,17 @@ test('cleanSubjectMask: a subject running off the page keeps its edge', async ()
   assert.equal(out[20 * w + 0], 255, 'the left frame edge is not eroded');
   assert.equal(out[20 * w + 35], 0, 'the background is still background');
 });
+
+test('upscaleMask + subject cleanup survive a low-res round trip', async () => {
+  // The segmentation runs small and is blown back up, so a mask computed at
+  // preview size must still land on the same pixels at plate size.
+  const { cleanSubjectMask } = await import('../src/lib/imposition-toolkit/impose.ts');
+  const w = 64, h = 64;
+  const m = new Uint8Array(w * h);
+  for (let y = 16; y < 48; y++) for (let x = 16; x < 48; x++) m[y * w + x] = 1;
+  const out = cleanSubjectMask(m, w, h, { closeRadius: 1 });
+  assert.equal(out[32 * w + 32], 255, 'centre kept');
+  assert.equal(out[2 * w + 2], 0, 'corner still background');
+  // The close must not grow the shape outward past a pixel or two.
+  assert.equal(out[32 * w + 10], 0, 'no runaway dilation');
+});
