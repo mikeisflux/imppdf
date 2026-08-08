@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Fetch the MobileSAM weights and the ONNX runtime WASM for the segmentation
-# tools (Tuck Behind Art, Remove Background, Raised Metal's subject dropout).
+# tools: Remove Background, Raised Metal's subject dropout, and the Divinity
+# Box's subject-aware black knockout.
 # The binaries are ~77MB, so they are not kept in git — run this once after
-# cloning, and in the deploy step. Without them the tuck tool silently falls
-# back to the old luminance-threshold cutout.
+# cloning, and in the deploy step. Without them those tools fall through
+# untouched: no cutout, no dropout, and the knockout stops shielding the
+# subject. Nothing errors, so a missed fetch is easy to miss.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p public/models public/ort
