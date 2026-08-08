@@ -527,3 +527,53 @@ test('metalMaskFromPixels: plates the linework and highlights, not flat fills', 
   const clear = new Uint8Array(w * h * 4);
   assert.ok(metalMaskFromPixels(clear, w, h).every((v) => v === 0), 'transparent gets no metal');
 });
+
+test('metalMaskFromPixels: the noise floor ramps to zero, it does not cut', async () => {
+  const { metalMaskFromPixels } = await import('../src/lib/imposition-toolkit/impose.ts');
+  // A smooth luminance ramp, plated by grey tone alone. A hard `v < floor -> 0`
+  // leaves a step the height of the floor part-way along it; on a curved edge
+  // that step is exactly the jaggedness that shows up in the white plate.
+  const w = 256, h = 4;
+  const px = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const p = (y * w + x) * 4;
+    px[p] = px[p + 1] = px[p + 2] = x;                 // 0..255 left to right
+    px[p + 3] = 255;
+  }
+  const m = metalMaskFromPixels(px, w, h, { toneGain: 1, edgeGain: 0, highlightGain: 0, floor: 24 });
+  const row = Array.from(m.slice(w, 2 * w));
+  const nonZero = row.filter((v) => v > 0);
+  assert.ok(nonZero.length > 0, 'the ramp plates');
+  assert.ok(Math.min(...nonZero) <= 6,
+    `the plate fades to nothing rather than stopping at the floor (min ${Math.min(...nonZero)})`);
+  // And no sudden jump anywhere along it.
+  let biggest = 0;
+  for (let i = 1; i < row.length; i++) biggest = Math.max(biggest, Math.abs(row[i]! - row[i - 1]!));
+  assert.ok(biggest <= 8, `no step along the ramp (largest ${biggest})`);
+});
+
+test('orientSubjectMask: a mask holding the corners is the background, so flip it', async () => {
+  const { orientSubjectMask } = await import('../src/lib/imposition-toolkit/impose.ts');
+  const w = 40, h = 40;
+  const idx = (x: number, y: number) => y * w + x;
+
+  // A centred figure: touches no corner. Left exactly as it is.
+  const subject = new Uint8Array(w * h);
+  for (let y = 8; y < 32; y++) for (let x = 12; x < 28; x++) subject[idx(x, y)] = 1;
+  const keptAs = orientSubjectMask(Uint8Array.from(subject), w, h);
+  assert.deepEqual(Array.from(keptAs), Array.from(subject), 'a centred subject is not flipped');
+
+  // The setting: everything EXCEPT that figure — holds all four corners.
+  const background = new Uint8Array(w * h);
+  for (let i = 0; i < background.length; i++) background[i] = subject[i] ? 0 : 1;
+  const flipped = orientSubjectMask(background, w, h);
+  assert.equal(flipped[idx(20, 20)], 1, 'the figure comes back as the subject');
+  assert.equal(flipped[idx(0, 0)], 0, 'the corner is background again');
+  assert.deepEqual(Array.from(flipped), Array.from(subject), 'exactly the figure');
+
+  // A subject running off ONE corner is still a subject — one corner is not two.
+  const cornerHugger = new Uint8Array(w * h);
+  for (let y = 0; y < 20; y++) for (let x = 0; x < 20; x++) cornerHugger[idx(x, y)] = 1;
+  const held = orientSubjectMask(Uint8Array.from(cornerHugger), w, h);
+  assert.deepEqual(Array.from(held), Array.from(cornerHugger), 'one corner does not trigger a flip');
+});

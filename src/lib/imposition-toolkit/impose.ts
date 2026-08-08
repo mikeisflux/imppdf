@@ -3898,6 +3898,22 @@ export function applyMaskAlpha(rgba: Uint8ClampedArray | Uint8Array, coverage: U
   }
 }
 
+/* SAM is given a box round the whole page, which describes the wall behind the
+   figure exactly as well as it describes the figure — and it regularly comes
+   back with the wall, so the plate drops the subject and keeps the setting.
+   It reads as the whole thing "operating in reverse", because it is.
+
+   Tell the two apart by the frame: a background reaches the corners of the
+   picture and a subject does not. A mask holding two or more corners is the
+   setting, so take its complement. Flips in place; exported for testing. */
+export function orientSubjectMask(mask: Uint8Array, w: number, h: number): Uint8Array {
+  const corners = [0, w - 1, (h - 1) * w, (h - 1) * w + w - 1];
+  let held = 0;
+  for (const i of corners) if (mask[i]) held++;
+  if (held >= 2) for (let i = 0; i < mask.length; i++) mask[i] = mask[i] ? 0 : 1;
+  return mask;
+}
+
 // Segment the subject of an already-rendered canvas. Returns 0..255 coverage
 // (255 = subject) at w×h, or null when the models aren't deployed. Shared by
 // the standalone cutout and the Divinity Box's subject-aware black knockout.
@@ -3914,6 +3930,7 @@ export async function subjectMask(
     const b = inkBoundsFromPixels(pixels, w, h);
     const mask = await segmentBox(emb, b?.x0 ?? 0, b?.y0 ?? 0, b?.x1 ?? w - 1, b?.y1 ?? h - 1);
     if (!mask || mask.w !== w || mask.h !== h) return null;
+    orientSubjectMask(mask.data, w, h);
     let on = 0;
     for (let i = 0; i < mask.data.length; i++) on += mask.data[i]!;
     // Nothing found, or the "subject" is the whole frame — no usable split.
@@ -4369,7 +4386,12 @@ export function metalMaskFromPixels(
       // Linework/highlights, plus a slight grey tone from the art's own shading.
       const tone = toneGain > 0 ? (1 - c / 255) * 255 * toneGain : 0;
       let v = Math.min(255, Math.max(edge, hl) + tone);
-      if (v < floor) continue;
+      // Drop the noise floor CONTINUOUSLY — subtract it and rescale — instead
+      // of cutting at it. A hard `v < floor -> 0` puts a step in the middle of
+      // every soft gradient, and a step along a curve is a staircase. This
+      // reaches zero at the same place and stays smooth on the way there.
+      if (v <= floor) continue;
+      v = ((v - floor) / (255 - floor)) * 255;
       if (gamma !== 1) v = 255 * Math.pow(Math.min(1, v / 255), gamma);
       out[y * w + x] = Math.max(0, Math.min(255, Math.round(v)));
     }
@@ -4427,8 +4449,15 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   const metal = metalMaskFromPixels(img, W, H, opts);
 
   if (opts?.subjectOnly) {
-    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`);
-    if (subj) for (let i = 0; i < metal.length; i++) if (subj[i]! < 128) metal[i] = 0;
+    // Feather 2 and MULTIPLY — never a `< 128` cut. A binary gate turns the
+    // mask outline into a hard 1px edge, which on the white plate prints as a
+    // jagged line. Multiplying keeps a soft ramp across the boundary, the same
+    // rule the Divinity Box works under (CLAUDE.md 6): no thresholds, keep the
+    // anti-aliasing.
+    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`, 2);
+    if (subj) for (let i = 0; i < metal.length; i++) {
+      metal[i] = Math.round((metal[i]! * subj[i]!) / 255);
+    }
   }
 
   const spot = opts?.spotName || 'V1';

@@ -27,6 +27,12 @@ export function paperName(wIn: number, hIn: number): string {
 
 // User-defined paper presets (persisted). Keyed by display name → [w, h] inches.
 const PAPER_PRESETS_KEY = 'pp_paper_presets';
+// Selected state for a picker button. FILLED, not outlined: on a pale button
+// an outline is easy to miss, and every option ends up looking the same.
+const pickStyle = (on: boolean): React.CSSProperties => on
+  ? { background: 'var(--pe-violet)', color: '#fff' }
+  : { background: 'var(--pe-fill)', color: 'var(--pe-muted)' };
+
 function loadPaperPresets(): Record<string, [number, number]> {
   try { return JSON.parse(localStorage.getItem(PAPER_PRESETS_KEY) || '{}'); } catch { return {}; }
 }
@@ -312,9 +318,9 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
       {p.type === 'artprint' && (
         <Section label="// PRINT SIZE" help="Sizes INCLUDE the 0.125&quot; bleed on every side — upload art at the full bleed size. Cut marks sit at the trim.">
           <div className="pe-row" style={{ gap: 8 }}>
-            <button className="pe-btn" style={Math.abs((s.cellWIn ?? 0) - 6.88) < 0.01 ? { outline: '2px solid currentColor' } : undefined}
+            <button className="pe-btn" style={pickStyle(Math.abs((s.cellWIn ?? 0) - 6.88) < 0.01)}
               onClick={() => up({ cellWIn: 6.88, cellHIn: 10.5 })}>Comic 6.88 × 10.5&quot;</button>
-            <button className="pe-btn" style={Math.abs((s.cellWIn ?? 0) - 11.25) < 0.01 ? { outline: '2px solid currentColor' } : undefined}
+            <button className="pe-btn" style={pickStyle(Math.abs((s.cellWIn ?? 0) - 11.25) < 0.01)}
               onClick={() => up({ cellWIn: 11.25, cellHIn: 17.25 })}>11 × 17&quot; (11.25 × 17.25 w/ bleed)</button>
           </div>
         </Section>
@@ -324,7 +330,7 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
           <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
             {([[6, 9, 'US trade 6×9'], [5.5, 8.5, 'Digest 5.5×8.5'], [5, 8, '5×8'], [6.14, 9.21, 'Royal 6.14×9.21'], [6.625, 10.25, 'Comic TPB 6.625×10.25'], [7, 10, '7×10'], [8.5, 11, 'Letter 8.5×11']] as [number, number, string][]).map(([tw, th, label]) => (
               <button key={label} className="pe-btn"
-                style={Math.abs((s.cellWIn ?? 0) - tw) < 0.01 && Math.abs((s.cellHIn ?? 0) - th) < 0.01 ? { outline: '2px solid currentColor' } : undefined}
+                style={pickStyle(Math.abs((s.cellWIn ?? 0) - tw) < 0.01 && Math.abs((s.cellHIn ?? 0) - th) < 0.01)}
                 // Ask for "as many as possible"; the clamp below reduces it to
                 // what genuinely fits. Never assume a count.
                 onClick={() => up({ cellWIn: tw, cellHIn: th, cols: 99, rows: 99 })}>{label}</button>
@@ -2294,7 +2300,7 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
           {([[6, 9, '6×9'], [5.5, 8.5, '5.5×8.5'], [6.625, 10.25, 'Comic 6.625×10.25'], [8.5, 11, '8.5×11']] as [number, number, string][]).map(([tw, th, label]) => (
             <button key={label} className="pe-btn"
-              style={Math.abs(trimW - tw) < 0.01 && Math.abs(trimH - th) < 0.01 ? { outline: '2px solid currentColor' } : undefined}
+              style={pickStyle(Math.abs(trimW - tw) < 0.01 && Math.abs(trimH - th) < 0.01)}
               onClick={() => up({ trimWIn: tw, trimHIn: th })}>{label}</button>
           ))}
         </div>
@@ -2454,7 +2460,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       // Background drop: segment once per artwork, then reuse. Applies to BOTH
       // plates — the varnish and the white must agree on what the subject is.
       if (s.subjectOnly && !subjRef.current) {
-        subjRef.current = await subjectMask(art.canvas, w, h, art.data, `metalprev:${w}x${h}`);
+        subjRef.current = await subjectMask(art.canvas, w, h, art.data, `metalprev:${w}x${h}`, 2);
         if (cancelled) return;
       }
       const subj = s.subjectOnly ? subjRef.current : null;
@@ -2463,7 +2469,9 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         highlightFrom: s.highlightFrom ?? 200, toneGain: s.toneGain ?? 0.18,
         floor: s.floor ?? 24, gamma: s.gamma ?? 1,
       });
-      if (subj) for (let i = 0; i < m.length; i++) if (subj[i]! < 128) m[i] = 0;
+      // Multiply, never threshold — see raisedMetalTiff. The preview has to
+      // show the same soft boundary the file carries.
+      if (subj) for (let i = 0; i < m.length; i++) m[i] = Math.round((m[i]! * subj[i]!) / 255);
       const out = ctx.createImageData(w, h);
       const at = (x: number, y: number) => m[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))]!;
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -2478,8 +2486,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
           // W1 the same way: black where the white lays.
           // W1 follows the RAISED METAL, not the whole artwork — white only
           // goes under the relief so it reads reflective there.
-          const dropped = subj ? subj[i]! < 128 : false;
-          const wInk = dropped || art.data[q + 3]! === 0 ? 0 : v;
+          const wInk = art.data[q + 3]! === 0 ? 0 : v;   // v already carries the drop
           const ia = 255 - wInk;
           out.data[q] = ia; out.data[q + 1] = ia; out.data[q + 2] = ia; out.data[q + 3] = 255;
         } else if (mode === 'overlay') {
@@ -2521,7 +2528,14 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show each spot channel exactly as the file stores it — BLACK = 100% ink, white = none, the same inverted polarity you see opening the channel in Photoshop. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art.">
         <div className="pe-row" style={{ gap: 8 }}>
           {([['plate', `${s.spotName || 'V1'} plate`], ['white', `${s.whiteName || 'W1'} plate`], ['relief', 'Relief'], ['overlay', 'Overlay']] as const).map(([mdl, label]) => (
-            <button key={mdl} className="pe-btn" style={{ flex: 1, padding: '6px 4px', ...(mode === mdl ? { outline: '2px solid currentColor' } : {}) }}
+            <button key={mdl} className="pe-btn" aria-pressed={mode === mdl}
+              style={{
+                flex: 1, padding: '6px 4px', justifyContent: 'center',
+                // The selected view is FILLED, not outlined — an outline on a
+                // pale button reads as "all four look the same".
+                background: mode === mdl ? 'var(--pe-violet)' : 'var(--pe-fill)',
+                color: mode === mdl ? '#fff' : 'var(--pe-muted)',
+              }}
               onClick={() => up({ previewMode: mdl })}>{label}</button>
           ))}
         </div>
