@@ -2415,11 +2415,41 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   // Cached so dragging a slider never re-runs segmentation.
   const subjRef = useRef<Uint8Array | null>(null);
   const [ready, setReady] = useState(0);
+  // A preview that silently fails to paint looks identical to one that has
+  // nothing to show. Say which it is.
+  const [artErr, setArtErr] = useState(false);
   const mode = s.previewMode ?? 'relief';
 
   // The subject cache is keyed on the artwork, so toggling the drop has to
   // clear it by hand.
   useEffect(() => { subjRef.current = null; }, [s.subjectOnly, s.matteTighten]);
+
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      artRef.current = null; subjRef.current = null; setArtErr(false); setReady((n) => n + 1);
+      if (!sourceBytes) return;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pdfjs: any = await import('pdfjs-dist');
+        try { pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default; } catch { /* bundled */ }
+        const doc = await pdfjs.getDocument({ data: sourceBytes.slice() }).promise;
+        const pg = await doc.getPage(1);
+        const v1 = pg.getViewport({ scale: 1 });
+        const scale = Math.min(1, 460 / v1.width);
+        const vp = pg.getViewport({ scale });
+        const w = Math.max(1, Math.ceil(vp.width)), h = Math.max(1, Math.ceil(vp.height));
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const cx = c.getContext('2d', { willReadFrequently: true })!;
+        await pg.render({ canvasContext: cx, viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
+        if (dead) return;
+        subjRef.current = null;
+        artRef.current = { data: cx.getImageData(0, 0, w, h).data, w, h, canvas: c };
+        setReady((n) => n + 1);
+      } catch { if (!dead) setArtErr(true); }
+    })();
+    return () => { dead = true; };
+  }, [sourceBytes]);
 
   useEffect(() => {
     const art = artRef.current, cv = canvasRef.current;
@@ -2515,9 +2545,11 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
           ))}
         </div>
         <div style={{ marginTop: 8, background: '#111', borderRadius: 6, padding: 6, textAlign: 'center' }}>
-          {sourceBytes
-            ? <canvas ref={canvasRef} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} />
-            : <div className="pe-note" style={{ margin: 0, padding: 12 }}>Load the artwork to preview.</div>}
+          {!sourceBytes
+            ? <div className="pe-note" style={{ margin: 0, padding: 12 }}>Load the artwork to preview.</div>
+            : artErr
+              ? <div className="pe-note" style={{ margin: 0, padding: 12 }}>Couldn&apos;t render that PDF for the preview. The export still works.</div>
+              : <canvas ref={canvasRef} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} />}
         </div>
       </Section>
       <Section label="// PLATE" help="How the varnish plate is derived from the artwork. Edges give you the linework, highlights catch the speculars, and the grey tone modulates the relief with the art's own shading.">
