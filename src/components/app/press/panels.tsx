@@ -2391,6 +2391,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         highlightFrom: s.highlightFrom ?? 200, toneGain: s.toneGain ?? 0.18,
         floor: s.floor ?? 24, gamma: s.gamma ?? 1, subjectOnly: !!s.subjectOnly,
         spotName: s.spotName || 'V1', whiteName: s.whiteName || 'W1', pass,
+        subjectBox: s.subjectBox ?? undefined,   // the plate must match the preview
       });
       downloadFile(tiff, pass === 'varnish' ? 'raised-metal-1-varnish.tif'
         : 'raised-metal-2-colour.tif', 'image/tiff');
@@ -2418,7 +2419,43 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
 
   // The subject cache is keyed on the artwork, so toggling the drop has to
   // clear it by hand.
-  useEffect(() => { subjRef.current = null; }, [s.subjectOnly]);
+  useEffect(() => { subjRef.current = null; }, [s.subjectOnly, s.subjectBox]);
+
+  // Drag on the preview to say where the subject is. A box round the whole
+  // page describes the setting just as well as the figure, which is why the
+  // automatic prompt keeps picking the wrong one; a box round HER cannot be
+  // read two ways. Stored as page fractions so it holds at plate resolution.
+  const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const atCanvas = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+      y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
+    };
+  };
+  const dragStart = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!s.subjectOnly) return;
+    e.preventDefault();
+    dragRef.current = atCanvas(e);
+    setDrag(null);
+  };
+  const dragMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const a = dragRef.current;
+    if (!a) return;
+    const b = atCanvas(e);
+    setDrag({
+      x0: Math.min(a.x, b.x), y0: Math.min(a.y, b.y),
+      x1: Math.max(a.x, b.x), y1: Math.max(a.y, b.y),
+    });
+  };
+  const dragEnd = () => {
+    const box = drag;
+    dragRef.current = null;
+    // Ignore a stray click — a box needs to actually enclose something.
+    if (box && box.x1 - box.x0 > 0.03 && box.y1 - box.y0 > 0.03) up({ subjectBox: box });
+    setDrag(null);
+  };
 
   useEffect(() => {
     let dead = false;
@@ -2460,7 +2497,8 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       // Background drop: segment once per artwork, then reuse. Applies to BOTH
       // plates — the varnish and the white must agree on what the subject is.
       if (s.subjectOnly && !subjRef.current) {
-        subjRef.current = await subjectMask(art.canvas, w, h, art.data, `metalprev:${w}x${h}`, 2);
+        subjRef.current = await subjectMask(art.canvas, w, h, art.data, `metalprev:${w}x${h}`, 2,
+          s.subjectBox ?? undefined);
         if (cancelled) return;
       }
       const subj = s.subjectOnly ? subjRef.current : null;
@@ -2519,7 +2557,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
       ctx.putImageData(out, 0, 0);
     }, 60);                                         // debounce the slider drag
     return () => { cancelled = true; clearTimeout(id); };
-  }, [ready, mode, s.subjectOnly, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
+  }, [ready, mode, s.subjectOnly, s.subjectBox, s.edgeGain, s.highlightGain, s.highlightFrom, s.toneGain, s.floor, s.gamma]);
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
@@ -2541,7 +2579,21 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         </div>
         <div style={{ marginTop: 8, background: '#111', borderRadius: 6, padding: 6, textAlign: 'center' }}>
           {sourceBytes
-            ? <canvas ref={canvasRef} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} />
+            ? <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
+                <canvas ref={canvasRef}
+                  onMouseDown={dragStart} onMouseMove={dragMove}
+                  onMouseUp={dragEnd} onMouseLeave={dragEnd}
+                  style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto', cursor: s.subjectOnly ? 'crosshair' : 'default' }} />
+                {(drag || s.subjectBox) && s.subjectOnly ? (() => {
+                  const bx = drag ?? s.subjectBox;
+                  return <div style={{
+                    position: 'absolute', pointerEvents: 'none',
+                    left: `${bx.x0 * 100}%`, top: `${bx.y0 * 100}%`,
+                    width: `${(bx.x1 - bx.x0) * 100}%`, height: `${(bx.y1 - bx.y0) * 100}%`,
+                    border: '2px solid var(--pe-violet)', background: 'rgba(109,92,255,0.12)',
+                  }} />;
+                })() : null}
+              </div>
             : <div className="pe-note" style={{ margin: 0, padding: 12 }}>Load the artwork to preview.</div>}
         </div>
       </Section>
@@ -2552,7 +2604,19 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         {rng('Grey tone', 'toneGain', s.toneGain ?? 0.18, 0, 1, 0.02, 'slight, from shading')}
         {rng('Noise floor', 'floor', s.floor ?? 24, 0, 128, 2, 'drop weak specks')}
         {rng('Line weight', 'gamma', s.gamma ?? 1, 0.4, 2, 0.05, '<1 fatter, >1 thinner')}
-        <Check icon="crop" label="Subject only" sub="Segment the art so the background stays flat (needs the models)" checked={!!s.subjectOnly} onChange={(v) => up({ subjectOnly: v })} />
+        <Check icon="crop" label="Subject only" sub="Plate the subject and leave the background flat (needs the models)" checked={!!s.subjectOnly} onChange={(v) => up({ subjectOnly: v })} />
+        {s.subjectOnly ? <>
+          <div className="pe-row" style={{ gap: 8, marginTop: 8, alignItems: 'center' }}>
+            <span className="pe-label" style={{ flex: 1 }}>
+              Subject box<span className="pe-label-sm"> · {s.subjectBox ? 'drawn' : 'automatic'}</span>
+            </span>
+            <button className="pe-btn" style={{ padding: '4px 10px', background: 'var(--pe-fill)' }}
+              disabled={!s.subjectBox} onClick={() => up({ subjectBox: null })}>Clear</button>
+          </div>
+          <div className="pe-note" style={{ marginTop: 8 }}>
+            Automatic uses a subject-matting model whose whole job is separating the subject from the background — it takes no prompt, so it cannot come back inverted, and it returns soft coverage rather than an in-or-out mask, which is what keeps the plate edge from stair-stepping. If it picks the wrong thing, <b>drag a box round the subject on the preview</b> and it switches to outlining exactly what you enclosed. The box is used for the exported plate too, so what you see is what prints.
+          </div>
+        </> : null}
       </Section>
       <Section label="// OUTPUT" help="Both files come out at the same pixel size so the two passes register on press.">
         <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>

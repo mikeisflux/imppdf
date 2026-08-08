@@ -3900,17 +3900,23 @@ export function applyMaskAlpha(rgba: Uint8ClampedArray | Uint8Array, coverage: U
 
 /* SAM is given a box round the whole page, which describes the wall behind the
    figure exactly as well as it describes the figure — and it regularly comes
-   back with the wall, so the plate drops the subject and keeps the setting.
-   It reads as the whole thing "operating in reverse", because it is.
+   back with the wall, so the plate keeps the setting and drops the subject.
+   It reads as the whole thing running in reverse, because it is.
 
-   Tell the two apart by the frame: a background reaches the corners of the
-   picture and a subject does not. A mask holding two or more corners is the
-   setting, so take its complement. Flips in place; exported for testing. */
+   Tell the two apart by the FRAME EDGE, not by the four corners: a background
+   runs along the border of the picture, a subject does not. Counting the whole
+   perimeter instead of four pixels is the difference between a rule that holds
+   and one that a single stray pixel — or a mask that happens to stop short of
+   a corner — defeats. Whichever side owns most of the border is the setting.
+   Flips in place; exported for testing. */
 export function orientSubjectMask(mask: Uint8Array, w: number, h: number): Uint8Array {
-  const corners = [0, w - 1, (h - 1) * w, (h - 1) * w + w - 1];
-  let held = 0;
-  for (const i of corners) if (mask[i]) held++;
-  if (held >= 2) for (let i = 0; i < mask.length; i++) mask[i] = mask[i] ? 0 : 1;
+  let border = 0, held = 0;
+  const tally = (i: number) => { border++; if (mask[i]) held++; };
+  for (let x = 0; x < w; x++) { tally(x); tally((h - 1) * w + x); }
+  for (let y = 1; y < h - 1; y++) { tally(y * w); tally(y * w + w - 1); }
+  if (border > 0 && held / border > 0.5) {
+    for (let i = 0; i < mask.length; i++) mask[i] = mask[i] ? 0 : 1;
+  }
   return mask;
 }
 
@@ -3921,14 +3927,37 @@ export function orientSubjectMask(mask: Uint8Array, w: number, h: number): Uint8
 export async function subjectMask(
   canvas: any, w: number, h: number, pixels: Uint8ClampedArray | Uint8Array,
   cacheKey?: string, featherPx = 1,
+  // Subject box in 0..1 page fractions. A box round the WHOLE page is the
+  // problem — it describes the setting as well as the subject — so when the
+  // operator draws one round the figure, SAM has an unambiguous prompt and
+  // this stops being a guess.
+  box?: { x0: number; y0: number; x1: number; y1: number },
 ): Promise<Uint8Array | null> {
   try {
+    /* U2-Net first: salient-object matting takes no prompt, so it cannot come
+       back inverted, and it returns a SOFT matte — partial coverage on hair
+       and edges, which is what keeps the plate boundary from stair-stepping.
+       SAM is the fallback, and is genuinely better when the operator has drawn
+       a box, because then the prompt is unambiguous and it outlines precisely
+       what was asked for. */
+    if (!box) {
+      const { matteAlpha } = await import('../matte');
+      const cov = await matteAlpha(canvas, w, h);
+      if (cov) {
+        let on = 0;
+        for (let i = 0; i < cov.length; i++) if (cov[i]! > 8) on++;
+        if (on > 0 && on < cov.length * 0.995) return cov;
+      }
+    }
     const { loadSam, encodeImage, segmentBox } = await import('../sam');
     if (!(await loadSam())) return null;
     const emb = await encodeImage(cacheKey ?? `sam:${w}x${h}`, canvas);
     if (!emb) return null;
     const b = inkBoundsFromPixels(pixels, w, h);
-    const mask = await segmentBox(emb, b?.x0 ?? 0, b?.y0 ?? 0, b?.x1 ?? w - 1, b?.y1 ?? h - 1);
+    const p = box
+      ? { x0: box.x0 * w, y0: box.y0 * h, x1: box.x1 * w, y1: box.y1 * h }
+      : { x0: b?.x0 ?? 0, y0: b?.y0 ?? 0, x1: b?.x1 ?? w - 1, y1: b?.y1 ?? h - 1 };
+    const mask = await segmentBox(emb, p.x0, p.y0, p.x1, p.y1);
     if (!mask || mask.w !== w || mask.h !== h) return null;
     orientSubjectMask(mask.data, w, h);
     let on = 0;
@@ -4413,6 +4442,7 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   spotName?: string;        // varnish channel name (default 'V1')
   whiteName?: string;       // white channel name on the colour pass (default 'W1')
   subjectOnly?: boolean;    // gate to the SAM subject so the background stays flat
+  subjectBox?: { x0: number; y0: number; x1: number; y1: number };  // 0..1, drawn by hand
   // TWO-PASS BUILD, printed in this order:
   //  'varnish' — the raised plate ONLY: line art + slight grey tone on the
   //              varnish channel, no colour and no white. Print and cure this
@@ -4454,7 +4484,7 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
     // jagged line. Multiplying keeps a soft ramp across the boundary, the same
     // rule the Divinity Box works under (CLAUDE.md 6): no thresholds, keep the
     // anti-aliasing.
-    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`, 2);
+    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`, 2, opts?.subjectBox);
     if (subj) for (let i = 0; i < metal.length; i++) {
       metal[i] = Math.round((metal[i]! * subj[i]!) / 255);
     }
