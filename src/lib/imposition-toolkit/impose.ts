@@ -3898,178 +3898,6 @@ export function applyMaskAlpha(rgba: Uint8ClampedArray | Uint8Array, coverage: U
   }
 }
 
-// Separable min filter that REPLICATES the border rather than treating outside
-// as empty — the erosion half of a morphological close, where the frame edge
-// must not act like a hole.
-function minFilterClamped(src: Uint8Array, w: number, h: number, r: number): Uint8Array {
-  if (r <= 0) return src;
-  const tmp = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) {
-    const row = y * w;
-    for (let x = 0; x < w; x++) {
-      let mn = 255;
-      for (let k = x - r; k <= x + r && mn > 0; k++) {
-        const v = src[row + Math.min(w - 1, Math.max(0, k))]!;
-        if (v < mn) mn = v;
-      }
-      tmp[row + x] = mn;
-    }
-  }
-  const out = new Uint8Array(w * h);
-  for (let x = 0; x < w; x++) {
-    for (let y = 0; y < h; y++) {
-      let mn = 255;
-      for (let k = y - r; k <= y + r && mn > 0; k++) {
-        const v = tmp[Math.min(h - 1, Math.max(0, k)) * w + x]!;
-        if (v < mn) mn = v;
-      }
-      out[y * w + x] = mn;
-    }
-  }
-  return out;
-}
-
-// Label the 4-connected runs of `on`/`off` pixels in a binary mask. Returns the
-// per-pixel label (0 = not in this phase) and each label's area.
-function labelComponents(
-  mask: Uint8Array, w: number, h: number, phase: 0 | 1,
-): { label: Int32Array; area: number[]; touchesEdge: boolean[] } {
-  const label = new Int32Array(w * h);
-  const area: number[] = [0];
-  const touchesEdge: boolean[] = [false];
-  const queue = new Int32Array(w * h);
-  let next = 1;
-  for (let s = 0; s < label.length; s++) {
-    if (label[s] || (mask[s] ? 1 : 0) !== phase) continue;
-    const id = next++;
-    let head = 0, tail = 0, n = 0, edge = false;
-    queue[tail++] = s; label[s] = id;
-    while (head < tail) {
-      const i = queue[head++]!;
-      n++;
-      const x = i % w, y = (i / w) | 0;
-      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) edge = true;
-      if (x > 0 && !label[i - 1] && (mask[i - 1] ? 1 : 0) === phase) { label[i - 1] = id; queue[tail++] = i - 1; }
-      if (x < w - 1 && !label[i + 1] && (mask[i + 1] ? 1 : 0) === phase) { label[i + 1] = id; queue[tail++] = i + 1; }
-      if (y > 0 && !label[i - w] && (mask[i - w] ? 1 : 0) === phase) { label[i - w] = id; queue[tail++] = i - w; }
-      if (y < h - 1 && !label[i + w] && (mask[i + w] ? 1 : 0) === phase) { label[i + w] = id; queue[tail++] = i + w; }
-    }
-    area.push(n); touchesEdge.push(edge);
-  }
-  return { label, area, touchesEdge };
-}
-
-/* Tidy a raw segmentation into something you can print against.
-
-   SAM's output on illustrated art is honest but ragged: speckle off in the
-   background, pinholes and torn patches inside the subject where a highlight
-   or a dark costume confused it. Left alone those become bare white blobs in
-   the middle of the plate. Three passes, in order:
-
-     1. close  — dilate then erode, bridging the tears without moving the edge
-     2. islands — drop specks far smaller than the main body
-     3. holes  — fill enclosed gaps, but only small ones, so a real see-through
-                 gap (between an arm and the body) is left alone           */
-export function cleanSubjectMask(
-  mask: Uint8Array, w: number, h: number,
-  opts?: { closeRadius?: number; minIslandFrac?: number; maxHoleFrac?: number },
-): Uint8Array {
-  const r = Math.max(0, Math.round(opts?.closeRadius ?? 2));
-  const minIsland = opts?.minIslandFrac ?? 0.05;
-  const maxHole = opts?.maxHoleFrac ?? 0.2;
-  let p: Uint8Array = new Uint8Array(w * h);
-  for (let i = 0; i < p.length; i++) p[i] = mask[i] ? 255 : 0;
-
-  if (r > 0) {
-    // dilate = complement(erode(complement)). NOT chokePlane: that counts
-    // off-sheet as empty (correct for the white choke, which must pull in from
-    // the trim) and would eat a subject that runs off the page — which a
-    // full-bleed cover always does.
-    for (let i = 0; i < p.length; i++) p[i] = 255 - p[i]!;
-    p = minFilterClamped(p, w, h, r);
-    for (let i = 0; i < p.length; i++) p[i] = 255 - p[i]!;
-    p = minFilterClamped(p, w, h, r);
-  }
-
-  const fg = labelComponents(p, w, h, 1);
-  let biggest = 0;
-  for (let i = 1; i < fg.area.length; i++) if (fg.area[i]! > biggest) biggest = fg.area[i]!;
-  if (biggest > 0) {
-    const floor = biggest * minIsland;
-    for (let i = 0; i < p.length; i++) if (p[i] && fg.area[fg.label[i]!]! < floor) p[i] = 0;
-  }
-
-  const bg = labelComponents(p, w, h, 0);
-  const holeCap = Math.max(1, biggest * maxHole);
-  for (let i = 0; i < p.length; i++) {
-    if (p[i]) continue;
-    const id = bg.label[i]!;
-    if (!bg.touchesEdge[id] && bg.area[id]! <= holeCap) p[i] = 255;
-  }
-  return p;
-}
-
-/** A click the operator placed on the artwork, in 0..1 page fractions.
- *  fg=false marks background. */
-export interface SubjectPoint { x: number; y: number; fg?: boolean }
-
-// Nearest-neighbour upscale of a binary mask. The segmentation is computed
-// small (see below) and blown back up; the edge is softened afterwards by the
-// close and the feather, so nothing here needs to interpolate.
-function upscaleMask(src: Uint8Array, sw: number, sh: number, dw: number, dh: number): Uint8Array {
-  if (sw === dw && sh === dh) return src;
-  const out = new Uint8Array(dw * dh);
-  for (let y = 0; y < dh; y++) {
-    const sy = Math.min(sh - 1, (y * sh / dh) | 0) * sw;
-    const row = y * dw;
-    for (let x = 0; x < dw; x++) out[row + x] = src[sy + Math.min(sw - 1, (x * sw / dw) | 0)]!;
-  }
-  return out;
-}
-
-/* Automatic subject: prompt SAM at a grid of points across the artwork, keep
-   the pieces that behave like subject, and union them.
-
-   One box prompt is not enough on illustrated art. A cover's subject is not a
-   single "object" to SAM — it is a figure plus hair plus boots plus whatever
-   she is holding, and one prompt returns whichever of those the model likes
-   best. That is how you get a clean body with the hair missing. Prompting all
-   over the picture and unioning the survivors recovers those parts.
-
-   What separates subject from setting is the frame: a background — a wall, a
-   floor, the sky through a window — reaches the corners of the picture, and a
-   subject does not. So any candidate covering two or more corners, or most of
-   the frame, is thrown out. That is the only assumption, and it is far weaker
-   than "the subject is in the middle". */
-async function autoSubject(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  emb: any, W: number, H: number,
-  box: { x0: number; y0: number; x1: number; y1: number },
-): Promise<Uint8Array> {
-  const { segment } = await import('../sam');
-  const acc = new Uint8Array(W * H);
-  const corners = [0, W - 1, (H - 1) * W, (H - 1) * W + W - 1];
-  const COLS = 5, ROWS = 7;
-  const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const x = box.x0 + bw * ((c + 0.5) / COLS);
-      const y = box.y0 + bh * ((r + 0.5) / ROWS);
-      const m = await segment(emb, { points: [{ x, y, fg: true }], out: { w: W, h: H } });
-      if (!m || m.w !== W || m.h !== H) continue;
-      let cornersHit = 0;
-      for (const i of corners) if (m.data[i]) cornersHit++;
-      if (cornersHit >= 2) continue;                       // background plane
-      let on = 0;
-      for (let i = 0; i < m.data.length; i++) if (m.data[i]) on++;
-      if (on > acc.length * 0.55) continue;                // the whole picture
-      if (on < acc.length * 0.002) continue;               // a speck
-      for (let i = 0; i < acc.length; i++) if (m.data[i]) acc[i] = 1;
-    }
-  }
-  return acc;
-}
-
 // Segment the subject of an already-rendered canvas. Returns 0..255 coverage
 // (255 = subject) at w×h, or null when the models aren't deployed. Shared by
 // the standalone cutout and the Divinity Box's subject-aware black knockout.
@@ -4077,43 +3905,20 @@ async function autoSubject(
 export async function subjectMask(
   canvas: any, w: number, h: number, pixels: Uint8ClampedArray | Uint8Array,
   cacheKey?: string, featherPx = 1,
-  clean?: { closeRadius?: number; minIslandFrac?: number; maxHoleFrac?: number },
-  points?: SubjectPoint[],
 ): Promise<Uint8Array | null> {
   try {
-    const { loadSam, encodeImage, segment } = await import('../sam');
+    const { loadSam, encodeImage, segmentBox } = await import('../sam');
     if (!(await loadSam())) return null;
     const emb = await encodeImage(cacheKey ?? `sam:${w}x${h}`, canvas);
     if (!emb) return null;
     const b = inkBoundsFromPixels(pixels, w, h);
-    const box = { x0: b?.x0 ?? 0, y0: b?.y0 ?? 0, x1: b?.x1 ?? w - 1, y1: b?.y1 ?? h - 1 };
-
-    /* Work small. The decoder upsamples a 256×256 logit map, so a full-size
-       mask carries no more information than a 768-px one — but at 300 dpi it
-       is ~17M floats per call, and the automatic path makes dozens of calls. */
-    const k = Math.min(1, 640 / Math.max(w, h));
-    const W = Math.max(1, Math.round(w * k)), H = Math.max(1, Math.round(h * k));
-
-    let raw: Uint8Array | null = null;
-    if (points?.length) {
-      // Operator clicks win outright: exactly what was clicked, nothing added.
-      const m = await segment(emb, {
-        points: points.map((p) => ({ x: p.x * w, y: p.y * h, fg: p.fg !== false })),
-        out: { w: W, h: H },
-      });
-      if (m && m.w === W && m.h === H) raw = m.data;
-    } else {
-      raw = await autoSubject(emb, W, H,
-        { x0: box.x0 * k, y0: box.y0 * k, x1: box.x1 * k, y1: box.y1 * k });
-    }
-    if (!raw) return null;
-
-    const cleaned = cleanSubjectMask(upscaleMask(raw, W, H, w, h), w, h, clean);
+    const mask = await segmentBox(emb, b?.x0 ?? 0, b?.y0 ?? 0, b?.x1 ?? w - 1, b?.y1 ?? h - 1);
+    if (!mask || mask.w !== w || mask.h !== h) return null;
     let on = 0;
-    for (let i = 0; i < cleaned.length; i++) if (cleaned[i]) on++;
+    for (let i = 0; i < mask.data.length; i++) on += mask.data[i]!;
     // Nothing found, or the "subject" is the whole frame — no usable split.
-    if (on === 0 || on >= cleaned.length * 0.995) return null;
-    return featherMask(cleaned, w, h, featherPx);
+    if (on === 0 || on >= mask.data.length * 0.995) return null;
+    return featherMask(mask.data, w, h, featherPx);
   } catch { return null; }
 }
 
@@ -4125,7 +3930,6 @@ export interface RemoveBackgroundOptions {
   // "the main object in here".
   box?: { x0: number; y0: number; x1: number; y1: number };
   featherPx?: number;   // edge softening (default 1)
-  points?: SubjectPoint[];  // operator clicks, in 0..1 page fractions
   cacheKey?: string;    // reuse an embedding across retries of the same art
 }
 
@@ -4153,8 +3957,7 @@ export async function removeBackground(bytes: Uint8Array, opts?: RemoveBackgroun
     await pg.render({ canvasContext: ctx, viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
     const img = ctx.getImageData(0, 0, w, h);
 
-    const coverage = await subjectMask(canvas, w, h, img.data, opts?.cacheKey,
-      opts?.featherPx ?? 1, undefined, opts?.points);
+    const coverage = await subjectMask(canvas, w, h, img.data, opts?.cacheKey, opts?.featherPx ?? 1);
     if (!coverage) return bytes;
     applyMaskAlpha(img.data, coverage);
     ctx.putImageData(img, 0, 0);
@@ -4588,8 +4391,6 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   spotName?: string;        // varnish channel name (default 'V1')
   whiteName?: string;       // white channel name on the colour pass (default 'W1')
   subjectOnly?: boolean;    // gate to the SAM subject so the background stays flat
-  bgClean?: number;         // close radius used to tidy that mask (default 2 px)
-  subjectPoints?: SubjectPoint[];  // operator clicks that override the auto guess
   // TWO-PASS BUILD, printed in this order:
   //  'varnish' — the raised plate ONLY: line art + slight grey tone on the
   //              varnish channel, no colour and no white. Print and cure this
@@ -4626,8 +4427,7 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   const metal = metalMaskFromPixels(img, W, H, opts);
 
   if (opts?.subjectOnly) {
-    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`, 1,
-      { closeRadius: opts?.bgClean ?? 2 }, opts?.subjectPoints);
+    const subj = await subjectMask(canvas, W, H, img, `metal:${W}x${H}`);
     if (subj) for (let i = 0; i < metal.length; i++) if (subj[i]! < 128) metal[i] = 0;
   }
 

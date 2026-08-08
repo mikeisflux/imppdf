@@ -127,18 +127,6 @@ export async function encodeImage(
     chw[plane + i] = (px[p + 1] - MEAN[1]) / STD[1];
     chw[2 * plane + i] = (px[p + 2] - MEAN[2]) / STD[2];
   }
-  /* SAM normalises the image and THEN pads the square with zeros. Normalising
-     the padding too (it is transparent black on the canvas) feeds the encoder
-     a hard -2.1 slab down the side of the picture, which it reads as content
-     and the masks come back ragged along that edge. A portrait page pads a
-     third of the width, so this matters. Zero the pad instead. */
-  for (let y = 0; y < SIDE; y++) {
-    const row = y * SIDE;
-    const from = y >= nh ? 0 : nw;                   // whole row below the image
-    for (let x = from; x < SIDE; x++) {
-      chw[row + x] = 0; chw[plane + row + x] = 0; chw[2 * plane + row + x] = 0;
-    }
-  }
 
   onProgress?.("encode", "Reading the artwork…");
   try {
@@ -159,86 +147,35 @@ export interface SamMask {
   score: number;
 }
 
-export interface SamPrompt {
-  box?: { x0: number; y0: number; x1: number; y1: number };
-  /** Extra clicks, in original image pixels. fg=false marks background. */
-  points?: { x: number; y: number; fg?: boolean }[];
-  /** Which of the decoder's candidate masks to take. SAM returns several —
-   *  roughly "the part", "the thing" and "the whole thing". 'score' is its own
-   *  quality estimate; 'largest' is what you want when the prompt describes a
-   *  whole subject and the highest-scoring candidate keeps coming back as a
-   *  sleeve or a boot. */
-  pick?: "score" | "largest";
-  /** Decode the mask at this size instead of the full image. The decoder just
-   *  upsamples a 256×256 logit map, so a smaller size loses no real detail —
-   *  and at 300 dpi a full-size mask is tens of megabytes per call, which
-   *  matters when a prompt is run dozens of times. Points are unaffected:
-   *  they are always given in original-image pixels. */
-  out?: { w: number; h: number };
-}
-
-/** Turn a prompt (box and/or clicks, in original image pixels) into a mask.
- *  Fast — milliseconds, once the image is encoded. */
-export async function segment(emb: Embedding, prompt: SamPrompt): Promise<SamMask | null> {
+/** Turn a box (in original image pixels) into a mask. Fast — milliseconds. */
+export async function segmentBox(
+  emb: Embedding, x0: number, y0: number, x1: number, y1: number,
+): Promise<SamMask | null> {
   const ort = await getOrt();
   if (!ort || !decoder) return null;
-  /* labels 2 and 3 are SAM's "this is a box corner" markers; 1 and 0 are
-     foreground and background clicks. Points are given in the encoder's
-     1024-space, not the original image's. */
-  const coords: number[] = [];
-  const labels: number[] = [];
-  if (prompt.box) {
-    coords.push(prompt.box.x0 * emb.scale, prompt.box.y0 * emb.scale,
-      prompt.box.x1 * emb.scale, prompt.box.y1 * emb.scale);
-    labels.push(2, 3);
-  }
-  for (const p of prompt.points ?? []) {
-    coords.push(p.x * emb.scale, p.y * emb.scale);
-    labels.push(p.fg === false ? 0 : 1);
-  }
-  if (!labels.length) return null;
+  /* labels 2 and 3 are SAM's "this is a box corner" markers, and the points
+     are given in the encoder's 1024-space, not the original image's */
+  const coords = Float32Array.from([
+    x0 * emb.scale, y0 * emb.scale,
+    x1 * emb.scale, y1 * emb.scale,
+  ]);
   try {
     const out = await decoder.run({
       image_embedding: emb.data,
-      point_coords: new ort.Tensor("float32", Float32Array.from(coords), [1, labels.length, 2]),
-      point_labels: new ort.Tensor("float32", Float32Array.from(labels), [1, labels.length]),
+      point_coords: new ort.Tensor("float32", coords, [1, 2, 2]),
+      point_labels: new ort.Tensor("float32", Float32Array.from([2, 3]), [1, 2]),
       mask_input: new ort.Tensor("float32", new Float32Array(256 * 256), [1, 1, 256, 256]),
       has_mask_input: new ort.Tensor("float32", Float32Array.from([0]), [1]),
-      orig_im_size: new ort.Tensor("float32",
-        Float32Array.from([prompt.out?.h ?? emb.origH, prompt.out?.w ?? emb.origW]), [2]),
+      orig_im_size: new ort.Tensor("float32", Float32Array.from([emb.origH, emb.origW]), [2]),
     });
     const masks = out.masks as Tensor;
     const dims = masks.dims as number[];
     const h = dims[dims.length - 2], w = dims[dims.length - 1];
     const raw = masks.data as Float32Array;
-    const plane = w * h;
-    const count = Math.max(1, Math.floor(raw.length / plane));
+    /* the decoder emits logits: positive is inside the mask */
+    const bits = new Uint8Array(w * h);
+    for (let i = 0; i < bits.length; i++) bits[i] = raw[i] > 0 ? 1 : 0;
     const scores = out.scores?.data as Float32Array | undefined;
-
-    /* the decoder emits logits: positive is inside the mask. Taking candidate
-       0 unconditionally — which this used to do — is how you end up with a
-       sub-part of the subject and a ragged edge. */
-    let best = 0, bestKey = -Infinity;
-    for (let m = 0; m < count; m++) {
-      let key: number;
-      if (prompt.pick === "largest") {
-        let on = 0;
-        for (let i = 0, o = m * plane; i < plane; i++, o++) if (raw[o] > 0) on++;
-        key = on;
-      } else key = scores ? scores[m] ?? 0 : -m;
-      if (key > bestKey) { bestKey = key; best = m; }
-    }
-    const off = best * plane;
-    const bits = new Uint8Array(plane);
-    for (let i = 0; i < plane; i++) bits[i] = raw[off + i] > 0 ? 1 : 0;
-    return { data: bits, w, h, score: scores ? scores[best] ?? 1 : 1 };
+    return { data: bits, w, h, score: scores ? scores[0] : 1 };
   } catch { return null; }
-}
-
-/** Box-only prompt — the common case. */
-export async function segmentBox(
-  emb: Embedding, x0: number, y0: number, x1: number, y1: number,
-  pick: "score" | "largest" = "score",
-): Promise<SamMask | null> {
-  return segment(emb, { box: { x0, y0, x1, y1 }, pick });
 }
