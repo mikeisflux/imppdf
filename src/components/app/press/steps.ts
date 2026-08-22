@@ -183,7 +183,7 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'indexcard':
       // Index cards (3×5") on Letter. Starts as a single 1×1 copy; raise
       // columns/rows (or tick Replicate) to gang up.
-      return nupPreset({ cellWIn: 3, cellHIn: 5 });
+      return nupPreset({ buttCut: true, cellWIn: 3, cellHIn: 5 });
     case 'prooflabel':
       // 30-up proof labels, measured from the shop's 8.5x11in30up template:
       // 2.625 x 1" labels, 3 cols x 10 rows, column pitch 2.7431" (0.1181"
@@ -276,41 +276,41 @@ export function defaultSettings(type: StepType): StepSettings {
       // Standard trading/sports cards (2.5×3.5") on Letter. Starts 1×1; raise
       // columns/rows (or tick Replicate) to gang up.
       return {
-        sheetWIn: 8.5, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 2.5, cellHIn: 3.5,
+        sheetWIn: 8.5, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 2.5, cellHIn: 3.5, buttCut: true,
         marginIn: 0.25, gutterIn: 0.1, gutterYIn: 0.1, order: 'sequential', duplex: false,
         autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125,
       };
     case 'bookmark':
       // Bookmarks (2×6") on Letter. Starts 1×1; raise columns/rows to gang up.
       return {
-        sheetWIn: 8.5, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 2, cellHIn: 6,
+        sheetWIn: 8.5, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 2, cellHIn: 6, buttCut: true,
         marginIn: 0.25, gutterIn: 0.125, gutterYIn: 0.125, order: 'sequential', duplex: false,
         autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125,
       };
     case 'flyer':
       // Full-bleed flyer prep (8.5×11"), 1-up with crop marks.
       return {
-        sheetWIn: 8.5, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 8.5, cellHIn: 11,
+        sheetWIn: 8.5, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 8.5, cellHIn: 11, buttCut: true,
         marginIn: 0, gutterIn: 0, gutterYIn: 0, order: 'sequential', duplex: false,
         autoscale: true, preserveAspect: true, ...MARKS, bleedMode: 'doc', bleedIn: 0.125,
       };
     // ── Domain N-Up preset tools ────────────────────────────────────────────
-    case 'business':  return nupPreset({ cols: 2, rows: 5, cellWIn: 3.5, cellHIn: 2 });                 // 10-up business cards, Letter
-    case 'postcard':  return nupPreset({ cols: 1, rows: 2, cellWIn: 6, cellHIn: 4, duplex: true, duplexFlip: 'long' }); // 2-up 6×4, duplex
-    case 'rackcard':  return nupPreset({ sheetWIn: 11, sheetHIn: 17, cols: 2, rows: 1, cellWIn: 4, cellHIn: 9 });       // 2-up 4×9 on tabloid
-    case 'hangtag':   return nupPreset({ sheetWIn: 11, sheetHIn: 17, cols: 2, rows: 4, cellWIn: 2.5, cellHIn: 4 });     // 8-up tags on tabloid
-    case 'label':     return nupPreset({ cols: 2, rows: 3, cellWIn: 4, cellHIn: 3.33 });                 // 6-up labels, Letter
-    case 'namebadge': return nupPreset({ cols: 2, rows: 4, cellWIn: 3.5, cellHIn: 2.25 });               // 8-up name badges
-    case 'ticket':    return nupPreset({ cols: 2, rows: 4, cellWIn: 4, cellHIn: 2.5 });                  // 8-up event tickets
-    case 'coupon':    return nupPreset({ cols: 2, rows: 5, cellWIn: 3.5, cellHIn: 2 });                  // 10-up coupons
-    case 'placecard': return nupPreset({ cols: 2, rows: 4, cellWIn: 3.5, cellHIn: 2 });                  // 8-up place cards
-    case 'greeting':  return nupPreset({ cols: 1, rows: 1, cellWIn: 5, cellHIn: 7 });                    // single-fold 5×7 greeting
+    case 'business':  return nupPreset({ buttCut: true, cols: 2, rows: 5, cellWIn: 3.5, cellHIn: 2 });                 // 10-up business cards, Letter
+    case 'postcard':  return nupPreset({ buttCut: true, cols: 1, rows: 2, cellWIn: 6, cellHIn: 4, duplex: true, duplexFlip: 'long' }); // 2-up 6×4, duplex
+    case 'rackcard':  return nupPreset({ buttCut: true, sheetWIn: 11, sheetHIn: 17, cols: 2, rows: 1, cellWIn: 4, cellHIn: 9 });       // 2-up 4×9 on tabloid
+    case 'hangtag':   return nupPreset({ buttCut: true, sheetWIn: 11, sheetHIn: 17, cols: 2, rows: 4, cellWIn: 2.5, cellHIn: 4 });     // 8-up tags on tabloid
+    case 'label':     return nupPreset({ buttCut: true, cols: 2, rows: 3, cellWIn: 4, cellHIn: 3.33 });                 // 6-up labels, Letter
+    case 'namebadge': return nupPreset({ buttCut: true, cols: 2, rows: 4, cellWIn: 3.5, cellHIn: 2.25 });               // 8-up name badges
+    case 'ticket':    return nupPreset({ buttCut: true, cols: 2, rows: 4, cellWIn: 4, cellHIn: 2.5 });                  // 8-up event tickets
+    case 'coupon':    return nupPreset({ buttCut: true, cols: 2, rows: 5, cellWIn: 3.5, cellHIn: 2 });                  // 10-up coupons
+    case 'placecard': return nupPreset({ buttCut: true, cols: 2, rows: 4, cellWIn: 3.5, cellHIn: 2 });                  // 8-up place cards
+    case 'greeting':  return nupPreset({ buttCut: true, cols: 1, rows: 1, cellWIn: 5, cellHIn: 7 });                    // single-fold 5×7 greeting
     // ── Flat extras ─────────────────────────────────────────────────────────
     case 'doorhanger': return nupPreset({ cols: 2, rows: 1, cellWIn: 3.875, cellHIn: 8.75 });            // 2-up door hangers, Letter
     case 'envelope':   return nupPreset({ sheetWIn: 11, sheetHIn: 17, cols: 1, rows: 4, cellWIn: 9.5, cellHIn: 4.125 }); // #10 flats 4-up
     case 'coaster':    return nupPreset({ sheetWIn: 11, sheetHIn: 17, cols: 2, rows: 3, cellWIn: 4, cellHIn: 4 });       // round coasters 6-up
-    case 'contact':    return nupPreset({ cols: 2, rows: 4, cellWIn: 3.75, cellHIn: 2.4 });              // 8-up photo contact sheet
-    case 'compslip':   return nupPreset({ sheetWIn: 8.86, sheetHIn: 12.6, cols: 1, rows: 3, cellWIn: 8.27, cellHIn: 3.9 }); // DL comp slips 3-up
+    case 'contact':    return nupPreset({ buttCut: true, cols: 2, rows: 4, cellWIn: 3.75, cellHIn: 2.4 });              // 8-up photo contact sheet
+    case 'compslip':   return nupPreset({ buttCut: true, sheetWIn: 8.86, sheetHIn: 12.6, cols: 1, rows: 3, cellWIn: 8.27, cellHIn: 3.9 }); // DL comp slips 3-up
     // ── Folds (impose the flat; add fold marks as a step) ───────────────────
     case 'trifold':   return nupPreset({ sheetWIn: 11, sheetHIn: 8.5, cols: 1, rows: 1, cellWIn: 11, cellHIn: 8.5 });
     case 'zfold':     return nupPreset({ sheetWIn: 17, sheetHIn: 11, cols: 1, rows: 1, cellWIn: 17, cellHIn: 11 });
@@ -428,6 +428,9 @@ function replicateOpts(s: StepSettings) {
     // Respecting the image size is the whole point — fixed card sizes are the
     // job of the normal N-up tools instead.
     sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, page: s.page ?? 1,
+    // Butt-cut work shares one cut between neighbours, so it needs no gutter —
+    // forcing one throws away a whole row. See fit/types.ts.
+    buttCut: !!s.buttCut,
     marginIn: s.marginIn,
     gutterXIn: s.gutterXIn ?? s.gutterIn ?? 0,
     gutterYIn: s.gutterYIn ?? s.gutterIn ?? 0,

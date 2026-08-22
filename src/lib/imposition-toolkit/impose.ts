@@ -5067,6 +5067,8 @@ export interface ReplicateExtra {
 export interface ReplicateOptions {
   sheetWIn: number;       // the SELECTED sheet — Replicate fills it, never grows past it
   sheetHIn: number;
+  /** Pieces butt together and share one cut — see SheetSpec.buttCut in ./fit. */
+  buttCut?: boolean;
   page?: number;          // primary page (1-based, default 1)
   cellWIn?: number;       // explicit cell size; when omitted the image's own size is used
   cellHIn?: number;
@@ -5093,35 +5095,23 @@ export interface ReplicateOptions {
 export function replicateGrid(opts: {
   sheetWIn: number; sheetHIn: number; cellWIn: number; cellHIn: number;
   marginIn: number; gutterXIn: number; gutterYIn: number;
-  /* Cut-mark geometry. Give markOffIn/markLenIn and the margin and gutters are
-     grown to what marks ACTUALLY need, which is not the same on both:
-
-       margin (outer edge) — the mark has nowhere to go but the margin, so it
-         needs the offset plus enough length to be visible. The mark is then
-         CLIPPED to the margin rather than the margin being grown to the full
-         mark length: a 0.43" mark would otherwise demand a 0.555" margin and
-         cost a whole column.
-
-       gutter (between items) — the marks either side of the trim are COLLINEAR
-         and merge into one cut line, exactly as they do on any gang sheet. Each
-         only has to clear the neighbour's artwork, so 2 x the offset is enough.
-         Reserving markOff + markLen here was reserving a full mark length twice
-         over for a line that is drawn once.
-
-     markAllowIn is the older, blunter form: one figure applied to both. */
-  markOffIn?: number; markLenIn?: number;
+  /* Cut-mark geometry, and whether the pieces butt together. ONE definition,
+     shared with ./fit — see markClearanceIn there for why the margin and the
+     gutter are different numbers, and why butt-cut work has no gutter at all.
+     markAllowIn is the older blunt form: one figure applied to both. */
+  markOffIn?: number; markLenIn?: number; buttCut?: boolean;
   markAllowIn?: number;
 }): { cols: number; rows: number; marginIn: number; gutterXIn: number; gutterYIn: number; fits: boolean } {
-  const MIN_MARK_IN = 0.08;                         // a mark shorter than this is not worth drawing
   const explicit = opts.markOffIn !== undefined || opts.markLenIn !== undefined;
-  const off = Math.max(0, opts.markOffIn ?? 0);
-  const marginNeed = explicit
-    ? off + Math.min(Math.max(0, opts.markLenIn ?? 0), MIN_MARK_IN)
-    : Math.max(0, opts.markAllowIn ?? 0);
-  const gutterNeed = explicit ? 2 * off : Math.max(0, opts.markAllowIn ?? 0);
-  const marginIn = Math.max(opts.marginIn, marginNeed);
-  const gutterXIn = Math.max(opts.gutterXIn, gutterNeed);
-  const gutterYIn = Math.max(opts.gutterYIn, gutterNeed);
+  const clear = explicit
+    ? markClearanceIn({
+        sheetWIn: opts.sheetWIn, sheetHIn: opts.sheetHIn, addMarks: true,
+        markOffIn: opts.markOffIn, markLenIn: opts.markLenIn, buttCut: opts.buttCut,
+      })
+    : { marginIn: Math.max(0, opts.markAllowIn ?? 0), gutterIn: Math.max(0, opts.markAllowIn ?? 0) };
+  const marginIn = Math.max(opts.marginIn, clear.marginIn);
+  const gutterXIn = Math.max(opts.gutterXIn, clear.gutterIn);
+  const gutterYIn = Math.max(opts.gutterYIn, clear.gutterIn);
   const shW = opts.sheetWIn * PT, shH = opts.sheetHIn * PT, m = marginIn * PT;
   const gx = gutterXIn * PT, gy = gutterYIn * PT;
   const cellW = opts.cellWIn * PT, cellH = opts.cellHIn * PT;
@@ -5157,7 +5147,9 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
   const gridOf = (w: number, h: number) => replicateGrid({
     sheetWIn: opts.sheetWIn, sheetHIn: opts.sheetHIn, cellWIn: w, cellHIn: h,
     marginIn: opts.marginIn, gutterXIn: opts.gutterXIn, gutterYIn: opts.gutterYIn,
-    ...(opts.addMarks ? { markOffIn: opts.markOffIn ?? 0.125, markLenIn: opts.markLenIn ?? 0.43 } : {}),
+    ...(opts.addMarks
+      ? { markOffIn: opts.markOffIn ?? 0.125, markLenIn: opts.markLenIn ?? 0.43, buttCut: opts.buttCut }
+      : {}),
   });
   let upright = gridOf(cellWIn, cellHIn);
   let turned = gridOf(cellHIn, cellWIn);

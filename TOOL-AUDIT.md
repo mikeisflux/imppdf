@@ -31,14 +31,14 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 | `greeting` Greeting Cards | 5 × 7" | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `trading` Trading Cards | 2.5 × 3.5" | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `bookmark` Bookmarks | 2 × 6" | 8.5 × 11 | [x] | [x] | [x] | [x] |
-| `flyer` Flyers | 8.5 × 11" | 8.5 × 11 | [x] | [ ] | [ ] | [ ] |
+| `flyer` Flyers | 8.5 × 11" | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `doorhanger` Door Hangers | 3.875 × 8.75" | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `envelope` Envelopes | 9.5 × 4.125" | 11 × 17 | [x] | [x] | [x] | [x] |
 | `coaster` Coasters | 4 × 4" | 11 × 17 | [x] | [x] | [x] | [x] |
 | `contact` Contact Sheets | 3.75 × 2.4" | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `compslip` Comp Slips | 8.27 × 3.9" | 8.86 × 12.6 | [x] | [x] | [x] | [x] |
-| `cards` Cards (generic) | user | 8.5 × 11 | [ ] | [ ] | [ ] | [ ] |
-| `grid` Grid N-Up | user | 8.5 × 11 | [ ] | [ ] | [ ] | [ ] |
+| `cards` Cards (generic) | user | 8.5 × 11 | [x] | [x] | [x] | [x] |
+| `grid` Grid N-Up | user | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `stickers` Sticker Nest | user | 11 × 8.5 | [ ] | [ ] | [ ] | [ ] |
 | `replicate` Replicate | native | selected | [ ] | [ ] | [ ] | [ ] |
 | `gangsheet` Gang Sheet | mixed | 11 × 8.5 | [ ] | [ ] | [ ] | [ ] |
@@ -48,55 +48,55 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 
 | Tool | Piece | Default sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
-| `artprint` Art Prints | 6.88 × 10.5" / 11.25 × 17.25" | 12 × 18 | [x] | [x] | [ ] | [ ] |
+| `artprint` Art Prints | 6.88 × 10.5" / 11.25 × 17.25" | 12 × 18 | [x] | [x] | [x] | [x] |
 
 ## Fixed die — grid is the die-cutter's, never calculated
 
 | Tool | Grid | Sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
-| `prooflabel` 30-Up Proof Labels | 3 × 10, art stretched | 8.5 × 11 | [x] | [x] | [ ] | [ ] |
+| `prooflabel` 30-Up Proof Labels | 3 × 10, art stretched | 8.5 × 11 | [x] | [x] | [x] | [x] |
 
 ## One-up / large format — one piece per sheet, no cut marks
 
 | Tool | Piece | Sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
-| `poster` Posters | 24 × 36" | 24 × 36 | [ ] | [ ] | [ ] | [ ] |
-| `banner` Banners | 24 × 72" | 24 × 72 | [ ] | [ ] | [ ] | [ ] |
-| `rollbanner` Roll-Up Banners | 33 × 80" | 33 × 80 | [ ] | [ ] | [ ] | [ ] |
-| `featherflag` Feather Flags | 30 × 100" | 30 × 100 | [ ] | [ ] | [ ] | [ ] |
-| `yardsign` Yard Signs | 24 × 18" | 24 × 18 | [ ] | [ ] | [ ] | [ ] |
+| `poster` Posters | 24 × 36" | 24 × 36 | [x] | [x] | [x] | [x] |
+| `banner` Banners | 24 × 72" | 24 × 72 | [x] | [x] | [x] | [x] |
+| `rollbanner` Roll-Up Banners | 33 × 80" | 33 × 80 | [x] | [x] | [x] | [x] |
+| `featherflag` Feather Flags | 30 × 100" | 30 × 100 | [x] | [x] | [x] | [x] |
+| `yardsign` Yard Signs | 24 × 18" | 24 × 18 | [x] | [x] | [x] | [x] |
 
 ## Folded — panel geometry, not a grid
 
 | Tool | Panels | Sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
-| `trifold` Tri-Fold | 3 | 11 × 8.5 | [ ] | [ ] | [ ] | [ ] |
-| `zfold` Z-Fold | 3 | 17 × 11 | [ ] | [ ] | [ ] | [ ] |
-| `gatefold` Gate-Fold | 4 | 11 × 8.5 | [ ] | [ ] | [ ] | [ ] |
-| `menu` Menus | 2 | 17 × 11 | [ ] | [ ] | [ ] | [ ] |
-| `zine` Fold Zine | 8-page fold | 11 × 8.5 | [ ] | [ ] | [ ] | [ ] |
-| `boxcarton` Box / Carton | dieline | 11 × 17 | [ ] | [ ] | [ ] | [ ] |
-| `presfolder` Presentation Folder | dieline | 11 × 17 | [ ] | [ ] | [ ] | [ ] |
+| `trifold` Tri-Fold | 3 | 11 × 8.5 | [x] | [x] | [x] | [x] |
+| `zfold` Z-Fold | 3 | 17 × 11 | [x] | [x] | [x] | [x] |
+| `gatefold` Gate-Fold | 4 | 11 × 8.5 | [x] | [x] | [x] | [x] |
+| `menu` Menus | 2 | 17 × 11 | [x] | [x] | [x] | [x] |
+| `zine` Fold Zine | 8-page fold | 11 × 8.5 | [x] | [x] | [x] | [x] |
+| `boxcarton` Box / Carton | dieline | 11 × 17 | [x] | [x] | [x] | [x] |
+| `presfolder` Presentation Folder | dieline | 11 × 17 | [x] | [x] | [x] | [x] |
 | `divinitybox` Divinity Box | 5 fixed panels, 306 × 572mm | fixed | [ ] | [ ] | [ ] | [ ] |
 
 ## Bound — signature and stacking maths
 
 | Tool | Scheme | Sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
-| `booklet` Booklet | saddle | 16.54 × 11.69 | [ ] | [ ] | [ ] | [ ] |
-| `comic` Comic Book | saddle | — | [ ] | [ ] | [ ] | [ ] |
-| `magazine` Magazine | saddle, 4-sheet sigs | 16.54 × 11.69 | [ ] | [ ] | [ ] | [ ] |
-| `catalog` Catalog | saddle | 16 × 8 | [ ] | [ ] | [ ] | [ ] |
-| `program` Program | saddle | 11.69 × 8.27 | [ ] | [ ] | [ ] | [ ] |
-| `notebook` Notebook | saddle | 11.69 × 8.27 | [ ] | [ ] | [ ] | [ ] |
-| `hymnal` Hymnal | saddle, 4-sheet sigs | 11.69 × 8.27 | [ ] | [ ] | [ ] | [ ] |
-| `perfectbound` Perfect Bound | cut-and-stack, duplex | 17 × 11 | [ ] | [ ] | [ ] | [ ] |
+| `booklet` Booklet | saddle | 16.54 × 11.69 | [x] | [x] | [x] | [x] |
+| `comic` Comic Book | saddle | — | [x] | [x] | [x] | [x] |
+| `magazine` Magazine | saddle, 4-sheet sigs | 16.54 × 11.69 | [x] | [x] | [x] | [x] |
+| `catalog` Catalog | saddle | 16 × 8 | [x] | [x] | [x] | [x] |
+| `program` Program | saddle | 11.69 × 8.27 | [x] | [x] | [x] | [x] |
+| `notebook` Notebook | saddle | 11.69 × 8.27 | [x] | [x] | [x] | [x] |
+| `hymnal` Hymnal | saddle, 4-sheet sigs | 11.69 × 8.27 | [x] | [x] | [x] | [x] |
+| `perfectbound` Perfect Bound | cut-and-stack, duplex | 17 × 11 | [x] | [x] | [x] | [x] |
 | `pbcover` Perfect Bound Cover | back/spine/front wrap | computed | [ ] | [ ] | [ ] | [ ] |
-| `cutstack` Cut & Stack | cut-and-stack | 8.5 × 11 | [ ] | [ ] | [ ] | [ ] |
-| `nupbook` N-Up Book | n-up signatures | — | [ ] | [ ] | [ ] | [ ] |
-| `fierybooklet` Fiery Booklet | single pages, spine bleed trim — **DO NOT EDIT** | — | [ ] | [ ] | [ ] | [ ] |
-| `fieryserial` Fiery Serial | numbering | — | [ ] | [ ] | [ ] | [ ] |
-| `calendar` Calendar | half-sheet, rotated back | — | [ ] | [ ] | [ ] | [ ] |
+| `cutstack` Cut & Stack | cut-and-stack | 8.5 × 11 | [x] | [x] | [x] | [x] |
+| `nupbook` N-Up Book | n-up signatures | — | [x] | [x] | [x] | [x] |
+| `fierybooklet` Fiery Booklet | single pages, spine bleed trim — **DO NOT EDIT** | — | [x] | [x] | [x] | [x] |
+| `fieryserial` Fiery Serial | numbering | — | [x] | [x] | [x] | [x] |
+| `calendar` Calendar | half-sheet, rotated back | — | [x] | [x] | [x] | [x] |
 
 ## Spot colour / finishing
 
@@ -115,7 +115,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 
 | Tool | Smoke | Shot |
 |---|---|---|
-| all 15 | [ ] | [ ] |
+| all 15 | [x] | [x] |
 
 ## PDF operations — no fit calculation
 
@@ -126,7 +126,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 
 | Tool | Smoke | Shot |
 |---|---|---|
-| all 21 | [ ] | [ ] |
+| all 21 | [x] | [x] | (`coloreffects` is browser-only by design — verified by its refusal in node, not skipped) |
 
 ---
 
@@ -156,6 +156,26 @@ calculator. PNGs in `smoke-out/`, contact sheet at `smoke-out/gang-montage.png`.
 | coaster | 11×17 | 2×3 | 6 | |
 | contact | 8.5×11 | 2×4 | 8 | |
 | compslip | 8.86×12.6 | 1×3 | 3 | |
+
+## Everything else — 68 tools through the real engine
+
+`npm run smoke` runs both suites; `npm test` now runs unit tests AND both smoke
+runs, so none of this can rot quietly. Every row below produced a PDF that
+opens, at the expected sheet size and page count, and was rendered to PNG.
+
+**68/68 pass.** Renders in `smoke-out/`.
+
+Confirmed by reading the rendered pages, not just the counts:
+
+| Tool | What the render proves |
+|---|---|
+| `booklet` | Sheet 1 reads **P8 \| P1** — the last page beside the first, which is the fold order. A booklet that counts right and reads as nonsense fails here. |
+| `magazine` | **P16 \| P1** on a 4-sheet signature. |
+| `cutstack` | **P1, P3, P5, P7** on sheet 1 — cut into piles and stacked, the book is in order. Sequential fill would give P1..P4. |
+| `perfectbound` | 2 pages per sheet, TURNED — two 6×9 pages side by side is 12" on an 11" sheet. 8 pages duplex = 4 sheets. |
+| `shuffle` | First page is **P4** — reversed. |
+| `watermark` | PROOF across the page. `barcode` a scannable QR. `colorbar` real CMYK patches. |
+| `crop` | 8.5×11 → **7.5×10**. `bleed` → **8.75×11.25**. `resize` → **8.27×11.69** (A4). `rotate` → landscape. |
 
 ## Log
 

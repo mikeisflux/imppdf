@@ -785,7 +785,9 @@ function replicateSheet(s: StepSettings, pageSizes: { wPt: number; hPt: number }
     sheetWIn: s.sheetWIn ?? 8.5, sheetHIn: s.sheetHIn ?? 11, marginIn: s.marginIn ?? 0,
     gutterXIn: s.gutterXIn ?? s.gutterIn ?? 0, gutterYIn: s.gutterYIn ?? s.gutterIn ?? 0,
     // Mirror the engine exactly, or the panel's count is a different number.
-    ...(s.addMarks ? { markOffIn: s.markOffIn ?? 0.125, markLenIn: s.markLenIn ?? 0.43 } : {}),
+    ...(s.addMarks
+      ? { markOffIn: s.markOffIn ?? 0.125, markLenIn: s.markLenIn ?? 0.43, buttCut: !!s.buttCut }
+      : {}),
   };
   let upright = replicateGrid({ ...base, cellWIn, cellHIn });
   let turned = replicateGrid({ ...base, cellWIn: cellHIn, cellHIn: cellWIn });
