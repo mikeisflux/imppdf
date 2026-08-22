@@ -32,6 +32,8 @@ export interface SheetFit {
   rotated: boolean;
   /** False when even one piece cannot fit the sheet at this size. */
   fits: boolean;
+  /** Pieces butt together and share one cut — drives the engine's gutter. */
+  buttCut: boolean;
   /** Plain-language account of what limited the count. Shown in the panel. */
   why: string;
 }
@@ -50,4 +52,11 @@ export interface SheetSpec {
   bleedIn?: number;
   /** Allow turning the piece 90° when that fits more. */
   autoRotate?: boolean;
+  /** BUTT-CUT: pieces touch, and one guillotine cut serves both sides of the
+   *  join — how business cards, tickets and labels are actually produced. The
+   *  gutter is then 0 by intent, and the marks either side of the join land on
+   *  the same line, which is the cut line. Forcing a gutter on butt-cut work
+   *  throws away a whole row: 3.5 x 2" cards go 10-up on Letter butt-cut and
+   *  only 8-up with a gutter. */
+  buttCut?: boolean;
 }

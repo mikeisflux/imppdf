@@ -25,7 +25,7 @@ export function fitProofLabels(spec: SheetSpec, cellWIn: number, cellHIn: number
   const fits = needW <= spec.sheetWIn + 1e-6 && needH <= spec.sheetHIn + 1e-6;
   return {
     cols: PROOF_LABEL_COLS, rows: PROOF_LABEL_ROWS, n: PROOF_LABEL_COLS * PROOF_LABEL_ROWS,
-    marginIn, gutterXIn, gutterYIn, cellWIn, cellHIn, rotated: false, fits,
+    marginIn, gutterXIn, gutterYIn, cellWIn, cellHIn, rotated: false, fits, buttCut: false,
     why: `Fixed ${PROOF_LABEL_COLS}×${PROOF_LABEL_ROWS} die — the label positions are the `
       + 'die-cutter\'s, not something to calculate. Art is stretched to fill each label cell.'
       + (fits ? '' : ' The die does not fit the selected sheet.'),

@@ -501,6 +501,8 @@ export async function imposeCalendar(bytes: Uint8Array, opts: CalendarOptions): 
   return outDoc.save();
 }
 
+import { markClearanceIn } from './fit/sheet-grid.ts';
+
 // ── N-Up Grid / Step & Repeat ───────────────────────────────────────────────
 
 export interface NUpOptions {
@@ -522,6 +524,14 @@ export interface NUpOptions {
   // cell is portrait (or vice-versa), swap the cell's width/height so the art
   // isn't cropped to the wrong orientation. Default on for fixed-size cells.
   autoOrient?: boolean;
+  /** Pieces butt together and share one cut — see SheetSpec.buttCut in ./fit. */
+  buttCut?: boolean;
+  /* Turn every ITEM 90° on the sheet. autoOrient swaps the CELL to match the
+     art; this turns the ART instead, which is the only way to take a layout
+     that fits more by rotating — CLAUDE.md: "If rotating an item 90° lets more
+     fit, rotate it." Without it a 3.5 x 2" card can only ever go 10-up on
+     Letter, when turned it goes 12-up. */
+  rotateItems?: boolean;
   // Optional vertical gutter (defaults to gutterIn). Lets labels use a
   // horizontal gutter with zero vertical gap (e.g. Avery 5160).
   gutterYIn?: number;
@@ -576,19 +586,31 @@ export function computeNUpGrid(opts: NUpOptions): NUpGrid {
     // fit — never assume. The margin/gutters grow to at least the mark reach
     // (markOff + markLen) and the bleed (2× in a shared gutter), so marks never
     // land in a neighbour's art and the count reflects real production spacing.
-    const markAllow = opts.addMarks ? ((opts.markOffIn ?? 0) + (opts.markLenIn ?? 0)) : 0;
+    /* ONE definition of mark clearance, shared with the per-tool calculators in
+       ./fit — see markClearanceIn there for why the margin and the gutter are
+       not the same number. This used to hold its own copy of that rule, and the
+       copy was wrong: markOff + markLen reserved as the margin AND as every
+       gutter. A 3 x 5" card then went 4-up on a 17 x 11 sheet that holds 10. */
+    const clear = markClearanceIn({
+      sheetWIn: opts.sheetWIn, sheetHIn: opts.sheetHIn,
+      addMarks: opts.addMarks, markOffIn: opts.markOffIn, markLenIn: opts.markLenIn,
+      buttCut: opts.buttCut,
+    });
     const bleed = opts.bleedIn ?? 0;
-    const effM = Math.max(opts.marginIn, markAllow, bleed) * PT;
-    const effGx = Math.max(opts.gutterIn, markAllow, 2 * bleed) * PT;
-    const effGy = Math.max((opts.gutterYIn ?? opts.gutterIn), markAllow, 2 * bleed) * PT;
-    // +1e-6 so an exact edge fit (e.g. 3 cards = 11.000") isn't lost to float error.
-    const fitCols=Math.max(1, Math.floor((shW-2*effM+effGx)/(cellW+effGx)+1e-6));
-    const fitRows=Math.max(1, Math.floor((shH-2*effM+effGy)/(cellH+effGy)+1e-6));
+    const effM = Math.max(opts.marginIn, clear.marginIn, bleed) * PT;
+    const effGx = Math.max(opts.gutterIn, clear.gutterIn, 2 * bleed) * PT;
+    const effGy = Math.max((opts.gutterYIn ?? opts.gutterIn), clear.gutterIn, 2 * bleed) * PT;
+    const fitCols=Math.floor((shW-2*effM+effGx)/(cellW+effGx)+1e-6);
+    const fitRows=Math.floor((shH-2*effM+effGy)/(cellH+effGy)+1e-6);
+    /* Floor at ONE here, unlike the pure calculators in ./fit which report a
+       truthful zero. The difference is what each is for: fit/ answers "how many
+       fit", so inventing a column there would put items on a sheet that cannot
+       hold them. This function PLACES art, and the placement path scales the
+       piece into its cell — so one oversized card comes out shrunk to fit,
+       which is what the operator wants to see, rather than a blank sheet. */
     // Honour the requested columns/rows — never silently fill the whole sheet.
-    // Only fall back to the max that fits when a count is missing/zero, and never
-    // exceed what physically fits. This is what makes 1×1 place a single copy.
-    const cols=Math.max(1, Math.min(opts.cols || fitCols, fitCols));
-    const rows=Math.max(1, Math.min(opts.rows || fitRows, fitRows));
+    const cols=Math.max(1, Math.min(opts.cols || fitCols || 1, fitCols || 1));
+    const rows=Math.max(1, Math.min(opts.rows || fitRows || 1, fitRows || 1));
     const blockW=cols*cellW+(cols-1)*effGx, blockH=rows*cellH+(rows-1)*effGy;
     return { cols, rows, cellWPt:cellW, cellHPt:cellH, leftGapPt:(shW-blockW)/2, topGapPt:(shH-blockH)/2, gxPt:effGx, gyPt:effGy };
   }
@@ -599,7 +621,7 @@ export function computeNUpGrid(opts: NUpOptions): NUpGrid {
 }
 
 export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Uint8Array> {
-  const { PDFDocument, rgb, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } = await import('pdf-lib');
+  const { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } = await import('pdf-lib');
   const srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const srcPages = srcDoc.getPages();
   const N = srcPages.length;
@@ -646,9 +668,19 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
     // Default 'contain' so the graphic keeps its aspect ratio and is never
     // cropped/stretched unless the user explicitly chooses Cover or Stretch.
     const fit = pf?.fit ?? opts.fit ?? 'contain';
-    const sw = emb.width, sh = emb.height;
+    /* When the item is turned, its FOOTPRINT on the sheet is the source with
+       width and height swapped — fit against that, or the art is scaled to the
+       wrong box and sits in a corner of its cell with the sheet half empty. */
+    const turn = !!opts.rotateItems;
+    const sw = turn ? emb.height : emb.width, sh = turn ? emb.width : emb.height;
+    // pdf-lib rotates about the bottom-left corner, so a 90° turn has to be
+    // pushed back up by the drawn height to land where it was asked for.
+    const draw = (dx: number, dy: number, dw: number, dh: number) => {
+      if (!turn) { sheet.drawPage(emb, { x: dx, y: dy, width: dw, height: dh }); return; }
+      sheet.drawPage(emb, { x: dx, y: dy + dh, width: dh, height: dw, rotate: degrees(-90) });
+    };
     if (fit === 'stretch' || !sw || !sh) {
-      sheet.drawPage(emb, { x, y, width: cellW, height: cellH });
+      draw(x, y, cellW, cellH);
     } else {
       const base = fit === 'contain' ? Math.min(cellW / sw, cellH / sh) : Math.max(cellW / sw, cellH / sh);
       const s = base * (pf?.imageZoom ?? opts.imageZoom ?? 1);
@@ -658,10 +690,10 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
       if (dw > cellW + 0.5 || dh > cellH + 0.5) {
         // Clip to the cell so the cropped overflow can't bleed into neighbours.
         sheet.pushOperators(pushGraphicsState(), rectangle(x, y, cellW, cellH), clip(), endPath());
-        sheet.drawPage(emb, { x: dx, y: dy, width: dw, height: dh });
+        draw(dx, dy, dw, dh);
         sheet.pushOperators(popGraphicsState());
       } else {
-        sheet.drawPage(emb, { x: dx, y: dy, width: dw, height: dh });
+        draw(dx, dy, dw, dh);
       }
     }
     if (opts.addMarks) {

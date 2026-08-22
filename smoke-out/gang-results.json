@@ -1,0 +1,182 @@
+[
+  {
+    "id": "indexcard",
+    "sheet": "17x11",
+    "expected": 10,
+    "measured": 10,
+    "grid": "5x2",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "business",
+    "sheet": "8.5x11",
+    "expected": 12,
+    "measured": 12,
+    "grid": "4x3",
+    "rotated": "yes",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "postcard",
+    "sheet": "8.5x11",
+    "expected": 2,
+    "measured": 2,
+    "grid": "1x2",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "rackcard",
+    "sheet": "11x17",
+    "expected": 4,
+    "measured": 4,
+    "grid": "1x4",
+    "rotated": "yes",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "hangtag",
+    "sheet": "11x17",
+    "expected": 16,
+    "measured": 16,
+    "grid": "4x4",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "label",
+    "sheet": "8.5x11",
+    "expected": 6,
+    "measured": 6,
+    "grid": "2x3",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "namebadge",
+    "sheet": "8.5x11",
+    "expected": 9,
+    "measured": 9,
+    "grid": "3x3",
+    "rotated": "yes",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "ticket",
+    "sheet": "8.5x11",
+    "expected": 8,
+    "measured": 8,
+    "grid": "2x4",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "coupon",
+    "sheet": "8.5x11",
+    "expected": 12,
+    "measured": 12,
+    "grid": "4x3",
+    "rotated": "yes",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "placecard",
+    "sheet": "8.5x11",
+    "expected": 12,
+    "measured": 12,
+    "grid": "4x3",
+    "rotated": "yes",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "greeting",
+    "sheet": "8.5x11",
+    "expected": 2,
+    "measured": 2,
+    "grid": "1x2",
+    "rotated": "yes",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "trading",
+    "sheet": "8.5x11",
+    "expected": 9,
+    "measured": 9,
+    "grid": "3x3",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "bookmark",
+    "sheet": "8.5x11",
+    "expected": 5,
+    "measured": 5,
+    "grid": "1x5",
+    "rotated": "yes",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "doorhanger",
+    "sheet": "8.5x11",
+    "expected": 2,
+    "measured": 2,
+    "grid": "2x1",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "envelope",
+    "sheet": "11x17",
+    "expected": 3,
+    "measured": 3,
+    "grid": "1x3",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "coaster",
+    "sheet": "11x17",
+    "expected": 6,
+    "measured": 6,
+    "grid": "2x3",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "contact",
+    "sheet": "8.5x11",
+    "expected": 8,
+    "measured": 8,
+    "grid": "2x4",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  },
+  {
+    "id": "compslip",
+    "sheet": "8.86x12.6",
+    "expected": 3,
+    "measured": 3,
+    "grid": "1x3",
+    "rotated": "",
+    "ok": "PASS",
+    "note": ""
+  }
+]
