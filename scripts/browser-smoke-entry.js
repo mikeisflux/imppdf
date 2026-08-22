@@ -325,6 +325,42 @@ add('gangsheet', async () => {
     images: [['gang sheet', shrink(r.canvas)]] };
 });
 
+// ── export finishing — thumbnail, classic xref, Info, /ID ────────────────
+add('export-finish', async () => {
+  const { finalizePdfForExport } = await import('../src/lib/imposition-toolkit/pdf-finish.ts');
+  const src = await artPdf(6, 9);
+  const out = await finalizePdfForExport(src, { creator: 'ImpositionPDF' });
+  const txt = new TextDecoder('latin1').decode(out);
+  const checks = [];
+  const need = (ok, msg) => checks.push((ok ? 'ok  ' : 'FAIL ') + msg);
+
+  need(/^%PDF-1\.[45]/.test(txt), `header ${txt.slice(0, 8)}`);
+  need(!/\/Type\s*\/ObjStm/.test(txt), 'no object streams — every object directly addressable');
+  need(!/\/Type\s*\/XRef/.test(txt), 'classic xref table, not an xref stream');
+  need(/\/ID\s*\[/.test(txt), 'trailer carries a file identifier');
+  need(/\/Producer\s*\(/.test(txt), 'Producer is a literal string, as Adobe writes');
+  need(/\/Subtype\s*\/XML/.test(txt), 'XMP metadata packet present');
+
+  // THE POINT OF ALL THIS: a preview must actually be in the file.
+  need(/\/Thumb\s+\d+\s+\d+\s+R/.test(txt), 'page carries /Thumb — the PDF spec preview');
+  const gimg = txt.match(/<xmpGImg:image>([^<]{200,})<\/xmpGImg:image>/);
+  need(!!gimg, `XMP carries a thumbnail image${gimg ? ` (${gimg[1].length} base64 chars)` : ''}`);
+
+  // And the xref must still be right after the byte-level patching.
+  const sx = txt.lastIndexOf('startxref');
+  const at = parseInt(txt.slice(sx + 9).trim(), 10);
+  need(txt.slice(at, at + 4) === 'xref', 'startxref still lands on the table after patching');
+
+  // Show the thumbnail that was embedded, decoded back out of the file.
+  const images = [];
+  if (gimg) images.push(['XMP thumbnail', 'data:image/png;base64,' + gimg[1]]);
+  const r = await pdfToCanvas(out);
+  images.push(['finished page', shrink(r.canvas)]);
+  const fail = checks.some((c) => c.startsWith('FAIL'));
+  return { ok: !fail, note: checks.join(' · '),
+    meta: `${src.length} -> ${out.length} bytes`, images };
+});
+
 window.runSmoke = async function runSmoke() {
   const out = [];
   for (const [id, fn] of CASES) {

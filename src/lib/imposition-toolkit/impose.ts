@@ -5523,8 +5523,17 @@ export function downloadFile(bytes: Uint8Array, filename: string, mime = 'applic
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
-export function downloadPdf(bytes: Uint8Array, filename: string) {
-  downloadFile(bytes, filename, 'application/pdf');
+/* Every PDF leaving the app goes through the finisher first: a thumbnail so the
+   job previews in the spooler, a classic cross-reference table, a file
+   identifier and real Info metadata. See pdf-finish.ts for what was measured
+   against a reference Adobe file and why each part is there. */
+export async function downloadPdf(bytes: Uint8Array, filename: string) {
+  let out = bytes;
+  try {
+    const { finalizePdfForExport } = await import('./pdf-finish');
+    out = await finalizePdfForExport(bytes, { creator: 'ImpositionPDF' });
+  } catch { /* hand over the unfinished file rather than nothing */ }
+  downloadFile(out, filename, 'application/pdf');
 }
 
 export function downloadMultiple(files: Uint8Array[], baseName: string) {
