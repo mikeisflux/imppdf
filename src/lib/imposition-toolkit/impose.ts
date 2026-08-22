@@ -5220,8 +5220,22 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
     const cellX = leftGap + col * (cellW + gx);
     const cellY = shH - topGap - cellH - row * (cellH + gy);   // PDF bottom-up
 
+    /* Rotate the ARTWORK only when that makes it fill this cell better — which
+       is NOT the same question as whether the CELL was turned to pack more per
+       sheet, and conflating the two is what put landscape cards on their side.
+
+       Tiling at native size, cell and art are the same shape, so a turned cell
+       needs a turned item and this agrees. But when the art is too big to tile
+       and falls back to the tool's own cell, the cell may be turned for packing
+       while the art already matches its new orientation — turning it as well
+       stands it on end and shrinks it to a sliver inside the cell. A landscape
+       3 x 5" index card came out reading vertically for exactly this reason. */
+    const containScale = (w: number, h: number) => Math.min(cellW / w, cellH / h);
+    const turnItem = opts.autoRotate === false
+      ? rotate                                        // caller pinned the orientation
+      : containScale(art.h, art.w) > containScale(art.w, art.h) * 1.0001;
     // Footprint after the optional 90° rotation (art.w/h are the native dims).
-    const fw = rotate ? art.h : art.w, fh = rotate ? art.w : art.h;
+    const fw = turnItem ? art.h : art.w, fh = turnItem ? art.w : art.h;
     let dw = cellW, dh = cellH, dx = cellX, dy = cellY;
     if (fit !== 'stretch') {
       const sc = fit === 'cover' ? Math.max(cellW / fw, cellH / fh) : Math.min(cellW / fw, cellH / fh);
@@ -5233,7 +5247,7 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
       moveTo(cellX, cellY), lineTo(cellX + cellW, cellY),
       lineTo(cellX + cellW, cellY + cellH), lineTo(cellX, cellY + cellH),
       closePath(), clip(), endPath());
-    if (rotate) {
+    if (turnItem) {
       // 90° CCW: the native page draws with width=dh, height=dw, anchored so the
       // rotated footprint lands exactly in [dx,dx+dw]×[dy,dy+dh].
       pg.drawPage(art.emb, { x: dx + dw, y: dy, width: dh, height: dw, rotate: degrees(90) });

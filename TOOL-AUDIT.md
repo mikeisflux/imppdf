@@ -40,7 +40,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 | `cards` Cards (generic) | user | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `grid` Grid N-Up | user | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `stickers` Sticker Nest | user | 11 × 8.5 | [ ] | [ ] | [ ] | [ ] |
-| `replicate` Replicate | native | selected | [ ] | [ ] | [ ] | [ ] |
+| `replicate` Replicate | native | selected | [x] | [x] | [x] | [x] |
 | `gangsheet` Gang Sheet | mixed | 11 × 8.5 | [x] | [x] | [x] | [x] |
 | `customimpose` Custom Impose | user | 12.6 × 17.72 | [ ] | [ ] | [ ] | [ ] |
 
@@ -199,6 +199,17 @@ parses the TIFF back out of the bytes and checks the layout the RIP reads.
 
 Newest first. Every entry records a **measured** number, not a claim.
 
+- **Replicate stood landscape art on end.** ONE `rotate` flag was driving two different
+  decisions: whether to turn the CELL for packing, and whether to turn the ARTWORK. They
+  are not the same question. Tiling at native size the cell and the art are the same
+  shape so the flag happens to be right, but when the art is too big to tile and falls
+  back to the tool's own cell, the cell can be turned for packing while the art already
+  matches its new orientation — turning it too stands it on end and shrinks it to 36% of
+  the cell it was given. A landscape 3 × 5" index card came out reading vertically with
+  the sheet mostly white. The artwork is now turned only when that makes it fill THIS
+  cell better, which is a question about the art and the cell, not about the packing.
+  `scripts/smoke-replicate.mjs` measures cell fill and aspect rather than asserting
+  "never rotate" — rotating is often right, coming out tiny never is.
 - **pdfjs needs a browser API Chromium 141 does not have.** pdfjs-dist 6 calls
   `Map.prototype.getOrInsertComputed` on every worker message dispatch. It is a very
   recent proposal: a current shipping Chromium lacks it. The failure is nasty because
