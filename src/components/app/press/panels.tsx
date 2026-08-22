@@ -352,9 +352,12 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
           ) : (
             <div className="pe-note" style={{ marginTop: 8 }}>
               {rep.scaled
-                ? <>Your image is too big to gang at its native size, so it is scaled to this tool&apos;s <b>{rep.cellWIn.toFixed(3)}×{rep.cellHIn.toFixed(3)}&quot;</b> cell. </>
+                ? <>Your image is too big to gang at its native size, so it is scaled to this tool&apos;s <b>{rep.cellWIn.toFixed(2)}×{rep.cellHIn.toFixed(2)}&quot;</b> cell. </>
                 : rep.hasImage ? <>Your image is <b>{rep.cellWIn.toFixed(2)}×{rep.cellHIn.toFixed(2)}&quot;</b>. </> : null}
-              {rep.scaled ? 'At that size' : `At its native size${rep.rotated ? ' (rotated 90° to fit more)' : ''}`}, <b>{rep.N}</b> safely fit ({rep.cols}×{rep.rows}) on the <b>{s.sheetWIn}×{s.sheetHIn}&quot;</b> sheet with room for the margins and cut marks{rep.extraCells > 0 ? ` (${rep.extraCells} replaced by extra art)` : ''}. Set the sheet size and margins below.
+              {rep.rotated
+                ? <>Turned <b>90°</b>, so each one sits <b>{rep.placedWIn.toFixed(2)}×{rep.placedHIn.toFixed(2)}&quot;</b> on the sheet — that is what fits the most. </>
+                : null}
+              <b>{rep.N}</b> fit — <b>{rep.cols}</b> across × <b>{rep.rows}</b> down, {rep.cols}×{rep.placedWIn.toFixed(2)}&quot; by {rep.rows}×{rep.placedHIn.toFixed(2)}&quot; — on the <b>{s.sheetWIn}×{s.sheetHIn}&quot;</b> sheet with room for the margins and cut marks{rep.extraCells > 0 ? ` (${rep.extraCells} replaced by extra art)` : ''}. Set the sheet size and margins below.
             </div>
           ))}
         </Section>
@@ -803,10 +806,18 @@ function replicateSheet(s: StepSettings, pageSizes: { wPt: number; hPt: number }
   const rotated = turned.cols * turned.rows > upright.cols * upright.rows;
   const grid = rotated ? turned : upright;
   const { cols, rows, fits } = grid;
+  /* Report the cell as PLACED, not as supplied. Without this swap the panel
+     said "scaled to this tool's 3.000×5.000 cell … 10 fit (2×5)", which is a
+     flat contradiction: 2 across by 5 down of a 3×5 card is 6×25" and does not
+     go on a 17" sheet. The layout was right — the cards are turned, so each
+     sits 5×3 — but the sentence described a sheet that cannot exist. */
+  const placedWIn = rotated ? cellHIn : cellWIn;
+  const placedHIn = rotated ? cellWIn : cellHIn;
   const extras = (s.extras ?? []) as { qty?: number }[];
   const extraCells = extras.reduce((n, e) => n + Math.max(1, Math.round(e.qty ?? 1)), 0);
   const N = cols * rows;
-  return { cols, rows, N, cellWIn, cellHIn, rotated, scaled, extraCells, primaryCopies: Math.max(0, N - extraCells), fits, hasImage: !!src };
+  return { cols, rows, N, cellWIn, cellHIn, placedWIn, placedHIn, rotated, scaled,
+    extraCells, primaryCopies: Math.max(0, N - extraCells), fits, hasImage: !!src };
 }
 
 // Uploader + list for the additional images/PDFs that fill leftover cells.

@@ -181,7 +181,8 @@ export function defaultSettings(type: StepType): StepSettings {
         extras: [], ...MARKS,
       };
     case 'indexcard':
-      // Index cards (3×5") on Letter. Starts as a single 1×1 copy; raise
+      // Index cards, 3 wide × 5 tall. Turned 90° when that yields more (10 on a
+      // tabloid vs 9 upright) — the panel says so. Starts as a 1×1 copy; raise
       // columns/rows (or tick Replicate) to gang up.
       return nupPreset({ buttCut: true, cellWIn: 3, cellHIn: 5 });
     case 'prooflabel':

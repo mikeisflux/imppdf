@@ -25,7 +25,10 @@ import type { SheetFit, SheetSpec } from '../src/lib/imposition-toolkit/fit/type
 
 type Calc = (spec: SheetSpec) => SheetFit;
 
-const TOOLS: { id: string; fit: Calc; w: number; h: number }[] = [
+/* `turns` says whether the tool is ALLOWED to rotate its piece. Most may:
+   one more per sheet is one more, and you cut it out the same either way.
+   Large format may not — a flag delivered on its side is a ruined flag. */
+const TOOLS: { id: string; fit: Calc; w: number; h: number; turns?: boolean }[] = [
   { id: 'indexcard', fit: (s) => fitIndexCards(s), w: 3, h: 5 },
   { id: 'business', fit: (s) => fitBusinessCard(s), w: 3.5, h: 2 },
   { id: 'postcard', fit: (s) => fitPostcard(s), w: 6, h: 4 },
@@ -76,9 +79,10 @@ for (const t of TOOLS) {
     for (const [sw, sh, name] of SHEETS) {
       const s = spec(sw, sh);
       const f = t.fit(s);
-      // Both orientations, counted the slow way, take the better.
+      // Counted the slow way, in whichever orientations this tool may use.
       let best = 0;
-      for (const [cw, ch] of [[t.w, t.h], [t.h, t.w]]) {
+      const orientations = t.turns === false ? [[t.w, t.h]] : [[t.w, t.h], [t.h, t.w]];
+      for (const [cw, ch] of orientations) {
         const uw = sw - 2 * f.marginIn, uh = sh - 2 * f.marginIn;
         best = Math.max(best,
           bruteForceMax(uw, cw!, f.gutterXIn) * bruteForceMax(uh, ch!, f.gutterYIn));
@@ -108,6 +112,56 @@ for (const t of TOOLS) {
     }
   });
 }
+
+test('no tool ever claims more than the sheet area allows', () => {
+  /* An area bound is the cheapest possible sanity check and it catches any
+     count that could not physically exist, whichever direction the mistake was
+     made in: no arrangement of rectangles can beat sheet area / piece area. It
+     is only an upper bound — real packing is usually below it — but a count
+     ABOVE it is impossible, full stop. */
+  for (const t of TOOLS) {
+    for (const [sw, sh, name] of SHEETS) {
+      const f = t.fit(spec(sw, sh));
+      const usable = (sw - 2 * f.marginIn) * (sh - 2 * f.marginIn);
+      const cap = Math.floor(usable / (t.w * t.h));
+      assert.ok(f.n <= cap,
+        `${t.id} on ${name}: claims ${f.n} but only ${cap} pieces of ${t.w}×${t.h}" `
+        + `worth of area fit in ${usable.toFixed(2)} sq in. ${f.why}`);
+    }
+  }
+});
+
+test('every placed grid physically fits, in BOTH directions', () => {
+  for (const t of TOOLS) {
+    for (const [sw, sh, name] of SHEETS) {
+      const f = t.fit(spec(sw, sh));
+      if (!f.fits) continue;
+      const usedW = f.cols * f.cellWIn + (f.cols - 1) * f.gutterXIn;
+      const usedH = f.rows * f.cellHIn + (f.rows - 1) * f.gutterYIn;
+      assert.ok(usedW <= sw - 2 * f.marginIn + 1e-9,
+        `${t.id} on ${name}: ${f.cols} × ${f.cellWIn}" = ${usedW.toFixed(2)}" is wider than the sheet allows`);
+      assert.ok(usedH <= sh - 2 * f.marginIn + 1e-9,
+        `${t.id} on ${name}: ${f.rows} × ${f.cellHIn}" = ${usedH.toFixed(2)}" is taller than the sheet allows`);
+      // …and it is the MOST that fits: one more would not go.
+      assert.ok(usedW + f.gutterXIn + f.cellWIn > sw - 2 * f.marginIn + 1e-9,
+        `${t.id} on ${name}: another column would fit`);
+      assert.ok(usedH + f.gutterYIn + f.cellHIn > sh - 2 * f.marginIn + 1e-9,
+        `${t.id} on ${name}: another row would fit`);
+    }
+  }
+});
+
+test('a tool that may turn its piece always picks the better orientation', () => {
+  for (const t of TOOLS) {
+    if (t.turns === false) continue;
+    const f = t.fit(spec(11, 17));
+    const upright = bruteForceMax(11 - 2 * f.marginIn, t.w, f.gutterXIn)
+      * bruteForceMax(17 - 2 * f.marginIn, t.h, f.gutterYIn);
+    const turned = bruteForceMax(11 - 2 * f.marginIn, t.h, f.gutterXIn)
+      * bruteForceMax(17 - 2 * f.marginIn, t.w, f.gutterYIn);
+    assert.equal(f.n, Math.max(upright, turned), `${t.id}: ${f.why}`);
+  }
+});
 
 test('a bigger sheet never fits fewer pieces', () => {
   for (const t of TOOLS) {
