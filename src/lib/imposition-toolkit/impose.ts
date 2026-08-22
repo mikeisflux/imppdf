@@ -502,6 +502,9 @@ export async function imposeCalendar(bytes: Uint8Array, opts: CalendarOptions): 
 }
 
 import { markClearanceIn } from './fit/sheet-grid.ts';
+// Must be imported before anything touches pdfjs — see the file for what
+// breaks without it and why only a browser shows it.
+import '../polyfills.ts';
 
 // ── N-Up Grid / Step & Repeat ───────────────────────────────────────────────
 

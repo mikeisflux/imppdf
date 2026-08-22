@@ -15,7 +15,8 @@
     "test": "npm run test:unit && npm run smoke",
     "fetch-sam": "bash scripts/fetch-sam.sh",
     "test:unit": "node --experimental-strip-types --test 'test/**/*.test.ts'",
-    "smoke": "node --experimental-strip-types scripts/smoke-gang.mjs && node --experimental-strip-types scripts/smoke-all.mjs"
+    "smoke": "node --experimental-strip-types scripts/smoke-gang.mjs && node --experimental-strip-types scripts/smoke-all.mjs",
+    "smoke:browser": "node scripts/browser-smoke.mjs"
   },
   "dependencies": {
     "@neslinesli93/qpdf-wasm": "^0.3.0",
@@ -39,6 +40,8 @@
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "esbuild": "^0.28.2",
+    "playwright": "^1.62.1",
     "typescript": "^5.7.2"
   },
   "overrides": {

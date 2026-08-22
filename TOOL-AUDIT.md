@@ -41,7 +41,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 | `grid` Grid N-Up | user | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `stickers` Sticker Nest | user | 11 × 8.5 | [ ] | [ ] | [ ] | [ ] |
 | `replicate` Replicate | native | selected | [ ] | [ ] | [ ] | [ ] |
-| `gangsheet` Gang Sheet | mixed | 11 × 8.5 | [ ] | [ ] | [ ] | [ ] |
+| `gangsheet` Gang Sheet | mixed | 11 × 8.5 | [x] | [x] | [x] | [x] |
 | `customimpose` Custom Impose | user | 12.6 × 17.72 | [ ] | [ ] | [ ] | [ ] |
 
 ## Bleed-inclusive — piece placed at BLEED size, marks inside at the trim
@@ -77,7 +77,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 | `zine` Fold Zine | 8-page fold | 11 × 8.5 | [x] | [x] | [x] | [x] |
 | `boxcarton` Box / Carton | dieline | 11 × 17 | [x] | [x] | [x] | [x] |
 | `presfolder` Presentation Folder | dieline | 11 × 17 | [x] | [x] | [x] | [x] |
-| `divinitybox` Divinity Box | 5 fixed panels, 306 × 572mm | fixed | [ ] | [ ] | [ ] | [ ] |
+| `divinitybox` Divinity Box | 5 fixed panels, 306 × 572mm | fixed | [x] | [x] | [x] | [x] |
 
 ## Bound — signature and stacking maths
 
@@ -91,7 +91,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 | `notebook` Notebook | saddle | 11.69 × 8.27 | [x] | [x] | [x] | [x] |
 | `hymnal` Hymnal | saddle, 4-sheet sigs | 11.69 × 8.27 | [x] | [x] | [x] | [x] |
 | `perfectbound` Perfect Bound | cut-and-stack, duplex | 17 × 11 | [x] | [x] | [x] | [x] |
-| `pbcover` Perfect Bound Cover | back/spine/front wrap | computed | [ ] | [ ] | [ ] | [ ] |
+| `pbcover` Perfect Bound Cover | back/spine/front wrap | computed | [x] | [x] | [x] | [x] |
 | `cutstack` Cut & Stack | cut-and-stack | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `nupbook` N-Up Book | n-up signatures | — | [x] | [x] | [x] | [x] |
 | `fierybooklet` Fiery Booklet | single pages, spine bleed trim — **DO NOT EDIT** | — | [x] | [x] | [x] | [x] |
@@ -102,9 +102,9 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 
 | Tool | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|
-| `raisedmetal` Raised Metal | n/a | n/a | [ ] | [ ] |
+| `raisedmetal` Raised Metal | n/a | n/a | [x] | [x] |
 | `whitevarnish` White / Varnish | n/a | n/a | [ ] | [ ] |
-| `removebg` Remove Background | n/a | n/a | [ ] | [ ] |
+| `removebg` Remove Background | n/a | n/a | [x] | [x] |
 | `braille` Braille | n/a | n/a | [ ] | [ ] |
 
 ## Marks and page furniture — no fit calculation
@@ -177,10 +177,37 @@ Confirmed by reading the rendered pages, not just the counts:
 | `watermark` | PROOF across the page. `barcode` a scannable QR. `colorbar` real CMYK patches. |
 | `crop` | 8.5×11 → **7.5×10**. `bleed` → **8.75×11.25**. `resize` → **8.27×11.69** (A4). `rotate` → landscape. |
 
+## Browser-only tools — real Chromium, real models
+
+`npm run smoke:browser` bundles the engine from `src/` and runs it inside
+Chromium, where canvas and the ONNX weights exist. Not the UI: the same engine
+the app ships, so a failure is the engine's, not a selector's. **7/7 pass.**
+
+The spot-colour tools emit TIFF, so "it rendered" proves nothing. The harness
+parses the TIFF back out of the bytes and checks the layout the RIP reads.
+
+| Tool | Verified |
+|---|---|
+| `divinitybox` | 14 checks: photometric 2 RGB not Separated, 6 samples R,G,B,α,W1,V1, uncompressed, interleaved, 8-bit; W1/V1 inverted polarity (255 = clear, 0 = full ink); **27% ink / 28% ink inside a printed panel** — the plate follows the artwork instead of flooding it; transparent areas stay transparent; **varnish stays off unless asked for**. |
+| `raisedmetal` | Both passes 750×1050px — they must register. Pass 1 lays varnish and NO white; pass 2 lays white and NO varnish. |
+| `removebg` | Cut 73% of the page to transparent using the installed ONNX weights. |
+| `pbcover` | Spine 0.500" for 200pp at 0.0025"/page; sheet 12.750 × 9.250" — back \| spine \| front, measured against the arithmetic. |
+| `gangsheet` | 6 pieces, 2 jobs, one 11 × 8.5" sheet. |
+| `colormanage`, `coloreffects` | Run in a browser, where node refuses. |
+
 ## Log
 
 Newest first. Every entry records a **measured** number, not a claim.
 
+- **pdfjs needs a browser API Chromium 141 does not have.** pdfjs-dist 6 calls
+  `Map.prototype.getOrInsertComputed` on every worker message dispatch. It is a very
+  recent proposal: a current shipping Chromium lacks it. The failure is nasty because
+  it is not immediate — the FIRST PDF opens fine and every one after it throws, since
+  the handler only reaches for that cache on a second document. So the app looks
+  healthy, the operator loads another file, and every pdfjs tool dies at once: the
+  previews, Divinity Box, Raised Metal, Remove Background, Colour Effects, Trim to
+  Artwork. `src/lib/polyfills.ts` fills it in. **Node has the method, so no amount of
+  node testing would ever have shown this** — it took running in a real browser.
 - **engine `computeNUpGrid`** — held its own COPY of the mark-clearance rule, and the
   copy was the wrong one. Fixing `fit/` changed nothing until this was routed through
   the same `markClearanceIn`, because the engine never consulted the calculators. This
