@@ -5061,15 +5061,35 @@ export interface ReplicateOptions {
 export function replicateGrid(opts: {
   sheetWIn: number; sheetHIn: number; cellWIn: number; cellHIn: number;
   marginIn: number; gutterXIn: number; gutterYIn: number;
-  // Extra clear space each item needs for its cut marks (= markOff + markLen).
-  // The margin and gutters are grown to at least this so marks always have room,
-  // which lowers the count to what SAFELY fits with borders and marks.
+  /* Cut-mark geometry. Give markOffIn/markLenIn and the margin and gutters are
+     grown to what marks ACTUALLY need, which is not the same on both:
+
+       margin (outer edge) — the mark has nowhere to go but the margin, so it
+         needs the offset plus enough length to be visible. The mark is then
+         CLIPPED to the margin rather than the margin being grown to the full
+         mark length: a 0.43" mark would otherwise demand a 0.555" margin and
+         cost a whole column.
+
+       gutter (between items) — the marks either side of the trim are COLLINEAR
+         and merge into one cut line, exactly as they do on any gang sheet. Each
+         only has to clear the neighbour's artwork, so 2 x the offset is enough.
+         Reserving markOff + markLen here was reserving a full mark length twice
+         over for a line that is drawn once.
+
+     markAllowIn is the older, blunter form: one figure applied to both. */
+  markOffIn?: number; markLenIn?: number;
   markAllowIn?: number;
 }): { cols: number; rows: number; marginIn: number; gutterXIn: number; gutterYIn: number; fits: boolean } {
-  const mark = Math.max(0, opts.markAllowIn ?? 0);
-  const marginIn = Math.max(opts.marginIn, mark);
-  const gutterXIn = Math.max(opts.gutterXIn, mark);
-  const gutterYIn = Math.max(opts.gutterYIn, mark);
+  const MIN_MARK_IN = 0.08;                         // a mark shorter than this is not worth drawing
+  const explicit = opts.markOffIn !== undefined || opts.markLenIn !== undefined;
+  const off = Math.max(0, opts.markOffIn ?? 0);
+  const marginNeed = explicit
+    ? off + Math.min(Math.max(0, opts.markLenIn ?? 0), MIN_MARK_IN)
+    : Math.max(0, opts.markAllowIn ?? 0);
+  const gutterNeed = explicit ? 2 * off : Math.max(0, opts.markAllowIn ?? 0);
+  const marginIn = Math.max(opts.marginIn, marginNeed);
+  const gutterXIn = Math.max(opts.gutterXIn, gutterNeed);
+  const gutterYIn = Math.max(opts.gutterYIn, gutterNeed);
   const shW = opts.sheetWIn * PT, shH = opts.sheetHIn * PT, m = marginIn * PT;
   const gx = gutterXIn * PT, gy = gutterYIn * PT;
   const cellW = opts.cellWIn * PT, cellH = opts.cellHIn * PT;
@@ -5102,10 +5122,10 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
   // Fill the SELECTED sheet with as many copies as SAFELY fit — reserving room
   // for the margins AND the cut marks (the grid grows the gutters/margin to at
   // least the mark reach), so the count reflects real production spacing.
-  const markAllow = opts.addMarks ? ((opts.markOffIn ?? 0.125) + (opts.markLenIn ?? 0.43)) : 0;
   const gridOf = (w: number, h: number) => replicateGrid({
     sheetWIn: opts.sheetWIn, sheetHIn: opts.sheetHIn, cellWIn: w, cellHIn: h,
-    marginIn: opts.marginIn, gutterXIn: opts.gutterXIn, gutterYIn: opts.gutterYIn, markAllowIn: markAllow,
+    marginIn: opts.marginIn, gutterXIn: opts.gutterXIn, gutterYIn: opts.gutterYIn,
+    ...(opts.addMarks ? { markOffIn: opts.markOffIn ?? 0.125, markLenIn: opts.markLenIn ?? 0.43 } : {}),
   });
   let upright = gridOf(cellWIn, cellHIn);
   let turned = gridOf(cellHIn, cellWIn);
@@ -5156,7 +5176,15 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
   while (order.length < N) order.push({ emb: primEmb, w: pSize.width, h: pSize.height });
 
   const markStyle: MarkStyle = { center: !!opts.centerMarks, weight: opts.markWeightPt };
-  const off = (opts.markOffIn ?? 0.125) * PT, len = (opts.markLenIn ?? 0.43) * PT;
+  const off = (opts.markOffIn ?? 0.125) * PT;
+  /* Clip the mark to the space it has. The grid reserved room for the offset
+     plus a short mark, not for the full length, so drawing the full length
+     would run marks across the neighbouring card. Half a gutter each is right:
+     the two marks meet in the middle and read as one cut line. */
+  const room = [m - off,
+    ...(cols > 1 ? [gx / 2 - off] : []),
+    ...(rows > 1 ? [gy / 2 - off] : [])].filter((v) => Number.isFinite(v));
+  const len = Math.max(0.06 * PT, Math.min((opts.markLenIn ?? 0.43) * PT, ...room));
 
   // Draw row-major, top row first (top-down reading order on the sheet).
   for (let i = 0; i < N; i++) {
