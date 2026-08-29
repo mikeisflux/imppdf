@@ -4155,6 +4155,9 @@ export function spineWidthIn(pages: number, caliperPerPageIn: number, coverAllow
 
 export interface PerfectCoverArt { bytes: Uint8Array; page?: number }
 
+/** Reading crease, 6 mm off each spine fold — the shop standard. */
+export const HINGE_DEFAULT_IN = 6 / 25.4;
+
 export interface PerfectCoverOptions {
   // Front, back and spine are usually authored as SEPARATE files. Any that is
   // omitted falls back to a page of the pipeline's source PDF.
@@ -4209,7 +4212,10 @@ export interface PerfectCoverOptions {
   spineText?: string;
   addMarks?: boolean;                     // trim marks + spine/hinge ticks
   markLenIn?: number; markOffIn?: number; markWeightPt?: number;
-  hingeIn?: number;                       // score guides this far off each spine edge (default 0.1875")
+  /* The READING CREASE (hinge score), measured from each spine fold. The shop
+     runs 6 mm; that is the shop standard and what the binder expects. Stored in
+     inches like every other measurement here, so 6 / 25.4. */
+  hingeIn?: number;
 }
 
 // Build the wrap. Front/back art each bleed off their outer and top/bottom
@@ -4349,7 +4355,7 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   /* Stated in SHEET coordinates (ox already added), because a crease is set
      from the edge of the sheet that goes into the creaser — not from the edge
      of the artwork, which nobody can register against. */
-  const hinge = (opts.hingeIn ?? 0.1875) * PT;
+  const hinge = (opts.hingeIn ?? HINGE_DEFAULT_IN) * PT;
   const CREASES = ([
     { x: ox + bleed + trimW - hinge, tag: 'score' },
     { x: ox + bleed + trimW, tag: 'fold' },

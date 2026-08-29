@@ -2432,7 +2432,8 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
       </Section>
       <Section label="// FINISHING" help="Bleed around the wrap, plus the hinge scores that let the cover open without cracking the spine glue.">
         {num('Bleed', 'bleedIn', bleed, 0.0625, 'inches')}
-        {num('Hinge from spine', 'hingeIn', s.hingeIn ?? 0.1875, 0.0625, 'inches')}
+        {num('Hinge from spine', 'hingeIn', s.hingeIn ?? 6 / 25.4, 0.01,
+          `${(((s.hingeIn ?? 6 / 25.4) * 25.4)).toFixed(1)} mm`)}
         <Check icon="foldmarks" label="Crease positions in mm" sub="Along the top, inside the bleed — trimmed off the finished cover"
           checked={s.creaseLabels !== false} onChange={(v) => up({ creaseLabels: v })} />
         {s.creaseLabels !== false ? <>

@@ -135,7 +135,7 @@ export function defaultSettings(type: StepType): StepSettings {
            scaling to taste. That is how a batch of finished covers came back
            the wrong size. Set to the shop's default media; change it per job. */
         mediaWIn: 11, mediaHIn: 17, mediaOrient: 'auto',
-        spineText: '', addMarks: true, hingeIn: 0.1875,
+        spineText: '', addMarks: true, hingeIn: 6 / 25.4,   // reading crease, 6 mm
         // Crease positions in mm along the top, inside the bleed — for whoever
         // sets the creaser, and trimmed off the finished cover.
         creaseLabels: true, creaseLabelPt: 4,
@@ -600,7 +600,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         bleedIn: s.bleedIn ?? 0.125, frontPage: s.frontPage ?? 1, backPage: s.backPage ?? 2,
         spineText: s.spineText || undefined, addMarks: s.addMarks !== false,
         markLenIn: s.markLenIn, markOffIn: s.markOffIn, markWeightPt: s.markWeightPt,
-        hingeIn: s.hingeIn ?? 0.1875,
+        hingeIn: s.hingeIn ?? 6 / 25.4,
         /* 0/absent is a deliberate choice in the panel ("Cover size"), so it is
            passed through as-is rather than defaulted here — otherwise the panel
            could not turn the sheet off. New steps get 11x17 above. */

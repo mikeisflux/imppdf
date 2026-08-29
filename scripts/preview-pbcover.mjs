@@ -2,7 +2,7 @@
    layout and the new crease labels can be checked before any real art exists. */
 import fs from 'node:fs';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import { imposePerfectCover, spineWidthIn } from '../src/lib/imposition-toolkit/impose.ts';
+import { imposePerfectCover, spineWidthIn, HINGE_DEFAULT_IN } from '../src/lib/imposition-toolkit/impose.ts';
 import { renderPng, OUT, PT } from './smoke.mjs';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 
@@ -52,7 +52,7 @@ const out = await imposePerfectCover(await block(TRIM_W + BLEED * 2, TRIM_H + BL
   insideBack: { bytes: await block(TRIM_W + BLEED * 2, TRIM_H + BLEED * 2, 'insideBack') },
   trimWIn: TRIM_W, trimHIn: TRIM_H, pages: PAGES, caliperPerPageIn: CALIPER,
   coverAllowanceIn: 0, bleedIn: BLEED, addMarks: true, markLenIn: 0.25,
-  markOffIn: 0.125, markWeightPt: 0.25, hingeIn: 0.1875,
+  markOffIn: 0.125, markWeightPt: 0.25,          // hinge left at the 6 mm default
   creaseLabels: true, creaseLabelPt: 4,
 });
 fs.writeFileSync(`${OUT}/pbcover-preview.pdf`, out);
@@ -66,6 +66,9 @@ for (const p of [1, 2]) {
 }
 console.log('\ncrease positions, from the sheet left edge:');
 for (const [label, xIn] of [
-  ['score (back)', BLEED + TRIM_W - 0.1875], ['fold  back|spine', BLEED + TRIM_W],
-  ['fold  spine|front', BLEED + TRIM_W + spineIn], ['score (front)', BLEED + TRIM_W + spineIn + 0.1875],
+  // Read the hinge from the ENGINE, never a second copy of the number here —
+  // a readout that restates a constant can report a value the engine stopped
+  // producing, which is exactly what it did.
+  ['score (back)', BLEED + TRIM_W - HINGE_DEFAULT_IN], ['fold  back|spine', BLEED + TRIM_W],
+  ['fold  spine|front', BLEED + TRIM_W + spineIn], ['score (front)', BLEED + TRIM_W + spineIn + HINGE_DEFAULT_IN],
 ]) console.log(`  ${label.padEnd(18)} ${xIn.toFixed(4)}in = ${(xIn * 25.4).toFixed(1)}mm`);

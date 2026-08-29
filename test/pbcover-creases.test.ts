@@ -91,3 +91,27 @@ test('perfect cover: labels can be turned off', async () => {
   const out = await imposePerfectCover(art, { ...BASE, front: { bytes: art }, creaseLabels: false });
   assert.equal(labelsIn(out).length, 0, 'no millimeter figures when the option is off');
 });
+
+test('perfect cover: the reading crease sits 6 mm off each spine fold', async () => {
+  /* Shop standard, and what the binder expects. The hinge is what lets the
+     cover open without cracking the spine glue, so its distance from the fold
+     is a real production number, not a nicety — the old 0.1875" (4.76 mm) was
+     1.2 mm short. Read back through the printed mm figures, which is what
+     whoever sets the creaser actually works from. */
+  const { HINGE_DEFAULT_IN } = await import('../src/lib/imposition-toolkit/impose.ts');
+  assert.ok(Math.abs(HINGE_DEFAULT_IN * 25.4 - 6) < 0.001, 'default hinge is 6 mm');
+
+  const art = await block(6.875, 10.5);
+  const out = await imposePerfectCover(art, {
+    front: { bytes: art }, back: { bytes: art },
+    trimWIn: 6.625, trimHIn: 10.25, pages: 32, caliperPerPageIn: 0.0025,
+    bleedIn: 0.125, creaseLabels: true, creaseLabelPt: 6,
+  });
+  const mm = labelsIn(out).sort((a, b) => a - b);
+  assert.equal(mm.length, 4, `four creases, got ${JSON.stringify(mm)}`);
+  const [scoreBack, foldBack, foldFront, scoreFront] = mm as [number, number, number, number];
+  assert.ok(Math.abs((foldBack - scoreBack) - 6) < 0.15,
+    `back hinge 6 mm off the fold, got ${(foldBack - scoreBack).toFixed(2)}`);
+  assert.ok(Math.abs((scoreFront - foldFront) - 6) < 0.15,
+    `front hinge 6 mm off the fold, got ${(scoreFront - foldFront).toFixed(2)}`);
+});
