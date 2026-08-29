@@ -245,3 +245,22 @@ test("media fix: portrait + turned artwork matches a portrait tray exactly", asy
     assert.ok(near(b[1]!, ((17 - 13.59) / 2) * PT), "centered down");
   }
 });
+
+test("media fix: Trim and Bleed nest legally inside Media", async () => {
+  /* ISO 32000 requires Media > Bleed > Trim. Setting only the BleedBox left the
+     TrimBox at the full sheet — a trim LARGER than the bleed inside it. A RIP is
+     entitled to fit to those boxes, so an invalid pair is not cosmetic: it is an
+     instruction that contradicts itself, on a file whose whole purpose is to
+     leave the press nothing to decide. Checked on the SHIPPED bytes, since the
+     export finisher restates every box on the way out. */
+  const { finalizePdfForExport } = await import("../src/lib/imposition-toolkit/pdf-finish.ts");
+  const { bytes } = await imposeOnMedia(await pagePdf(13.59, 10.5), { mediaWIn: 11, mediaHIn: 17 });
+  const doc = await PDFDocument.load(await finalizePdfForExport(bytes, { noThumbnails: true }),
+    { updateMetadata: false });
+  const M = box(doc, 0, "MediaBox")!, T = box(doc, 0, "TrimBox")!, B = box(doc, 0, "BleedBox")!;
+  const inside = (a: number[], b: number[]) =>
+    a[0]! >= b[0]! - 0.5 && a[1]! >= b[1]! - 0.5 && a[2]! <= b[2]! + 0.5 && a[3]! <= b[3]! + 0.5;
+  assert.ok(inside(B, M), "BleedBox inside MediaBox");
+  assert.ok(inside(T, B), "TrimBox inside BleedBox");
+  assert.ok(near(T[2]! - T[0]!, 13.59 * PT), "and the trim IS the artwork");
+});

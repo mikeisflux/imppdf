@@ -4728,11 +4728,16 @@ export async function imposeOnMedia(
     page.drawPage(emb, { ...place, x: a.x + dx, y: a.y + dy, rotate: degrees(theta) });
 
     /* The artwork's footprint on the sheet, so downstream tools (and the RIP)
-       can tell the job from the paper around it. */
+       can tell the job from the paper around it.
+       BOTH Trim and Bleed, and both the same rect. ISO 32000 requires
+       Media > Bleed > Trim; setting only the Bleed left the TrimBox at the full
+       sheet, i.e. a trim LARGER than the bleed inside it, which is invalid. A
+       RIP is entitled to fit to those boxes, so an invalid pair is not a
+       cosmetic fault — it is an instruction that contradicts itself. */
     try {
-      const bx = x + dx, by = y + dy;
-      page.setBleedBox(Math.max(0, bx), Math.max(0, by),
-        Math.min(pw, shW - Math.max(0, bx)), Math.min(ph, shH - Math.max(0, by)));
+      const bx = Math.max(0, x + dx), by = Math.max(0, y + dy);
+      const bw = Math.min(pw, shW - bx), bh = Math.min(ph, shH - by);
+      if (bw > 1 && bh > 1) { page.setBleedBox(bx, by, bw, bh); page.setTrimBox(bx, by, bw, bh); }
     } catch { /* nicety */ }
 
     report.sheetIn.push({ wIn: shW / PT, hIn: shH / PT });
