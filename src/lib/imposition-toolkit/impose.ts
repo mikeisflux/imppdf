@@ -4175,6 +4175,12 @@ export interface PerfectCoverOptions {
   // panel (and over the glue zone). Trimmed per panel: back cover's right,
   // front cover's left, inside front's right, inside back's left. Default ON.
   trimSpineBleed?: boolean;
+  /* Print each crease's ABSOLUTE position, in millimetres from the sheet's left
+     edge, along the top edge inside the bleed. The bleed is trimmed away, so
+     these never reach the finished cover — they are there for whoever sets the
+     creaser, who otherwise has to measure the fold off a proof. Default ON. */
+  creaseLabels?: boolean;
+  creaseLabelPt?: number;      // type size (default 4pt — it lives in the bleed)
   // Spine files are normally authored at the exact spine size with NO bleed, so
   // the art occupies the TRIM band only and is never stretched into the bleed.
   // Set this when the spine file does carry top/bottom bleed.
@@ -4200,7 +4206,7 @@ export interface PerfectCoverOptions {
 // edges; the spine keeps its own clear width so nothing important creeps in.
 export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOptions): Promise<Uint8Array> {
   const PL = await import('pdf-lib');
-  const { PDFDocument, rgb, degrees } = PL;
+  const { PDFDocument, rgb, degrees, StandardFonts } = PL;
   const bleed = (opts.bleedIn ?? 0.125) * PT;
   const trimW = opts.trimWIn * PT, trimH = opts.trimHIn * PT;
   let spine = spineWidthIn(opts.pages, opts.caliperPerPageIn ?? 0.0025, opts.coverAllowanceIn ?? 0) * PT;
@@ -4295,6 +4301,17 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /* ONE definition of the crease geometry, used by both the tick marks and the
+     millimetre labels — so a number printed on the sheet can never disagree
+     with the tick it belongs to. */
+  const hinge = (opts.hingeIn ?? 0.1875) * PT;
+  const CREASES = ([
+    { x: bleed + trimW - hinge, tag: 'score' },
+    { x: bleed + trimW, tag: 'fold' },
+    { x: bleed + trimW + spine, tag: 'fold' },
+    { x: bleed + trimW + spine + hinge, tag: 'score' },
+  ] as { x: number; tag: 'score' | 'fold' }[]).sort((a, b) => a.x - b.x);
+
   const drawCoverMarks = (page: any) => {
     const off = (opts.markOffIn ?? 0.125) * PT, len = (opts.markLenIn ?? 0.25) * PT;
     const w0 = opts.markWeightPt ?? 0.25;
@@ -4311,7 +4328,6 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
     }
     // Spine folds, plus the hinge scores a binder needs so the cover opens
     // without cracking the glue. Ticks only — never across the artwork.
-    const hinge = (opts.hingeIn ?? 0.1875) * PT;
     for (const x of [bleed + trimW, bleed + trimW + spine]) {
       line(x, 0, x, Math.max(0, bleed - off));
       line(x, shH, x, shH - Math.max(0, bleed - off));
@@ -4322,7 +4338,68 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
     }
     void len;
   };
+
+  /* Crease positions in millimetres, along the top edge, inside the bleed.
+     Measured from the sheet's LEFT EDGE (the PDF page origin) because that is
+     the edge the creaser registers against — and stated on the sheet, so there
+     is no question which datum the numbers use.
+     The bleed is trimmed off, so none of this reaches the finished cover. */
+  const drawCreaseLabels = async (page: any) => {
+    const size = Math.max(2, opts.creaseLabelPt ?? 4);
+    const font = await out.embedFont(StandardFonts.Helvetica);
+    const MM = 25.4 / PT;                                  // points -> millimetres
+    const creases = CREASES;
+
+    /* Sit the baseline inside the bleed band. With no bleed there is nowhere to
+       hide them, so they go just inside the top trim instead of being dropped —
+       an operator would rather trim a number off than not have it. */
+    const band = Math.max(0, shH - bleed);
+    const baseY = bleed > size + 1 ? band + (bleed - size) / 2 + 0.5 : shH - size - 1;
+
+    /* Knock a white box out behind every mark. The bleed carries ARTWORK — that
+       is what bleed is — so a number set straight onto it can land dark-on-dark
+       and be unreadable exactly when someone needs it. The box is trimmed away
+       with everything else here. */
+    const label = (text: string, x: number) => {
+      const w = font.widthOfTextAtSize(text, size);
+      page.drawRectangle({
+        x: x - 1, y: baseY - size * 0.28, width: w + 2, height: size * 1.18,
+        color: rgb(1, 1, 1),
+      });
+      page.drawText(text, { x, y: baseY, size, font, color: rgb(0, 0, 0) });
+      return w;
+    };
+
+    // Legend, clear of the corner trim mark rather than printed across it.
+    const legend = 'CREASE mm from left edge:';
+    let cursor = bleed + 2;
+    try {
+      cursor += label(legend, cursor) + 4;
+    } catch { /* legend is optional; the numbers are the point */ }
+
+    for (const c of creases) {
+      const mm = c.x * MM;
+      const text = `${mm.toFixed(1)}`;
+      const w = font.widthOfTextAtSize(text, size);
+      /* Centre each number on its crease, but never let two overlap: a pair of
+         numbers printed on top of each other is worse than one shifted a
+         millimetre off centre, because the tick already marks the exact spot. */
+      let x = c.x - w / 2;
+      if (x < cursor) x = cursor;
+      cursor = x + w + 3;
+      if (x + w > shW - 1) break;                          // ran out of edge
+      try {
+        // A hairline from the number down to the trim FIRST, so the knockout
+        // box sits over it and the leader reads as starting at the number.
+        page.drawLine({ start: { x: c.x, y: baseY + size }, end: { x: c.x, y: band },
+          thickness: opts.markWeightPt ?? 0.25, color: rgb(0, 0, 0) });
+        label(text, x);
+      } catch { /* skip this one rather than lose the sheet */ }
+    }
+    void creases;
+  };
   if (opts.addMarks !== false) drawCoverMarks(pg);
+  if (opts.creaseLabels !== false) await drawCreaseLabels(pg);
   // ── Inside of the wrap (page 2) ──────────────────────────────────────────
   const mirrorIn = opts.mirrorInside !== false;
   // Mirrored: inside front prints on the LEFT of the inside, so ITS right edge
@@ -4356,6 +4433,8 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
       color: rgb(1, 1, 1), borderWidth: 0,
     });
     if (opts.addMarks !== false) drawCoverMarks(ip);
+    // The inside is the same sheet turned over, so it creases on the same lines.
+    if (opts.creaseLabels !== false) await drawCreaseLabels(ip);
   }
 
   if (srcDoc) await carryColorContext(srcDoc, out);

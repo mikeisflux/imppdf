@@ -35,12 +35,14 @@ async function sourceArt(wIn, hIn) {
   return doc.save();
 }
 
-async function renderPng(bytes, outPath, maxPx = 900) {
+async function renderPng(bytes, outPath, maxPx = 900, pageNo = 1) {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const doc = await pdfjs.getDocument({ data: bytes, useSystemFonts: false }).promise;
-  const pg = await doc.getPage(1);
+  /* A COPY every time: pdfjs transfers the buffer into its worker, so the second
+     call on the same Uint8Array gets a detached one and throws DataCloneError. */
+  const doc = await pdfjs.getDocument({ data: bytes.slice(), useSystemFonts: false }).promise;
+  const pg = await doc.getPage(Math.min(doc.numPages, Math.max(1, pageNo)));
   const v1 = pg.getViewport({ scale: 1 });
-  const scale = Math.min(maxPx / v1.width, maxPx / v1.height, 2);
+  const scale = Math.min(maxPx / v1.width, maxPx / v1.height, 3);
   const vp = pg.getViewport({ scale });
   const canvas = createCanvas(Math.ceil(vp.width), Math.ceil(vp.height));
   const ctx = canvas.getContext('2d');

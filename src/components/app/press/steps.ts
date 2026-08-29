@@ -130,6 +130,9 @@ export function defaultSettings(type: StepType): StepSettings {
         trimWIn: 6, trimHIn: 9, pages: 200, caliperPerPageIn: 0.0025,
         coverAllowanceIn: 0, bleedIn: 0.125, frontPage: 1, backPage: 2,
         spineText: '', addMarks: true, hingeIn: 0.1875,
+        // Crease positions in mm along the top, inside the bleed — for whoever
+        // sets the creaser, and trimmed off the finished cover.
+        creaseLabels: true, creaseLabelPt: 4,
         markLenIn: 0.25, markOffIn: 0.125, markWeightPt: 0.25,
         front: null, back: null, spineArt: null,
         insideFront: null, insideBack: null, mirrorInside: true, spineGlueClearIn: 0,
@@ -580,6 +583,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         spineText: s.spineText || undefined, addMarks: s.addMarks !== false,
         markLenIn: s.markLenIn, markOffIn: s.markOffIn, markWeightPt: s.markWeightPt,
         hingeIn: s.hingeIn ?? 0.1875,
+        creaseLabels: s.creaseLabels !== false, creaseLabelPt: s.creaseLabelPt ?? 4,
       }); break;
       case 'removebg': b = await removeBackground(b, {
         page: s.page ?? 1, dpi: s.dpi ?? 300, featherPx: s.featherPx ?? 1,

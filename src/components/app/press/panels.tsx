@@ -2378,6 +2378,14 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
       <Section label="// FINISHING" help="Bleed around the wrap, plus the hinge scores that let the cover open without cracking the spine glue.">
         {num('Bleed', 'bleedIn', bleed, 0.0625, 'inches')}
         {num('Hinge from spine', 'hingeIn', s.hingeIn ?? 0.1875, 0.0625, 'inches')}
+        <Check icon="foldmarks" label="Crease positions in mm" sub="Along the top, inside the bleed — trimmed off the finished cover"
+          checked={s.creaseLabels !== false} onChange={(v) => up({ creaseLabels: v })} />
+        {s.creaseLabels !== false ? <>
+          {num('Label size', 'creaseLabelPt', s.creaseLabelPt ?? 4, 0.5, 'pt')}
+          <div className="pe-note" style={{ marginTop: 8 }}>
+            Every crease — both spine folds and both hinge scores — is measured from the sheet&apos;s <b>left edge</b> and printed above it, so whoever sets the creaser reads the number off the sheet instead of measuring a proof. The datum is stated on the sheet next to the figures. Each sits on a white knockout, because the bleed carries artwork and a number set straight onto it can land dark-on-dark. All of it is inside the bleed, so none of it survives the trim.
+          </div>
+        </> : null}
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 6 }}>
           <span className="pe-label" style={{ flex: 1 }}>Spine text</span>
           <input className="pe-input" value={s.spineText ?? ''} placeholder="Title / author" style={{ width: 180 }}
