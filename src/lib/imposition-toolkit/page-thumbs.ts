@@ -1,6 +1,6 @@
-// Rasterises each page of a PDF to a small PNG/JPEG data URL so the live
+// Rasterizes each page of a PDF to a small PNG/JPEG data URL so the live
 // imposition preview can show the *actual* artwork in each cell instead of a
-// coloured numbered placeholder. Browser-only (uses <canvas> + pdf.js).
+// colored numbered placeholder. Browser-only (uses <canvas> + pdf.js).
 //
 // This is site glue that lives alongside the vendored plugin — it uses the same
 // pdf.js worker import the engine uses (`impose.ts`). If the plugin is upgraded,
@@ -30,7 +30,7 @@ const thumbCache = new WeakMap<Uint8Array, string[]>();
 
 export interface RenderedSheet { url: string; wPt: number; hPt: number; }
 
-// Rasterise the pages of a (usually imposed) PDF for the live preview canvas.
+// Rasterize the pages of a (usually imposed) PDF for the live preview canvas.
 // `maxPx` bounds the longest edge; `maxPages` bounds how many sheets render;
 // `fillWhite=false` keeps transparency (PNG) for the fill-background toggle.
 export async function rasterizePdfSheets(

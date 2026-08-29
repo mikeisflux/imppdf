@@ -3,7 +3,7 @@
    
    The point is that nothing here trusts the calculator. The source art is a
    solid block; after imposition the rendered page is scanned for connected
-   blocks of that colour, and the number found is compared with what the tool
+   blocks of that color, and the number found is compared with what the tool
    said it would place. A count that is right on paper and wrong on the sheet
    fails here.
    
@@ -20,7 +20,7 @@ const PT = 72;
 
 /* Source art: a magenta block INSET inside a white piece, with a notch top-left
    so rotation is visible. The inset matters: butt-cut tools place pieces edge
-   to edge, and a full-bleed block would touch its neighbour and be counted as
+   to edge, and a full-bleed block would touch its neighbor and be counted as
    one region by the flood fill below — the measurement would report a single
    giant item and look like a catastrophic failure that had not happened. */
 const INSET_PT = 5;
@@ -54,7 +54,7 @@ async function renderPng(bytes, outPath, maxPx = 900, pageNo = 1) {
            ptW: v1.width, ptH: v1.height };
 }
 
-/* Count solid blocks of the source colour by flood fill. This is what makes
+/* Count solid blocks of the source color by flood fill. This is what makes
    the number MEASURED: it is whatever actually got drawn on the page. */
 function countBlocks(ctx, w, h) {
   const px = ctx.getImageData(0, 0, w, h).data;

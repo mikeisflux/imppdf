@@ -119,7 +119,7 @@ const CASES = [
   ['resize', async () => E.resizePdf(await doc(1), { mode: 'fit', scalePct: 100, targetWIn: 8.27, targetHIn: 11.69 }, 'all'), { pages: 1, sheet: [8.27, 11.69] }],
   ['mix', async () => E.mixPdfs(await doc(3, 8.5, 11, 'A'), await doc(3, 8.5, 11, 'B'), false), { pages: 6 }],
   ['nudge', async () => E.nudgePdf(await doc(1), { dxIn: 0.1, dyIn: 0.1, rotateDeg: 0, pages: 'all' }), { pages: 1 }],
-  // Colour Effects rasterises through a canvas, so it is browser-only by
+  // Color Effects rasterizes through a canvas, so it is browser-only by
   // design and refuses in node. Verified by the refusal, not skipped silently.
   ['coloreffects', async () => {
     try { await E.applyColorEffects(await doc(1), { brightness: 110, contrast: 100, saturation: 90,

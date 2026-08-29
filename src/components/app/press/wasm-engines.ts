@@ -82,7 +82,7 @@ export async function applyIccColorManagement(bytes: Uint8Array, icc: Uint8Array
   const transform = lcms.cmsCreateProofingTransform(srgb, TYPE_RGBA, srgb, TYPE_RGBA, prof, intent, intent, flags);
   if (!transform) { lcms.cmsCloseProfile(prof); throw new Error('This ICC profile has no usable transform tables (needs A2B/B2A).'); }
 
-  // Rasterise pages, push pixels through the transform, re-embed.
+  // Rasterize pages, push pixels through the transform, re-embed.
   const { parsePageRange } = await import('@/lib/imposition-toolkit/impose');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdfjs: any = await import('pdfjs-dist');

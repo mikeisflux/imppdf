@@ -36,7 +36,7 @@ export interface RgbSpotTiffInput {
   alpha?: boolean;
   // ICC profile to embed (tag 34675) so readers interpret the RGB correctly.
   // Without it, Photoshop assigns the user's working RGB space to the untagged
-  // file — sRGB pixel values read as e.g. Adobe RGB and every colour shifts.
+  // file — sRGB pixel values read as e.g. Adobe RGB and every color shifts.
   iccProfile?: Uint8Array;
   // Override the ≈1 MB-per-strip default (mainly for tests).
   rowsPerStrip?: number;
@@ -63,10 +63,10 @@ function psResource(id: number, data: Uint8Array): Uint8Array {
 
 export interface PsChannelDef {
   name: string;
-  // 'spot' = a printing spot plate (W1 white, V1 varnish) — gets a colour chip
+  // 'spot' = a printing spot plate (W1 white, V1 varnish) — gets a color chip
   // and is what a RIP reads as W/V. 'mask' = non-printing (the transparency).
   kind: 'spot' | 'mask';
-  rgb: [number, number, number];   // display colour chip
+  rgb: [number, number, number];   // display color chip
 }
 
 function photoshopChannelNames(defs: PsChannelDef[]): Uint8Array {
@@ -75,14 +75,14 @@ function photoshopChannelNames(defs: PsChannelDef[]): Uint8Array {
   const pas: number[] = [];
   for (const d of defs) { const b = enc.encode(d.name); pas.push(b.length, ...b); }
   // 1007: DisplayInfo — one 14-byte record per channel, in the same order:
-  // colourSpace(0=RGB) + 4×u16 colour + opacity + kind(2=spot, 1=mask) + pad.
-  // kind=2 is what makes W1/V1 true SPOT channels (colour chip, RIP-readable)
+  // colorSpace(0=RGB) + 4×u16 color + opacity + kind(2=spot, 1=mask) + pad.
+  // kind=2 is what makes W1/V1 true SPOT channels (color chip, RIP-readable)
   // instead of anonymous alphas.
   const di = new Uint8Array(defs.length * 14);
   { const dv = new DataView(di.buffer);
     defs.forEach((d, i) => {
       const o = i * 14;
-      dv.setInt16(o, 0, false);                                  // colourSpace RGB
+      dv.setInt16(o, 0, false);                                  // colorSpace RGB
       dv.setUint16(o + 2, d.rgb[0] * 257, false);
       dv.setUint16(o + 4, d.rgb[1] * 257, false);
       dv.setUint16(o + 6, d.rgb[2] * 257, false);
@@ -130,7 +130,7 @@ export function encodeRgbSpotTiff(input: RgbSpotTiffInput): Uint8Array {
   // alpha it consumes as the checkerboard — so the transparency slot must be
   // named too, or it eats "W1" and shifts every spot name off by one
   // (W1→"V1", V1→"Alpha 3").
-  // SPOT COLOUR — DO NOT CHANGE: every spot channel's colour is BLACK
+  // SPOT COLOR — DO NOT CHANGE: every spot channel's color is BLACK
   // (100,100,100,100), per the shop's workflow. Never white/yellow/anything else.
   const spotDefs: PsChannelDef[] = spotNames.map((n) => ({ name: n, kind: 'spot', rgb: [0, 0, 0] }));
   const psResources = photoshopChannelNames(

@@ -1,6 +1,6 @@
 // sRGB2014 ICC profile (International Color Consortium, freely distributable).
 // Embedded in exported TIFFs (tag 34675) so Photoshop/RIPs interpret the RGB
-// values as sRGB instead of assigning the working space (which shifts colours).
+// values as sRGB instead of assigning the working space (which shifts colors).
 const B64 =
   'AAAL0AAAAAACAAAAbW50clJHQiBYWVogB98AAgAPAAAAAAAAYWNzcAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAPbWAAEA' +
   'AAAA0y0AAAAAPQ6y3q6Tl76bZybOjApDzgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQZGVzYwAAAUQAAABjYlhZWgAA' +

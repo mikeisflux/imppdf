@@ -1,14 +1,14 @@
 // PDF/X export — turn an imposed PDF into a conformant PDF/X-4 or PDF/X-1a file.
 //
-// Deliberately optional at every layer: adding this step is opt-in, and colour
+// Deliberately optional at every layer: adding this step is opt-in, and color
 // conversion to CMYK is OFF by default. If you send to a RIP or Fiery that does
-// its own colour management you usually do NOT want the app to convert colour —
+// its own color management you usually do NOT want the app to convert color —
 // leave `convertCmyk` off and the page content is preserved untouched; only the
 // PDF/X container (output intent, boxes, XMP identification, /ID, version) is
-// added so the file is recognised as PDF/X.
+// added so the file is recognized as PDF/X.
 //
 // What it does:
-//  • (optional) rasterise + convert colour to CMYK through the chosen profile,
+//  • (optional) rasterize + convert color to CMYK through the chosen profile,
 //  • embed the OutputIntent (DestOutputProfile = the CMYK ICC),
 //  • ensure every page has a TrimBox (and BleedBox where a bleed exists),
 //  • write XMP PDF/X identification metadata,
@@ -26,7 +26,7 @@ export interface PdfXOptions {
   conditionName?: string;          // OutputConditionIdentifier, e.g. "Generic CMYK"
   convertCmyk?: boolean;           // default false — leave off for RIP/Fiery workflows
   intent?: 'perceptual' | 'relative' | 'saturation' | 'absolute';
-  dpi?: number;                    // rasterisation DPI when converting
+  dpi?: number;                    // rasterization DPI when converting
 }
 
 // A stable 32-hex-char id derived from the content (no RNG — deterministic and
@@ -65,7 +65,7 @@ export async function exportPdfX(bytes: Uint8Array, opts: PdfXOptions): Promise<
   const { standard, icc } = opts;
   const conditionName = opts.conditionName || 'Custom CMYK';
 
-  // 1. Optional colour conversion to CMYK (rasterises). Off by default.
+  // 1. Optional color conversion to CMYK (rasterizes). Off by default.
   let working = bytes;
   if (opts.convertCmyk) {
     const { applyIccColorManagement } = await import('../../components/app/press/wasm-engines');

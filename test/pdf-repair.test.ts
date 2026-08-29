@@ -1,7 +1,7 @@
 /* PDF Repair — the finisher run over a file that is already imposed.
  *
  * The fault this tool exists for: a page that MEASURES right in Acrobat and
- * IMAGES wrong on the press, because the viewer honours the CropBox and the RIP
+ * IMAGES wrong on the press, because the viewer honors the CropBox and the RIP
  * images the MediaBox. Sixteen finished covers were destroyed trying to fix that
  * by re-exporting them through Perfect Bound Cover, which re-imposed them. So
  * the two things asserted here are: the fault is detected, and the repair fixes

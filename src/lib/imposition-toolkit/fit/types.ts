@@ -1,7 +1,7 @@
 /* Per-tool fit calculators.
 
    WHY THESE EXIST AS SEPARATE FILES. There used to be one shared grid function
-   that every tool called with slightly different arguments, and its behaviour
+   that every tool called with slightly different arguments, and its behavior
    was tuned whenever one tool looked wrong. Tuning it for one tool silently
    changed the others — an index card sheet quietly dropped from ten cards to
    four because a mark allowance had been widened for a different tool, and

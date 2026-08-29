@@ -11,7 +11,7 @@ const nextConfig = {
   webpack: (config, { isServer }) => {
     // The imposition plugin loads the pdf.js worker via a Vite-style `?url`
     // import (wrapped in try/catch). Teach webpack to emit that asset and return
-    // its URL, matching Vite's behaviour.
+    // its URL, matching Vite's behavior.
     config.module.rules.push({ resourceQuery: /url/, type: 'asset/resource' });
     // qpdf-wasm's emscripten glue probes Node builtins at runtime; in the
     // browser bundle they must resolve to empty stubs.

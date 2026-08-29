@@ -1,4 +1,4 @@
-/* Runs INSIDE Chromium. These tools cannot be driven from node: they rasterise
+/* Runs INSIDE Chromium. These tools cannot be driven from node: they rasterize
    through a canvas, or they load ONNX models, or both. Everything else is
    covered by scripts/smoke-all.mjs — this file exists only for the six that a
    node harness genuinely cannot reach.
@@ -27,7 +27,7 @@ async function artPdf(wIn, hIn, opts = {}) {
   return d.save();
 }
 
-/* Minimal baseline-TIFF reader. The spot-colour tools emit TIFF, not PDF, so
+/* Minimal baseline-TIFF reader. The spot-color tools emit TIFF, not PDF, so
    "it rendered" is not a check — what matters is the channel LAYOUT the RIP
    reads (CLAUDE.md rules 2 and 4): 8-bit RGB photometric 2, interleaved,
    6 samples in the order R,G,B,alpha,W1,V1. This pulls that back out of the
@@ -66,7 +66,7 @@ function readTiff(bytes) {
     compression: tags[259], planar: tags[284] };
 }
 
-/** Draw one sample plane of a TIFF as greyscale — this is what the channel
+/** Draw one sample plane of a TIFF as grayscale — this is what the channel
  *  looks like opened in Photoshop, INVERTED spot polarity included. */
 function planeToCanvas(t, sample) {
   const c = document.createElement('canvas');
@@ -205,7 +205,7 @@ add('divinitybox', async () => {
     `W1 has ink AND clear inside a printed panel (${band.ink}% ink) — CLAUDE.md 5, no flooding`);
   need(bandV.hasInk && bandV.hasClear,
     `V1 has ink AND clear inside a printed panel (${bandV.ink}% ink)`);
-  // And the transparent gaps must carry no colour either.
+  // And the transparent gaps must carry no color either.
   const alpha = bandStats(t, 3, 0.30, 0.42);
   need(alpha.hasClear, 'the panel keeps transparent areas transparent');
   const fail = checks.some((c) => c.startsWith('FAIL'));
@@ -219,8 +219,8 @@ add('divinitybox', async () => {
 add('raisedmetal', async () => {
   const art = await artPdf(5, 7);
   const varnish = await E.raisedMetalTiff(art, { dpi: 150, pass: 'varnish' });
-  const colour = await E.raisedMetalTiff(art, { dpi: 150, pass: 'colour' });
-  const tv = readTiff(varnish), tc = readTiff(colour);
+  const color = await E.raisedMetalTiff(art, { dpi: 150, pass: 'color' });
+  const tv = readTiff(varnish), tc = readTiff(color);
   const checks = [];
   const need = (ok, msg) => checks.push((ok ? 'ok  ' : 'FAIL ') + msg);
   need(tv.spp === 6 && tc.spp === 6, 'both passes carry 6 samples');
@@ -231,13 +231,13 @@ add('raisedmetal', async () => {
   // Pass 1 is varnish ONLY: W1 empty (255 everywhere), V1 carrying the plate.
   need(vW.min === 255, `pass 1 lays no white (W1 min ${vW.min})`);
   need(vV.min < 250, `pass 1 lays varnish (V1 min ${vV.min})`);
-  // Pass 2 is colour + white, no varnish.
+  // Pass 2 is color + white, no varnish.
   need(cV.min === 255, `pass 2 lays no varnish (V1 min ${cV.min})`);
   need(cW.min < 250, `pass 2 lays white under the metal (W1 min ${cW.min})`);
   const fail = checks.some((c) => c.startsWith('FAIL'));
   return { ok: !fail, note: checks.join(' · '), meta: `${tv.width}x${tv.height}px both passes`,
     images: [['1 · V1 varnish', shrink(planeToCanvas(tv, 5))],
-      ['2 · W1 white', shrink(planeToCanvas(tc, 4))], ['2 · colour', shrink(rgbToCanvas(tc))]] };
+      ['2 · W1 white', shrink(planeToCanvas(tc, 4))], ['2 · color', shrink(rgbToCanvas(tc))]] };
 });
 
 // ── removebg — needs the ONNX models ─────────────────────────────────────
@@ -272,7 +272,7 @@ add('colormanage', async () => {
     meta: `${r.ptW.toFixed(0)}x${r.ptH.toFixed(0)}pt`, images: [['managed', shrink(r.canvas)]] };
 });
 
-// ── coloreffects — canvas rasterisation ──────────────────────────────────
+// ── coloreffects — canvas rasterization ──────────────────────────────────
 add('coloreffects', async () => {
   const art = await artPdf(4, 6);
   const out = await E.applyColorEffects(art, {
@@ -354,7 +354,7 @@ add('export-finish', async () => {
     && b[2] === boxes[0][2] && b[3] === boxes[0][3]), 'every box agrees');
   need(boxes.every((b) => b[0] === 0 && b[1] === 0),
     `boxes start at 0,0 (got ${boxes[0] ? boxes[0].slice(0, 2).join(',') : '?'}) — a shifted `
-    + 'origin moves the artwork on a RIP that honours it');
+    + 'origin moves the artwork on a RIP that honors it');
 
   // THE POINT OF ALL THIS: a preview must actually be in the file.
   need(/\/Thumb\s+\d+\s+\d+\s+R/.test(txt), 'page carries /Thumb — the PDF spec preview');
@@ -409,7 +409,7 @@ add('repair-existing', async () => {
     `the input really is faulty: Media ${before.m[2]}x${before.m[3]}pt vs Crop ${before.c[2]}x${before.c[3]}pt`);
   need(after.m[2] === after.c[2] && after.m[3] === after.c[3],
     `repaired: Media and Crop now agree at ${after.m[2]}x${after.m[3]}pt`);
-  need(after.m[0] === 0 && after.m[1] === 0, 'origin normalised to 0,0');
+  need(after.m[0] === 0 && after.m[1] === 0, 'origin normalized to 0,0');
   need(after.m[2] === before.c[2] && after.m[3] === before.c[3],
     'the page is the size the operator SAW, not the oversized sheet');
   const txt = new TextDecoder('latin1').decode(fixed);

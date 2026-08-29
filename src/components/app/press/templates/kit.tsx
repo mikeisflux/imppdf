@@ -413,7 +413,7 @@ export function bookSheet(id: string, g: BookGeom, o: MarkOpts & { saddle?: bool
 }
 
 /** True-scale gang: pieces are drawn at their real cellWIn×cellHIn dimensions
- *  relative to the sheet (uniform px-per-inch), packed cols×rows and centred, so
+ *  relative to the sheet (uniform px-per-inch), packed cols×rows and centered, so
  *  the imposed pieces show at their correct size with the sheet margin visible.
  *  Use this for cards/postcards/labels where the piece size must read correctly. */
 export interface SizedGeom {

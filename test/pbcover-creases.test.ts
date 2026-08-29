@@ -89,5 +89,5 @@ test('perfect cover: a different page count moves the labels with the spine', as
 test('perfect cover: labels can be turned off', async () => {
   const art = await block(6.25, 9.25);
   const out = await imposePerfectCover(art, { ...BASE, front: { bytes: art }, creaseLabels: false });
-  assert.equal(labelsIn(out).length, 0, 'no millimetre figures when the option is off');
+  assert.equal(labelsIn(out).length, 0, 'no millimeter figures when the option is off');
 });

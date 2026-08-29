@@ -121,7 +121,7 @@ export function SettingsModal({ settings, onChange, onClose, exampleCtx }: {
         <div className="pe-row">
           <Seg value={settings.unit} onChange={(v) => set({ unit: v })}
             options={[{ v: 'mm', label: 'MM' }, { v: 'in', label: 'IN' }, { v: 'pt', label: 'PT' }]} />
-          <span className="pe-modal-note" style={{ margin: 0 }}>{settings.unit === 'mm' ? 'Millimetres' : settings.unit === 'in' ? 'Inches' : 'Points'}</span>
+          <span className="pe-modal-note" style={{ margin: 0 }}>{settings.unit === 'mm' ? 'Millimeters' : settings.unit === 'in' ? 'Inches' : 'Points'}</span>
         </div>
       </ModalSection>
       <ModalSection label="RULER">

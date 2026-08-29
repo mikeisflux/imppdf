@@ -17,7 +17,7 @@ export async function runPreflightChecks(bytes: Uint8Array): Promise<PfReport> {
   const pages = doc.getPages();
   const findings: PfFinding[] = [];
 
-  // Document-level checks come from the shared deep engine (fonts, spot colours,
+  // Document-level checks come from the shared deep engine (fonts, spot colors,
   // transparency, RGB/CMYK, bleed, binding page count, DPI, PDF/X-1a readiness).
   // Its finding.title is what the auto-fixer matches on, so keep it as `text`.
   try {

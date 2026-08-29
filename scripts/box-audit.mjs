@@ -40,7 +40,7 @@ async function audit(file) {
     const media = got.MediaBox;
     const missing = BOXES.filter((b) => !got[b]);
     /* Only a CROPBOX that differs from the MediaBox is a fault: the viewer
-       honours the CropBox and the RIP images the MediaBox, so the file measures
+       honors the CropBox and the RIP images the MediaBox, so the file measures
        right and prints wrong. A TrimBox or BleedBox INSET from the MediaBox is
        not a fault — it is the whole point of them, telling the RIP where the
        trim sits inside the bleed. What would be wrong is one reaching OUTSIDE

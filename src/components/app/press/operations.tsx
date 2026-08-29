@@ -158,7 +158,7 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'rackcard', label: 'Rack Cards', icon: 'columns', tip: 'Gang rack cards (4×9") 2-up on tabloid with cut marks.' },
     { id: 'hangtag', label: 'Hang Tags', icon: 'duplicate', tip: 'Gang hang tags (2.5×4") 8-up on tabloid for die-cutting.' },
     { id: 'label', label: 'Labels', icon: 'stickers', tip: 'Gang labels (4×3.33") 6-up on Letter.' },
-    { id: 'raisedmetal', label: 'Raised Metal', icon: 'droplet', tip: 'Two-pass raised metal: a varnish-only plate from the artwork\'s line art and grey tone to build relief, then the colour + white printed on top of it.' },
+    { id: 'raisedmetal', label: 'Raised Metal', icon: 'droplet', tip: 'Two-pass raised metal: a varnish-only plate from the artwork\'s line art and gray tone to build relief, then the color + white printed on top of it.' },
     { id: 'removebg', label: 'Remove Background', icon: 'crop', tip: 'Cut the subject out of the artwork and make everything else transparent. Runs entirely in your browser (MobileSAM); art never leaves the machine.' },
     { id: 'prooflabel', label: '30-Up Proof Labels', icon: 'grid', tip: 'Standard 30-up label sheet: 2.625×1" labels, 3 × 10 on Letter. Matches the 8.5x11 30-up template; marks off for die-cut stock.' },
     { id: 'namebadge', label: 'Name Badges', icon: 'user', tip: 'Gang name badges (3.5×2.25") 8-up on Letter.' },
@@ -187,7 +187,7 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'layers', label: 'Layers', icon: 'layers', tip: 'Use Layers for turns the named layers inside your PDF on or off.' },
     { id: 'customimpose', label: 'Custom Impose', icon: 'grid', tip: 'Use Custom Impose for build any imposition by hand, placing and rotating each page per cell.' },
     { id: 'pdftools', label: 'PDF Tools', icon: 'settings', tip: 'Use PDF Tools for shrink, speed up or repair whole PDFs.' },
-    { id: 'mediafix', label: 'Media Size Fix', icon: 'resize', tip: 'Put a finished file on the sheet it actually prints on — 11\u00d717, 12\u00d718, whatever is in the tray — centred at 1:1. The artwork is not re-imposed and not re-scaled; it just gains the paper around it, so the RIP has nothing left to decide about where the job lands. Batch a folder of finished files straight through it.' },
+    { id: 'mediafix', label: 'Media Size Fix', icon: 'resize', tip: 'Put a finished file on the sheet it actually prints on — 11\u00d717, 12\u00d718, whatever is in the tray — centered at 1:1. The artwork is not re-imposed and not re-scaled; it just gains the paper around it, so the RIP has nothing left to decide about where the job lands. Batch a folder of finished files straight through it.' },
       { id: 'pdfrepair', label: 'PDF Repair', icon: 'preflight', tip: 'Make an existing PDF safe for the RIP WITHOUT changing its layout: state every page box so the press images the page you see, add a preview thumbnail, and write it the conservative way Adobe does. Nothing is re-imposed — drop finished files in and take them straight back out.' },
   ] },
   { label: '// TRANSFORM', ops: [

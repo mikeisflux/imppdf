@@ -23,13 +23,13 @@ async function pageCount(bytes: Uint8Array) {
   return (await PDFDocument.load(bytes)).getPageCount();
 }
 
-test('computeNUpGrid honours requested cols/rows and centres the block', () => {
+test('computeNUpGrid honors requested cols/rows and centers the block', () => {
   const g = computeNUpGrid({ ...baseNUp, cols: 2, rows: 5, cellWIn: 3.5, cellHIn: 2 });
   assert.equal(g.cols, 2);          // requested 2, fits 2
   assert.equal(g.rows, 5);          // requested 5, fits 5
   const blockW = g.cols * g.cellWPt + (g.cols - 1) * g.gxPt;
   const expectLeft = (8.5 * PT - blockW) / 2;
-  assert.ok(Math.abs(g.leftGapPt - expectLeft) < 0.01, 'block is horizontally centred');
+  assert.ok(Math.abs(g.leftGapPt - expectLeft) < 0.01, 'block is horizontally centered');
 });
 
 test('computeNUpGrid: 1×1 places a single cell even when many would fit', () => {
@@ -189,7 +189,7 @@ test('stampSerialNumber: stamps only the chosen page, keeps page count', async (
   assert.ok(Math.abs(s.width - 6 * 72) < 0.5 && Math.abs(s.height - 9 * 72) < 0.5, 'page geometry unchanged');
 });
 
-test('imposeNUp: crop marks never cross into a neighbour (small gutter)', async () => {
+test('imposeNUp: crop marks never cross into a neighbor (small gutter)', async () => {
   // 2×2 of 4×6 cards on 12×18 with a small 0.125" gutter and long 0.5" marks.
   // With clamping, marks must stay within the gutter/margins — assert the output
   // builds and stays on the sheet (no throw, single sheet).
@@ -263,7 +263,7 @@ test('chokePlane: white under-base pulls in by r px from every edge (choke trap)
   assert.equal(at(17, 10), 0, 'within 3px of right edge choked');
   // The interior (>= 3 px from every edge) is untouched.
   assert.equal(at(3, 3), 255, 'first fully-interior pixel kept');
-  assert.equal(at(10, 10), 255, 'centre kept');
+  assert.equal(at(10, 10), 255, 'center kept');
   assert.equal(at(16, 16), 255, 'interior kept');
   // A hole in the middle erodes outward by exactly 3 px (square) too.
   const src2 = new Uint8Array(w * h).fill(255);
@@ -362,10 +362,10 @@ test('blackKnockoutAlpha: substrate black drops out, light art untouched, edges 
   // Pure black art → no ink at all (the box's own black shows through).
   assert.equal(blackKnockoutAlpha(0, 0, 0, 255), 0);
   assert.equal(blackKnockoutAlpha(8, 8, 8, 255), 0, 'near-black still knocks out');
-  // Light/coloured art is untouched — full alpha preserved.
+  // Light/colored art is untouched — full alpha preserved.
   assert.equal(blackKnockoutAlpha(255, 255, 255, 255), 255);
   assert.equal(blackKnockoutAlpha(200, 30, 30, 255), 255, 'saturated red prints normally');
-  assert.equal(blackKnockoutAlpha(60, 60, 60, 255), 255, 'dark grey above the ramp still prints');
+  assert.equal(blackKnockoutAlpha(60, 60, 60, 255), 255, 'dark gray above the ramp still prints');
   // Between the thresholds it RAMPS (never a hard cliff), so anti-aliased
   // edges and shadow gradients stay smooth.
   const mid = blackKnockoutAlpha(22, 22, 22, 255);
@@ -397,13 +397,13 @@ test('blackSwathKeepMask: knocks out a large black expanse, spares small black d
   const px = canvasOf(w, h, [
     { x: 0, y: 0, w: 200, h: 80, c: [0, 0, 0] },        // 32% of the panel — a swath
     { x: 20, y: 120, w: 10, h: 10, c: [0, 0, 0] },      // 0.25% — a detail (eye, line art)
-    { x: 100, y: 120, w: 40, h: 40, c: [180, 40, 40] }, // coloured element
+    { x: 100, y: 120, w: 40, h: 40, c: [180, 40, 40] }, // colored element
   ]);
   const keep = blackSwathKeepMask(px, w, h, { minAreaFrac: 0.02, step: 1 });
   const at = (x: number, y: number) => keep[y * w + x];
   assert.equal(at(100, 40), 0, 'inside the big black swath → knocked out');
   assert.equal(at(25, 125), 255, 'small black detail → kept');
-  assert.equal(at(120, 140), 255, 'coloured element → kept');
+  assert.equal(at(120, 140), 255, 'colored element → kept');
   assert.equal(at(150, 180), 255, 'white paper → kept');
 });
 
@@ -430,7 +430,7 @@ test('featherMask / applyMaskAlpha: soft edges, alpha only ever scales down', ()
   const m = new Uint8Array(w * h);
   for (let y = 3; y <= 5; y++) for (let x = 3; x <= 5; x++) m[y * w + x] = 1;
   const cov = featherMask(m, w, h, 1);
-  assert.equal(cov[4 * w + 4], 255, 'centre fully covered');
+  assert.equal(cov[4 * w + 4], 255, 'center fully covered');
   assert.equal(cov[0], 0, 'far corner empty');
   const edge = cov[3 * w + 2]!;
   assert.ok(edge > 0 && edge < 255, `edge is a soft ramp (${edge})`);
@@ -503,7 +503,7 @@ test('perfect bound cut-and-stack: leaf N is page N front / page N+1 back', asyn
 test('metalMaskFromPixels: plates the linework and highlights, not flat fills', () => {
   const w = 40, h = 40;
   const px = new Uint8Array(w * h * 4);
-  // Left half mid-grey, right half near-white → a hard edge down the middle,
+  // Left half mid-gray, right half near-white → a hard edge down the middle,
   // and the right half also reads as a specular highlight.
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = (y * w + x) * 4, v = x < 20 ? 120 : 245;
@@ -515,12 +515,12 @@ test('metalMaskFromPixels: plates the linework and highlights, not flat fills', 
   // the edge region rather than one exact pixel (that was Sobel's position).
   const edgeBand = [15, 16, 17, 18, 19, 20].map((x) => at(x, 20));
   assert.ok(Math.max(...edgeBand) > 200, `the edge is plated (${edgeBand.join(',')})`);
-  assert.equal(at(5, 20), 0, 'flat mid-grey gets no metal without tone');
+  assert.equal(at(5, 20), 0, 'flat mid-gray gets no metal without tone');
   assert.equal(at(35, 20), 0, 'flat white gets none either with highlights off');
   // Highlights on: the bright side now plates even though it is flat.
   const hl = metalMaskFromPixels(px, w, h, { toneGain: 0, highlightGain: 1, highlightFrom: 200, floor: 1 });
   assert.ok(hl[20 * w + 35]! > 0, 'specular highlight is plated when enabled');
-  // A slight grey tone lifts the darker side (more varnish where the art is dark).
+  // A slight gray tone lifts the darker side (more varnish where the art is dark).
   const tone = metalMaskFromPixels(px, w, h, { toneGain: 0.5, highlightGain: 0, floor: 1 });
   assert.ok(tone[20 * w + 5]! > tone[20 * w + 35]!, 'darker art carries more tone');
   // Transparent artwork never plates.
@@ -530,7 +530,7 @@ test('metalMaskFromPixels: plates the linework and highlights, not flat fills', 
 
 test('metalMaskFromPixels: the noise floor ramps to zero, it does not cut', async () => {
   const { metalMaskFromPixels } = await import('../src/lib/imposition-toolkit/impose.ts');
-  // A smooth luminance ramp, plated by grey tone alone. A hard `v < floor -> 0`
+  // A smooth luminance ramp, plated by gray tone alone. A hard `v < floor -> 0`
   // leaves a step the height of the floor part-way along it; on a curved edge
   // that step is exactly the jaggedness that shows up in the white plate.
   const w = 256, h = 4;
@@ -557,11 +557,11 @@ test('orientSubjectMask: a mask holding the corners is the background, so flip i
   const w = 40, h = 40;
   const idx = (x: number, y: number) => y * w + x;
 
-  // A centred figure: touches no corner. Left exactly as it is.
+  // A centered figure: touches no corner. Left exactly as it is.
   const subject = new Uint8Array(w * h);
   for (let y = 8; y < 32; y++) for (let x = 12; x < 28; x++) subject[idx(x, y)] = 1;
   const keptAs = orientSubjectMask(Uint8Array.from(subject), w, h);
-  assert.deepEqual(Array.from(keptAs), Array.from(subject), 'a centred subject is not flipped');
+  assert.deepEqual(Array.from(keptAs), Array.from(subject), 'a centered subject is not flipped');
 
   // The setting: everything EXCEPT that figure — holds all four corners.
   const background = new Uint8Array(w * h);

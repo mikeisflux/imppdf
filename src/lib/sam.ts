@@ -22,7 +22,7 @@ import type { InferenceSession, Tensor } from "onnxruntime-web";
 const ENCODER_URL = "/models/mobilesam-encoder.onnx";
 const DECODER_URL = "/models/mobilesam-decoder.onnx";
 const SIDE = 1024;                                  // what the encoder expects
-/* SAM's own normalisation constants — the model was trained with these */
+/* SAM's own normalization constants — the model was trained with these */
 const MEAN = [123.675, 116.28, 103.53];
 const STD = [58.395, 57.12, 57.375];
 

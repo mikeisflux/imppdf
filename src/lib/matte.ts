@@ -127,7 +127,7 @@ async function inferRegion(
   const out = await session.run(feeds);
   const raw = (out[session.outputNames[0]!] as Tensor).data as Float32Array;
 
-  // The head is a logit map: min-max normalise, as the models' own inference does.
+  // The head is a logit map: min-max normalize, as the models' own inference does.
   let lo = Infinity, hi = -Infinity;
   for (let i = 0; i < plane; i++) { const v = raw[i]!; if (v < lo) lo = v; if (v > hi) hi = v; }
   const span = hi - lo;
@@ -135,7 +135,7 @@ async function inferRegion(
   for (let i = 0; i < plane; i++) small[i] = span > 1e-6 ? (raw[i]! - lo) / span : 0;
 
   /* BILINEAR back out. The matte is smooth to begin with and interpolating
-     keeps it smooth; a nearest-neighbour blow-up would put a staircase on
+     keeps it smooth; a nearest-neighbor blow-up would put a staircase on
      every edge, which is the whole thing being avoided here. */
   const cov = new Float32Array(outW * outH);
   for (let y = 0; y < outH; y++) {

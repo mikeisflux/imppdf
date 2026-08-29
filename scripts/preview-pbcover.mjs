@@ -1,4 +1,4 @@
-/* Perfect Bound Cover preview: a coloured block per uploaded file, so the
+/* Perfect Bound Cover preview: a colored block per uploaded file, so the
    layout and the new crease labels can be checked before any real art exists. */
 import fs from 'node:fs';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
@@ -6,7 +6,7 @@ import { imposePerfectCover, spineWidthIn } from '../src/lib/imposition-toolkit/
 import { renderPng, OUT, PT } from './smoke.mjs';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 
-// One colour per FILE the tool accepts, so it is obvious which panel came from
+// One color per FILE the tool accepts, so it is obvious which panel came from
 // which upload — and obvious if two ever land in the same place.
 const PARTS = {
   front:       [0.85, 0.11, 0.38, 'FRONT COVER'],

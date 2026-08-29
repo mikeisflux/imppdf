@@ -1,8 +1,8 @@
 // One-click preflight fixes. Each takes the source PDF bytes and returns a
-// corrected copy — honest, in-browser transformations only. Colour conversion
+// corrected copy — honest, in-browser transformations only. Color conversion
 // (RGB→CMYK) is deliberately NOT offered here: faithfully converting vector +
-// image content to CMYK needs a colour-managed design app, and a naive remap
-// would shift colour silently. The preflight panel exposes only the fixes below.
+// image content to CMYK needs a color-managed design app, and a naive remap
+// would shift color silently. The preflight panel exposes only the fixes below.
 
 export type FixId = 'padTo4' | 'addBleed';
 

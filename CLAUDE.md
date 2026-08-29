@@ -12,7 +12,7 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    (see `photoshopChannelNames`) or Photoshop shifts the spot names off by one
    (W1 becomes "V1", V1 becomes "Alpha 3").
 3. **W1/V1 are SPOT channels** (Photoshop DisplayInfo resource 1007, kind=2),
-   not anonymous alpha channels. **Both channel colours are BLACK
+   not anonymous alpha channels. **Both channel colors are BLACK
    100,100,100,100 — never white, yellow, or anything else.**
 4. **TIFF format: 8-bit RGB (Photometric 2), uncompressed, interleaved.**
    NEVER Separated/CMYK (Photometric 5) — that is "unsupported color space"
@@ -20,7 +20,7 @@ Breaking any of them produces files the RIP rejects or prints wrong.
 5. **White (W1) and varnish (V1) print ONLY where the artwork has ink**
    (alpha > 0). No flooding. Empty panels, panel gaps, the non-printable
    flap ("panel E"), and transparent areas around logos get NO white, NO
-   varnish, NO colour — the black box shows through.
+   varnish, NO color — the black box shows through.
 6. **Spot-channel polarity is INVERTED (Photoshop layer-mask style):
    0/black = 100% ink, 255/white = no ink.** The shop builds these by
    filling a layer mask with 100,100,100,100 black over the art and naming
@@ -47,17 +47,17 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    ≥34), never a hard threshold, so edges stay anti-aliased.
 7. **Geometry (owner spec, 2026-07-21, supersedes the New_Box_Full template
    PDF and the press-compensation experiments): sheet 306 × 572 mm = trim
-   300 × 572 + 3 mm bleed LEFT+RIGHT. Folds are 5 mm WIDE zones centred at
+   300 × 572 + 3 mm bleed LEFT+RIGHT. Folds are 5 mm WIDE zones centered at
    47.5 / 260 / 310 / 525 mm (top = 0)** → zones 45–50, 257.5–262.5,
    307.5–312.5, 522.5–527.5. Sections: A 0–45, B 50–257.5, C 262.5–307.5,
    D 312.5–522.5, E 527.5–572 no-print. **Every section's art carries 3 mm
    bleed on TOP and BOTTOM too** (into the fold zones; adjacent bleeds
-   overlap ~1 mm at fold centres — TIFF composite is a UNION of opaque
-   pixels so one panel's transparent edge never erases a neighbour's
+   overlap ~1 mm at fold centers — TIFF composite is a UNION of opaque
+   pixels so one panel's transparent edge never erases a neighbor's
    bleed; A's top is the sheet edge, no bleed above 0). No crop, cut,
    registration, or fold marks on the artwork. Fold ticks default OFF.
 8. **The white plate is choked 3 px** (`DBOX_WHITE_CHOKE_PX`) inside the art
-   edges so misregistration never shows a white halo. Colour/alpha keep full
+   edges so misregistration never shows a white halo. Color/alpha keep full
    extent.
 9. **Rasterize each panel with a SINGLE direct pdf.js render into the
    panel-sized canvas (centering transform).** Never render-then-drawImage-crop:

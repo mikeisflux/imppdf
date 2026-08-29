@@ -969,8 +969,8 @@ function DivinityBoxPanel(p: PanelProps) {
         <Check icon="droplet" label="White under-base (W1)" sub="Prints white behind every panel — required on black stock" checked={s.whiteUnder !== false} onChange={(v) => up({ whiteUnder: v })} />
         <Check icon="droplet" label="Gloss varnish (V1)" sub="Spot gloss over each panel" checked={!!s.varnish} onChange={(v) => up({ varnish: v })} />
       </Section>
-      <Section label="// BLACK KNOCKOUT" help="Large open expanses of black need no ink on a black box: knocking them out lets the substrate show through, saves white and colour, and reads deeper than black printed over a white base. ONLY big swaths qualify — blacks on the character, line art and bounded background elements are left alone.">
-        <Check icon="droplet" label="Knock large black areas out of the plate" sub="Big black expanses print as bare box — no colour, no W1, no V1" checked={s.knockoutBlack !== false} onChange={(v) => up({ knockoutBlack: v })} />
+      <Section label="// BLACK KNOCKOUT" help="Large open expanses of black need no ink on a black box: knocking them out lets the substrate show through, saves white and color, and reads deeper than black printed over a white base. ONLY big swaths qualify — blacks on the character, line art and bounded background elements are left alone.">
+        <Check icon="droplet" label="Knock large black areas out of the plate" sub="Big black expanses print as bare box — no color, no W1, no V1" checked={s.knockoutBlack !== false} onChange={(v) => up({ knockoutBlack: v })} />
         {s.knockoutBlack !== false && (
           <>
             <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
@@ -1795,7 +1795,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
     case 'coloreffects':
       return (
         <>
-          <Section label="// COLOR ADJUSTMENTS" help="Rasterises pages and applies the filter stack.">
+          <Section label="// COLOR ADJUSTMENTS" help="Rasterizes pages and applies the filter stack.">
             {([['brightness', 'Brightness', 0, 200], ['contrast', 'Contrast', 0, 200], ['saturation', 'Saturation', 0, 200]] as const).map(([k, label, min, max]) => (
               <Slider key={k} label={label} value={s[k]} min={min} max={max} suffix="" onChange={(v) => up({ [k]: v })} />
             ))}
@@ -1851,7 +1851,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
               <option value="relative">Relative Colorimetric</option><option value="perceptual">Perceptual</option>
               <option value="saturation">Saturation</option><option value="absolute">Absolute Colorimetric</option>
             </select>
-            <Check icon="colormanageIc" label="Convert colours (not just tag)" sub="Rewrite pixels toward the CMYK gamut instead of only tagging" checked={!!s.convert} onChange={(v) => up({ convert: v })} />
+            <Check icon="colormanageIc" label="Convert colors (not just tag)" sub="Rewrite pixels toward the CMYK gamut instead of only tagging" checked={!!s.convert} onChange={(v) => up({ convert: v })} />
             <Check icon="droplet" label="Black-point compensation" checked={s.blackPointComp !== false} onChange={(v) => up({ blackPointComp: v })} />
             <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Rasterize DPI</span>
               <select className="pe-select" style={{ width: 110, flex: '0 0 110px' }} value={s.dpi} onChange={(e) => up({ dpi: +e.target.value })}>
@@ -1864,7 +1864,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
           </Section>
           <div className="pe-note" style={{ marginBottom: 12 }}>
             ⓘ {s.icc
-              ? 'Color conversion rasterises each page, transforms pixels through your ICC profile with LittleCMS, re-embeds them and tags the output with the profile as its OutputIntent.'
+              ? 'Color conversion rasterizes each page, transforms pixels through your ICC profile with LittleCMS, re-embeds them and tags the output with the profile as its OutputIntent.'
               : 'Without an uploaded ICC profile this step approximates the CMYK gamut in-browser. Upload a profile above for a true LittleCMS transform.'}
           </div>
         </>
@@ -1872,7 +1872,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
     case 'pdfx':
       return (
         <>
-          <Section label="// PDF/X STANDARD" help="Tags the file as PDF/X so colour-managed RIPs recognise it. X-4 is the modern default (allows transparency and layers); X-1a is the older CMYK-flattened standard.">
+          <Section label="// PDF/X STANDARD" help="Tags the file as PDF/X so color-managed RIPs recognize it. X-4 is the modern default (allows transparency and layers); X-1a is the older CMYK-flattened standard.">
             <div className="pe-cards2">
               <SelCard on={s.standard !== 'x-1a'} cap="PDF/X-4" onClick={() => up({ standard: 'x-4' })}><Ic name="pdfxIc" size={22} /></SelCard>
               <SelCard on={s.standard === 'x-1a'} off={s.standard !== 'x-1a'} cap="PDF/X-1a" onClick={() => up({ standard: 'x-1a' })}><Ic name="pdfxIc" size={22} /></SelCard>
@@ -1881,9 +1881,9 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
               Adds an output intent, sets TrimBox/BleedBox, writes PDF/X identification metadata and a document ID.
             </div>
           </Section>
-          <Section label="// COLOUR" help="Whether to convert page colour to CMYK now, or leave it for your RIP.">
-            <Check icon="colormanageIc" label="Convert colours to CMYK"
-              sub="Leave OFF if your RIP or Fiery does colour conversion (recommended). Converting rasterises pages."
+          <Section label="// COLOR" help="Whether to convert page color to CMYK now, or leave it for your RIP.">
+            <Check icon="colormanageIc" label="Convert colors to CMYK"
+              sub="Leave OFF if your RIP or Fiery does color conversion (recommended). Converting rasterizes pages."
               checked={!!s.convertCmyk} onChange={(v) => up({ convertCmyk: v })} />
             {s.standard === 'x-1a' && !s.convertCmyk && (
               <div className="pe-note" style={{ color: '#f59e0b' }}>
@@ -1898,7 +1898,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
               </div>
             )}
           </Section>
-          <Section label="// OUTPUT INTENT (ICC)" help="The CMYK profile embedded as the PDF/X output intent. A generic profile is built in; upload your press's profile for accurate colour.">
+          <Section label="// OUTPUT INTENT (ICC)" help="The CMYK profile embedded as the PDF/X output intent. A generic profile is built in; upload your press's profile for accurate color.">
             <div className="pe-cards2" style={{ marginBottom: 8 }}>
               <SelCard on={s.iccSource !== 'upload'} cap="GENERIC CMYK" onClick={() => up({ iccSource: 'bundled' })}><Ic name="droplet" size={20} /></SelCard>
               <SelCard on={s.iccSource === 'upload'} off={s.iccSource !== 'upload'} cap={s.iccName ? `✓ ${s.iccName}`.slice(0, 16) : 'UPLOAD ICC'} onClick={() => {
@@ -1915,11 +1915,11 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
               }}><Ic name="upload" size={20} /></SelCard>
             </div>
             <div className="pe-note">
-              The bundled profile is a generic CMYK approximation (fine as a default). For colour-accurate work, upload the ICC profile your printer provides.
+              The bundled profile is a generic CMYK approximation (fine as a default). For color-accurate work, upload the ICC profile your printer provides.
             </div>
           </Section>
           <div className="pe-note" style={{ marginBottom: 12 }}>
-            ⓘ Not sending to a colour-managed RIP? You may not need PDF/X at all — a plain export works too. This step is entirely optional.
+            ⓘ Not sending to a color-managed RIP? You may not need PDF/X at all — a plain export works too. This step is entirely optional.
           </div>
         </>
       );
@@ -1974,7 +1974,7 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
             </div>
           </Section>
           <div className="pe-note" style={{ marginBottom: 12 }}>
-            ⓘ Same spine-bleed trim as Fiery Booklet (single pages, colour preserved). The only addition is the serial number on <b>page 1 only</b>. Download emits one PDF per copy so a limited run of {total} becomes {total} numbered books.
+            ⓘ Same spine-bleed trim as Fiery Booklet (single pages, color preserved). The only addition is the serial number on <b>page 1 only</b>. Download emits one PDF per copy so a limited run of {total} becomes {total} numbered books.
           </div>
         </>
       );
@@ -2180,7 +2180,7 @@ function RemoveBgPanel({ s, up }: PanelProps) {
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Finds the subject and makes everything around it transparent — a clean cutout for stickers, die-cuts, or art that has to sit on a coloured stock. Runs <b>entirely in your browser</b>; the artwork never leaves your machine.
+        Finds the subject and makes everything around it transparent — a clean cutout for stickers, die-cuts, or art that has to sit on a colored stock. Runs <b>entirely in your browser</b>; the artwork never leaves your machine.
       </div>
       <Section label="// QUALITY" help="Resolution of the cut-out image and how softly the cut edge blends. The result is a raster image at this DPI.">
         <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
@@ -2414,7 +2414,7 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
             </div>
             <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
               <div>Wrap <b>{sheetW.toFixed(3)} × {sheetH.toFixed(3)}&quot;</b> on a <b>{pressW} × {pressH}&quot;</b> sheet{pressTurned ? ' (turned)' : ''}</div>
-              <div>Centred, with <b>{((pressW - sheetW) / 2).toFixed(3)}&quot;</b> each side and <b>{((pressH - sheetH) / 2).toFixed(3)}&quot;</b> top and bottom</div>
+              <div>Centered, with <b>{((pressW - sheetW) / 2).toFixed(3)}&quot;</b> each side and <b>{((pressH - sheetH) / 2).toFixed(3)}&quot;</b> top and bottom</div>
             </div>
             {!pressFits && (
               <div className="pe-gang-warn" style={{ marginTop: 8 }}>
@@ -2458,7 +2458,7 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
 function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
-  const run = async (pass: 'varnish' | 'colour') => {
+  const run = async (pass: 'varnish' | 'color') => {
     setBusy(pass); setErr('');
     try {
       const { raisedMetalTiff, downloadFile } = await import('@/lib/imposition-toolkit/impose');
@@ -2472,7 +2472,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         matteTighten: s.matteTighten ?? 2.5,     // the plate must match the preview
       });
       downloadFile(tiff, pass === 'varnish' ? 'raised-metal-1-varnish.tif'
-        : 'raised-metal-2-colour.tif', 'image/tiff');
+        : 'raised-metal-2-color.tif', 'image/tiff');
     } catch (e) { setErr(e instanceof Error ? e.message : 'Export failed.'); }
     finally { setBusy(''); }
   };
@@ -2581,7 +2581,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
           out.data[q + 3] = 255;
         } else {
           // RELIEF: the plate as lit geometry on a NEUTRAL ground — the artwork
-          // colour is deliberately hidden. Composited over the art you cannot
+          // color is deliberately hidden. Composited over the art you cannot
           // judge the height at all: the picture just looks like the picture.
           const dx = (at(x + 1, y) - at(x - 1, y)) / 255;
           const dy = (at(x, y + 1) - at(x, y - 1)) / 255;
@@ -2606,7 +2606,7 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight grey tone on the {s.spotName || 'V1'} channel, no colour and no white — and cure it; repeating that pass builds the relief as high as you want it. Then the <b>colour pass</b> caps it — the artwork with {s.whiteName || 'W1'} white laid <b>only under the raised metal</b>, so no white is wasted and no varnish is left exposed.
+        Raised metal in <b>two passes</b>. First print the <b>varnish plate</b> — line art plus a slight gray tone on the {s.spotName || 'V1'} channel, no color and no white — and cure it; repeating that pass builds the relief as high as you want it. Then the <b>color pass</b> caps it — the artwork with {s.whiteName || 'W1'} white laid <b>only under the raised metal</b>, so no white is wasted and no varnish is left exposed.
       </div>
       <Section label="// PREVIEW" help="Live, from the loaded artwork. The two plate views show each spot channel exactly as the file stores it — BLACK = 100% ink, white = none, the same inverted polarity you see opening the channel in Photoshop. Relief lights the varnish plate as a height map on a neutral ground so you can judge the height. Overlay flags the plate on the art.">
         <div className="pe-row" style={{ gap: 8 }}>
@@ -2630,11 +2630,11 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
               : <canvas ref={canvasRef} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} />}
         </div>
       </Section>
-      <Section label="// PLATE" help="How the varnish plate is derived from the artwork. Edges give you the linework, highlights catch the speculars, and the grey tone modulates the relief with the art's own shading.">
+      <Section label="// PLATE" help="How the varnish plate is derived from the artwork. Edges give you the linework, highlights catch the speculars, and the gray tone modulates the relief with the art's own shading.">
         {rng('Line art', 'edgeGain', s.edgeGain ?? 1, 0, 3, 0.1, 'edge strength')}
         {rng('Highlights', 'highlightGain', s.highlightGain ?? 0.6, 0, 2, 0.1, 'speculars')}
         {rng('Highlight point', 'highlightFrom', s.highlightFrom ?? 200, 120, 250, 5, 'luminance')}
-        {rng('Grey tone', 'toneGain', s.toneGain ?? 0.18, 0, 1, 0.02, 'slight, from shading')}
+        {rng('Gray tone', 'toneGain', s.toneGain ?? 0.18, 0, 1, 0.02, 'slight, from shading')}
         {rng('Noise floor', 'floor', s.floor ?? 24, 0, 128, 2, 'drop weak specks')}
         {rng('Line weight', 'gamma', s.gamma ?? 1, 0.4, 2, 0.05, '<1 fatter, >1 thinner')}
         <Check icon="crop" label="Subject only" sub="Plate the subject and leave the background flat (needs the models)" checked={!!s.subjectOnly} onChange={(v) => up({ subjectOnly: v })} />
@@ -2657,10 +2657,10 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         </div>
         <div className="pe-row" style={{ gap: 8, marginTop: 8 }}>
           <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('varnish')}>{busy === 'varnish' ? 'Rendering…' : '1 · Varnish'}</button>
-          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('colour')}>{busy === 'colour' ? 'Rendering…' : '2 · Colour + white'}</button>
+          <button className="pe-btn" style={{ flex: 1 }} disabled={!!busy} onClick={() => run('color')}>{busy === 'color' ? 'Rendering…' : '2 · Color + white'}</button>
         </div>
         <div className="pe-note" style={{ marginTop: 8 }}>
-The varnish goes down first, then the colour pass caps it, so nothing is left as bare varnish. <b>1</b> builds the relief — run it as many times as the height needs. <b>2</b> prints the artwork with {s.whiteName || 'W1'} under the raised areas. Both files are the same pixel size, so they register.
+The varnish goes down first, then the color pass caps it, so nothing is left as bare varnish. <b>1</b> builds the relief — run it as many times as the height needs. <b>2</b> prints the artwork with {s.whiteName || 'W1'} under the raised areas. Both files are the same pixel size, so they register.
         </div>
         {err && <div className="form-error" style={{ marginTop: 8 }}>{err}</div>}
       </Section>
@@ -2781,7 +2781,7 @@ function Line({ ok, label, detail }: { ok?: boolean; label: string; detail?: str
  * has in its trays. Send that to a Fiery loaded with 11×17 and the RIP decides
  * what to do with it — and it decides by rotating and scaling to taste. The
  * artwork is the right size in the PDF and the wrong size off the press. This
- * settles it in the file: name the media, centre the job on it at 1:1, done. */
+ * settles it in the file: name the media, center the job on it at 1:1, done. */
 function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: PanelProps) {
   const mw = s.mediaWIn ?? 11, mh = s.mediaHIn ?? 17;
   const MEDIA: [number, number, string][] = [
@@ -2849,13 +2849,13 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
       <Section label="// PLACEMENT" help="Where the job sits on the sheet, and what to do when it doesn't fit.">
         <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
           <span className="pe-label" style={{ width: 76 }}>Across</span>
-          {([['left', 'Left'], ['center', 'Centre'], ['right', 'Right']] as const).map(([v, l]) => (
+          {([['left', 'Left'], ['center', 'Center'], ['right', 'Right']] as const).map(([v, l]) => (
             <button key={v} className="pe-chipbtn" style={pickStyle((s.alignX ?? 'center') === v)} onClick={() => up({ alignX: v })}>{l}</button>
           ))}
         </div>
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 6 }}>
           <span className="pe-label" style={{ width: 76 }}>Down</span>
-          {([['bottom', 'Bottom'], ['center', 'Centre'], ['top', 'Top']] as const).map(([v, l]) => (
+          {([['bottom', 'Bottom'], ['center', 'Center'], ['top', 'Top']] as const).map(([v, l]) => (
             <button key={v} className="pe-chipbtn" style={pickStyle((s.alignY ?? 'center') === v)} onClick={() => up({ alignY: v })}>{l}</button>
           ))}
         </div>
@@ -2865,6 +2865,9 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
         <Check icon="resize" label="Shrink an oversized page to fit"
           sub="Off by default. A cover that comes back at 96% is a reprint — leave this off and an overhang shows itself instead"
           checked={!!s.shrinkOversize} onChange={(v) => up({ shrinkOversize: v })} />
+        <Check icon="crop" label="Center the artwork, ignoring blank space"
+          sub="Leave OFF for full-bleed work — a cover wrap IS its page. Only for a file whose page box is bigger than the job drawn on it"
+          checked={!!s.centerArt} onChange={(v) => up({ centerArt: v })} />
       </Section>
 
       <Section label="// WHAT YOU'LL GET" help="Measured from the loaded file's real page sizes, before anything is exported.">

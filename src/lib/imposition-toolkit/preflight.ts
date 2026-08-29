@@ -83,7 +83,7 @@ export async function runPreflight(
   // RGB), and no live transparency.
   const blockers: string[] = [];
   if (out.some((f) => /unembedded font/i.test(f.title))) blockers.push('embed all fonts');
-  if (out.some((f) => /RGB colour detected/i.test(f.title))) blockers.push('convert RGB to CMYK');
+  if (out.some((f) => /RGB color detected/i.test(f.title))) blockers.push('convert RGB to CMYK');
   if (out.some((f) => /transparency/i.test(f.title))) blockers.push('flatten transparency');
   if (blockers.length)
     out.push({ level: 'warning', title: 'Not yet PDF/X-1a ready', detail: `For strict PDF/X-1a output you still need to: ${blockers.join(', ')}.` });
@@ -112,7 +112,7 @@ function checkFontsAndColor(doc: PDFDocument, bytes: Uint8Array, out: PreflightF
     let spot = 0, deviceN = 0, transparency = false;
     const objs = doc.context.enumerateIndirectObjects();
     for (const [, obj] of objs) {
-      // Spot / DeviceN colour spaces are arrays: [/Separation name alt tint] etc.
+      // Spot / DeviceN color spaces are arrays: [/Separation name alt tint] etc.
       if (obj instanceof PDFArray) {
         const head = str(obj.get(0));
         if (head === 'Separation') spot++;
@@ -144,12 +144,12 @@ function checkFontsAndColor(doc: PDFDocument, bytes: Uint8Array, out: PreflightF
       out.push({ level: 'pass', title: 'Fonts embedded', detail: 'All detected fonts carry embedded outlines.' });
 
     if (spot + deviceN > 0)
-      out.push({ level: 'warning', title: `${spot + deviceN} spot/separation colour${spot + deviceN > 1 ? 's' : ''}`, detail: 'Separation/DeviceN inks print on their own plates. Confirm the spot colours are intended, or convert to process (CMYK).' });
+      out.push({ level: 'warning', title: `${spot + deviceN} spot/separation color${spot + deviceN > 1 ? 's' : ''}`, detail: 'Separation/DeviceN inks print on their own plates. Confirm the spot colors are intended, or convert to process (CMYK).' });
 
     if (transparency)
       out.push({ level: 'warning', title: 'Live transparency present', detail: 'Transparency/soft masks can render inconsistently on older RIPs. Flatten to PDF/X-1a if your printer requires it.' });
 
-    // Coarse colour-space hint from raw tokens (image XObject dicts are usually
+    // Coarse color-space hint from raw tokens (image XObject dicts are usually
     // not inside object streams, so these tokens survive a byte-scan). Skipped
     // for very large files to bound memory.
     if (bytes.length < 40 * 1024 * 1024) {
@@ -157,9 +157,9 @@ function checkFontsAndColor(doc: PDFDocument, bytes: Uint8Array, out: PreflightF
       const hasCMYK = txt.includes('/DeviceCMYK');
       const hasRGB = txt.includes('/DeviceRGB');
       if (hasRGB && !hasCMYK)
-        out.push({ level: 'warning', title: 'RGB colour detected', detail: 'The file appears to use RGB. Most offset/digital presses expect CMYK — colours may shift on conversion. Supply CMYK artwork for accurate colour.' });
+        out.push({ level: 'warning', title: 'RGB color detected', detail: 'The file appears to use RGB. Most offset/digital presses expect CMYK — colors may shift on conversion. Supply CMYK artwork for accurate color.' });
       else if (hasCMYK && !hasRGB)
-        out.push({ level: 'pass', title: 'CMYK colour', detail: 'File uses process (CMYK) colour — press-ready.' });
+        out.push({ level: 'pass', title: 'CMYK color', detail: 'File uses process (CMYK) color — press-ready.' });
     }
   } catch { /* low-level scan is best-effort */ }
 }

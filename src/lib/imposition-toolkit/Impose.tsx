@@ -25,7 +25,7 @@ import type {
 } from './impose';
 import { TEMPLATES, TEMPLATE_INDUSTRIES, RECIPES as RECIPE_DATA } from './catalog';
 import type { TemplateDef, TemplatePreset, RecipeDef } from './catalog';
-// Site glue: rasterises PDF pages to thumbnails so the preview shows real
+// Site glue: rasterizes PDF pages to thumbnails so the preview shows real
 // artwork in each cell. Re-apply the ToolWorkspace/ImpositionCanvas/Cell hooks
 // below after a plugin upgrade (see docs/UPGRADING.md).
 import { rasterizePdfThumbs } from './page-thumbs';
@@ -725,7 +725,7 @@ const TOOLS: ToolDef[] = [
     desc: 'Carbonless multi-part forms.',
     tags: ['3-part carbonless', 'white / pink / yellow', 'Letter sheet', 'collated set'],
     defaultNup: { cellWIn: 8.5, cellHIn: 11, sheetWIn: 17, sheetHIn: 11, marginIn: 0.25, gutterIn: 0.25 },
-    note: 'Print one set per colour stock (white / pink / yellow), then collate into pads.', Thumb: cardThumb(2, 1),
+    note: 'Print one set per color stock (white / pink / yellow), then collate into pads.', Thumb: cardThumb(2, 1),
   },
   {
     id: 'envelope', name: 'Envelopes', preset: 'Envelope Flats 4-Up (#10)', category: 'Cards & labels', engine: 'nup',
@@ -924,7 +924,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     id: 'nudge', name: 'Nudge', preset: 'Nudge', category: 'Page & PDF tools', engine: 'nudge',
-    desc: 'Shift page content by a small offset and/or rotate it about the centre — fix mis-registration.',
+    desc: 'Shift page content by a small offset and/or rotate it about the center — fix mis-registration.',
     tags: ['shift', 'micro-rotate', 'press fudge'], Thumb: NudgeThumb,
   },
   {
@@ -939,8 +939,8 @@ const TOOLS: ToolDef[] = [
   },
   {
     id: 'coloreffects', name: 'Color Effects', preset: 'Color Effects', category: 'Page & PDF tools', engine: 'coloreffects',
-    desc: 'Apply brightness / contrast / saturation and grayscale / warm / invert / hue effects by rasterising the targeted pages. Runs in the browser.',
-    tags: ['colour grade', 'grayscale / sepia', 'rasterise'], Thumb: ColorEffectsThumb,
+    desc: 'Apply brightness / contrast / saturation and grayscale / warm / invert / hue effects by rasterizing the targeted pages. Runs in the browser.',
+    tags: ['color grade', 'grayscale / sepia', 'rasterize'], Thumb: ColorEffectsThumb,
   },
   {
     id: 'colormanage', name: 'Color Management', preset: 'Color Management', category: 'Large & specialty', engine: 'colormanage',
@@ -975,7 +975,7 @@ const TOOLS: ToolDef[] = [
   {
     id: 'registration', name: 'Registration Marks', preset: 'Registration Marks', category: 'Marks & prepress', engine: 'registration',
     desc: 'Add press registration targets (bullseye + crosshair) at the corners and edge midpoints.',
-    tags: ['target', 'crosshair', 'colour align'], Thumb: RegThumb,
+    tags: ['target', 'crosshair', 'color align'], Thumb: RegThumb,
   },
   {
     id: 'watermark', name: 'Watermark', preset: 'Watermark', category: 'Marks & prepress', engine: 'watermark',
@@ -984,7 +984,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     id: 'headerfooter', name: 'Header / Footer', preset: 'Header / Footer', category: 'Marks & prepress', engine: 'headerfooter',
-    desc: 'Add a running header and/or footer line to every page, aligned left, centre or right.',
+    desc: 'Add a running header and/or footer line to every page, aligned left, center or right.',
     tags: ['running head', 'footer', 'title'], Thumb: HFThumb,
   },
   {
@@ -1019,12 +1019,12 @@ const TOOLS: ToolDef[] = [
   },
   {
     id: 'cutcontour', name: 'Die Lines', preset: 'Cut Contour', category: 'Marks & prepress', engine: 'cutcontour',
-    desc: 'Draw a die-line path (rectangle / rounded / ellipse) on a real spot-colour channel (CutContour, KissCut, Crease, Perf, DieCut) that RIPs and digital cutters read as a toolpath.',
-    tags: ['cut contour', 'kiss-cut / thru-cut', 'spot colour'], Thumb: CutContourThumb,
+    desc: 'Draw a die-line path (rectangle / rounded / ellipse) on a real spot-color channel (CutContour, KissCut, Crease, Perf, DieCut) that RIPs and digital cutters read as a toolpath.',
+    tags: ['cut contour', 'kiss-cut / thru-cut', 'spot color'], Thumb: CutContourThumb,
   },
   {
     id: 'whitevarnish', name: 'White / Varnish', preset: 'White / Varnish', category: 'Marks & prepress', engine: 'whitevarnish',
-    desc: 'Add a white-ink under-base or spot-varnish / gloss layer as a named Separation spot colour — flood, trim, bleed or custom coverage.',
+    desc: 'Add a white-ink under-base or spot-varnish / gloss layer as a named Separation spot color — flood, trim, bleed or custom coverage.',
     tags: ['white ink', 'spot varnish', 'under-base / gloss'], Thumb: WhiteVarnishThumb,
   },
   {
@@ -1034,7 +1034,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     id: 'qrstamp', name: 'Barcode / QR', preset: 'Barcode / QR', category: 'Marks & prepress', engine: 'barcode',
-    desc: 'Stamp a QR, Code 128, DataMatrix (ECC200) or EAN-13 barcode — scale, quiet zone, 9-point position, rotation, colours and human-readable text.',
+    desc: 'Stamp a QR, Code 128, DataMatrix (ECC200) or EAN-13 barcode — scale, quiet zone, 9-point position, rotation, colors and human-readable text.',
     tags: ['QR / DataMatrix', 'Code 128 / EAN-13', 'scannable'], Thumb: QrThumb,
   },
   {
@@ -1044,8 +1044,8 @@ const TOOLS: ToolDef[] = [
   },
   {
     id: 'backdrop', name: 'Background Fill', preset: 'Background Fill', category: 'Marks & prepress', engine: 'backdrop',
-    desc: 'Paint a solid colour behind every page — put borderless art onto a coloured stock.',
-    tags: ['background', 'flatten', 'coloured stock'], Thumb: BackdropThumb,
+    desc: 'Paint a solid color behind every page — put borderless art onto a colored stock.',
+    tags: ['background', 'flatten', 'colored stock'], Thumb: BackdropThumb,
   },
   {
     id: 'dimensions', name: 'Dimensions', preset: 'Dimensions', category: 'Marks & prepress', engine: 'dimensions',
@@ -1488,8 +1488,8 @@ function fmtDim(inch: number, unit: 'in' | 'mm' | 'pt'): string {
   return unit === 'mm' ? (inch * MM_PER_IN).toFixed(1) : unit === 'pt' ? String(Math.round(inch * 72)) : inch.toFixed(2);
 }
 
-// A single cell. Shows the real page artwork (`img`) when a rasterised
-// thumbnail is available, otherwise falls back to a numbered coloured block.
+// A single cell. Shows the real page artwork (`img`) when a rasterized
+// thumbnail is available, otherwise falls back to a numbered colored block.
 function Cell({ x, y, w, h, n, blank, img, rotate }: { x: number; y: number; w: number; h: number; n: number; blank: boolean; img?: string; rotate?: boolean }) {
   const clipId = React.useId();
   const fs = Math.min(w, h) * 0.42;
@@ -1709,7 +1709,7 @@ function CropSettings({ opts, onChange }: { opts: CropMarksOptions; onChange: (o
       <Field label="Added margin (in)" note="Blank area added for marks"><input type="number" min={0.25} max={1.5} step={0.0625} value={opts.marginIn} onChange={e => set('marginIn', +e.target.value)} style={iStyle} /></Field>
       <Field label="Mark length (in)"><input type="number" min={0.1} max={0.5} step={0.0625} value={opts.markLenIn} onChange={e => set('markLenIn', +e.target.value)} style={iStyle} /></Field>
       <Field label="Mark offset (in)" note="Gap between trim and mark"><input type="number" min={0.05} max={0.25} step={0.0625} value={opts.markOffIn} onChange={e => set('markOffIn', +e.target.value)} style={iStyle} /></Field>
-      <Field label="Cut type" note="Colour / line style">
+      <Field label="Cut type" note="Color / line style">
         <select value={opts.cutType ?? 'thru'} onChange={e => set('cutType', e.target.value as CropMarksOptions['cutType'])} style={iStyle}>
           <option value="thru">Thru-cut (black)</option>
           <option value="kiss">Kiss-cut (magenta)</option>
@@ -2055,7 +2055,7 @@ function NudgeSettings({ opts, onChange }: { opts: NudgeOptions; onChange: (o: N
     <Grid>
       <Field label="Shift right (in)" note="Negative = left"><input type="number" min={-2} max={2} step={0.01} value={opts.dxIn} onChange={e => set('dxIn', +e.target.value)} style={iStyle} /></Field>
       <Field label="Shift up (in)" note="Negative = down"><input type="number" min={-2} max={2} step={0.01} value={opts.dyIn} onChange={e => set('dyIn', +e.target.value)} style={iStyle} /></Field>
-      <Field label="Rotate (deg)" note="About page centre"><input type="number" min={-15} max={15} step={0.1} value={opts.rotateDeg} onChange={e => set('rotateDeg', +e.target.value)} style={iStyle} /></Field>
+      <Field label="Rotate (deg)" note="About page center"><input type="number" min={-15} max={15} step={0.1} value={opts.rotateDeg} onChange={e => set('rotateDeg', +e.target.value)} style={iStyle} /></Field>
       <Field label="Pages" note="all · 1-5 · odd · last"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
     </Grid>
   );
@@ -2064,7 +2064,7 @@ function NudgeSettings({ opts, onChange }: { opts: NudgeOptions; onChange: (o: N
 function BackdropSettings({ opts, onChange }: { opts: BackdropOptions; onChange: (o: BackdropOptions) => void }) {
   return (
     <Grid>
-      <Field label="Backdrop colour" note="Painted behind every page">
+      <Field label="Backdrop color" note="Painted behind every page">
         <input type="color" value={rgbToHex(opts)} onChange={e => onChange(hexToRgb(e.target.value))} style={{ ...iStyle, height: 38, padding: 2 }} />
       </Field>
     </Grid>
@@ -2166,7 +2166,7 @@ function NestSettings({ opts, onChange }: { opts: NestOptions; onChange: (o: Nes
       <Field label="Nesting"><Row><input type="checkbox" checked={!!opts.trueShape} onChange={e => set('trueShape', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>True-shape (pack into negative space)</span></Row></Field>
       {opts.trueShape && <Field label="Detail (DPI)" note="Higher = tighter but slower"><input type="number" min={12} max={150} step={6} value={opts.dpi ?? 36} onChange={e => set('dpi', +e.target.value)} style={iStyle} /></Field>}
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-        Packs each source page (different sizes = different stickers) as tightly as it can. <strong>True-shape</strong> rasterises the artwork outline and nests items into each other's negative space (best for irregular die-cut shapes); leave it off for fast rectangular bin-packing.
+        Packs each source page (different sizes = different stickers) as tightly as it can. <strong>True-shape</strong> rasterizes the artwork outline and nests items into each other's negative space (best for irregular die-cut shapes); leave it off for fast rectangular bin-packing.
       </div>
     </Grid>
   );
@@ -2457,7 +2457,7 @@ function ToolWorkspace({ tool, preset, file, onFile, onSelectTool, onBack }: { t
   const gridPreset = preset?.nup?.cols != null;
   const cardMode = tool.engine === 'nup' && !gridPreset && !!(tool.defaultNup?.cellWIn || preset?.nup?.cellWIn || tool.fitSource);
 
-  // Per-engine settings state (initialised from the tool's presets, then any
+  // Per-engine settings state (initialized from the tool's presets, then any
   // template overrides layered on top).
   const [bookletOpts, setBookletOpts] = useState<BookletOptions>({ ...DEFAULT_BOOKLET, ...tool.defaultBooklet, ...preset?.booklet });
   const [nupBookOpts, setNupBookOpts] = useState<NUpBookOptions>({ ...DEFAULT_NUPBOOK, ...(preset?.booklet ? { rtl: preset.booklet.rtl } : {}) });
@@ -2511,7 +2511,7 @@ function ToolWorkspace({ tool, preset, file, onFile, onSelectTool, onBack }: { t
   const [editOps, setEditOps] = useState<EditOp[]>([]);
   const [jdfOpts, setJdfOpts] = useState<JdfOptions>(DEFAULT_JDF);
   const [mixReverse, setMixReverse] = useState(false);
-  // Initialise order-list tools from the (possibly already-loaded) file so they
+  // Initialize order-list tools from the (possibly already-loaded) file so they
   // are correct even when this tool was reached by switching in the rail.
   const [shuffleOrder, setShuffleOrder] = useState(() => file ? Array.from({ length: file.info.count }, (_, i) => i + 1).join(', ') : '');
   const [splitRanges, setSplitRanges] = useState(() => file ? `1-${file.info.count}` : '');
@@ -2557,9 +2557,9 @@ function ToolWorkspace({ tool, preset, file, onFile, onSelectTool, onBack }: { t
   const [unit, setUnit] = useState<'in' | 'mm' | 'pt'>('in');
   useEffect(() => { setSheetIndex(0); }, [tool.id]);
 
-  // Rasterise the loaded PDF's pages so the preview shows the real artwork in
+  // Rasterize the loaded PDF's pages so the preview shows the real artwork in
   // each cell (not just numbered blocks). Runs in the browser; degrades to the
-  // numbered fallback if rasterisation fails.
+  // numbered fallback if rasterization fails.
   const [pageThumbs, setPageThumbs] = useState<string[]>([]);
   useEffect(() => {
     let cancelled = false;
@@ -2959,11 +2959,11 @@ function BleedSettings({ opts, onChange }: { opts: BleedOptions; onChange: (o: B
           <option value="scale">Scale (enlarge content)</option>
           <option value="mirror">Mirror edge</option>
           <option value="repeat">Repeat edge</option>
-          <option value="solid">Solid colour</option>
+          <option value="solid">Solid color</option>
         </select>
       </Field>
       {opts.mode === 'solid' && (
-        <Field label="Bleed colour">
+        <Field label="Bleed color">
           <input type="color" value={hex} onChange={e => { const m = /#(..)(..)(..)/.exec(e.target.value)!; set('color', { r: parseInt(m[1]!, 16) / 255, g: parseInt(m[2]!, 16) / 255, b: parseInt(m[3]!, 16) / 255 }); }} style={{ ...iStyle, height: 38, padding: 2 }} />
         </Field>
       )}
@@ -3016,7 +3016,7 @@ function WatermarkSettings({ opts, onChange }: { opts: WatermarkOptions; onChang
       </Field>
       <Field label="Watermark text"><input type="text" value={opts.text} onChange={e => set('text', e.target.value)} style={iStyle} /></Field>
       <Field label="Font size (pt)"><input type="number" min={24} max={200} step={4} value={opts.fontSizePt} onChange={e => set('fontSizePt', +e.target.value)} style={iStyle} /></Field>
-      <Field label="Colour"><input type="color" value={rgbToHex(opts.color ?? { r: 0.53, g: 0.53, b: 0.53 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Color"><input type="color" value={rgbToHex(opts.color ?? { r: 0.53, g: 0.53, b: 0.53 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
       <Field label={`Opacity: ${Math.round(opts.opacity * 100)}%`}><input type="range" min={5} max={80} step={5} value={opts.opacity * 100} onChange={e => set('opacity', +e.target.value / 100)} style={{ width: '100%', marginTop: '.5rem' }} /></Field>
       <Field label="Angle (°)" note="45 diagonal · 0 horizontal · 90 vertical"><input type="number" min={-90} max={360} step={5} value={opts.angleDeg} onChange={e => set('angleDeg', +e.target.value)} style={iStyle} /></Field>
       <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
@@ -3044,7 +3044,7 @@ function BarcodeSettings({ opts, onChange }: { opts: BarcodeStampOptions; onChan
       {!is2D && <Field label="Human-readable text"><Row><input type="checkbox" checked={!!opts.showText} onChange={e => set('showText', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Show value under bars</span></Row></Field>}
       <Field label="Position">
         <select value={opts.position} onChange={e => set('position', e.target.value as BarcodeStampOptions['position'])} style={iStyle}>
-          {[['tl', 'Top-left'], ['tc', 'Top-centre'], ['tr', 'Top-right'], ['ml', 'Mid-left'], ['mc', 'Centre'], ['mr', 'Mid-right'], ['bl', 'Bottom-left'], ['bc', 'Bottom-centre'], ['br', 'Bottom-right']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {[['tl', 'Top-left'], ['tc', 'Top-center'], ['tr', 'Top-right'], ['ml', 'Mid-left'], ['mc', 'Center'], ['mr', 'Mid-right'], ['bl', 'Bottom-left'], ['bc', 'Bottom-center'], ['br', 'Bottom-right']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </Field>
       <Field label="Margin (pt)"><input type="number" min={0} max={144} step={1} value={opts.marginPt ?? 18} onChange={e => set('marginPt', +e.target.value)} style={iStyle} /></Field>
@@ -3055,7 +3055,7 @@ function BarcodeSettings({ opts, onChange }: { opts: BarcodeStampOptions; onChan
           {[0, 90, 180, 270].map(d => <option key={d} value={d}>{d}°</option>)}
         </select>
       </Field>
-      <Field label="Bar colour"><input type="color" value={rgbToHex(opts.barColor ?? { r: 0, g: 0, b: 0 })} onChange={e => set('barColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Bar color"><input type="color" value={rgbToHex(opts.barColor ?? { r: 0, g: 0, b: 0 })} onChange={e => set('barColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
       <Field label="Background"><input type="color" value={rgbToHex(opts.bgColor ?? { r: 1, g: 1, b: 1 })} onChange={e => set('bgColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
       <Field label="Transparent bg"><Row><input type="checkbox" checked={!!opts.transparent} onChange={e => set('transparent', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>No background panel</span></Row></Field>
       <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
@@ -3105,7 +3105,7 @@ function ColorEffectsSettings({ opts, onChange }: { opts: ColorEffectsOptions; o
       <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
       <Row><button className="btn secondary" style={{ padding: '.3rem .7rem', fontSize: '.8rem' }} onClick={() => onChange({ ...DEFAULT_COLOREFFECTS })}>Reset all</button></Row>
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-        Applies brightness / contrast / saturation and creative effects by <strong>rasterising</strong> the targeted pages (vector text/paths become a bitmap at the chosen DPI). For press-accurate colour-space conversion use <em>Color Management</em> instead. Runs in the browser.
+        Applies brightness / contrast / saturation and creative effects by <strong>rasterizing</strong> the targeted pages (vector text/paths become a bitmap at the chosen DPI). For press-accurate color-space conversion use <em>Color Management</em> instead. Runs in the browser.
       </div>
     </Grid>
   );
@@ -3159,11 +3159,11 @@ function ColorManageSettings({ opts, onChange }: { opts: ColorManageOptions; onC
           {[150, 300, 600].map(d => <option key={d} value={d}>{d} DPI</option>)}
         </select>
       </Field>
-      <Field label="Convert to CMYK"><Row><input type="checkbox" checked={!!opts.convert} onChange={e => set('convert', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Rasterise + map to CMYK gamut</span></Row></Field>
-      <Field label="Gamut warning"><Row><input type="checkbox" checked={!!opts.gamutWarning} onChange={e => set('gamutWarning', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Flag out-of-gamut colours (green)</span></Row></Field>
+      <Field label="Convert to CMYK"><Row><input type="checkbox" checked={!!opts.convert} onChange={e => set('convert', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Rasterize + map to CMYK gamut</span></Row></Field>
+      <Field label="Gamut warning"><Row><input type="checkbox" checked={!!opts.gamutWarning} onChange={e => set('gamutWarning', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Flag out-of-gamut colors (green)</span></Row></Field>
       <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-        Two independent actions: <strong>assign a profile</strong> — upload an ICC below and it is embedded as a PDF/X <em>OutputIntent</em> (lossless, vectors intact, what a RIP reads); and <strong>convert / gamut-check</strong> — rasterise and map to the CMYK-reproducible gamut (RGB→CMYK→RGB via an 8-primary ink model), optionally flagging out-of-gamut colours. A device-exact ICC transform needs a full CMM; the pixel conversion uses a standard CMYK model — genuine for gamut checking and RGB→CMYK normalisation.
+        Two independent actions: <strong>assign a profile</strong> — upload an ICC below and it is embedded as a PDF/X <em>OutputIntent</em> (lossless, vectors intact, what a RIP reads); and <strong>convert / gamut-check</strong> — rasterize and map to the CMYK-reproducible gamut (RGB→CMYK→RGB via an 8-primary ink model), optionally flagging out-of-gamut colors. A device-exact ICC transform needs a full CMM; the pixel conversion uses a standard CMYK model — genuine for gamut checking and RGB→CMYK normalization.
       </div>
     </Grid>
   );
@@ -3194,7 +3194,7 @@ function LayersPanel({ file, states, onChange }: { file: LoadedFile; states: Rec
           </div>
         );
       })}
-      <div style={{ fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>Click a layer to cycle Default → On → Off. <em>Off</em> force-hides the layer in the output; <em>On</em> force-shows it. Not all RIPs honour layer visibility — test with yours.</div>
+      <div style={{ fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>Click a layer to cycle Default → On → Off. <em>Off</em> force-hides the layer in the output; <em>On</em> force-shows it. Not all RIPs honor layer visibility — test with yours.</div>
     </div>
   );
 }
@@ -3243,7 +3243,7 @@ function PdfToolsSettings({ opts, onChange }: { opts: typeof DEFAULT_PDFTOOLS; o
         <Field label="Remove unreferenced objects"><Row><input type="checkbox" checked={opts.removeUnused} onChange={e => set('removeUnused', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Drop orphaned objects</span></Row></Field>
       </>}
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: unavailable ? '#b45309' : 'var(--muted)', lineHeight: 1.5 }}>
-        {opts.operation === 'optimize' && 'Rebuilds the PDF and packs objects into object streams — drops orphaned objects and re-writes a lean cross-reference table. Typical savings on unoptimised files; already-lean PDFs change little.'}
+        {opts.operation === 'optimize' && 'Rebuilds the PDF and packs objects into object streams — drops orphaned objects and re-writes a lean cross-reference table. Typical savings on unoptimized files; already-lean PDFs change little.'}
         {opts.operation === 'decrypt' && 'Removes password protection / encryption by re-saving the document unencrypted. You must be able to open the file (supply the password in your viewer first if needed).'}
         {opts.operation === 'repair' && 'Re-writes the whole PDF structure — fixes broken xref tables, stream lengths and object numbering that make viewers/RIPs reject a file.'}
         {opts.operation === 'linearize' && '⚠ Linearisation (fast web view) reorders the byte stream and is not available in the browser engine — it needs a server-side pass (e.g. qpdf/Ghostscript). Use Optimize to shrink instead.'}
@@ -3365,12 +3365,12 @@ function CollatingSettings({ opts, onChange }: { opts: CollatingOptions; onChang
         </select>
       </Field>
       <Field label="Step size (pt)" note="Vertical distance between marks"><input type="number" min={1} max={60} step={1} value={opts.stepPt ?? 8} onChange={e => set('stepPt', +e.target.value)} style={iStyle} /></Field>
-      <Field label="Mark colour"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
-      <Field label="Wrap colour" note="2nd-pass (contrasting)"><input type="color" value={rgbToHex(opts.color2 ?? { r: 0, g: 0.6, b: 0.9 })} onChange={e => set('color2', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Mark color"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Wrap color" note="2nd-pass (contrasting)"><input type="color" value={rgbToHex(opts.color2 ?? { r: 0, g: 0.6, b: 0.9 })} onChange={e => set('color2', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
       <Field label="Opacity"><input type="number" min={0.1} max={1} step={0.05} value={opts.opacity ?? 1} onChange={e => set('opacity', +e.target.value)} style={iStyle} /></Field>
       <Field label="Pages" note="all · 1-5 · odd · even · last"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-        One mark per <strong>signature</strong> (page ÷ pages-per-signature), stepped down the spine. When the staircase reaches <em>signatures / set</em> it resets to the top and switches to the wrap colour so the two passes stay distinguishable — a break in the staircase reveals a mis-gathered book.
+        One mark per <strong>signature</strong> (page ÷ pages-per-signature), stepped down the spine. When the staircase reaches <em>signatures / set</em> it resets to the top and switches to the wrap color so the two passes stay distinguishable — a break in the staircase reveals a mis-gathered book.
       </div>
     </Grid>
   );
@@ -3446,12 +3446,12 @@ function GatheringSettings({ opts, onChange }: { opts: GatheringOptions; onChang
         </select>
       </Field>
       <Field label="Step size (pt)" note="Horizontal distance between marks"><input type="number" min={1} max={60} step={1} value={opts.stepPt ?? 8} onChange={e => set('stepPt', +e.target.value)} style={iStyle} /></Field>
-      <Field label="Mark colour"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
-      <Field label="Wrap colour" note="2nd-pass (contrasting)"><input type="color" value={rgbToHex(opts.color2 ?? { r: 0, g: 0.6, b: 0.9 })} onChange={e => set('color2', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Mark color"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Wrap color" note="2nd-pass (contrasting)"><input type="color" value={rgbToHex(opts.color2 ?? { r: 0, g: 0.6, b: 0.9 })} onChange={e => set('color2', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
       <Field label="Opacity"><input type="number" min={0.1} max={1} step={0.05} value={opts.opacity ?? 1} onChange={e => set('opacity', +e.target.value)} style={iStyle} /></Field>
       <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-        The gripper-edge cousin of collating marks: one mark per <strong>section</strong>, stepped <em>horizontally</em> along the leading edge (kept clear of the gripper zone). A clean staircase across the cut stack confirms correct gathering; the pattern resets and switches to the wrap colour every <em>sections / set</em>.
+        The gripper-edge cousin of collating marks: one mark per <strong>section</strong>, stepped <em>horizontally</em> along the leading edge (kept clear of the gripper zone). A clean staircase across the cut stack confirms correct gathering; the pattern resets and switches to the wrap color every <em>sections / set</em>.
       </div>
     </Grid>
   );
@@ -3497,7 +3497,7 @@ function FoldMarksSettings({ opts, onChange }: { opts: FoldMarksOptions; onChang
       <Field label="Edge offset (pt)"><input type="number" min={0} max={80} step={0.5} value={opts.offsetPt ?? 0} onChange={e => set('offsetPt', +e.target.value)} style={iStyle} /></Field>
       <Field label="Line weight (pt)"><input type="number" min={0.25} max={5} step={0.25} value={opts.weightPt ?? 0.75} onChange={e => set('weightPt', +e.target.value)} style={iStyle} /></Field>
       <Field label="Full guide line"><Row><input type="checkbox" checked={!!opts.fullLine} onChange={e => set('fullLine', e.target.checked)} /><span style={{ fontSize: '.85rem' }}>Across whole sheet</span></Row></Field>
-      <Field label="Colour"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Color"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
       <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
         Dashed tick guides in the trim margin at each fold. <strong>Vertical</strong> folds divide the width (brochure panels); <strong>horizontal</strong> divide the height. Roll fold shrinks each panel so it tucks inside the previous; use <em>Custom</em> for exact positions.
@@ -3535,7 +3535,7 @@ function LayMarksSettings({ opts, onChange }: { opts: LayMarksOptions; onChange:
       <Field label="Mark size (pt)"><input type="number" min={2} max={80} step={0.5} value={opts.sizePt ?? 14.17} onChange={e => set('sizePt', +e.target.value)} style={iStyle} /></Field>
       <Field label="Line thickness (pt)"><input type="number" min={0.25} max={5} step={0.25} value={opts.thicknessPt ?? 0.5} onChange={e => set('thicknessPt', +e.target.value)} style={iStyle} /></Field>
       <Field label="Offset from corner (pt)"><input type="number" min={0} max={120} step={0.5} value={opts.offsetPt ?? 14.17} onChange={e => set('offsetPt', +e.target.value)} style={iStyle} /></Field>
-      <Field label="Colour"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Color"><input type="color" value={rgbToHex(opts.color ?? { r: 0, g: 0, b: 0 })} onChange={e => set('color', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
       <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
         Front lay marks the gripper (leading) edge feed direction; side lay marks the guide side for lateral registration. Lay marks belong on the imposed <strong>press sheet</strong> — after imposition the gripper margin exists; on un-imposed pages the marks land inside the trim.
@@ -3564,7 +3564,7 @@ function CutContourSettings({ opts, onChange }: { opts: CutContourOptions; onCha
         <Field label="Custom width (pt)"><input type="number" min={1} step={1} value={opts.customWpt ?? 216} onChange={e => set('customWpt', +e.target.value)} style={iStyle} /></Field>
         <Field label="Custom height (pt)"><input type="number" min={1} step={1} value={opts.customHpt ?? 144} onChange={e => set('customHpt', +e.target.value)} style={iStyle} /></Field>
       </>}
-      <Field label="Spot colour name" note="Layer name sent to the RIP / cutter">
+      <Field label="Spot color name" note="Layer name sent to the RIP / cutter">
         <input list="spotnames" value={opts.spotName} onChange={e => set('spotName', e.target.value)} style={iStyle} />
         <datalist id="spotnames">{SPOT_NAMES.map(s => <option key={s} value={s} />)}</datalist>
       </Field>
@@ -3577,10 +3577,10 @@ function CutContourSettings({ opts, onChange }: { opts: CutContourOptions; onCha
       </>}
       <Field label="X offset (pt)" note="+ right"><input type="number" step={0.5} value={opts.xOffsetPt ?? 0} onChange={e => set('xOffsetPt', +e.target.value)} style={iStyle} /></Field>
       <Field label="Y offset (pt)" note="+ down"><input type="number" step={0.5} value={opts.yOffsetPt ?? 0} onChange={e => set('yOffsetPt', +e.target.value)} style={iStyle} /></Field>
-      <Field label="Preview colour" note="Output uses the spot channel"><input type="color" value={rgbToHex(opts.previewColor ?? { r: 0.925, g: 0, b: 0.55 })} onChange={e => set('previewColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Preview color" note="Output uses the spot channel"><input type="color" value={rgbToHex(opts.previewColor ?? { r: 0.925, g: 0, b: 0.55 })} onChange={e => set('previewColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
       <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-        Adds a vector die-line path on a real <strong>Separation</strong> spot channel (named above) so a RIP or digital cutter reads it as a toolpath, not artwork. The preview colour is on-screen only. For a closed cut set the shape to enclose the trim; run Preflight to confirm the path is closed before sending to the die maker.
+        Adds a vector die-line path on a real <strong>Separation</strong> spot channel (named above) so a RIP or digital cutter reads it as a toolpath, not artwork. The preview color is on-screen only. For a closed cut set the shape to enclose the trim; run Preflight to confirm the path is closed before sending to the die maker.
       </div>
     </Grid>
   );
@@ -3590,7 +3590,7 @@ function WhiteVarnishSettings({ opts, onChange }: { opts: WhiteVarnishOptions; o
   const set = <K extends keyof WhiteVarnishOptions>(k: K, v: WhiteVarnishOptions[K]) => onChange({ ...opts, [k]: v });
   return (
     <Grid>
-      <Field label="Spot colour name">
+      <Field label="Spot color name">
         <input list="wvnames" value={opts.spotName} onChange={e => set('spotName', e.target.value)} style={iStyle} />
         <datalist id="wvnames"><option value="White" /><option value="Varnish" /><option value="Gloss" /><option value="Matte" /></datalist>
       </Field>
@@ -3612,10 +3612,10 @@ function WhiteVarnishSettings({ opts, onChange }: { opts: WhiteVarnishOptions; o
       <Field label="Tint" note="0–1 ink density"><input type="number" min={0} max={1} step={0.05} value={opts.tint ?? 1} onChange={e => set('tint', +e.target.value)} style={iStyle} /></Field>
       <Field label="X offset (pt)"><input type="number" step={0.5} value={opts.xOffsetPt ?? 0} onChange={e => set('xOffsetPt', +e.target.value)} style={iStyle} /></Field>
       <Field label="Y offset (pt)"><input type="number" step={0.5} value={opts.yOffsetPt ?? 0} onChange={e => set('yOffsetPt', +e.target.value)} style={iStyle} /></Field>
-      <Field label="Preview colour"><input type="color" value={rgbToHex(opts.previewColor ?? { r: 0.85, g: 0.86, b: 0.92 })} onChange={e => set('previewColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Preview color"><input type="color" value={rgbToHex(opts.previewColor ?? { r: 0.85, g: 0.86, b: 0.92 })} onChange={e => set('previewColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
       <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-        Lays a named <strong>Separation</strong> layer (White ink or spot Varnish) as a spot-colour fill. <em>Under-base</em> prints behind the artwork (white ink for clear/metallic/dark stock); <em>on top</em> is a gloss/matte varnish over the art. The preview colour is on-screen only.
+        Lays a named <strong>Separation</strong> layer (White ink or spot Varnish) as a spot-color fill. <em>Under-base</em> prints behind the artwork (white ink for clear/metallic/dark stock); <em>on top</em> is a gloss/matte varnish over the art. The preview color is on-screen only.
       </div>
     </Grid>
   );
@@ -3633,7 +3633,7 @@ function BrailleSettings({ opts, onChange }: { opts: BrailleOptions; onChange: (
       <Field label="Cell spacing (pt)" note="6 mm ≈ 17"><input type="number" min={4} max={40} step={0.5} value={opts.cellSpacePt ?? 17} onChange={e => set('cellSpacePt', +e.target.value)} style={iStyle} /></Field>
       <Field label="Line spacing (pt)" note="10 mm ≈ 28.35"><input type="number" min={6} max={60} step={0.5} value={opts.lineSpacePt ?? 28.35} onChange={e => set('lineSpacePt', +e.target.value)} style={iStyle} /></Field>
       <Field label="Spot channel" note="blank = visible ink"><input list="brspots" value={opts.spotName ?? ''} onChange={e => set('spotName', e.target.value || undefined)} style={iStyle} /><datalist id="brspots"><option value="Varnish" /><option value="Emboss" /><option value="Braille" /></datalist></Field>
-      <Field label="Preview colour"><input type="color" value={rgbToHex(opts.previewColor ?? { r: 0.55, g: 0.55, b: 0.6 })} onChange={e => set('previewColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
+      <Field label="Preview color"><input type="color" value={rgbToHex(opts.previewColor ?? { r: 0.55, g: 0.55, b: 0.6 })} onChange={e => set('previewColor', hexToRgb(e.target.value))} style={{ ...iStyle, padding: 2, height: 34 }} /></Field>
       <Field label="Pages"><input type="text" value={opts.pages ?? 'all'} onChange={e => set('pages', e.target.value)} style={iStyle} /></Field>
       <div style={{ gridColumn: '1 / -1', fontSize: '.76rem', color: 'var(--muted)', lineHeight: 1.5 }}>
         Places <strong>Grade-1</strong> (uncontracted) Braille as raised dots at ADA metrics (1.5 mm dots, 2.5 mm within-cell, 6 mm cell, 10 mm line). Digits get an automatic number sign. Target a spot channel (Emboss / Varnish) for a raised-dot plate, or leave blank to draw visible dots.

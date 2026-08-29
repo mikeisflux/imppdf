@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-// Accessible dialog behaviour for a modal container:
+// Accessible dialog behavior for a modal container:
 //  • traps Tab focus inside the dialog,
 //  • closes on Escape,
 //  • moves focus into the dialog on open and restores it to the previously

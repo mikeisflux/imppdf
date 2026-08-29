@@ -40,7 +40,7 @@ export interface FinishOptions {
   maxThumbPages?: number;
   /** Longest side of a thumbnail, in pixels. Acrobat's own are ~106. */
   thumbPx?: number;
-  /** Skip rasterising (no canvas available, or the caller does not want it). */
+  /** Skip rasterizing (no canvas available, or the caller does not want it). */
   noThumbnails?: boolean;
 }
 
@@ -216,7 +216,7 @@ export async function finalizePdfForExport(
   /* NORMALISE THE PAGE BOXES — the single biggest cause of "the right size in
      the PDF, the wrong size on the RIP".
 
-     A viewer honours the CropBox. A RIP images the MediaBox. When the two
+     A viewer honors the CropBox. A RIP images the MediaBox. When the two
      disagree the file measures correctly on the desk and prints wrong, and
      nothing about it looks broken. Crop is the obvious case: it sets a CropBox
      of [36 36 576 756] and leaves the MediaBox at the full [0 0 612 792], so

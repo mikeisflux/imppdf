@@ -12,7 +12,7 @@ import { findOp } from './operations';
 
 // Recipe step kinds that only make sense in a color-managed / raster RIP and
 // have no engine backing yet. They're dropped from the chain (never silently —
-// the modal shows the full chain and greys out what's skipped).
+// the modal shows the full chain and grays out what's skipped).
 const UNSUPPORTED_KINDS = new Set(['passthrough', 'preflight']);
 
 const KIND_TO_TYPE: Record<string, StepType> = {

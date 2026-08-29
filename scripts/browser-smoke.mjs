@@ -1,6 +1,6 @@
 /* Drive the browser-only tools in real Chromium.
 
-   Six tools cannot be reached from node: they rasterise through a canvas, or
+   Six tools cannot be reached from node: they rasterize through a canvas, or
    they load ONNX models, or both. Rather than click through the UI — which
    tests selectors more than it tests imposition — this bundles the REAL engine
    from src/ and runs it inside the browser, where those APIs exist. Same code

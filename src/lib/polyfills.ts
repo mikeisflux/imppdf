@@ -12,7 +12,7 @@
    because the message handler only reaches for the cache on a second document.
    So the app looks fine, the operator loads another file, and every tool that
    touches pdfjs — the previews, Divinity Box, Raised Metal, Remove Background,
-   Colour Effects, Trim to Artwork — dies at once. Found by running the engine
+   Color Effects, Trim to Artwork — dies at once. Found by running the engine
    in real Chromium; node has the methods, so no amount of node testing would
    have shown it.
 

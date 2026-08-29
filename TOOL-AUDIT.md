@@ -98,7 +98,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 | `fieryserial` Fiery Serial | numbering | — | [x] | [x] | [x] | [x] |
 | `calendar` Calendar | half-sheet, rotated back | — | [x] | [x] | [x] | [x] |
 
-## Spot colour / finishing
+## Spot color / finishing
 
 | Tool | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|
@@ -131,7 +131,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 ### `mediafix` Media Size Fix
 
 Puts a FINISHED file on the sheet it actually prints on — 11×17, 12×18, 13×19,
-SRA3 — centred at 1:1. Never re-imposed, never re-scaled, same file name.
+SRA3 — centered at 1:1. Never re-imposed, never re-scaled, same file name.
 
 The fault it exists for: a cover wrap exported at its own size (13.75 × 10.5")
 is a page no press has in its trays. A Fiery loaded with 11×17 then decides what
@@ -144,7 +144,7 @@ a reprint. An oversized page overhangs visibly instead, which is a question the
 operator can answer.
 
 Covered by `test/media-fix.test.ts` (10 assertions, shared with the cover tool):
-centred placement on a turned sheet, artwork size preserved exactly, no silent
+centered placement on a turned sheet, artwork size preserved exactly, no silent
 scaling, opt-in shrink, forced orientation, opt-in artwork turn, `/Rotate`
 sources measured as they PRINT, and every page of a multi-page file placed.
 Rendered previews in `scripts/preview-mediafix.mjs`.
@@ -153,7 +153,7 @@ Rendered previews in `scripts/preview-mediafix.mjs`.
 
 Same fix at source. The cover tool had no media selection at all: the page WAS
 the wrap, so every cover it made handed the placement decision to the RIP. It
-now takes a press sheet and centres the wrap on it, with the trim/fold/hinge
+now takes a press sheet and centers the wrap on it, with the trim/fold/hinge
 marks and the mm crease labels moved out into the sheet margin (bare paper)
 instead of being buried in the artwork-bearing bleed. Crease figures are stated
 from the SHEET's left edge, which is the edge the creaser registers against.
@@ -229,7 +229,7 @@ Confirmed by reading the rendered pages, not just the counts:
 Chromium, where canvas and the ONNX weights exist. Not the UI: the same engine
 the app ships, so a failure is the engine's, not a selector's. **7/7 pass.**
 
-The spot-colour tools emit TIFF, so "it rendered" proves nothing. The harness
+The spot-color tools emit TIFF, so "it rendered" proves nothing. The harness
 parses the TIFF back out of the bytes and checks the layout the RIP reads.
 
 | Tool | Verified |
@@ -262,7 +262,7 @@ Newest first. Every entry records a **measured** number, not a claim.
   it is not immediate — the FIRST PDF opens fine and every one after it throws, since
   the handler only reaches for that cache on a second document. So the app looks
   healthy, the operator loads another file, and every pdfjs tool dies at once: the
-  previews, Divinity Box, Raised Metal, Remove Background, Colour Effects, Trim to
+  previews, Divinity Box, Raised Metal, Remove Background, Color Effects, Trim to
   Artwork. `src/lib/polyfills.ts` fills it in. **Node has the method, so no amount of
   node testing would ever have shown this** — it took running in a real browser.
 - **engine `computeNUpGrid`** — held its own COPY of the mark-clearance rule, and the

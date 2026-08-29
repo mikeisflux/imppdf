@@ -41,7 +41,7 @@ export interface MarkStyle {
   skipRight?: boolean;
   // Max outward distance (points) a mark may reach from the trim edge on each
   // side, measured from the trim box. Used to keep marks inside the gutter/margin
-  // so ganged cards' crop marks never cross into a neighbour's artwork. Omit for
+  // so ganged cards' crop marks never cross into a neighbor's artwork. Omit for
   // no clamp (full length).
   reach?: { l?: number; r?: number; t?: number; b?: number };
 }
@@ -52,7 +52,7 @@ function drawCropMarks(page: any, rgb: any, tx: number, ty: number, tw: number, 
   const thickness = style?.weight ?? 0.5;
   const dashArray = style?.dash;
   const L = !style?.skipLeft, R = !style?.skipRight;   // draw left / right edge marks?
-  // Clamp each side's mark length to the room available before the neighbour.
+  // Clamp each side's mark length to the room available before the neighbor.
   const rc = style?.reach;
   const eff = (side: 'l' | 'r' | 't' | 'b') => {
     const r = rc?.[side];
@@ -72,10 +72,10 @@ function drawCropMarks(page: any, rgb: any, tx: number, ty: number, tw: number, 
   }
   if (style?.center) {
     const cx = tx + tw/2, cy = ty + th/2;
-    if (lB > 0) segs.push([cx,ty-off-lB,   cx,ty-off]);          // bottom-centre
-    if (lT > 0) segs.push([cx,ty+th+off,    cx,ty+th+off+lT]);   // top-centre
-    if (L && lL > 0) segs.push([tx-off-lL,cy, tx-off,cy]);       // left-centre
-    if (R && lR > 0) segs.push([tx+tw+off,cy, tx+tw+off+lR,cy]); // right-centre
+    if (lB > 0) segs.push([cx,ty-off-lB,   cx,ty-off]);          // bottom-center
+    if (lT > 0) segs.push([cx,ty+th+off,    cx,ty+th+off+lT]);   // top-center
+    if (L && lL > 0) segs.push([tx-off-lL,cy, tx-off,cy]);       // left-center
+    if (R && lR > 0) segs.push([tx+tw+off,cy, tx+tw+off+lR,cy]); // right-center
   }
   if (style?.knockout) for (const [x1,y1,x2,y2] of segs)
     page.drawLine({ start:{x:x1,y:y1}, end:{x:x2,y:y2}, thickness: thickness+1.4, color: rgb(1,1,1) });
@@ -83,9 +83,9 @@ function drawCropMarks(page: any, rgb: any, tx: number, ty: number, tw: number, 
     page.drawLine({ start:{x:x1,y:y1}, end:{x:x2,y:y2}, thickness, color:c, ...(dashArray ? { dashArray } : {}) });
 }
 
-// Carry the document-level colour context from a SOURCE pdf onto a REBUILT
+// Carry the document-level color context from a SOURCE pdf onto a REBUILT
 // output pdf. Imposition that composes pages into a fresh document (embedPages)
-// keeps each object's own ICC (so screen colour is right) but drops the
+// keeps each object's own ICC (so screen color is right) but drops the
 // document-level markers a RIP/Fiery uses to convert RGB→CMYK — the OutputIntent
 // (with its embedded profile) and the XMP metadata — making prints come out
 // dark. This copies those across, deep-copying any referenced streams. Whatever
@@ -131,7 +131,7 @@ async function carryColorContext(srcDoc: any, outDoc: any): Promise<void> {
       const resolved = ref ? scx.lookup(ref) : null;
       if (resolved) outDoc.catalog.set(PDFName.of(key), dup(ref));
     }
-  } catch { /* never break an export over colour metadata */ }
+  } catch { /* never break an export over color metadata */ }
 }
 
 // ── Booklet / Saddle Stitch (2-up) ─────────────────────────────────────────
@@ -150,7 +150,7 @@ export interface BookletOptions {
   // many SHEETS (×4 pages); each signature is imposed on its own and concatenated
   // — how perfect-bound and thick books are actually gathered.
   signatureSheets?: number;
-  // ── Press-sheet controls (all optional; legacy behaviour when omitted) ──
+  // ── Press-sheet controls (all optional; legacy behavior when omitted) ──
   sheetWIn?: number;        // explicit output sheet width; spread is derived from
   sheetHIn?: number;        //   the source pages when not given
   autoscale?: boolean;      // scale pages to fill the sheet cells (default true when sheet set)
@@ -197,7 +197,7 @@ export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Pr
   const willDropSpine = opts.keepSpineBleed !== true && bleedSrcPt > 0.01;
 
   // Placed page size: with an explicit sheet the pages scale into the two cells;
-  // otherwise the spread wraps the source pages 1:1 (legacy behaviour).
+  // otherwise the spread wraps the source pages 1:1 (legacy behavior).
   let dw = pw, dh = ph, spreadW: number, spreadH: number;
   if (opts.fitSheetToSpread) {
     // Bleed to the sheet edge, no paper margin: the output sheet IS the two-page
@@ -252,7 +252,7 @@ export async function imposeBooklet(bytes: Uint8Array, opts: BookletOptions): Pr
       // Drop the spine bleed: butt the two page trims at the fold and clip each
       // page's inner (spine-side) bleed so it isn't carried across the fold.
       const dropSpine = opts.keepSpineBleed !== true && bPt > 0.01;
-      const foldX = x0 + dw + gPt/2;                 // fixed fold (sheet centre when centred)
+      const foldX = x0 + dw + gPt/2;                 // fixed fold (sheet center when centered)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const drawClipped = (pg:any, e:any, px:number, clipX:number, clipW:number) => {
         pg.pushOperators(pushGraphicsState(), rectangle(clipX, yB, clipW, dh), clip(), endPath());
@@ -312,7 +312,7 @@ export interface FieryBookletOptions {
 export async function fieryBooklet(bytes: Uint8Array, opts: FieryBookletOptions): Promise<Uint8Array> {
   const { PDFDocument } = await import('pdf-lib');
   // Edit the ORIGINAL document in place — do NOT rebuild into a fresh PDF.
-  // Rebuilding (embedPages) discards the document-level colour context Affinity
+  // Rebuilding (embedPages) discards the document-level color context Affinity
   // writes — the embedded ICC profile (sRGB IEC61966-2.1 by default), the
   // OutputIntent and XMP metadata — which a RIP/Fiery uses to convert RGB→CMYK.
   // Losing it makes the Fiery fall back to a darker default. Cropping the page
@@ -352,7 +352,7 @@ export async function fieryBooklet(bytes: Uint8Array, opts: FieryBookletOptions)
 // ── Serial / limited-edition number stamp ───────────────────────────────────
 // Draws one line of text (e.g. "1/200") on a single page, anchored to the
 // bottom-right of that page's visible box. Edits the page IN PLACE (appends to
-// its content stream) so the document-level colour context — embedded ICC,
+// its content stream) so the document-level color context — embedded ICC,
 // OutputIntent, XMP — is preserved exactly, same as fieryBooklet. Used by the
 // Fiery Serial Booklet tool to number each copy of a limited run on page 1.
 
@@ -520,7 +520,7 @@ export interface NUpOptions {
   markLenIn: number;
   markOffIn: number;
   // Optional: place each item at a fixed physical size (cards/labels). When set,
-  // cols/rows are honoured (clamped to what fits) and the grid is centered.
+  // cols/rows are honored (clamped to what fits) and the grid is centered.
   cellWIn?: number;
   cellHIn?: number;
   // Auto-orient the cell to the artwork: if the source page is landscape but the
@@ -541,7 +541,7 @@ export interface NUpOptions {
   // Cut-and-stack ordering: pages are laid out so that cutting the sheets into
   // piles by cell position and stacking them yields sequential order.
   cutStack?: boolean;
-  // Center marks at each edge midpoint + configurable mark weight/colour.
+  // Center marks at each edge midpoint + configurable mark weight/color.
   centerMarks?: boolean;
   markWeightPt?: number;
   // Bleed-aware marks: art fills the whole cell, but crop marks are drawn at the
@@ -561,7 +561,7 @@ export interface NUpOptions {
   // scales to fill and crops overflow; 'contain' letterboxes; 'stretch' distorts.
   fit?: 'cover' | 'contain' | 'stretch';
   // Optional user adjustment from the crop/approve dialog: zoom multiplier and
-  // 0..1 anchor (0.5,0.5 = centred) controlling which part shows after cropping.
+  // 0..1 anchor (0.5,0.5 = centered) controlling which part shows after cropping.
   imageZoom?: number;
   imageOffsetX?: number;
   imageOffsetY?: number;
@@ -588,7 +588,7 @@ export function computeNUpGrid(opts: NUpOptions): NUpGrid {
     // ALWAYS reserve room for the cut marks and bleed before deciding how many
     // fit — never assume. The margin/gutters grow to at least the mark reach
     // (markOff + markLen) and the bleed (2× in a shared gutter), so marks never
-    // land in a neighbour's art and the count reflects real production spacing.
+    // land in a neighbor's art and the count reflects real production spacing.
     /* ONE definition of mark clearance, shared with the per-tool calculators in
        ./fit — see markClearanceIn there for why the margin and the gutter are
        not the same number. This used to hold its own copy of that rule, and the
@@ -611,7 +611,7 @@ export function computeNUpGrid(opts: NUpOptions): NUpGrid {
        hold them. This function PLACES art, and the placement path scales the
        piece into its cell — so one oversized card comes out shrunk to fit,
        which is what the operator wants to see, rather than a blank sheet. */
-    // Honour the requested columns/rows — never silently fill the whole sheet.
+    // Honor the requested columns/rows — never silently fill the whole sheet.
     const cols=Math.max(1, Math.min(opts.cols || fitCols || 1, fitCols || 1));
     const rows=Math.max(1, Math.min(opts.rows || fitRows || 1, fitRows || 1));
     const blockW=cols*cellW+(cols-1)*effGx, blockH=rows*cellH+(rows-1)*effGy;
@@ -691,7 +691,7 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
       const ox = pf?.imageOffsetX ?? opts.imageOffsetX ?? 0.5, oy = pf?.imageOffsetY ?? opts.imageOffsetY ?? 0.5; // 0..1 anchor
       const dx = x + (cellW - dw) * ox, dy = y + (cellH - dh) * oy;
       if (dw > cellW + 0.5 || dh > cellH + 0.5) {
-        // Clip to the cell so the cropped overflow can't bleed into neighbours.
+        // Clip to the cell so the cropped overflow can't bleed into neighbors.
         sheet.pushOperators(pushGraphicsState(), rectangle(x, y, cellW, cellH), clip(), endPath());
         draw(dx, dy, dw, dh);
         sheet.pushOperators(popGraphicsState());
@@ -700,9 +700,9 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
       }
     }
     if (opts.addMarks) {
-      // Clamp each mark to the room available before the neighbour cell so crop
+      // Clamp each mark to the room available before the neighbor cell so crop
       // marks never run across the gutter into an adjacent card's artwork. An
-      // interior edge shares its gutter with the neighbour (half each); an outer
+      // interior edge shares its gutter with the neighbor (half each); an outer
       // edge can use the full margin.
       const reach = {
         l: bl + (cc === 0 ? leftGapPt : gxPt / 2),
@@ -797,7 +797,7 @@ export interface CropMarksOptions {
   centerMarks?: boolean;
   markWeightPt?: number;
   // Cutter-mark options (pdfpress "Cutter Marks"):
-  cutType?: 'thru' | 'kiss' | 'crease' | 'perf';  // colour/style of the lines
+  cutType?: 'thru' | 'kiss' | 'crease' | 'perf';  // color/style of the lines
   knockout?: boolean;      // white halo behind marks (for dark stock)
   overshootIn?: number;    // extend each mark past the corner
   keyMark?: boolean;       // orientation key (filled square, bottom-left)
@@ -809,7 +809,7 @@ export async function addCropMarksOnly(bytes: Uint8Array, opts: CropMarksOptions
   const srcPages=srcDoc.getPages();
   const outDoc=await PDFDocument.create();
   const embeds=await outDoc.embedPages(srcPages);
-  // Cut type sets colour + dash: thru=solid black, kiss=magenta, crease=blue
+  // Cut type sets color + dash: thru=solid black, kiss=magenta, crease=blue
   // dashed, perf=red dashed.
   const ct = opts.cutType ?? 'thru';
   const color = ct === 'kiss' ? rgb(1, 0, 1) : ct === 'crease' ? rgb(0.15, 0.4, 0.9) : ct === 'perf' ? rgb(0.85, 0.11, 0.14) : rgb(0, 0, 0);
@@ -868,7 +868,7 @@ export function parsePageRange(expr: string, n: number): Set<number> {
 
 // ── Rotate ──────────────────────────────────────────────────────────────────
 // Multiples of 90 set the page /Rotate flag; arbitrary angles are baked in by
-// re-drawing the page rotated about its centre onto a grown bounding box.
+// re-drawing the page rotated about its center onto a grown bounding box.
 
 export async function rotatePdf(bytes: Uint8Array, angleDeg: number, pages?: string): Promise<Uint8Array> {
   const { PDFDocument, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix } = await import('pdf-lib');
@@ -890,7 +890,7 @@ export async function rotatePdf(bytes: Uint8Array, angleDeg: number, pages?: str
     if (!sel.has(i + 1)) { const pg = outDoc.addPage([w, h]); pg.drawPage(embeds[i]!, { x: 0, y: 0, width: w, height: h }); continue; }
     const nw = Math.abs(w * cos) + Math.abs(h * sin), nh = Math.abs(w * sin) + Math.abs(h * cos);
     const pg = outDoc.addPage([nw, nh]);
-    // translate to new centre, rotate, translate back to old centre
+    // translate to new center, rotate, translate back to old center
     const a = cos, b = sin, c = -sin, d = cos;
     const e = nw / 2 - (a * (w / 2) + c * (h / 2)), f = nh / 2 - (b * (w / 2) + d * (h / 2));
     pg.pushOperators(pushGraphicsState(), concatTransformationMatrix(a, b, c, d, e, f));
@@ -1013,7 +1013,7 @@ export interface OverlayOptions {
   // 9-point anchor for 'center' mode + padding (points) from the edges.
   anchor?: 'tl' | 'tc' | 'tr' | 'ml' | 'mc' | 'mr' | 'bl' | 'bc' | 'br';
   paddingPt?: number;
-  blend?: 'normal' | 'multiply';   // Multiply drops white areas (logos on colour)
+  blend?: 'normal' | 'multiply';   // Multiply drops white areas (logos on color)
 }
 
 export async function overlayPdf(baseBytes: Uint8Array, stampBytes: Uint8Array, opts: OverlayOptions): Promise<Uint8Array> {
@@ -1204,7 +1204,7 @@ export async function cropPdf(bytes: Uint8Array, opts: { top:number; right:numbe
 
 // ── Resize / Scale ──────────────────────────────────────────────────────────
 // scale: multiply every page by a percentage. fit: drop each page onto a fixed
-// target sheet, preserving aspect ratio (letterboxed + centred). stretch: force
+// target sheet, preserving aspect ratio (letterboxed + centered). stretch: force
 // content to exactly fill the target sheet (aspect may change).
 
 export interface ResizeOptions {
@@ -1377,7 +1377,7 @@ export async function imposeTiledPoster(bytes: Uint8Array, opts: {
 
 // ── Generate Bleed ──────────────────────────────────────────────────────────
 // Fabricate a bleed margin on artwork that has none by scaling the content to
-// overflow the trim on every edge. Ideal for full-bleed art (photos, colour
+// overflow the trim on every edge. Ideal for full-bleed art (photos, color
 // backgrounds); the original trim is recorded in the TrimBox so downstream
 // marks can find it.
 
@@ -1408,13 +1408,13 @@ export async function generateBleed(bytes: Uint8Array, opts: BleedOptions): Prom
       pg.drawRectangle({ x: 0, y: 0, width: w + 2 * b, height: h + 2 * b, color: rgb(col.r, col.g, col.b) });
       pg.drawPage(emb, { x: b, y: b, width: w, height: h });
     } else if (mode === 'repeat') {
-      // repeat: extend the edge outward with un-mirrored copies (8 around + centre).
+      // repeat: extend the edge outward with un-mirrored copies (8 around + center).
       for (const [ox, oy] of [[-w, 0], [w, 0], [0, -h], [0, h], [-w, -h], [w, -h], [-w, h], [w, h]] as [number, number][])
         pg.drawPage(emb, { x: b + ox, y: b + oy, width: w, height: h });
       pg.drawPage(emb, { x: b, y: b, width: w, height: h });
     } else {
       // mirror: reflect the page across each edge into the bleed, then the real
-      // page on top. Order: corners, edges, centre.
+      // page on top. Order: corners, edges, center.
       const draw = (mx: number, my: number) => {
         pg.pushOperators(pushGraphicsState(), concatTransformationMatrix(mx < 0 ? -1 : 1, 0, 0, my < 0 ? -1 : 1, mx, my));
         pg.drawPage(emb, { x: b, y: b, width: w, height: h });
@@ -1491,7 +1491,7 @@ export interface WatermarkOptions {
   opacity: number;
   angleDeg: number;
   fontSizePt: number;
-  color?: { r: number; g: number; b: number };   // default mid-grey
+  color?: { r: number; g: number; b: number };   // default mid-gray
   pages?: string;                                  // default all
 }
 
@@ -1508,7 +1508,7 @@ export async function addTextWatermark(bytes: Uint8Array, opts: WatermarkOptions
     const pg = pages[i]!;
     const { width: w, height: h } = pg.getSize();
     const tw = font.widthOfTextAtSize(opts.text || 'PROOF', opts.fontSizePt);
-    // Position the baseline so the text's midpoint lands at the page centre.
+    // Position the baseline so the text's midpoint lands at the page center.
     const x = w / 2 - (tw / 2) * Math.cos(rad);
     const y = h / 2 - (tw / 2) * Math.sin(rad);
     pg.drawText(opts.text || 'PROOF', {
@@ -1563,8 +1563,8 @@ export interface CollatingOptions {
   pagesPerSig?: number;     // pages that make up one signature (default 16)
   sigsPerSet?: number;      // staircase length before it resets/wraps (default 12)
   stepPt?: number;          // vertical distance between successive marks (default = markH)
-  color?: { r: number; g: number; b: number };   // primary mark colour (default black)
-  color2?: { r: number; g: number; b: number };  // contrasting colour for the 2nd pass
+  color?: { r: number; g: number; b: number };   // primary mark color (default black)
+  color2?: { r: number; g: number; b: number };  // contrasting color for the 2nd pass
   opacity?: number;         // default 1
   pages?: string;           // which pages to mark (default all)
 }
@@ -1573,7 +1573,7 @@ export interface CollatingOptions {
 // per folded section, stepped progressively down the spine so a correctly
 // gathered book block shows a clean diagonal staircase. When the staircase
 // reaches `sigsPerSet` it resets to the top and the next pass is drawn in a
-// contrasting colour so the two cycles stay distinguishable.
+// contrasting color so the two cycles stay distinguishable.
 export async function addCollatingMarks(bytes: Uint8Array, opts: CollatingOptions): Promise<Uint8Array> {
   const { PDFDocument, rgb } = await import('pdf-lib');
   const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
@@ -1691,7 +1691,7 @@ export async function addOmrMarks(bytes: Uint8Array, opts: OmrOptions): Promise<
 // horizontally along the leading (gripper) edge instead of down the spine.
 // After cutting and stacking, a correct gather shows a clean staircase across
 // the stack edge. Marks sit an `edgeOffset` in from the gripper edge to clear
-// the press gripper zone (10–15 mm), and reset with a contrasting colour once
+// the press gripper zone (10–15 mm), and reset with a contrasting color once
 // the staircase reaches `sectionsPerSet`.
 export interface GatheringOptions {
   edge: 'top' | 'bottom';       // gripper (leading) edge
@@ -1703,7 +1703,7 @@ export interface GatheringOptions {
   sectionsPerSet?: number;      // staircase length before it resets (default 12)
   stepPt?: number;              // horizontal distance between marks (default 8)
   color?: { r: number; g: number; b: number };
-  color2?: { r: number; g: number; b: number };  // contrasting colour for the 2nd pass
+  color2?: { r: number; g: number; b: number };  // contrasting color for the 2nd pass
   opacity?: number;
   pages?: string;
 }
@@ -2243,7 +2243,7 @@ export async function imposeCustomGrid(bytes: Uint8Array, opts: CustomImposeOpti
       const cx = margin + c * (cw + gutter), cy = SH - margin - (r + 1) * ch - r * gutter;   // row 0 = top
       const emb = embeds[cell.page - 1]!;
       const rot = ((cell.rotation ?? 0) % 360) as 0 | 90 | 180 | 270;
-      // fit the (possibly rotated) source into the cell, centred
+      // fit the (possibly rotated) source into the cell, centered
       const sw = emb.width, sh = emb.height;
       const rotated = rot === 90 || rot === 270;
       const fitW = rotated ? sh : sw, fitH = rotated ? sw : sh;
@@ -2479,7 +2479,7 @@ function drawEan13(page: any, rgb: any, text: string, x: number, y: number, w: n
   const first = +d[0]!, parity = EAN_PARITY[first]!;
   let bits = '101'; // start guard
   for (let i = 1; i <= 6; i++) bits += (parity[i - 1] === 'L' ? EAN_L : EAN_G)[+d[i]!];
-  bits += '01010'; // centre guard
+  bits += '01010'; // center guard
   for (let i = 7; i <= 12; i++) bits += EAN_R[+d[i]!];
   bits += '101'; // end guard
   const mod = w / bits.length; const black = rgb(0, 0, 0);
@@ -2661,7 +2661,7 @@ export async function imposeDataMerge(csvText: string, opts: DataMergeOptions): 
 
 // ── Registration Marks ──────────────────────────────────────────────────────
 // Standalone press registration targets (crosshair or bullseye) at the corners
-// and edge midpoints — used to align colour separations on press.
+// and edge midpoints — used to align color separations on press.
 
 export interface RegMarkOptions { marginIn: number; sizeIn: number; style: 'target' | 'crosshair'; }
 
@@ -2732,7 +2732,7 @@ export async function mixPdfs(aBytes: Uint8Array, bBytes: Uint8Array, reverseB =
 }
 
 // ── Nudge ───────────────────────────────────────────────────────────────────
-// Shift every page's content by a small offset and/or rotate it about its centre
+// Shift every page's content by a small offset and/or rotate it about its center
 // — a press fudge for plate mis-registration or trim drift.
 
 export interface NudgeOptions { dxIn: number; dyIn: number; rotateDeg: number; pages?: string; }
@@ -2791,7 +2791,7 @@ export async function repairPdf(bytes: Uint8Array, opts: RepairOptions = {}): Pr
   return out.save({ useObjectStreams: true });
 }
 
-// ── Colour Effects (rasterise + filter) ─────────────────────────────────────
+// ── Color Effects (rasterize + filter) ─────────────────────────────────────
 // Renders targeted pages to a bitmap and applies brightness / contrast /
 // saturation and creative effects, then re-embeds them. Browser-only (needs a
 // canvas); non-targeted pages are copied through unchanged.
@@ -2803,7 +2803,7 @@ export interface ColorEffectsOptions {
   warmTone?: number;     // 0–100 % (sepia cast)
   invert?: number;       // 0–100 %
   hueRotate?: number;    // 0–360°
-  dpi?: number;          // rasterise resolution (150 / 300 / 600)
+  dpi?: number;          // rasterize resolution (150 / 300 / 600)
   pages?: string;
 }
 
@@ -2820,14 +2820,14 @@ export function colorEffectsFilter(o: ColorEffectsOptions): string {
   return p.join(' ');
 }
 
-// Is this effect stack a no-op (identity)? Used to skip needless rasterisation.
+// Is this effect stack a no-op (identity)? Used to skip needless rasterization.
 export function colorEffectsIsIdentity(o: ColorEffectsOptions): boolean {
   return (o.brightness ?? 100) === 100 && (o.contrast ?? 100) === 100 && (o.saturation ?? 100) === 100 &&
     !o.grayscale && !o.warmTone && !o.invert && !o.hueRotate;
 }
 
 export async function applyColorEffects(bytes: Uint8Array, opts: ColorEffectsOptions): Promise<Uint8Array> {
-  if (typeof document === 'undefined') throw new Error('Colour Effects needs a browser (canvas rasterisation).');
+  if (typeof document === 'undefined') throw new Error('Color Effects needs a browser (canvas rasterization).');
   const { PDFDocument } = await import('pdf-lib');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdfjs: any = await import('pdfjs-dist');
@@ -2865,13 +2865,13 @@ export async function applyColorEffects(bytes: Uint8Array, opts: ColorEffectsOpt
   return out.save();
 }
 
-// ── Colour Management (RGB → CMYK gamut simulation + gamut warning) ──────────
-// A genuine gamut-aware conversion done client-side: rasterise, map each pixel
+// ── Color Management (RGB → CMYK gamut simulation + gamut warning) ──────────
+// A genuine gamut-aware conversion done client-side: rasterize, map each pixel
 // RGB → CMYK → RGB (standard GCR model) so the output shows the CMYK-reproducible
-// colour, and optionally flag out-of-gamut pixels. Note: precise device ICC
-// profiles (FOGRA39, GRACoL…) require a full colour-management module; this uses
+// color, and optionally flag out-of-gamut pixels. Note: precise device ICC
+// profiles (FOGRA39, GRACoL…) require a full color-management module; this uses
 // a standard SWOP-like CMYK model — accurate enough for gamut checking and
-// RGB→CMYK normalisation, and honest about not being a device-exact transform.
+// RGB→CMYK normalization, and honest about not being a device-exact transform.
 export function rgbToCmyk(r: number, g: number, b: number): [number, number, number, number] {
   const k = 1 - Math.max(r, g, b);
   if (k >= 1 - 1e-6) return [0, 0, 0, 1];
@@ -2901,12 +2901,12 @@ export function cmykToRgb(c: number, m: number, y: number, k: number): [number, 
   const kf = 1 - 0.9 * k;   // black-ink darkening
   return [r * kf, g * kf, b * kf];
 }
-// RGB → CMYK → RGB round-trip = the CMYK-reproducible approximation of a colour.
+// RGB → CMYK → RGB round-trip = the CMYK-reproducible approximation of a color.
 export function cmykRoundTrip(r: number, g: number, b: number): [number, number, number] {
   const [c, m, y, k] = rgbToCmyk(r, g, b);
   return cmykToRgb(c, m, y, k);
 }
-// A colour is "out of CMYK gamut" when the round-trip can't get close to it
+// A color is "out of CMYK gamut" when the round-trip can't get close to it
 // (saturated RGB primaries/secondaries drift the most).
 export function isOutOfCmykGamut(r: number, g: number, b: number, thresh = 0.12): boolean {
   const [r2, g2, b2] = cmykRoundTrip(r, g, b);
@@ -2924,8 +2924,8 @@ export function mapPixelCmyk(r: number, g: number, b: number, intent: string): [
 }
 
 // Assign a destination ICC profile to the PDF as a PDF/X `/OutputIntent` — the
-// real, lossless "embed the profile" operation a RIP reads (no rasterisation).
-// `/N` (colorant count) is read from the ICC header's colour-space signature.
+// real, lossless "embed the profile" operation a RIP reads (no rasterization).
+// `/N` (colorant count) is read from the ICC header's color-space signature.
 export async function assignOutputIntent(baseBytes: Uint8Array, iccBytes: Uint8Array, conditionName: string): Promise<Uint8Array> {
   const { PDFDocument, PDFName, PDFString } = await import('pdf-lib');
   const doc = await PDFDocument.load(baseBytes, { ignoreEncryption: true });
@@ -2948,14 +2948,14 @@ export interface ColorManageOptions {
   destProfile?: string;       // informational (FOGRA39 / GRACoL / SWOP …)
   intent?: 'perceptual' | 'relative' | 'saturation' | 'absolute';
   dpi?: number;
-  convert?: boolean;          // rasterise + RGB→CMYK gamut conversion
-  gamutWarning?: boolean;     // paint out-of-gamut pixels a warning colour
+  convert?: boolean;          // rasterize + RGB→CMYK gamut conversion
+  gamutWarning?: boolean;     // paint out-of-gamut pixels a warning color
   warningColor?: { r: number; g: number; b: number };  // default bright green
   pages?: string;
 }
 
 export async function applyColorManagement(bytes: Uint8Array, opts: ColorManageOptions): Promise<Uint8Array> {
-  if (typeof document === 'undefined') throw new Error('Colour Management needs a browser (canvas rasterisation).');
+  if (typeof document === 'undefined') throw new Error('Color Management needs a browser (canvas rasterization).');
   const { PDFDocument } = await import('pdf-lib');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdfjs: any = await import('pdfjs-dist');
@@ -2997,8 +2997,8 @@ export async function applyColorManagement(bytes: Uint8Array, opts: ColorManageO
 }
 
 // ── Backdrop ────────────────────────────────────────────────────────────────
-// Paint a solid colour behind every page's content — turns transparent /
-// borderless art onto a coloured stock, or flattens knockouts to a base.
+// Paint a solid color behind every page's content — turns transparent /
+// borderless art onto a colored stock, or flattens knockouts to a base.
 
 export interface BackdropOptions { r: number; g: number; b: number; }
 
@@ -3225,8 +3225,8 @@ export async function addDimensions(bytes: Uint8Array): Promise<Uint8Array> {
   return doc.save();
 }
 
-// ── Spot-colour helpers (Separation channels for RIPs / cutters) ────────────
-// Registers a `/Separation` colour space named `spotName` on the document (the
+// ── Spot-color helpers (Separation channels for RIPs / cutters) ────────────
+// Registers a `/Separation` color space named `spotName` on the document (the
 // name is what a RIP or digital cutter reads) with a DeviceRGB alternate for
 // on-screen preview, wires it into the page's resources, and returns the
 // resource key to reference in the content stream. Cached per document.
@@ -3252,7 +3252,7 @@ function ensureSeparation(PL: any, doc: any, page: any, spotName: string, previe
 }
 
 // Append (or prepend) a raw content stream to a page without disturbing the
-// existing content — used to lay spot-colour separations behind or in front.
+// existing content — used to lay spot-color separations behind or in front.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function addContentStream(PL: any, ctx: any, page: any, str: string, prepend: boolean): void {
   const { PDFName, PDFArray } = PL;
@@ -3318,7 +3318,7 @@ function boxOf(page: any, target: string, customWpt?: number, customHpt?: number
   return { x: b.x, y: b.y, w: b.width, h: b.height };
 }
 
-// ── Die lines / Cut contour (spot-colour toolpath) ──────────────────────────
+// ── Die lines / Cut contour (spot-color toolpath) ──────────────────────────
 export interface CutContourOptions {
   shape: 'rectangle' | 'rounded' | 'ellipse';
   target: 'trim' | 'bleed' | 'media' | 'custom';
@@ -3358,7 +3358,7 @@ export async function addCutContour(bytes: Uint8Array, opts: CutContourOptions):
   return doc.save();
 }
 
-// ── White ink / spot varnish (flood or targeted spot-colour fill) ───────────
+// ── White ink / spot varnish (flood or targeted spot-color fill) ───────────
 export interface WhiteVarnishOptions {
   spotName: string;              // 'White' or 'Varnish' (or custom)
   coverage: 'flood' | 'trim' | 'bleed' | 'custom';
@@ -3403,11 +3403,11 @@ export async function addWhiteVarnish(bytes: Uint8Array, opts: WhiteVarnishOptio
 // Artwork spans the full 306 so the side trim cuts through ink.
 const DBOX_TRIM_W_MM = 300, DBOX_BLEED_MM = 3;
 const DBOX_SHEET_W_MM = DBOX_TRIM_W_MM + 2 * DBOX_BLEED_MM, DBOX_SHEET_H_MM = 572;
-// Fold zones (owner spec, 2026-07-21): each fold is 5 mm WIDE, centred at
+// Fold zones (owner spec, 2026-07-21): each fold is 5 mm WIDE, centered at
 // these positions (mm from the top, top = 0). Zones: 45-50, 257.5-262.5,
 // 307.5-312.5, 522.5-527.5. Sections between zones carry 3 mm bleed
 // top+bottom INTO the zones (adjacent bleeds overlap ~1 mm at each fold
-// centre — the TIFF composite is a UNION, opaque pixels only).
+// center — the TIFF composite is a UNION, opaque pixels only).
 const DBOX_FOLDS_MM = [47.5, 260, 310, 525];
 // CHOKE: the white under-base is pulled IN this many pixels from every art edge
 // so slight press misregistration never shows a white halo past the printed art
@@ -3421,7 +3421,7 @@ const DBOX_WHITE_CHOKE_PX = 3;
 // Ink amount on press is the RIP's job (density/Percent/layers), not the file's.
 
 // BLACK KNOCKOUT (owner): the box substrate IS black, so artwork that is
-// already black needs no ink — knocking it out saves white and colour, and the
+// already black needs no ink — knocking it out saves white and color, and the
 // substrate's own black reads deeper than black printed over a white base.
 // A RAMP, never a hard threshold: fully knocked out at/below DBOX_KO_FULL
 // luminance, untouched at/above DBOX_KO_NONE, scaled smoothly between, so
@@ -3563,7 +3563,7 @@ export interface DivinityBoxOptions {
   fit?: 'cover' | 'contain' | 'stretch';   // how each panel's art fills its panel (default cover)
   whiteUnder?: boolean;    // spot "W1" white under-base behind each panel (default true — black box)
   // Knock LARGE swaths of black out of the plate so the box's own black shows
-  // through and no white/colour is wasted there (default ON). Only big open
+  // through and no white/color is wasted there (default ON). Only big open
   // black expanses qualify — never the blacks on the subject or in bounded
   // background elements.
   knockoutBlack?: boolean;
@@ -3605,7 +3605,7 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
     if (!colorSrc) colorSrc = src;
 
     const cellW = panel.wMm * MM, cellH = panel.hMm * MM;
-    const cellX = (sheetW - cellW) / 2;                       // full width, centred
+    const cellX = (sheetW - cellW) / 2;                       // full width, centered
     const cellY = sheetH - panel.topMm * MM - cellH;          // PDF bottom-up
     placedPanels.push({ x: cellX, y: cellY, w: cellW, h: cellH });
 
@@ -3710,7 +3710,7 @@ async function composeDivinityBox(
       // transparent pixel transparent. DO NOT reintroduce a drawImage crop here.
       const pc = mkCanvas(pwPx, phPx);
       const pctx = pc.getContext('2d');
-      // Crop-centre with an INTEGER translate: browser canvases render large
+      // Crop-center with an INTEGER translate: browser canvases render large
       // images in tiles, and a fractional offset makes every tile boundary land
       // between pixels — the smoothing leaves alpha ~250-254 seams that print
       // as lines in the white plate ("tons of lines in the print").
@@ -3743,7 +3743,7 @@ async function composeDivinityBox(
         const rawA = img[pi + 3]!;
         let aByte = rawA >= 250 ? 255 : rawA <= 5 ? 0 : rawA;
         // Black knockout: LARGE swaths of black print as bare substrate — no
-        // colour, no W1, no V1 (they mirror this alpha). Only big open black
+        // color, no W1, no V1 (they mirror this alpha). Only big open black
         // expanses qualify; blacks on the subject or in bounded elements are
         // untouched (see blackSwathKeepMask).
         if (keepMask && aByte > 0) {
@@ -3752,7 +3752,7 @@ async function composeDivinityBox(
         }
         // UNION compositing: only pixels with ink write. Panels' 3 mm top/bottom
         // bleeds overlap ~1 mm inside the 5 mm fold zones — a transparent edge
-        // of a later panel must never erase the neighbour's bleed underneath.
+        // of a later panel must never erase the neighbor's bleed underneath.
         if (aByte === 0) continue;
         // RGB straight from the artwork (channels 0,1,2 = R,G,B).
         buf[si] = img[pi]!;
@@ -3778,7 +3778,7 @@ async function composeDivinityBox(
 
   // Choke the white under-base (W1, channel 4) inward by DBOX_WHITE_CHOKE_PX so
   // no white halo shows past the art. Runs on INK LEVEL (bright = ink), before
-  // the polarity inversion below. Colour (RGB) and transparency (A) keep full
+  // the polarity inversion below. Color (RGB) and transparency (A) keep full
   // extent — only the white plate pulls in.
   if (opts.whiteUnder !== false && DBOX_WHITE_CHOKE_PX > 0) {
     const plane = new Uint8Array(W * H);
@@ -3807,8 +3807,8 @@ export async function divinityBoxTiff(opts: DivinityBoxOptions & { dpi?: number 
   }
 
   // R G B A W1 V1 — alpha:true writes the transparency as the first extra sample.
-  // Tagged sRGB (tag 34675) so Photoshop/RIPs read the colours as-is instead of
-  // assigning the working space to an untagged file (which shifts every colour).
+  // Tagged sRGB (tag 34675) so Photoshop/RIPs read the colors as-is instead of
+  // assigning the working space to an untagged file (which shifts every color).
   const { srgbProfile } = await import('./srgb-profile');
   return encodeRgbSpotTiff({ width: W, height: H, interleaved: buf, spotNames: ['W1', 'V1'], alpha: true, iccProfile: srgbProfile(), dpi });
 }
@@ -4052,7 +4052,7 @@ export async function removeBackground(bytes: Uint8Array, opts?: RemoveBackgroun
 // Proof PDF that reflects the REAL plates: the artwork as rendered plus true
 // W1/V1 Separation images built from the same compositor the production TIFF
 // uses — so knockout, the artwork's own alpha and the 3px white choke all show
-// up in the proof instead of the old solid panel rectangles. Rasterised by
+// up in the proof instead of the old solid panel rectangles. Rasterized by
 // nature (a spot plate that follows artwork alpha cannot be vector), so this is
 // a separate deliverable from the fast vector layout PDF.
 export async function divinityBoxProof(opts: DivinityBoxOptions & { dpi?: number }): Promise<Uint8Array> {
@@ -4175,7 +4175,7 @@ export interface PerfectCoverOptions {
   // panel (and over the glue zone). Trimmed per panel: back cover's right,
   // front cover's left, inside front's right, inside back's left. Default ON.
   trimSpineBleed?: boolean;
-  /* Print each crease's ABSOLUTE position, in millimetres from the sheet's left
+  /* Print each crease's ABSOLUTE position, in millimeters from the sheet's left
      edge, along the top edge inside the bleed. The bleed is trimmed away, so
      these never reach the finished cover — they are there for whoever sets the
      creaser, who otherwise has to measure the fold off a proof. Default ON. */
@@ -4192,7 +4192,7 @@ export interface PerfectCoverOptions {
   /* THE PRESS SHEET the wrap prints on (11×17, 12×18, …). Omit and the page IS
      the wrap, which leaves the RIP to decide where a 13.75×10.5" cover lands on
      the 11×17 in the tray — and a Fiery answers that by rotating and scaling it
-     to taste. Naming the media here imposes the wrap ourselves, centred, so the
+     to taste. Naming the media here imposes the wrap ourselves, centered, so the
      press has nothing left to decide. */
   mediaWIn?: number; mediaHIn?: number;
   /* Which way round the sheet is described. 'auto' (default) emits whichever
@@ -4234,7 +4234,7 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   const wrapW = 2 * trimW + spine + 2 * bleed, wrapH = trimH + 2 * bleed;
 
   /* THE PRESS SHEET. With no media named the page IS the wrap (what this tool
-     always did). Name the media and the wrap is centred on a real sheet, so the
+     always did). Name the media and the wrap is centered on a real sheet, so the
      RIP is not left to place a 13.75 x 10.5" cover on the 11x17 in the tray —
      which it answers by rotating and scaling to taste. That is the whole cause
      of "the right size in the PDF, the wrong size out of the Fiery" on covers.
@@ -4344,7 +4344,7 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   /* ONE definition of the crease geometry, used by both the tick marks and the
-     millimetre labels — so a number printed on the sheet can never disagree
+     millimeter labels — so a number printed on the sheet can never disagree
      with the tick it belongs to. */
   /* Stated in SHEET coordinates (ox already added), because a crease is set
      from the edge of the sheet that goes into the creaser — not from the edge
@@ -4391,7 +4391,7 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
     for (const x of [wx0 + bleed + trimW - hinge, wx0 + bleed + trimW + spine + hinge]) tickVDash(x);
   };
 
-  /* Crease positions in millimetres, along the top edge, inside the bleed.
+  /* Crease positions in millimeters, along the top edge, inside the bleed.
      Measured from the sheet's LEFT EDGE (the PDF page origin) because that is
      the edge the creaser registers against — and stated on the sheet, so there
      is no question which datum the numbers use.
@@ -4399,7 +4399,7 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   const drawCreaseLabels = async (page: any) => {
     const size = Math.max(2, opts.creaseLabelPt ?? 4);
     const font = await out.embedFont(StandardFonts.Helvetica);
-    const MM = 25.4 / PT;                                  // points -> millimetres
+    const MM = 25.4 / PT;                                  // points -> millimeters
     const creases = CREASES;
 
     /* Where the numbers sit, best place first:
@@ -4439,9 +4439,9 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
       const mm = c.x * MM;
       const text = `${mm.toFixed(1)}`;
       const w = font.widthOfTextAtSize(text, size);
-      /* Centre each number on its crease, but never let two overlap: a pair of
+      /* Center each number on its crease, but never let two overlap: a pair of
          numbers printed on top of each other is worse than one shifted a
-         millimetre off centre, because the tick already marks the exact spot. */
+         millimeter off center, because the tick already marks the exact spot. */
       let x = c.x - w / 2;
       if (x < cursor) x = cursor;
       cursor = x + w + 3;
@@ -4512,7 +4512,7 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
 
 /* ── Media Size Fix ─────────────────────────────────────────────────────────
 
-   Put a FINISHED file onto the sheet it actually prints on, and centre it there
+   Put a FINISHED file onto the sheet it actually prints on, and center it there
    at 1:1. Nothing is re-imposed and nothing is re-scaled: the artwork keeps its
    exact dimensions and simply gains the paper around it.
 
@@ -4542,6 +4542,66 @@ export interface MediaFitOptions {
   shrinkOversize?: boolean;
   alignX?: 'center' | 'left' | 'right';
   alignY?: 'center' | 'bottom' | 'top';
+  /* Center the ARTWORK rather than the page box. Default OFF, and it should
+     stay off for anything full-bleed: a cover wrap IS its page, and measuring
+     ink instead would shift a cover that happens to have a white edge in the
+     art. Turn it on only for a file whose page box is bigger than the job drawn
+     on it — leftover space from an earlier tool, say. Falls back to the page
+     box when there is no canvas to measure with, or the page is blank. */
+  centerArt?: boolean;
+  /** Longest side, in pixels, of the scan used to find the ink. */
+  inkScanPx?: number;
+}
+
+/** The inked area of each page, in points, in VISIBLE page coordinates (i.e.
+ *  after the page's own /Rotate). Null per page where nothing was found.
+ *
+ *  Ink is "not transparent and not paper-white": rendered on a transparent
+ *  canvas, a pixel counts when it is opaque enough to see AND not white. That
+ *  treats an empty page and a page with a white rectangle painted over it the
+ *  same way, which is right — neither puts toner down. */
+async function inkBoundsPt(
+  bytes: Uint8Array, scanPx: number,
+): Promise<({ x: number; y: number; w: number; h: number } | null)[]> {
+  if (typeof document === 'undefined') return [];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfjs: any = await import('pdfjs-dist');
+    try { pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default; } catch { /* bundler resolves worker */ }
+    const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+    const out: ({ x: number; y: number; w: number; h: number } | null)[] = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const v1 = page.getViewport({ scale: 1 });          // already honors /Rotate
+      const scale = Math.min(scanPx / v1.width, scanPx / v1.height, 2);
+      const vp = page.getViewport({ scale });
+      const cw = Math.max(1, Math.ceil(vp.width)), ch = Math.max(1, Math.ceil(vp.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+      ctx.clearRect(0, 0, cw, ch);                        // TRANSPARENT, not white
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      const data = ctx.getImageData(0, 0, cw, ch).data;
+      let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
+      for (let y = 0; y < ch; y++) {
+        for (let x = 0; x < cw; x++) {
+          const p = (y * cw + x) * 4;
+          const a = data[p + 3]!;
+          if (a < 12) continue;                            // nothing drawn here
+          if (data[p]! >= 250 && data[p + 1]! >= 250 && data[p + 2]! >= 250) continue;  // paper white
+          if (x < x0) x0 = x; if (x > x1) x1 = x;
+          if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+      }
+      if (x1 < x0 || y1 < y0) { out.push(null); continue; }
+      // Canvas y runs down, PDF y runs up.
+      out.push({
+        x: x0 / scale, y: (ch - 1 - y1) / scale,
+        w: (x1 - x0 + 1) / scale, h: (y1 - y0 + 1) / scale,
+      });
+    }
+    return out;
+  } catch { return []; }
 }
 
 export interface MediaFitReport {
@@ -4551,9 +4611,13 @@ export interface MediaFitReport {
   oversize: number[];
   scaled: number[];
   sheetIn: { wIn: number; hIn: number }[];
+  /** The measured inked area per page, when it could be measured. */
+  inkIn: { wIn: number; hIn: number }[];
+  /** Pages where no ink was found, so the page box was centered instead. */
+  noInk: number[];
 }
 
-/** Centre every page of `bytes` on the named media. Returns the new PDF. */
+/** Center every page of `bytes` on the named media. Returns the new PDF. */
 export async function imposeOnMedia(
   bytes: Uint8Array, opts: MediaFitOptions,
 ): Promise<{ bytes: Uint8Array; report: MediaFitReport }> {
@@ -4564,10 +4628,11 @@ export async function imposeOnMedia(
 
   const mw = Math.max(1, opts.mediaWIn) * PT, mh = Math.max(1, opts.mediaHIn) * PT;
   const EPS = 0.5;
-  const report: MediaFitReport = { pages: 0, turned: [], oversize: [], scaled: [], sheetIn: [] };
+  const report: MediaFitReport = { pages: 0, turned: [], oversize: [], scaled: [], sheetIn: [], inkIn: [], noInk: [] };
 
   const pages = src.getPages();
   const embeds = pages.length ? await out.embedPages(pages) : [];
+  const ink = opts.centerArt ? await inkBoundsPt(bytes, opts.inkScanPx ?? 700) : [];
 
   for (let i = 0; i < pages.length; i++) {
     const emb = embeds[i]!;
@@ -4626,12 +4691,32 @@ export async function imposeOnMedia(
       180: { x: x + pw, y: y + ph },
       270: { x, y: y + ph },
     };
+    /* Shift so the INK is centered rather than the page box — see centerArt.
+       The ink rect is measured in visible page coordinates, so it is turned
+       with the artwork before being used. */
+    let dx = 0, dy = 0;
+    const ib = ink[i];
+    if (ib) {
+      const r = turnArt ? { x: ah - ib.y - ib.h, y: ib.x, w: ib.h, h: ib.w } : ib;
+      const ix = r.x * scale, iy = r.y * scale, iw = r.w * scale, ih = r.h * scale;
+      const wantX = opts.alignX === 'left' ? 0 : opts.alignX === 'right' ? shW - iw : (shW - iw) / 2;
+      const wantY = opts.alignY === 'bottom' ? 0 : opts.alignY === 'top' ? shH - ih : (shH - ih) / 2;
+      dx = wantX - (x + ix); dy = wantY - (y + iy);
+      report.inkIn.push({ wIn: r.w / PT, hIn: r.h / PT });
+    } else if (opts.centerArt) {
+      report.noInk.push(i + 1);
+    }
+
     const a = anchors[theta] ?? anchors[0]!;
-    page.drawPage(emb, { ...place, x: a.x, y: a.y, rotate: degrees(theta) });
+    page.drawPage(emb, { ...place, x: a.x + dx, y: a.y + dy, rotate: degrees(theta) });
 
     /* The artwork's footprint on the sheet, so downstream tools (and the RIP)
        can tell the job from the paper around it. */
-    try { page.setBleedBox(x, y, Math.min(pw, shW), Math.min(ph, shH)); } catch { /* nicety */ }
+    try {
+      const bx = x + dx, by = y + dy;
+      page.setBleedBox(Math.max(0, bx), Math.max(0, by),
+        Math.min(pw, shW - Math.max(0, bx)), Math.min(ph, shH - Math.max(0, by)));
+    } catch { /* nicety */ }
 
     report.sheetIn.push({ wIn: shW / PT, hIn: shH / PT });
   }
@@ -4653,7 +4738,7 @@ export interface RaisedMetalTuning {
   highlightFrom?: number;   // luminance where a highlight starts (default 200)
   floor?: number;           // drop coverage below this — kills sensor/JPEG noise (default 24)
   gamma?: number;           // <1 fattens the lines, >1 thins them (default 1)
-  // A slight grey tone under the linework so the relief modulates with the art
+  // A slight gray tone under the linework so the relief modulates with the art
   // instead of being flat lines. Small by design (default 0.18); darker art
   // gets more varnish, which is where the shading and metal mass sits.
   toneGain?: number;
@@ -4721,7 +4806,7 @@ export function metalMaskFromPixels(
       const edge = Math.min(255, Math.max(0, -dog) * PHI * 255) * edgeGain;
       // Specular highlight: how far above the highlight point this pixel sits.
       const hl = c > hlFrom ? ((c - hlFrom) / (255 - hlFrom)) * 255 * hlGain : 0;
-      // Linework/highlights, plus a slight grey tone from the art's own shading.
+      // Linework/highlights, plus a slight gray tone from the art's own shading.
       const tone = toneGain > 0 ? (1 - c / 255) * 255 * toneGain : 0;
       let v = Math.min(255, Math.max(edge, hl) + tone);
       // Drop the noise floor CONTINUOUSLY — subtract it and rescale — instead
@@ -4734,7 +4819,7 @@ export function metalMaskFromPixels(
       out[y * w + x] = Math.max(0, Math.min(255, Math.round(v)));
     }
   }
-  // Auto-normalise: without it a softly painted page plates at ~20% and the
+  // Auto-normalize: without it a softly painted page plates at ~20% and the
   // varnish "doesn't do much". Scale so the strongest linework reaches full ink.
   let peak = 0;
   for (let i = 0; i < out.length; i++) if (out[i]! > peak) peak = out[i]!;
@@ -4749,17 +4834,17 @@ export interface RaisedMetalOptions extends RaisedMetalTuning {
   page?: number;
   dpi?: number;             // plate resolution (default 300)
   spotName?: string;        // varnish channel name (default 'V1')
-  whiteName?: string;       // white channel name on the colour pass (default 'W1')
+  whiteName?: string;       // white channel name on the color pass (default 'W1')
   subjectOnly?: boolean;    // gate to the SAM subject so the background stays flat
   matteTighten?: number;    // pull the matte's soft fringe in (1 = as the model gives it)
   // TWO-PASS BUILD, printed in this order:
-  //  'varnish' — the raised plate ONLY: line art + slight grey tone on the
-  //              varnish channel, no colour and no white. Print and cure this
+  //  'varnish' — the raised plate ONLY: line art + slight gray tone on the
+  //              varnish channel, no color and no white. Print and cure this
   //              first; the repeated varnish passes build the relief.
-  //  'colour'  — the artwork with its white under-base, overprinted on the
+  //  'color'  — the artwork with its white under-base, overprinted on the
   //              cured varnish so the finish reads as raised metal.
   // Both come out the same pixel size, so they register.
-  pass?: 'varnish' | 'colour';
+  pass?: 'varnish' | 'color';
 }
 
 // RGB + (transparency) + the metal spot channel, in the same uncompressed,
@@ -4815,7 +4900,7 @@ export async function raisedMetalTiff(src: Uint8Array, opts?: RaisedMetalOptions
   for (let i = 0, p = 0, q = 0; i < W * H; i++, p += 4, q += spp) {
     const a = img[p + 3]!;
     if (isVarnish) {
-      // Pass 1 — relief only: no colour, no white, just the varnish plate.
+      // Pass 1 — relief only: no color, no white, just the varnish plate.
       buf[q] = 255; buf[q + 1] = 255; buf[q + 2] = 255;
       buf[q + 3] = 255;                              // opaque, so the RIP keeps it
       buf[q + 4] = 255;                              // W1 empty (INVERTED: 255 = no ink)
@@ -4919,7 +5004,7 @@ export async function addBraille(bytes: Uint8Array, opts: BrailleOptions): Promi
 // ── Nesting (Stickers): bin-packing + optional true-shape ───────────────────
 // Packs the source pages (which may be different sizes = different stickers)
 // onto sheets or a roll, minimising waste. Bounding-box mode uses a skyline
-// bottom-left packer with optional 90° rotation. True-shape mode rasterises each
+// bottom-left packer with optional 90° rotation. True-shape mode rasterizes each
 // item's alpha outline (via pdf.js) and packs into each other's negative space.
 
 export interface NestOptions {
@@ -4930,8 +5015,8 @@ export interface NestOptions {
   allowRotate: boolean;     // allow 90° rotation
   copies: number;           // copies per source page
   fillSheet: boolean;       // fill a sheet with copies (ignores `copies`)
-  trueShape?: boolean;      // rasterise outlines + pack into negative space
-  dpi?: number;             // rasterisation DPI for true-shape (default 36)
+  trueShape?: boolean;      // rasterize outlines + pack into negative space
+  dpi?: number;             // rasterization DPI for true-shape (default 36)
 }
 
 interface NestItem { page: number; w: number; h: number; }
@@ -4963,13 +5048,13 @@ function skylinePlace(sky: { x: number; y: number; w: number }[], x: number, y: 
   }
   out.push({ x, y: top, w });
   out.sort((a, b) => a.x - b.x);
-  // merge equal-height neighbours
+  // merge equal-height neighbors
   const merged: { x: number; y: number; w: number }[] = [];
   for (const s of out) { const last = merged[merged.length - 1]; if (last && Math.abs(last.y - s.y) < 1e-6 && Math.abs(last.x + last.w - s.x) < 1e-6) last.w += s.w; else merged.push({ ...s }); }
   return merged;
 }
 
-// Rasterise a page to a coarse boolean occupancy grid via pdf.js (browser only).
+// Rasterize a page to a coarse boolean occupancy grid via pdf.js (browser only).
 // grid[row][col] = true where the artwork is non-transparent. cellPt = grid cell
 // size in points. Returns null if pdf.js / canvas is unavailable.
 async function rasterizeOccupancy(bytes: Uint8Array, pageIndex: number, cellPt: number): Promise<boolean[][] | null> {
@@ -5000,7 +5085,7 @@ async function nestTrueShape(bytes: Uint8Array, srcPages: any[], items: NestItem
   const cellPt = Math.max(2, 72 / (opts.dpi ?? 36));     // grid resolution
   const occ: (boolean[][] | null)[] = [];
   for (let i = 0; i < srcPages.length; i++) occ[i] = await rasterizeOccupancy(bytes, i, cellPt);
-  if (occ.some(o => !o)) return null;                    // rasterisation unavailable → fall back
+  if (occ.some(o => !o)) return null;                    // rasterization unavailable → fall back
   const pad = Math.round((opts.paddingIn * PT) / cellPt);
   const m = Math.round((opts.marginIn * PT) / cellPt);
   const SW = Math.floor((opts.sheetWIn * PT) / cellPt) - 2 * m;
@@ -5056,7 +5141,7 @@ export async function nestPdf(bytes: Uint8Array, opts: NestOptions): Promise<Uin
   items.sort((a, b) => b.h - a.h);
 
   // True-shape nesting (pdf.js) when requested; falls back to bounding-box if the
-  // rasteriser is unavailable (e.g. non-browser) or nothing rasterised.
+  // rasterizer is unavailable (e.g. non-browser) or nothing rasterized.
   if (opts.trueShape) {
     const ts = await nestTrueShape(bytes, srcPages, items, opts);
     if (ts) return renderNest(await PDFDocument.create(), srcPages, ts, opts, degrees);
@@ -5242,7 +5327,7 @@ export async function addCutterMarks(bytes: Uint8Array, opts: CutterMarksOptions
     if (opts.refBox === 'trim') {
       try { const tb = refPg.getTrimBox(); bx = tb.x; by = tb.y; bw = tb.width; bh = tb.height; } catch { /* media */ }
     }
-    // Mark centres sit `margin` inside (or outside) the reference box corners.
+    // Mark centers sit `margin` inside (or outside) the reference box corners.
     const d = opts.placement === 'outside' ? -m : m;
     const x0 = bx + d, x1 = bx + bw - d, y0 = by + d, y1 = by + bh - d;
 
@@ -5373,7 +5458,7 @@ export interface ReplicateOptions {
   bleedIn?: number;
 }
 
-// How many copies safely fit the selected sheet, and the centred grid geometry.
+// How many copies safely fit the selected sheet, and the centered grid geometry.
 export function replicateGrid(opts: {
   sheetWIn: number; sheetHIn: number; cellWIn: number; cellHIn: number;
   marginIn: number; gutterXIn: number; gutterYIn: number;
@@ -5416,7 +5501,7 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
   const pSize = primaryPage.getSize();
 
   // Cell = the image's OWN native size (default) — respect the art, don't squish
-  // it into a preset card. An explicit cell size is honoured only if passed.
+  // it into a preset card. An explicit cell size is honored only if passed.
   let cellWIn = opts.cellWIn || pSize.width / PT;
   let cellHIn = opts.cellHIn || pSize.height / PT;
   if (opts.autoOrient !== false && opts.cellWIn && opts.cellHIn) {
@@ -5452,7 +5537,7 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
   const shW = opts.sheetWIn * PT, shH = opts.sheetHIn * PT;
   const m = grid.marginIn * PT, gx = grid.gutterXIn * PT, gy = grid.gutterYIn * PT;
   const cellW = cellWIn * PT, cellH = cellHIn * PT;
-  // Centre the packed block on the sheet (gaps are never less than the margin).
+  // Center the packed block on the sheet (gaps are never less than the margin).
   const blockW = cols * cellW + (cols - 1) * gx, blockH = rows * cellH + (rows - 1) * gy;
   const leftGap = (shW - blockW) / 2, topGap = (shH - blockH) / 2;
 
@@ -5485,7 +5570,7 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
   const off = (opts.markOffIn ?? 0.125) * PT;
   /* Clip the mark to the space it has. The grid reserved room for the offset
      plus a short mark, not for the full length, so drawing the full length
-     would run marks across the neighbouring card. Half a gutter each is right:
+     would run marks across the neighboring card. Half a gutter each is right:
      the two marks meet in the middle and read as one cut line. */
   const room = [m - off,
     ...(cols > 1 ? [gx / 2 - off] : []),
@@ -5537,7 +5622,7 @@ export async function replicateFill(primary: Uint8Array, opts: ReplicateOptions)
     if (opts.addMarks) {
       // Marks sit at the TRIM: inset by the bleed the artwork carries. The
       // reach clamp grows by the same amount (the mark may cross its own bleed
-      // strip, which is cut away — never a neighbour's art).
+      // strip, which is cut away — never a neighbor's art).
       const bl = (opts.bleedIn ?? 0) * PT;
       const reach = {
         l: (col === 0 ? leftGap : gx / 2) + bl,
@@ -5672,7 +5757,7 @@ export async function imposeGangJobs(sources: Uint8Array[], jobs: GangJob[], opt
 
 // ── Fold-and-cut zine ────────────────────────────────────────────────────────
 // One-sheet zines: Half (1/2 · 2 panels), Quarter (1/4 · 4 panels) and the
-// classic Mini (1/8 · 8 panels, single-sided, cut a centre slit and fold).
+// classic Mini (1/8 · 8 panels, single-sided, cut a center slit and fold).
 // Pages nest from both ends so one folded stack reads in order.
 
 export type ZineFormat = 'half' | 'quarter' | 'mini';
@@ -5755,7 +5840,7 @@ export async function imposeFoldZine(bytes: Uint8Array, opts: FoldZineOptions): 
         for (let r = 1; r < rows; r++) pg.drawLine({ start: { x: 0, y: r * cellH }, end: { x: shW, y: r * cellH }, thickness: gw.fold ?? 0.75, color: violet, dashArray: [5, 4] });
       }
       if (opts.guides?.center && opts.format === 'mini') {
-        // The cut slit: centre horizontal, spanning the middle two column pairs.
+        // The cut slit: center horizontal, spanning the middle two column pairs.
         pg.drawLine({ start: { x: cellW, y: shH / 2 }, end: { x: shW - cellW, y: shH / 2 }, thickness: gw.center ?? 1.1, color: orange });
       }
       if (opts.guides?.margin) {

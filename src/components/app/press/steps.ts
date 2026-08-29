@@ -146,7 +146,7 @@ export function defaultSettings(type: StepType): StepSettings {
       };
     case 'raisedmetal':
       // Two-pass raised metal: a varnish-only plate built from the artwork's
-      // line art plus a slight grey tone, then the colour + white printed on
+      // line art plus a slight gray tone, then the color + white printed on
       // top of the cured relief.
       return {
         dpi: 300, edgeGain: 1, highlightGain: 0.6, highlightFrom: 200,
@@ -154,11 +154,11 @@ export function defaultSettings(type: StepType): StepSettings {
         spotName: 'V1', whiteName: 'W1', subjectOnly: false, matteTighten: 2.5,
       };
     case 'mediafix':
-      /* Centre a FINISHED file on the sheet it actually prints on. Scaling is
+      /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
          tool exists to prevent, not a convenience. */
       return { mediaWIn: 11, mediaHIn: 17, orient: 'auto', rotateArt: false,
-        shrinkOversize: false, alignX: 'center', alignY: 'center' };
+        shrinkOversize: false, centerArt: false, alignX: 'center', alignY: 'center' };
     case 'pdfrepair':
       /* Repairs a finished PDF for the RIP WITHOUT touching the layout. This
          exists because the only other way to run the finisher over an existing
@@ -175,7 +175,7 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'braille':
       return { text: '', position: 'bl', dotDiaPt: 4.25, pages: 'all' };
     case 'pdfx':
-      // CMYK conversion is OFF by default: RIPs/Fiery do their own colour
+      // CMYK conversion is OFF by default: RIPs/Fiery do their own color
       // management, so converting here is usually wrong. The generic bundled
       // profile is used unless you upload your press's ICC.
       return { standard: 'x-4', convertCmyk: false, iccSource: 'bundled', intent: 'relative', dpi: 300, conditionName: 'Generic CMYK', icc: null, iccName: '' };
@@ -450,7 +450,7 @@ function replicateOpts(s: StepSettings) {
     // Respecting the image size is the whole point — fixed card sizes are the
     // job of the normal N-up tools instead.
     sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn, page: s.page ?? 1,
-    // Butt-cut work shares one cut between neighbours, so it needs no gutter —
+    // Butt-cut work shares one cut between neighbors, so it needs no gutter —
     // forcing one throws away a whole row. See fit/types.ts.
     buttCut: !!s.buttCut,
     marginIn: s.marginIn,
@@ -499,7 +499,7 @@ function braillePos(pos: string): { xPt?: number; yPt?: number } {
 
 // Runs every enabled step. `split` and `preflight` are pass-through here — the
 // export path handles split's multi-file output separately. Encryption only
-// applies on export (`forExport`) so the live preview can still rasterise.
+// applies on export (`forExport`) so the live preview can still rasterize.
 export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forExport = false): Promise<Uint8Array> {
   let b = bytes;
   for (const step of steps) {
@@ -612,7 +612,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         b = (await imposeOnMedia(b, {
           mediaWIn: s.mediaWIn ?? 11, mediaHIn: s.mediaHIn ?? 17,
           orient: s.orient ?? 'auto', rotateArt: !!s.rotateArt,
-          shrinkOversize: !!s.shrinkOversize,
+          shrinkOversize: !!s.shrinkOversize, centerArt: !!s.centerArt,
           alignX: s.alignX ?? 'center', alignY: s.alignY ?? 'center',
         })).bytes;
         break;
@@ -625,7 +625,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           creator: 'ImpositionPDF',
           /* Thumbnails cost one render per page. The PREVIEW does not show them
              and re-renders on every settings change, so only the export builds
-             them — the box normalisation, which is what the preview would show,
+             them — the box normalization, which is what the preview would show,
              runs either way. */
           noThumbnails: s.thumbnails === false || !forExport,
           thumbPx: s.thumbPx ?? 128, maxThumbPages: s.maxThumbPages ?? 32,
@@ -887,7 +887,7 @@ export function resolveName(template: string, ctx: NamingCtx): string {
 export interface SavedWorkflow { name: string; savedAt: number; steps: Array<{ type: StepType; s: StepSettings }>; }
 const WF_KEY = 'pp_workflows';
 
-// Strip runtime byte buffers (merge/overlay attachments) before serialising.
+// Strip runtime byte buffers (merge/overlay attachments) before serializing.
 function stripBytes(s: StepSettings): StepSettings {
   const c: StepSettings = { ...s };
   if (Array.isArray(c.files)) c.files = [];

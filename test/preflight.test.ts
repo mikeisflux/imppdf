@@ -27,12 +27,12 @@ test('a page with no bleed box is flagged', async () => {
   assert.ok(findings.some((f) => /bleed/i.test(f.title)), 'reports on bleed');
 });
 
-test('a clean Letter PDF is recognised as a standard trim', async () => {
+test('a clean Letter PDF is recognized as a standard trim', async () => {
   const { bytes, pageSizes } = await pdfOf([[8.5, 11]]);
   const findings = await runPreflight(bytes, pageSizes);
   assert.ok(has(findings, 'Trim'), 'reports a trim finding');
   assert.ok(findings.some((f) => /letter/i.test(f.detail) || /letter/i.test(f.title)),
-    'recognises Letter');
+    'recognizes Letter');
   assert.equal(level(findings, 'Consistent page size'), 'pass');
 });
 

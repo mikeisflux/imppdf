@@ -1,6 +1,6 @@
 /* Gatefold — 4 panels, folded, ONE piece per sheet.
  *
- * Two outer panels meeting in the middle over a double-width centre. The outer panels are each half the centre, less the tuck.
+ * Two outer panels meeting in the middle over a double-width center. The outer panels are each half the center, less the tuck.
  *
  * A folded piece is not a grid: the panels are divisions of ONE sheet, so the
  * count is 1 and what matters is where the folds land. Treating it as an

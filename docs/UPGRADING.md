@@ -31,7 +31,7 @@ with minimal changes. Everything the plugin touches is isolated behind three fil
      If the new plugin already accepts an initial-tool prop, use that instead and update
      `AppWorkspace.tsx`. If plugin tool ids change, update `SLUG_TO_PLUGIN_ID` in `tools.ts`.
    - **Re-apply the real-artwork preview patch** so the imposition canvas shows the actual
-     PDF pages (not numbered colour blocks). `src/lib/imposition-toolkit/page-thumbs.ts` is
+     PDF pages (not numbered color blocks). `src/lib/imposition-toolkit/page-thumbs.ts` is
      ours and survives upgrades; re-wire these three hooks in the new `Impose.tsx`:
      1. `import { rasterizePdfThumbs } from './page-thumbs';` near the other imports.
      2. In `ToolWorkspace`, add `const [pageThumbs, setPageThumbs] = useState<string[]>([]);`

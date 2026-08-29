@@ -20,7 +20,7 @@ export const MIN_MARK_IN = 0.08;
  *
  *  BETWEEN TWO PIECES the marks either side of the trim are COLLINEAR: they lie
  *  on the same line and merge into one cut line, exactly as on any gang sheet.
- *  Each only has to clear its neighbour's artwork, so twice the offset is
+ *  Each only has to clear its neighbor's artwork, so twice the offset is
  *  enough. Reserving offset + length here reserves a full mark length twice
  *  over, for a line that gets drawn once. */
 export function markClearanceIn(spec: SheetSpec): { marginIn: number; gutterIn: number } {
@@ -95,14 +95,14 @@ function round(v: number): string {
 }
 
 /** Where each cell actually lands, in inches from the sheet's top-left, with
- *  the packed block centred. Exported so a test can check the POSITIONS —
+ *  the packed block centered. Exported so a test can check the POSITIONS —
  *  a correct count placed wrongly is still a ruined sheet. */
 export function cellRects(fit: SheetFit, sheetWIn: number, sheetHIn: number): {
   xIn: number; yIn: number; wIn: number; hIn: number; col: number; row: number;
 }[] {
   const blockW = fit.cols * fit.cellWIn + (fit.cols - 1) * fit.gutterXIn;
   const blockH = fit.rows * fit.cellHIn + (fit.rows - 1) * fit.gutterYIn;
-  // Centre the block, but never inside the margin.
+  // Center the block, but never inside the margin.
   const left = Math.max(fit.marginIn, (sheetWIn - blockW) / 2);
   const top = Math.max(fit.marginIn, (sheetHIn - blockH) / 2);
   const out = [];

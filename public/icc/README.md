@@ -7,9 +7,9 @@ licensing restrictions. It is placed in the public domain / free to use.
 It is a **generic CMYK approximation** (a simple ink model), intended only as a
 convenient default PDF/X OutputIntent so the PDF/X export works out of the box.
 
-For colour-accurate print work, upload your press/printer's real ICC profile in
+For color-accurate print work, upload your press/printer's real ICC profile in
 the PDF/X export — that profile is embedded instead. And if you send to a RIP or
-Fiery that does its own colour management, you can skip CMYK conversion and the
+Fiery that does its own color management, you can skip CMYK conversion and the
 output intent entirely (both are optional and off by default).
 
 Regenerate with:

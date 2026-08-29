@@ -107,7 +107,7 @@ export const COMPETITORS: Competitor[] = [
     intro: `callas pdfToolbox is a comprehensive prepress automation and preflight suite with imposition among many features. It is a paid, installed product for production automation. ${siteName} focuses on fast, free, in-browser imposition with built-in preflight checks for the everyday jobs.`,
     whySwitch: [
       'Free and instant in the browser.',
-      'Built-in preflight (fonts, bleed, DPI, colour, page count).',
+      'Built-in preflight (fonts, bleed, DPI, color, page count).',
       'No install or automation setup for one-off jobs.',
     ],
     rows: baseRows({ free: false }),

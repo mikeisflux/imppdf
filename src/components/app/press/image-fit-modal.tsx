@@ -33,7 +33,7 @@ export function ImageFitModal({ thumbs, index = 0, cellWIn, cellHIn, values, fal
   const patch = (p: Partial<ImageFit>) =>
     setMap((m) => ({ ...m, [idx]: { ...(m[idx] ?? fallback), ...p } }));
 
-  // Switching mode applies it live. Contain/Stretch reset zoom & centre so the
+  // Switching mode applies it live. Contain/Stretch reset zoom & center so the
   // mode visibly does its job; you can zoom again afterwards.
   const chooseFit = (f: ImageFit['fit']) =>
     patch(f === 'cover' ? { fit: f } : { fit: f, zoom: 1, offsetX: 0.5, offsetY: 0.5 });
