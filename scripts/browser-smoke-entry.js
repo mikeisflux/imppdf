@@ -341,6 +341,21 @@ add('export-finish', async () => {
   need(/\/Producer\s*\(/.test(txt), 'Producer is a literal string, as Adobe writes');
   need(/\/Subtype\s*\/XML/.test(txt), 'XMP metadata packet present');
 
+  /* Page boxes. A missing CropBox is legal — it defaults to the MediaBox — but
+     a controller that keys off CropBox or TrimBox and finds neither falls back
+     to a default size, and the job images wrong while the PDF measures right.
+     Adobe states all of them; so do we. */
+  for (const box of ['MediaBox', 'CropBox', 'BleedBox', 'TrimBox', 'ArtBox']) {
+    need(new RegExp(`/${box}\\s*\\[`).test(txt), `${box} stated explicitly`);
+  }
+  const boxes = [...txt.matchAll(/\/(?:Media|Crop|Bleed|Trim|Art)Box\s*\[([^\]]+)\]/g)]
+    .map((m) => m[1].trim().split(/\s+/).map(Number));
+  need(boxes.length > 0 && boxes.every((b) => b[0] === boxes[0][0] && b[1] === boxes[0][1]
+    && b[2] === boxes[0][2] && b[3] === boxes[0][3]), 'every box agrees');
+  need(boxes.every((b) => b[0] === 0 && b[1] === 0),
+    `boxes start at 0,0 (got ${boxes[0] ? boxes[0].slice(0, 2).join(',') : '?'}) — a shifted `
+    + 'origin moves the artwork on a RIP that honours it');
+
   // THE POINT OF ALL THIS: a preview must actually be in the file.
   need(/\/Thumb\s+\d+\s+\d+\s+R/.test(txt), 'page carries /Thumb — the PDF spec preview');
   const gimg = txt.match(/<xmpGImg:image>([^<]{200,})<\/xmpGImg:image>/);

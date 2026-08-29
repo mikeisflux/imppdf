@@ -184,7 +184,7 @@ function patchBytes(bytes: Uint8Array, usesLayers: boolean): Uint8Array {
 export async function finalizePdfForExport(
   bytes: Uint8Array, opts: FinishOptions = {},
 ): Promise<Uint8Array> {
-  const { PDFDocument, PDFName, PDFRawStream, PDFDict, PDFString } = await import('pdf-lib');
+  const { PDFDocument, PDFName, PDFRawStream, PDFDict, PDFString, PDFArray } = await import('pdf-lib');
   let doc: PDFDocument;
   try {
     doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
@@ -213,7 +213,69 @@ export async function finalizePdfForExport(
     }
   } catch { /* an odd Info dict is not worth failing an export over */ }
 
+  /* NORMALISE THE PAGE BOXES — the single biggest cause of "the right size in
+     the PDF, the wrong size on the RIP".
+
+     A viewer honours the CropBox. A RIP images the MediaBox. When the two
+     disagree the file measures correctly on the desk and prints wrong, and
+     nothing about it looks broken. Crop is the obvious case: it sets a CropBox
+     of [36 36 576 756] and leaves the MediaBox at the full [0 0 612 792], so
+     Acrobat shows a trimmed page and the press images a full sheet with the
+     artwork small in the middle of it.
+
+     So: the visible page IS the page. The CropBox (where one is stated) becomes
+     the MediaBox, the content is translated so the origin is 0,0 — a non-zero
+     origin is legal and handled inconsistently — and every box is restated in
+     the new coordinates. A TrimBox or BleedBox a tool set on purpose keeps its
+     position RELATIVE TO THE ARTWORK; it is moved with everything else, not
+     overwritten. Nothing about the printed result changes; only how the file
+     describes where its edges are. */
   const pages = doc.getPages();
+  for (const page of pages) {
+    try {
+      const read = (name: string): number[] | null => {
+        let node = page.node;
+        for (let guard = 0; node && guard < 8; guard++) {
+          const v = node.lookup(PDFName.of(name));
+          if (v instanceof PDFArray) return v.asArray().map((n) => Number(n.toString()));
+          node = node.lookup(PDFName.of('Parent')) as typeof node;
+        }
+        return null;
+      };
+      const media = read('MediaBox');
+      if (!media) continue;
+      const crop = read('CropBox');
+      const trim = read('TrimBox');
+      const art = read('ArtBox');
+      const bleedB = read('BleedBox');
+
+      // The page the operator sees, and therefore the page that prints.
+      const visible = crop ?? media;
+      const [vx, vy, vx1, vy1] = visible as [number, number, number, number];
+      const w = vx1 - vx, h = vy1 - vy;
+      if (!(w > 0 && h > 0)) continue;
+
+      const shifted = (b: number[] | null) => (b
+        ? [b[0]! - vx, b[1]! - vy, b[2]! - vx, b[3]! - vy] : null);
+      const clamp = (b: number[]) => [
+        Math.max(0, Math.min(w, b[0]!)), Math.max(0, Math.min(h, b[1]!)),
+        Math.max(0, Math.min(w, b[2]!)), Math.max(0, Math.min(h, b[3]!)),
+      ];
+
+      if (vx !== 0 || vy !== 0) page.translateContent(-vx, -vy);
+      page.setMediaBox(0, 0, w, h);
+      page.setCropBox(0, 0, w, h);
+      const t = shifted(trim), a = shifted(art), bl = shifted(bleedB);
+      const put = (setter: (x: number, y: number, ww: number, hh: number) => void, b: number[] | null) => {
+        const r = b ? clamp(b) : [0, 0, w, h];
+        setter(r[0]!, r[1]!, r[2]! - r[0]!, r[3]! - r[1]!);
+      };
+      put((x, y, ww, hh) => page.setTrimBox(x, y, ww, hh), t);
+      put((x, y, ww, hh) => page.setArtBox(x, y, ww, hh), a);
+      put((x, y, ww, hh) => page.setBleedBox(x, y, ww, hh), bl);
+    } catch { /* an unusual page is left alone rather than risking its geometry */ }
+  }
+
   const thumbs = opts.noThumbnails ? new Map<number, Uint8Array>()
     : await renderThumbs(bytes, Math.min(pages.length, opts.maxThumbPages ?? 32), opts.thumbPx ?? 128);
 

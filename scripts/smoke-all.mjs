@@ -191,6 +191,9 @@ for (const [id, run, exp] of CASES) {
   try {
     const bytes = await run();
     if (!bytes || bytes.length < 200) throw new Error('no output');
+    // Keep the PDF too, so the page-box audit can inspect every tool's output.
+    fs.mkdirSync(`${OUT}/pdf`, { recursive: true });
+    fs.writeFileSync(`${OUT}/pdf/${id}.pdf`, bytes);
     const r = await renderPng(bytes, `${OUT}/${id}.png`);
     pages = r.pages;
     sheet = `${(r.ptW / PT).toFixed(2)}x${(r.ptH / PT).toFixed(2)}`;
