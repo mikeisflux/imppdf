@@ -257,7 +257,25 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
     if (!hasEncrypt && Object.values(jobInfo).some((v) => v.trim())) out = await setPdfJobInfo(out, jobInfo);
     return out;
   }
-  const namedOutput = () => resolveName(settings.nameTemplate, {
+  /* PDF Repair rewrites a finished file in place — same pages, same layout, same
+   * name. A repaired file is meant to REPLACE the broken one in the hot folder,
+   * so appending "-PDFRepair" (or any other name-template token) would leave the
+   * operator guessing which of two files the press should get. When every
+   * enabled step is a repair, the output keeps the source's exact file name. */
+  const repairOnly = useMemo(() => {
+    const on = steps.filter((st) => st.enabled);
+    return on.length > 0 && on.every((st) => st.type === 'pdfrepair');
+  }, [steps]);
+  /* The finisher runs once more inside downloadPdf. Hand it the repair step's
+   * thumbnail settings so the operator's choice survives that last pass. */
+  const finishOpts = useMemo(() => {
+    const st = steps.find((x) => x.enabled && x.type === 'pdfrepair');
+    return st ? {
+      noThumbnails: st.s.thumbnails === false,
+      thumbPx: st.s.thumbPx ?? 128, maxThumbPages: st.s.maxThumbPages ?? 32,
+    } : undefined;
+  }, [steps]);
+  const namedOutput = () => repairOnly && file ? file.name : resolveName(settings.nameTemplate, {
     fileName: file?.name ?? 'output', tool: toolLabel, pages: totalSheets || file?.info.count || 0,
     paperSize: outPaper, custom: settings.customText,
   });
@@ -278,14 +296,14 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
         const width = String(total).length;
         const baseName = namedOutput().replace(/\.pdf$/i, '');
         await runSerial(out, serial, async (copy, n, tot) => {
-          downloadPdf(copy, `${baseName}_${String(n).padStart(width, '0')}of${tot}.pdf`);
+          downloadPdf(copy, `${baseName}_${String(n).padStart(width, '0')}of${tot}.pdf`, finishOpts);
           await new Promise((r) => setTimeout(r, 300));   // let the browser flush each download
         });
       } else if (sp) {
         const parts = await runSplit(out, sp);
-        parts.forEach((p, i) => downloadPdf(p, namedOutput().replace(/\.pdf$/, `-part${i + 1}.pdf`)));
+        parts.forEach((p, i) => downloadPdf(p, namedOutput().replace(/\.pdf$/, `-part${i + 1}.pdf`), finishOpts));
       } else {
-        downloadPdf(out, namedOutput());
+        downloadPdf(out, namedOutput(), finishOpts);
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Export failed'); }
     finally { setRendering(false); }
@@ -338,7 +356,8 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
       let bytes = f.bytes ?? new Uint8Array(await f.file!.arrayBuffer());
       const out = await runPipeline(bytes, pipelineSteps, true);
       bytes = null as unknown as Uint8Array;                       // release the source
-      downloadPdf(out, resolveName(settings.nameTemplate, { fileName: f.name, tool: toolLabel, pages: 0, paperSize: outPaper, custom: settings.customText }));
+      downloadPdf(out, repairOnly ? f.name
+        : resolveName(settings.nameTemplate, { fileName: f.name, tool: toolLabel, pages: 0, paperSize: outPaper, custom: settings.customText }), finishOpts);
       // Yield so the browser flushes this download (rapid ones aren't dropped)
       // and the GC can reclaim the output before the next file is read.
       await new Promise((r) => setTimeout(r, 400));

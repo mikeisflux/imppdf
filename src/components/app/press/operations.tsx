@@ -187,6 +187,7 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'layers', label: 'Layers', icon: 'layers', tip: 'Use Layers for turns the named layers inside your PDF on or off.' },
     { id: 'customimpose', label: 'Custom Impose', icon: 'grid', tip: 'Use Custom Impose for build any imposition by hand, placing and rotating each page per cell.' },
     { id: 'pdftools', label: 'PDF Tools', icon: 'settings', tip: 'Use PDF Tools for shrink, speed up or repair whole PDFs.' },
+    { id: 'pdfrepair', label: 'PDF Repair', icon: 'preflight', tip: 'Make an existing PDF safe for the RIP WITHOUT changing its layout: state every page box so the press images the page you see, add a preview thumbnail, and write it the conservative way Adobe does. Nothing is re-imposed — drop finished files in and take them straight back out.' },
   ] },
   { label: '// TRANSFORM', ops: [
     { id: 'editpdf', label: 'Edit PDF', icon: 'editpdf', tip: 'Edit text, add content, redact, and manage pages directly on the source.' },

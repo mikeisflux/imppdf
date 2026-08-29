@@ -2613,8 +2613,116 @@ The varnish goes down first, then the colour pass caps it, so nothing is left as
   );
 }
 
+/* PDF Repair — run the export finisher over a file that is already imposed.
+ *
+ * This exists because of a real and expensive mistake: the only way to put a
+ * finished job through the finisher used to be to load it into some other tool
+ * and export it again — and that tool then RE-IMPOSED the job, destroying 16
+ * covers that were already correct. Repair changes nothing about the layout.
+ * Same pages, same placement, same size, same file name. It restates the page
+ * boxes so the press images the page you see, adds the preview thumbnail, and
+ * writes the file the conservative way (classic xref, no object streams, /ID). */
+function PdfRepairPanel({ s, up, sourceBytes, pageCount = 0 }: PanelProps) {
+  const [rep, setRep] = useState<import('@/lib/imposition-toolkit/pdf-finish').RepairReport | null | 'loading'>(null);
+  useEffect(() => {
+    if (!sourceBytes) { setRep(null); return; }
+    let cancelled = false; setRep('loading');
+    import('@/lib/imposition-toolkit/pdf-finish')
+      .then(({ inspectPdfForRepair }) => inspectPdfForRepair(sourceBytes.slice()))
+      .then((r) => { if (!cancelled) setRep(r); })
+      .catch(() => { if (!cancelled) setRep(null); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceBytes, pageCount]);
+
+  const mm = (pt: number) => (pt / 72 * 25.4).toFixed(1);
+  const list = (n: number[]) => n.length > 6 ? `${n.slice(0, 6).join(', ')}… (${n.length})` : n.join(', ');
+  const r = rep && rep !== 'loading' ? rep : null;
+  const sized = r?.visiblePt && r.mediaPt
+    && (Math.abs(r.visiblePt.wPt - r.mediaPt.wPt) > 0.5 || Math.abs(r.visiblePt.hPt - r.mediaPt.hPt) > 0.5);
+
+  return (
+    <>
+      <Section label="// WHAT THIS DOES" help="The layout is never touched — no re-imposition, no rescaling, no page reordering.">
+        <div className="pe-note">
+          Drop a finished PDF in and take the same job back out, repaired for the RIP:
+          every page box restated so the press images the page you see, a preview
+          thumbnail added so the file is identifiable in the job list, and the file
+          written the conservative way Adobe writes it. <b>The layout and the file
+          name are left exactly as they are.</b>
+        </div>
+      </Section>
+
+      <Section label="// FILE REPORT" help="What this file has wrong right now. Read-only — nothing is changed until you export.">
+        {!sourceBytes && <div className="pe-note">Add a PDF to inspect it.</div>}
+        {rep === 'loading' && <div className="pe-note">Reading the file…</div>}
+        {rep === null && sourceBytes && <div className="pe-note">Could not read this file&rsquo;s structure. Repair will still run.</div>}
+        {r && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Line ok label={`${r.pages} page${r.pages === 1 ? '' : 's'} · PDF ${r.version}`} />
+            {sized ? (
+              <Line
+                label={`Page 1 measures ${mm(r.visiblePt!.wPt)} × ${mm(r.visiblePt!.hPt)} mm but images at ${mm(r.mediaPt!.wPt)} × ${mm(r.mediaPt!.hPt)} mm`}
+                detail="This is the wrong-size-on-the-Fiery fault. Repair makes the visible page the imaged page."
+              />
+            ) : <Line ok label="Page size images as it measures" />}
+            {r.cropMismatch.length > 0
+              ? <Line label={`CropBox ≠ MediaBox on page ${list(r.cropMismatch)}`} detail="The crop becomes the page." />
+              : <Line ok label="Page boxes agree" />}
+            {r.offOrigin.length > 0
+              ? <Line label={`Page origin is not 0,0 on page ${list(r.offOrigin)}`} detail="Content is shifted so the origin is 0,0." />
+              : <Line ok label="Page origin at 0,0" />}
+            {r.noMediaBox.length > 0 && <Line label={`No MediaBox on page ${list(r.noMediaBox)}`} detail="Left alone rather than guessed at." />}
+            {r.hasThumb ? <Line ok label="Preview thumbnail present" /> : <Line label="No preview thumbnail" detail="The job shows as a blank rectangle in the spooler." />}
+            {r.objectStreams ? <Line label="Object streams / xref stream (PDF 1.5+)" detail="Rewritten as a classic xref table with plain objects." /> : <Line ok label="Classic cross-reference table" />}
+            {r.hasId ? <Line ok label="File identifier present" /> : <Line label="No /ID" detail="Spoolers key on it to tell two versions of a job apart." />}
+          </div>
+        )}
+      </Section>
+
+      <Section label="// PREVIEW THUMBNAIL" help="Written both as /Thumb (ISO 32000 12.3.4) and into the XMP packet, because different software looks in different places.">
+        <div className="pe-row" style={{ marginBottom: 8 }}>
+          <button className={`pe-chipbtn ${s.thumbnails !== false ? 'pe-chip-on' : ''}`} onClick={() => up({ thumbnails: true })}>On</button>
+          <button className={`pe-chipbtn ${s.thumbnails === false ? 'pe-chip-on' : ''}`} onClick={() => up({ thumbnails: false })}>Off</button>
+        </div>
+        {s.thumbnails !== false && (
+          <>
+            <div className="pe-row" style={{ marginBottom: 8 }}>
+              <span className="pe-label pe-w96">Size</span>
+              <NumRaw value={s.thumbPx ?? 128} onValue={(v) => up({ thumbPx: Math.max(32, Math.min(512, Math.round(v))) })} w={70} />
+              <span className="pe-label-sm">px</span>
+            </div>
+            <div className="pe-row" style={{ marginBottom: 0 }}>
+              <span className="pe-label pe-w96">First</span>
+              <NumRaw value={s.maxThumbPages ?? 32} onValue={(v) => up({ maxThumbPages: Math.max(1, Math.round(v)) })} w={70} />
+              <span className="pe-label-sm">pages get one</span>
+            </div>
+            <div className="pe-note" style={{ marginTop: 8 }}>
+              Each thumbnail costs a small render. A spooler only shows page 1, so
+              there is no reason to raise this for a long book.
+            </div>
+          </>
+        )}
+      </Section>
+    </>
+  );
+}
+
+function Line({ ok, label, detail }: { ok?: boolean; label: string; detail?: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+      <span style={{ marginTop: 5, width: 8, height: 8, borderRadius: 4, flex: '0 0 auto', background: ok ? '#22c55e' : '#f59e0b' }} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="pe-label-sm">{label}</div>
+        {detail && <div className="pe-label-sm" style={{ color: 'var(--muted)' }}>{detail}</div>}
+      </div>
+    </div>
+  );
+}
+
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
+  if (type === 'pdfrepair') return <PdfRepairPanel {...props} />;
   if (type === 'raisedmetal') return <RaisedMetalPanel {...props} />;
   if (type === 'pbcover') return <PerfectCoverPanel {...props} />;
   if (type === 'removebg') return <RemoveBgPanel {...props} />;

@@ -17,6 +17,7 @@ const PLUGIN_TO_PRESS_OP: Record<string, string> = {
   bookmark: 'cards', hangtag: 'cards', coasters: 'cards', complimentslip: 'cards',
   cutstack: 'cutstack', shuffle: 'shuffle', rotate: 'rotate', flip: 'flip',
   merge: 'merge', split: 'split',
+  repair: 'pdfrepair',
 };
 
 interface Entitlement {

@@ -377,11 +377,15 @@ add('export-finish', async () => {
 });
 
 /* ── repairing an ALREADY-EXPORTED file ───────────────────────────────────
-   The path an operator takes for files that are already made: drop them in,
-   run with no steps enabled, download. runPipeline passes the bytes straight
-   through and downloadPdf finishes them, so the boxes are repaired and a
-   preview is added without re-doing the job. This proves that on a file
-   carrying the exact fault — a CropBox smaller than the MediaBox. */
+   The path for files that are already made: drop them in, pick the PDF REPAIR
+   tool, download. That step runs the finisher and NOTHING else, so the boxes
+   are repaired and a preview is added without re-doing the job, and the output
+   keeps the source's file name.
+
+   Pick any OTHER tool for this and it re-imposes the job — that is how sixteen
+   finished covers were destroyed. PDF Repair exists so there is a step that
+   cannot do that. This proves the repair on a file carrying the exact fault:
+   a CropBox smaller than the MediaBox. */
 add('repair-existing', async () => {
   const src = await PDFDocument.load(await artPdf(8.5, 11));
   const page = src.getPages()[0];

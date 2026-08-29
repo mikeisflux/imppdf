@@ -31,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -147,6 +147,12 @@ export function defaultSettings(type: StepType): StepSettings {
         toneGain: 0.18, floor: 24, gamma: 1,
         spotName: 'V1', whiteName: 'W1', subjectOnly: false, matteTighten: 2.5,
       };
+    case 'pdfrepair':
+      /* Repairs a finished PDF for the RIP WITHOUT touching the layout. This
+         exists because the only other way to run the finisher over an existing
+         file was to send it through some other tool, and that tool then
+         re-imposed it — which destroys a job that was already right. */
+      return { thumbnails: true, thumbPx: 128, maxThumbPages: 32 };
     case 'removebg':
       // Cut the subject out of the artwork and drop everything else to
       // transparent (MobileSAM, in-browser). Falls through untouched when the
@@ -585,6 +591,21 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         hingeIn: s.hingeIn ?? 0.1875,
         creaseLabels: s.creaseLabels !== false, creaseLabelPt: s.creaseLabelPt ?? 4,
       }); break;
+      case 'pdfrepair': {
+        // Layout untouched: boxes restated, preview added, written the
+        // conservative way. See pdf-finish.ts for what each part is for.
+        const { finalizePdfForExport } = await import('@/lib/imposition-toolkit/pdf-finish');
+        b = await finalizePdfForExport(b, {
+          creator: 'ImpositionPDF',
+          /* Thumbnails cost one render per page. The PREVIEW does not show them
+             and re-renders on every settings change, so only the export builds
+             them — the box normalisation, which is what the preview would show,
+             runs either way. */
+          noThumbnails: s.thumbnails === false || !forExport,
+          thumbPx: s.thumbPx ?? 128, maxThumbPages: s.maxThumbPages ?? 32,
+        });
+        break;
+      }
       case 'removebg': b = await removeBackground(b, {
         page: s.page ?? 1, dpi: s.dpi ?? 300, featherPx: s.featherPx ?? 1,
       }); break;

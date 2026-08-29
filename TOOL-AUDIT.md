@@ -122,11 +122,24 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 `shuffle` · `rotate` · `crop` · `split` · `flip` · `merge` · `overlay` · `distort` ·
 `resize` · `insertpages` · `mix` · `nudge` · `backdrop` · `coloreffects` ·
 `colormanage` · `pdftools` · `pdfx` · `layers` · `editpdf` · `preflight` ·
-`datamerge` · `trimart`
+`datamerge` · `trimart` · `pdfrepair`
 
 | Tool | Smoke | Shot |
 |---|---|---|
-| all 21 | [x] | [x] | (`coloreffects` is browser-only by design — verified by its refusal in node, not skipped) |
+| all 22 | [x] | [x] | (`coloreffects` is browser-only by design — verified by its refusal in node, not skipped) |
+
+### `pdfrepair` PDF Repair
+
+Runs the export finisher over a file that is ALREADY imposed, and changes
+nothing else: same pages, same placement, same size, **same file name**. It
+exists because the only previous way to put a finished job through the finisher
+was to load it into another tool and export again — and that tool then
+re-imposed it. Sixteen finished perfect-bound covers were destroyed that way.
+
+Covered by `test/pdf-repair.test.ts` (8 assertions): the crop/media mismatch is
+detected, the visible page becomes the imaged page at 0,0, the artwork does not
+move relative to it, a TrimBox keeps its position, page count and order are
+untouched, and a second run changes nothing further (idempotent).
 
 ---
 

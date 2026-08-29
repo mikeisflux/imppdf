@@ -5606,11 +5606,18 @@ export function downloadFile(bytes: Uint8Array, filename: string, mime = 'applic
    job previews in the spooler, a classic cross-reference table, a file
    identifier and real Info metadata. See pdf-finish.ts for what was measured
    against a reference Adobe file and why each part is there. */
-export async function downloadPdf(bytes: Uint8Array, filename: string) {
+/* Every PDF this app hands out goes through the finisher on its way to the
+ * download. `finish` lets a caller override the thumbnail settings — PDF Repair
+ * exposes them to the operator, and without this that choice would be silently
+ * re-rendered back to the defaults here, since this pass runs last. */
+export async function downloadPdf(
+  bytes: Uint8Array, filename: string,
+  finish?: Partial<import('./pdf-finish').FinishOptions>,
+) {
   let out = bytes;
   try {
     const { finalizePdfForExport } = await import('./pdf-finish');
-    out = await finalizePdfForExport(bytes, { creator: 'ImpositionPDF' });
+    out = await finalizePdfForExport(bytes, { creator: 'ImpositionPDF', ...finish });
   } catch { /* hand over the unfinished file rather than nothing */ }
   downloadFile(out, filename, 'application/pdf');
 }

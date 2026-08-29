@@ -320,3 +320,83 @@ export async function finalizePdfForExport(
   const saved = await doc.save({ useObjectStreams: false, addDefaultPage: false });
   return patchBytes(saved, usesLayers);
 }
+
+/* ── Inspection ─────────────────────────────────────────────────────────────
+   What a repair WOULD change, without changing anything. The PDF Repair panel
+   shows this before the operator commits, because "it printed the wrong size"
+   gives no clue which of several possible faults the file actually has. Read
+   only — it never writes and never throws. */
+
+export interface RepairReport {
+  pages: number;
+  /** Pages whose CropBox is smaller/other than the MediaBox: the press images
+   *  the MediaBox, so the artwork lands at the wrong size on the sheet. */
+  cropMismatch: number[];
+  /** Pages whose box origin is not 0,0 — legal, handled inconsistently. */
+  offOrigin: number[];
+  /** Pages with no MediaBox anywhere up the page tree (inherits nothing). */
+  noMediaBox: number[];
+  /** Page 1's visible size vs the size the press would image, in points. */
+  visiblePt?: { wPt: number; hPt: number };
+  mediaPt?: { wPt: number; hPt: number };
+  /** Structure the finisher rewrites regardless. */
+  hasThumb: boolean;
+  hasId: boolean;
+  objectStreams: boolean;
+  version: string;
+}
+
+export async function inspectPdfForRepair(bytes: Uint8Array): Promise<RepairReport | null> {
+  const { PDFDocument, PDFName, PDFArray } = await import('pdf-lib');
+  let doc: PDFDocument;
+  try {
+    doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+  } catch { return null; }
+
+  /* Scan for markers in the BYTES. Decoding a whole PDF to a string to run a
+     regex over it costs a copy the size of the file and mangles binary streams
+     — see patchBytes for the same rule stated at length. */
+  const has = (needle: string, from = 0): boolean => {
+    const pat = [...needle].map((c) => c.charCodeAt(0));
+    outer: for (let i = from; i <= bytes.length - pat.length; i++) {
+      for (let j = 0; j < pat.length; j++) if (bytes[i + j] !== pat[j]) continue outer;
+      return true;
+    }
+    return false;
+  };
+  const head = new TextDecoder('ascii').decode(bytes.subarray(0, 1024));
+  const rep: RepairReport = {
+    pages: doc.getPageCount(), cropMismatch: [], offOrigin: [], noMediaBox: [],
+    hasThumb: false,
+    hasId: has('/ID', Math.max(0, bytes.length - 4096)),
+    objectStreams: has('/ObjStm'),
+    version: (head.match(/%PDF-(\d\.\d)/) ?? [, '?'])[1]!,
+  };
+
+  doc.getPages().forEach((page, i) => {
+    try {
+      const read = (name: string): number[] | null => {
+        let node = page.node;
+        for (let guard = 0; node && guard < 8; guard++) {
+          const v = node.lookup(PDFName.of(name));
+          if (v instanceof PDFArray) return v.asArray().map((n) => Number(n.toString()));
+          node = node.lookup(PDFName.of('Parent')) as typeof node;
+        }
+        return null;
+      };
+      const media = read('MediaBox');
+      if (!media) { rep.noMediaBox.push(i + 1); return; }
+      const crop = read('CropBox');
+      const vis = crop ?? media;
+      const differs = !!crop && crop.some((v, k) => Math.abs(v - media[k]!) > 0.01);
+      if (differs) rep.cropMismatch.push(i + 1);
+      if (Math.abs(vis[0]!) > 0.01 || Math.abs(vis[1]!) > 0.01) rep.offOrigin.push(i + 1);
+      if (i === 0) {
+        rep.visiblePt = { wPt: vis[2]! - vis[0]!, hPt: vis[3]! - vis[1]! };
+        rep.mediaPt = { wPt: media[2]! - media[0]!, hPt: media[3]! - media[1]! };
+      }
+      if (page.node.get(PDFName.of('Thumb'))) rep.hasThumb = true;
+    } catch { /* an unusual page is simply not reported on */ }
+  });
+  return rep;
+}
