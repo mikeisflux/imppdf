@@ -376,6 +376,49 @@ add('export-finish', async () => {
     meta: `${src.length} -> ${out.length} bytes`, images };
 });
 
+/* ── repairing an ALREADY-EXPORTED file ───────────────────────────────────
+   The path an operator takes for files that are already made: drop them in,
+   run with no steps enabled, download. runPipeline passes the bytes straight
+   through and downloadPdf finishes them, so the boxes are repaired and a
+   preview is added without re-doing the job. This proves that on a file
+   carrying the exact fault — a CropBox smaller than the MediaBox. */
+add('repair-existing', async () => {
+  const src = await PDFDocument.load(await artPdf(8.5, 11));
+  const page = src.getPages()[0];
+  page.setCropBox(36, 36, 540, 720);              // the fault, as Crop produces it
+  page.setTrimBox(36, 36, 540, 720);
+  const broken = await src.save();
+
+  const { finalizePdfForExport } = await import('../src/lib/imposition-toolkit/pdf-finish.ts');
+  const fixed = await finalizePdfForExport(broken, { creator: 'ImpositionPDF' });
+
+  const boxesOf = async (bytes) => {
+    const d = await PDFDocument.load(bytes, { updateMetadata: false });
+    const p = d.getPages()[0];
+    const m = p.getMediaBox(), c = p.getCropBox();
+    return { m: [m.x, m.y, m.width, m.height], c: [c.x, c.y, c.width, c.height] };
+  };
+  const before = await boxesOf(broken), after = await boxesOf(fixed);
+  const checks = [];
+  const need = (ok, msg) => checks.push((ok ? 'ok  ' : 'FAIL ') + msg);
+  need(before.m[2] !== before.c[2],
+    `the input really is faulty: Media ${before.m[2]}x${before.m[3]}pt vs Crop ${before.c[2]}x${before.c[3]}pt`);
+  need(after.m[2] === after.c[2] && after.m[3] === after.c[3],
+    `repaired: Media and Crop now agree at ${after.m[2]}x${after.m[3]}pt`);
+  need(after.m[0] === 0 && after.m[1] === 0, 'origin normalised to 0,0');
+  need(after.m[2] === before.c[2] && after.m[3] === before.c[3],
+    'the page is the size the operator SAW, not the oversized sheet');
+  const txt = new TextDecoder('latin1').decode(fixed);
+  need(/\/Thumb\s+\d+\s+\d+\s+R/.test(txt), 'and it gained a preview on the way through');
+
+  // Render both, so the artwork is visibly in the same place on the page.
+  const a = await pdfToCanvas(broken), b = await pdfToCanvas(fixed);
+  const fail = checks.some((c) => c.startsWith('FAIL'));
+  return { ok: !fail, note: checks.join(' · '),
+    meta: `${before.m[2]}x${before.m[3]} -> ${after.m[2]}x${after.m[3]}pt`,
+    images: [['before (RIP sees this)', shrink(a.canvas)], ['after', shrink(b.canvas)]] };
+});
+
 window.runSmoke = async function runSmoke() {
   const out = [];
   for (const [id, fn] of CASES) {
