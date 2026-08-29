@@ -263,8 +263,11 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
    * operator guessing which of two files the press should get. When every
    * enabled step is a repair, the output keeps the source's exact file name. */
   const repairOnly = useMemo(() => {
+    // Fixers, not impositions: they correct a finished job in place. Both are
+    // meant to REPLACE the broken file in the hot folder.
+    const FIXERS = new Set(['pdfrepair', 'mediafix']);
     const on = steps.filter((st) => st.enabled);
-    return on.length > 0 && on.every((st) => st.type === 'pdfrepair');
+    return on.length > 0 && on.every((st) => FIXERS.has(st.type));
   }, [steps]);
   /* The finisher runs once more inside downloadPdf. Hand it the repair step's
    * thumbnail settings so the operator's choice survives that last pass. */

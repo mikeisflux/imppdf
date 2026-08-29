@@ -31,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair' | 'mediafix';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -147,6 +147,12 @@ export function defaultSettings(type: StepType): StepSettings {
         toneGain: 0.18, floor: 24, gamma: 1,
         spotName: 'V1', whiteName: 'W1', subjectOnly: false, matteTighten: 2.5,
       };
+    case 'mediafix':
+      /* Centre a FINISHED file on the sheet it actually prints on. Scaling is
+         off by default — silently shrinking a cover to fit is the failure this
+         tool exists to prevent, not a convenience. */
+      return { mediaWIn: 12, mediaHIn: 18, orient: 'auto', rotateArt: false,
+        shrinkOversize: false, alignX: 'center', alignY: 'center' };
     case 'pdfrepair':
       /* Repairs a finished PDF for the RIP WITHOUT touching the layout. This
          exists because the only other way to run the finisher over an existing
@@ -591,6 +597,16 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         hingeIn: s.hingeIn ?? 0.1875,
         creaseLabels: s.creaseLabels !== false, creaseLabelPt: s.creaseLabelPt ?? 4,
       }); break;
+      case 'mediafix': {
+        const { imposeOnMedia } = await import('@/lib/imposition-toolkit/impose');
+        b = (await imposeOnMedia(b, {
+          mediaWIn: s.mediaWIn ?? 12, mediaHIn: s.mediaHIn ?? 18,
+          orient: s.orient ?? 'auto', rotateArt: !!s.rotateArt,
+          shrinkOversize: !!s.shrinkOversize,
+          alignX: s.alignX ?? 'center', alignY: s.alignY ?? 'center',
+        })).bytes;
+        break;
+      }
       case 'pdfrepair': {
         // Layout untouched: boxes restated, preview added, written the
         // conservative way. See pdf-finish.ts for what each part is for.

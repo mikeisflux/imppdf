@@ -4189,6 +4189,16 @@ export interface PerfectCoverOptions {
   // spines are authored), so it wins over the calculator by default. Turn off
   // to force the calculated width instead.
   spineFromArt?: boolean;
+  /* THE PRESS SHEET the wrap prints on (11×17, 12×18, …). Omit and the page IS
+     the wrap, which leaves the RIP to decide where a 13.75×10.5" cover lands on
+     the 11×17 in the tray — and a Fiery answers that by rotating and scaling it
+     to taste. Naming the media here imposes the wrap ourselves, centred, so the
+     press has nothing left to decide. */
+  mediaWIn?: number; mediaHIn?: number;
+  /* Which way round the sheet is described. 'auto' (default) emits whichever
+     orientation the wrap fits — the same physical sheet either way, just fed
+     the other direction. */
+  mediaOrient?: 'auto' | 'portrait' | 'landscape';
   trimWIn: number; trimHIn: number;      // the finished book's trim size
   pages: number;                          // interior page count (not leaves)
   caliperPerPageIn?: number;              // default 0.0025" (60# offset ≈ 400 PPI)
@@ -4220,7 +4230,39 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
       if (p0 && p0.getSize().width > 0) spine = p0.getSize().width;
     } catch { /* unreadable — keep the calculated width */ }
   }
-  const shW = 2 * trimW + spine + 2 * bleed, shH = trimH + 2 * bleed;
+  // The wrap itself: back | spine | front, plus bleed all round.
+  const wrapW = 2 * trimW + spine + 2 * bleed, wrapH = trimH + 2 * bleed;
+
+  /* THE PRESS SHEET. With no media named the page IS the wrap (what this tool
+     always did). Name the media and the wrap is centred on a real sheet, so the
+     RIP is not left to place a 13.75 x 10.5" cover on the 11x17 in the tray —
+     which it answers by rotating and scaling to taste. That is the whole cause
+     of "the right size in the PDF, the wrong size out of the Fiery" on covers.
+
+     'auto' describes the sheet in whichever orientation the wrap fits. It is
+     the same physical sheet either way — 11x17 and 17x11 are one piece of paper
+     fed the other direction — so this costs nothing and never rotates artwork. */
+  const mediaW = Math.max(0, opts.mediaWIn ?? 0) * PT;
+  const mediaH = Math.max(0, opts.mediaHIn ?? 0) * PT;
+  let shW = wrapW, shH = wrapH, ox = 0, oy = 0;
+  if (mediaW > 0 && mediaH > 0) {
+    const EPS = 0.5;                                   // half a point of slop
+    const fits = (w: number, h: number) => wrapW <= w + EPS && wrapH <= h + EPS;
+    // Least waste among the orientations that fit; if neither does, the one
+    // that overhangs least — the panel warns, and an overhang is visible.
+    const slack = (w: number, h: number) => Math.min(w - wrapW, h - wrapH);
+    let turned = false;
+    if (opts.mediaOrient === 'portrait') turned = mediaW > mediaH;
+    else if (opts.mediaOrient === 'landscape') turned = mediaH > mediaW;
+    else if (!fits(mediaW, mediaH)) turned = fits(mediaH, mediaW) || slack(mediaH, mediaW) > slack(mediaW, mediaH);
+    shW = turned ? mediaH : mediaW;
+    shH = turned ? mediaW : mediaH;
+    ox = (shW - wrapW) / 2;
+    oy = (shH - wrapH) / 2;
+  }
+  // The margin around the wrap, for marks and labels that would otherwise have
+  // to sit on the artwork in the bleed.
+  const marginX = Math.max(0, ox), marginY = Math.max(0, oy);
 
   const out = await PDFDocument.create();
   const pg = out.addPage([shW, shH]);
@@ -4281,13 +4323,13 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
     pg.pushOperators(PL.popGraphicsState());
   };
   // Back cover occupies the left, including the left + top/bottom bleed.
-  drawInto(backEmb, 0, 0, bleed + trimW, shH);
+  drawInto(backEmb, ox, oy, bleed + trimW, wrapH);
   // Front cover on the right, including the right + top/bottom bleed.
-  drawInto(frontEmb, bleed + trimW + spine, 0, bleed + trimW, shH);
+  drawInto(frontEmb, ox + bleed + trimW + spine, oy, bleed + trimW, wrapH);
   // Spine art fills the spine panel. With no bleed on the file (the norm) it
   // sits in the trim band at its true height rather than being stretched the
   // extra 2*bleed — the bleed strips above and below are trimmed off anyway.
-  drawInto(spineEmb, bleed + trimW, opts.spineHasBleed ? 0 : bleed, spine, opts.spineHasBleed ? shH : trimH);
+  drawInto(spineEmb, ox + bleed + trimW, oy + (opts.spineHasBleed ? 0 : bleed), spine, opts.spineHasBleed ? wrapH : trimH);
 
   if (opts.spineText && spine > 2) {
     const font = await out.embedFont(PL.StandardFonts.HelveticaBold);
@@ -4295,7 +4337,7 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
     const tw = font.widthOfTextAtSize(opts.spineText, size);
     // Read top-to-bottom when the book stands upright on a shelf.
     pg.drawText(opts.spineText, {
-      x: bleed + trimW + spine / 2 + size * 0.36, y: shH / 2 + tw / 2,
+      x: ox + bleed + trimW + spine / 2 + size * 0.36, y: oy + wrapH / 2 + tw / 2,
       size, font, color: rgb(1, 1, 1), rotate: degrees(-90),
     });
   }
@@ -4304,12 +4346,15 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   /* ONE definition of the crease geometry, used by both the tick marks and the
      millimetre labels — so a number printed on the sheet can never disagree
      with the tick it belongs to. */
+  /* Stated in SHEET coordinates (ox already added), because a crease is set
+     from the edge of the sheet that goes into the creaser — not from the edge
+     of the artwork, which nobody can register against. */
   const hinge = (opts.hingeIn ?? 0.1875) * PT;
   const CREASES = ([
-    { x: bleed + trimW - hinge, tag: 'score' },
-    { x: bleed + trimW, tag: 'fold' },
-    { x: bleed + trimW + spine, tag: 'fold' },
-    { x: bleed + trimW + spine + hinge, tag: 'score' },
+    { x: ox + bleed + trimW - hinge, tag: 'score' },
+    { x: ox + bleed + trimW, tag: 'fold' },
+    { x: ox + bleed + trimW + spine, tag: 'fold' },
+    { x: ox + bleed + trimW + spine + hinge, tag: 'score' },
   ] as { x: number; tag: 'score' | 'fold' }[]).sort((a, b) => a.x - b.x);
 
   const drawCoverMarks = (page: any) => {
@@ -4317,26 +4362,33 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
     const w0 = opts.markWeightPt ?? 0.25;
     const line = (x1: number, y1: number, x2: number, y2: number, dash?: number[]) =>
       page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w0, color: rgb(0, 0, 0), ...(dash ? { dashArray: dash } : {}) });
+    // The wrap's own edges, wherever the wrap sits on the sheet.
+    const wx0 = ox, wx1 = ox + wrapW, wy0 = oy, wy1 = oy + wrapH;
+    /* On a bare wrap there is nowhere for a mark to go but the bleed, so it
+       reaches INWARD (and gets trimmed off with the bleed). On a real sheet
+       there is margin outside the wrap: put the mark there instead, clear of
+       the artwork, where it is actually legible. */
+    const outX = Math.min(marginX, len > 0 ? len : 0.25 * PT);
+    const outY = Math.min(marginY, len > 0 ? len : 0.25 * PT);
+    const inLen = Math.max(0, bleed - off);
+    const tickV = (x: number, frac = 1) => {                 // vertical tick, both ends
+      if (outY > off) { line(x, wy0 - off, x, wy0 - off - outY * frac); line(x, wy1 + off, x, wy1 + off + outY * frac); }
+      else { line(x, wy0, x, wy0 + inLen * frac); line(x, wy1, x, wy1 - inLen * frac); }
+    };
+    const tickVDash = (x: number) => {
+      if (outY > off) { line(x, wy0 - off, x, wy0 - off - outY * 0.6, [2, 2]); line(x, wy1 + off, x, wy1 + off + outY * 0.6, [2, 2]); }
+      else { line(x, wy0, x, wy0 + inLen * 0.6, [2, 2]); line(x, wy1, x, wy1 - inLen * 0.6, [2, 2]); }
+    };
     // Trim marks at the wrap's corners (the whole cover trims as one piece).
-    for (const x of [bleed, shW - bleed]) {
-      line(x, 0, x, Math.max(0, bleed - off));
-      line(x, shH, x, shH - Math.max(0, bleed - off));
-    }
-    for (const y of [bleed, shH - bleed]) {
-      line(0, y, Math.max(0, bleed - off), y);
-      line(shW, y, shW - Math.max(0, bleed - off), y);
+    for (const x of [wx0 + bleed, wx1 - bleed]) tickV(x);
+    for (const y of [wy0 + bleed, wy1 - bleed]) {
+      if (outX > off) { line(wx0 - off, y, wx0 - off - outX, y); line(wx1 + off, y, wx1 + off + outX, y); }
+      else { line(wx0, y, wx0 + inLen, y); line(wx1, y, wx1 - inLen, y); }
     }
     // Spine folds, plus the hinge scores a binder needs so the cover opens
     // without cracking the glue. Ticks only — never across the artwork.
-    for (const x of [bleed + trimW, bleed + trimW + spine]) {
-      line(x, 0, x, Math.max(0, bleed - off));
-      line(x, shH, x, shH - Math.max(0, bleed - off));
-    }
-    for (const x of [bleed + trimW - hinge, bleed + trimW + spine + hinge]) {
-      line(x, 0, x, Math.max(0, (bleed - off) * 0.6), [2, 2]);
-      line(x, shH, x, shH - Math.max(0, (bleed - off) * 0.6), [2, 2]);
-    }
-    void len;
+    for (const x of [wx0 + bleed + trimW, wx0 + bleed + trimW + spine]) tickV(x);
+    for (const x of [wx0 + bleed + trimW - hinge, wx0 + bleed + trimW + spine + hinge]) tickVDash(x);
   };
 
   /* Crease positions in millimetres, along the top edge, inside the bleed.
@@ -4350,11 +4402,17 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
     const MM = 25.4 / PT;                                  // points -> millimetres
     const creases = CREASES;
 
-    /* Sit the baseline inside the bleed band. With no bleed there is nowhere to
-       hide them, so they go just inside the top trim instead of being dropped —
-       an operator would rather trim a number off than not have it. */
-    const band = Math.max(0, shH - bleed);
-    const baseY = bleed > size + 1 ? band + (bleed - size) / 2 + 0.5 : shH - size - 1;
+    /* Where the numbers sit, best place first:
+         1. the sheet MARGIN above the wrap — bare paper, nothing behind them;
+         2. the top BLEED band — artwork behind, so they get a knockout;
+         3. just inside the top trim, when there is no bleed either. An operator
+            would rather trim a number off than not have it.
+       `band` is the line the leader runs down to: the top of the artwork. */
+    const band = Math.max(0, oy + wrapH - bleed);
+    const topMargin = shH - (oy + wrapH);
+    const baseY = topMargin > size + 2 ? oy + wrapH + Math.min(topMargin - size - 1, size * 0.9)
+      : bleed > size + 1 ? band + (bleed - size) / 2 + 0.5
+      : oy + wrapH - size - 1;
 
     /* Knock a white box out behind every mark. The bleed carries ARTWORK — that
        is what bleed is — so a number set straight onto it can land dark-on-dark
@@ -4372,7 +4430,7 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
 
     // Legend, clear of the corner trim mark rather than printed across it.
     const legend = 'CREASE mm from left edge:';
-    let cursor = bleed + 2;
+    let cursor = Math.max(1, ox + bleed) + 2;
     try {
       cursor += label(legend, cursor) + 4;
     } catch { /* legend is optional; the numbers are the point */ }
@@ -4423,13 +4481,13 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
       page.drawPage(emb, { x: x + (w - dw) / 2, y: y + (h - dh) / 2, width: dw, height: dh });
       page.pushOperators(PL.popGraphicsState());
     };
-    drawOn(ip, leftEmb, 0, 0, bleed + trimW, shH);
-    drawOn(ip, rightEmb, bleed + trimW + spine, 0, bleed + trimW, shH);
+    drawOn(ip, leftEmb, ox, oy, bleed + trimW, wrapH);
+    drawOn(ip, rightEmb, ox + bleed + trimW + spine, oy, bleed + trimW, wrapH);
     // GLUE ZONE — the exact spine strip, knocked back to white on top of any
     // inside art. Ink or coating here stops the adhesive bonding to the block.
     const clear = Math.max(0, opts.spineGlueClearIn ?? 0) * PT;
     ip.drawRectangle({
-      x: bleed + trimW - clear, y: 0, width: spine + 2 * clear, height: shH,
+      x: ox + bleed + trimW - clear, y: oy, width: spine + 2 * clear, height: wrapH,
       color: rgb(1, 1, 1), borderWidth: 0,
     });
     if (opts.addMarks !== false) drawCoverMarks(ip);
@@ -4437,8 +4495,150 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
     if (opts.creaseLabels !== false) await drawCreaseLabels(ip);
   }
 
+  /* State where the wrap is on the sheet. With a media sheet the artwork no
+     longer fills the page, so without these a downstream tool has no way to
+     tell the cover from the paper around it — and the trim is what everything
+     downstream actually cares about. */
+  for (const page of out.getPages()) {
+    try {
+      page.setBleedBox(ox, oy, wrapW, wrapH);
+      page.setTrimBox(ox + bleed, oy + bleed, 2 * trimW + spine, trimH);
+    } catch { /* a box is a nicety; never lose the sheet over one */ }
+  }
+
   if (srcDoc) await carryColorContext(srcDoc, out);
   return out.save();
+}
+
+/* ── Media Size Fix ─────────────────────────────────────────────────────────
+
+   Put a FINISHED file onto the sheet it actually prints on, and centre it there
+   at 1:1. Nothing is re-imposed and nothing is re-scaled: the artwork keeps its
+   exact dimensions and simply gains the paper around it.
+
+   Why this exists. A cover wrap exported at its own size — say 13.75 x 10.5" —
+   is a page no press has in its trays. Send it to a Fiery loaded with 11x17 and
+   the RIP has to decide what to do with it, and it decides by rotating and
+   scaling to taste. The artwork is the right size in the PDF and the wrong size
+   coming off the press, and nothing about the file looks broken. Naming the
+   media here settles it before the file ever reaches the press.
+
+   Scaling is OFF by default, and deliberately so: a cover that comes back 96%
+   is a reprint, and silently shrinking one to make it fit is exactly the
+   failure this tool exists to prevent. An oversized page overhangs visibly
+   instead — which is a question the operator can answer. */
+
+export interface MediaFitOptions {
+  mediaWIn: number;
+  mediaHIn: number;
+  /** 'auto' (default) describes the sheet in whichever orientation the artwork
+   *  fits — the same physical paper, fed the other way. */
+  orient?: 'auto' | 'portrait' | 'landscape';
+  /** Turn the ARTWORK 90° when that is the only way it fits the media as
+   *  described. Off by default: turning the sheet is free, turning the art is a
+   *  decision about how the job is fed. */
+  rotateArt?: boolean;
+  /** Scale a page down when it still will not fit. OFF by default — see above.*/
+  shrinkOversize?: boolean;
+  alignX?: 'center' | 'left' | 'right';
+  alignY?: 'center' | 'bottom' | 'top';
+}
+
+export interface MediaFitReport {
+  pages: number;
+  /** 1-based pages that had to be turned, and that overhang the sheet. */
+  turned: number[];
+  oversize: number[];
+  scaled: number[];
+  sheetIn: { wIn: number; hIn: number }[];
+}
+
+/** Centre every page of `bytes` on the named media. Returns the new PDF. */
+export async function imposeOnMedia(
+  bytes: Uint8Array, opts: MediaFitOptions,
+): Promise<{ bytes: Uint8Array; report: MediaFitReport }> {
+  const PL = await import('pdf-lib');
+  const { PDFDocument, degrees } = PL;
+  const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
+  const out = await PDFDocument.create();
+
+  const mw = Math.max(1, opts.mediaWIn) * PT, mh = Math.max(1, opts.mediaHIn) * PT;
+  const EPS = 0.5;
+  const report: MediaFitReport = { pages: 0, turned: [], oversize: [], scaled: [], sheetIn: [] };
+
+  const pages = src.getPages();
+  const embeds = pages.length ? await out.embedPages(pages) : [];
+
+  for (let i = 0; i < pages.length; i++) {
+    const emb = embeds[i]!;
+    /* The page as the operator SEES it. A page carrying /Rotate images turned,
+       so its visible width is the height of its box — measure what prints, not
+       what the box says, or a rotated cover lands sideways on the sheet. */
+    const rot = ((pages[i]!.getRotation().angle % 360) + 360) % 360;
+    const swap = rot === 90 || rot === 270;
+    const aw = swap ? emb.height : emb.width;
+    const ah = swap ? emb.width : emb.height;
+
+    // Which way to describe the sheet.
+    const fits = (w: number, h: number) => aw <= w + EPS && ah <= h + EPS;
+    const slack = (w: number, h: number) => Math.min(w - aw, h - ah);
+    let turnSheet = false;
+    if (opts.orient === 'portrait') turnSheet = mw > mh;
+    else if (opts.orient === 'landscape') turnSheet = mh > mw;
+    else if (!fits(mw, mh)) turnSheet = fits(mh, mw) || slack(mh, mw) > slack(mw, mh);
+    let shW = turnSheet ? mh : mw, shH = turnSheet ? mw : mh;
+
+    // Turning the artwork is a separate, opt-in decision.
+    let turnArt = false;
+    if (opts.rotateArt && !fits(shW, shH) && ah <= shW + EPS && aw <= shH + EPS) turnArt = true;
+    let pw = turnArt ? ah : aw, ph = turnArt ? aw : ah;
+
+    let scale = 1;
+    if (pw > shW + EPS || ph > shH + EPS) {
+      report.oversize.push(i + 1);
+      if (opts.shrinkOversize) {
+        scale = Math.min(shW / pw, shH / ph);
+        report.scaled.push(i + 1);
+        pw *= scale; ph *= scale;
+      }
+    }
+    if (turnArt) report.turned.push(i + 1);
+
+    const page = out.addPage([shW, shH]);
+    const x = opts.alignX === 'left' ? 0 : opts.alignX === 'right' ? shW - pw : (shW - pw) / 2;
+    const y = opts.alignY === 'bottom' ? 0 : opts.alignY === 'top' ? shH - ph : (shH - ph) / 2;
+
+    /* embedPage takes the page's CONTENT and drops its /Rotate, so the rotation
+       has to be re-applied here or a rotated source lands sideways on the sheet.
+       Mind the sign: /Rotate is CLOCKWISE ("turn the page 90° to view it"),
+       while a PDF rotation operator — which is what drawPage's `rotate` becomes
+       — is counter-clockwise. Passing /Rotate straight through turns the
+       artwork the wrong way, which looks plausible on a square-ish page and is
+       obvious only once something has printed. */
+    const theta = ((360 - rot) + (turnArt ? 90 : 0)) % 360;
+    /* drawPage rotates the box about the placement point, so the anchor is the
+       corner the rotation sweeps the content AWAY from, not the bottom-left of
+       where it should end up. */
+    const place = { width: emb.width * scale, height: emb.height * scale };
+    const anchors: Record<number, { x: number; y: number }> = {
+      0: { x, y },
+      90: { x: x + pw, y },
+      180: { x: x + pw, y: y + ph },
+      270: { x, y: y + ph },
+    };
+    const a = anchors[theta] ?? anchors[0]!;
+    page.drawPage(emb, { ...place, x: a.x, y: a.y, rotate: degrees(theta) });
+
+    /* The artwork's footprint on the sheet, so downstream tools (and the RIP)
+       can tell the job from the paper around it. */
+    try { page.setBleedBox(x, y, Math.min(pw, shW), Math.min(ph, shH)); } catch { /* nicety */ }
+
+    report.sheetIn.push({ wIn: shW / PT, hIn: shH / PT });
+  }
+  report.pages = pages.length;
+
+  await carryColorContext(src, out);
+  return { bytes: await out.save(), report };
 }
 
 // ── Raised metal ────────────────────────────────────────────────────────────

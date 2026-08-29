@@ -2229,6 +2229,17 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
   const effSpine = useFile ? spineFromFile : spine;
   const spineArtH = (spineArtInfo?.hPt ?? 0) / 72;
   const sheetW = 2 * trimW + effSpine + 2 * bleed, sheetH = trimH + 2 * bleed;
+  /* The press sheet, and which way round it gets described — the same rule the
+     engine uses, so the panel can never promise a placement it won't produce. */
+  const mediaW = s.mediaWIn ?? 0, mediaH = s.mediaHIn ?? 0;
+  const mFits = (w: number, h: number) => sheetW <= w + 0.01 && sheetH <= h + 0.01;
+  const mSlack = (w: number, h: number) => Math.min(w - sheetW, h - sheetH);
+  const pressTurned = mediaW > 0 && mediaH > 0 && (
+    s.mediaOrient === 'portrait' ? mediaW > mediaH
+      : s.mediaOrient === 'landscape' ? mediaH > mediaW
+        : !mFits(mediaW, mediaH) && (mFits(mediaH, mediaW) || mSlack(mediaH, mediaW) > mSlack(mediaW, mediaH)));
+  const pressW = pressTurned ? mediaH : mediaW, pressH = pressTurned ? mediaW : mediaH;
+  const pressFits = mFits(pressW, pressH);
   type CoverArtKey = 'front' | 'back' | 'spineArt' | 'insideFront' | 'insideBack';
   const pickCoverArt = (key: CoverArtKey) => {
     const inp = document.createElement('input');
@@ -2373,6 +2384,50 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
         )}
         {effSpine < 0.125 && pages > 0 && (
           <div className="pe-gang-warn" style={{ marginTop: 8 }}>⚠ Under 0.125&quot; most binders can&apos;t hold a perfect-bound spine — consider saddle stitch.</div>
+        )}
+      </Section>
+      <Section label="// MEDIA" help="The press sheet the wrap prints on. Without this the page IS the wrap, and the RIP is left to decide where a cover that size lands on the paper in the tray.">
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <button className="pe-btn" style={pickStyle(!mediaW || !mediaH)}
+            onClick={() => up({ mediaWIn: 0, mediaHIn: 0 })}>Cover size</button>
+          {([[11, 17, '11 × 17'], [12, 18, '12 × 18'], [13, 19, '13 × 19'], [12.6, 17.72, 'SRA3']] as [number, number, string][]).map(([w, h, label]) => (
+            <button key={label} className="pe-btn"
+              style={pickStyle(Math.abs(mediaW - w) < 0.01 && Math.abs(mediaH - h) < 0.01)}
+              onClick={() => up({ mediaWIn: w, mediaHIn: h })}>{label}</button>
+          ))}
+        </div>
+        {mediaW > 0 && mediaH > 0 ? (
+          <>
+            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+              <span className="pe-label" style={{ flex: 1 }}>Sheet size<span className="pe-label-sm"> · inches</span></span>
+              <input className="pe-input" type="number" step={0.25} value={mediaW} style={{ width: 80 }}
+                onChange={(e) => up({ mediaWIn: Number(e.target.value) })} />
+              <span className="pe-label-sm">×</span>
+              <input className="pe-input" type="number" step={0.25} value={mediaH} style={{ width: 80 }}
+                onChange={(e) => up({ mediaHIn: Number(e.target.value) })} />
+            </div>
+            <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              {([['auto', 'Auto'], ['portrait', 'Portrait'], ['landscape', 'Landscape']] as const).map(([v, label]) => (
+                <button key={v} className="pe-btn" style={pickStyle((s.mediaOrient ?? 'auto') === v)}
+                  onClick={() => up({ mediaOrient: v })}>{label}</button>
+              ))}
+            </div>
+            <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
+              <div>Wrap <b>{sheetW.toFixed(3)} × {sheetH.toFixed(3)}&quot;</b> on a <b>{pressW} × {pressH}&quot;</b> sheet{pressTurned ? ' (turned)' : ''}</div>
+              <div>Centred, with <b>{((pressW - sheetW) / 2).toFixed(3)}&quot;</b> each side and <b>{((pressH - sheetH) / 2).toFixed(3)}&quot;</b> top and bottom</div>
+            </div>
+            {!pressFits && (
+              <div className="pe-gang-warn" style={{ marginTop: 8 }}>
+                ⚠ The wrap is bigger than this sheet — it will hang off the edge. Pick a larger sheet, or reduce the trim size or bleed.
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="pe-gang-warn" style={{ marginTop: 8 }}>
+            ⚠ No media chosen, so the page is the wrap itself ({sheetW.toFixed(3)} × {sheetH.toFixed(3)}&quot;) — a size no press has in its trays.
+            The RIP then decides where it lands, and a Fiery answers that by rotating and scaling to taste.
+            Pick the sheet that&apos;s actually loaded.
+          </div>
         )}
       </Section>
       <Section label="// FINISHING" help="Bleed around the wrap, plus the hinge scores that let the cover open without cracking the spine glue.">
@@ -2720,9 +2775,125 @@ function Line({ ok, label, detail }: { ok?: boolean; label: string; detail?: str
   );
 }
 
+/* Media Size Fix — put a finished file on the sheet it really prints on.
+ *
+ * A cover wrap exported at its own size (13.75 × 10.5", say) is a page no press
+ * has in its trays. Send that to a Fiery loaded with 11×17 and the RIP decides
+ * what to do with it — and it decides by rotating and scaling to taste. The
+ * artwork is the right size in the PDF and the wrong size off the press. This
+ * settles it in the file: name the media, centre the job on it at 1:1, done. */
+function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: PanelProps) {
+  const mw = s.mediaWIn ?? 12, mh = s.mediaHIn ?? 18;
+  const MEDIA: [number, number, string][] = [
+    [11, 17, '11 × 17'], [12, 18, '12 × 18'], [13, 19, '13 × 19'],
+    [12.6, 17.72, 'SRA3'], [8.5, 11, '8.5 × 11'], [8.5, 14, '8.5 × 14'],
+  ];
+  const EPS = 0.01;
+
+  /* Work out what happens to each page, here, from the page sizes the editor
+     already has — so the answer is on screen before anything is exported. */
+  const rows = pageSizes.map((p) => {
+    const aw = p.wPt / 72, ah = p.hPt / 72;
+    const fits = (w: number, h: number) => aw <= w + EPS && ah <= h + EPS;
+    const slack = (w: number, h: number) => Math.min(w - aw, h - ah);
+    let turnSheet = false;
+    if (s.orient === 'portrait') turnSheet = mw > mh;
+    else if (s.orient === 'landscape') turnSheet = mh > mw;
+    else if (!fits(mw, mh)) turnSheet = fits(mh, mw) || slack(mh, mw) > slack(mw, mh);
+    const shW = turnSheet ? mh : mw, shH = turnSheet ? mw : mh;
+    const turnArt = !!s.rotateArt && !fits(shW, shH) && ah <= shW + EPS && aw <= shH + EPS;
+    const pw = turnArt ? ah : aw, ph = turnArt ? aw : ah;
+    const over = pw > shW + EPS || ph > shH + EPS;
+    return { aw, ah, shW, shH, turnArt, over, pw, ph };
+  });
+  const oversize = rows.filter((r) => r.over).length;
+  const first = rows[0];
+
+  return (
+    <>
+      <div className="pe-note" style={{ marginBottom: 12 }}>
+        The artwork is <b>never re-imposed and never re-scaled</b> — it keeps its exact
+        size and gains the paper around it. Drop finished files in, pick the sheet
+        that&apos;s in the tray, take them back out with the same name.
+      </div>
+
+      <Section label="// MEDIA" help="The sheet loaded on the press. This becomes the PDF's page size, so the RIP has nothing left to decide.">
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {MEDIA.map(([w, h, label]) => (
+            <button key={label} className="pe-btn"
+              style={pickStyle(Math.abs(mw - w) < EPS && Math.abs(mh - h) < EPS)}
+              onClick={() => up({ mediaWIn: w, mediaHIn: h })}>{label}</button>
+          ))}
+        </div>
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+          <span className="pe-label" style={{ flex: 1 }}>Sheet size<span className="pe-label-sm"> · inches</span></span>
+          <input className="pe-input" type="number" step={0.25} value={mw} style={{ width: 80 }}
+            onChange={(e) => up({ mediaWIn: Number(e.target.value) })} />
+          <span className="pe-label-sm">×</span>
+          <input className="pe-input" type="number" step={0.25} value={mh} style={{ width: 80 }}
+            onChange={(e) => up({ mediaHIn: Number(e.target.value) })} />
+        </div>
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          {([['auto', 'Auto'], ['portrait', 'Portrait'], ['landscape', 'Landscape']] as const).map(([v, label]) => (
+            <button key={v} className="pe-btn" style={pickStyle((s.orient ?? 'auto') === v)}
+              onClick={() => up({ orient: v })}>{label}</button>
+          ))}
+        </div>
+        <div className="pe-note" style={{ marginTop: 8 }}>
+          <b>Auto</b> describes the sheet whichever way round the job fits — 11×17 and
+          17×11 are one piece of paper fed the other direction, so this costs nothing
+          and never turns your artwork.
+        </div>
+      </Section>
+
+      <Section label="// PLACEMENT" help="Where the job sits on the sheet, and what to do when it doesn't fit.">
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
+          <span className="pe-label" style={{ width: 76 }}>Across</span>
+          {([['left', 'Left'], ['center', 'Centre'], ['right', 'Right']] as const).map(([v, l]) => (
+            <button key={v} className="pe-chipbtn" style={pickStyle((s.alignX ?? 'center') === v)} onClick={() => up({ alignX: v })}>{l}</button>
+          ))}
+        </div>
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 6 }}>
+          <span className="pe-label" style={{ width: 76 }}>Down</span>
+          {([['bottom', 'Bottom'], ['center', 'Centre'], ['top', 'Top']] as const).map(([v, l]) => (
+            <button key={v} className="pe-chipbtn" style={pickStyle((s.alignY ?? 'center') === v)} onClick={() => up({ alignY: v })}>{l}</button>
+          ))}
+        </div>
+        <Check icon="rotate" label="Turn the artwork 90° if that's the only way it fits"
+          sub="Off by default — turning the sheet is free, turning the art changes how the job feeds"
+          checked={!!s.rotateArt} onChange={(v) => up({ rotateArt: v })} />
+        <Check icon="resize" label="Shrink an oversized page to fit"
+          sub="Off by default. A cover that comes back at 96% is a reprint — leave this off and an overhang shows itself instead"
+          checked={!!s.shrinkOversize} onChange={(v) => up({ shrinkOversize: v })} />
+      </Section>
+
+      <Section label="// WHAT YOU'LL GET" help="Measured from the loaded file's real page sizes, before anything is exported.">
+        {!sourceBytes && <div className="pe-note">Add a PDF to see where it lands.</div>}
+        {sourceBytes && !rows.length && <div className="pe-note">Reading page sizes…</div>}
+        {first && (
+          <div className="pe-note" style={{ lineHeight: 1.7 }}>
+            <div>Artwork <b>{first.aw.toFixed(3)} × {first.ah.toFixed(3)}&quot;</b> ({(first.aw * 25.4).toFixed(1)} × {(first.ah * 25.4).toFixed(1)} mm){pageCount > 1 ? ` — page 1 of ${pageCount}` : ''}</div>
+            <div>Sheet <b>{first.shW} × {first.shH}&quot;</b>{first.shW !== mw ? ' (turned)' : ''}</div>
+            <div>Margin <b>{((first.shW - first.pw) / 2).toFixed(3)}&quot;</b> each side, <b>{((first.shH - first.ph) / 2).toFixed(3)}&quot;</b> top and bottom</div>
+            {first.turnArt && <div>Artwork turned 90° to fit.</div>}
+          </div>
+        )}
+        {oversize > 0 && (
+          <div className="pe-gang-warn" style={{ marginTop: 8 }}>
+            ⚠ {oversize === rows.length ? 'The artwork is' : `${oversize} of ${rows.length} pages are`} bigger
+            than this sheet and will hang off the edge. Pick a larger sheet, or turn the artwork —
+            {s.shrinkOversize ? ' shrinking is on, so it will be scaled down instead (the finished job will not be full size).' : ' shrinking is deliberately off, so nothing is silently resized.'}
+          </div>
+        )}
+      </Section>
+    </>
+  );
+}
+
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
   if (type === 'pdfrepair') return <PdfRepairPanel {...props} />;
+  if (type === 'mediafix') return <MediaFixPanel {...props} />;
   if (type === 'raisedmetal') return <RaisedMetalPanel {...props} />;
   if (type === 'pbcover') return <PerfectCoverPanel {...props} />;
   if (type === 'removebg') return <RemoveBgPanel {...props} />;

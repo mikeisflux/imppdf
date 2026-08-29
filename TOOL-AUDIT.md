@@ -122,11 +122,44 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 `shuffle` · `rotate` · `crop` · `split` · `flip` · `merge` · `overlay` · `distort` ·
 `resize` · `insertpages` · `mix` · `nudge` · `backdrop` · `coloreffects` ·
 `colormanage` · `pdftools` · `pdfx` · `layers` · `editpdf` · `preflight` ·
-`datamerge` · `trimart` · `pdfrepair`
+`datamerge` · `trimart` · `pdfrepair` · `mediafix`
 
 | Tool | Smoke | Shot |
 |---|---|---|
-| all 22 | [x] | [x] | (`coloreffects` is browser-only by design — verified by its refusal in node, not skipped) |
+| all 23 | [x] | [x] | (`coloreffects` is browser-only by design — verified by its refusal in node, not skipped) |
+
+### `mediafix` Media Size Fix
+
+Puts a FINISHED file on the sheet it actually prints on — 11×17, 12×18, 13×19,
+SRA3 — centred at 1:1. Never re-imposed, never re-scaled, same file name.
+
+The fault it exists for: a cover wrap exported at its own size (13.75 × 10.5")
+is a page no press has in its trays. A Fiery loaded with 11×17 then decides what
+to do with it, and decides by rotating and scaling to taste — the job is the
+right size in the PDF and the wrong size off the press. Naming the media settles
+it in the file.
+
+Scaling is OFF by default and deliberately so: a cover that comes back at 96% is
+a reprint. An oversized page overhangs visibly instead, which is a question the
+operator can answer.
+
+Covered by `test/media-fix.test.ts` (10 assertions, shared with the cover tool):
+centred placement on a turned sheet, artwork size preserved exactly, no silent
+scaling, opt-in shrink, forced orientation, opt-in artwork turn, `/Rotate`
+sources measured as they PRINT, and every page of a multi-page file placed.
+Rendered previews in `scripts/preview-mediafix.mjs`.
+
+### `pbcover` Perfect Bound Cover — media selection
+
+Same fix at source. The cover tool had no media selection at all: the page WAS
+the wrap, so every cover it made handed the placement decision to the RIP. It
+now takes a press sheet and centres the wrap on it, with the trim/fold/hinge
+marks and the mm crease labels moved out into the sheet margin (bare paper)
+instead of being buried in the artwork-bearing bleed. Crease figures are stated
+from the SHEET's left edge, which is the edge the creaser registers against.
+
+The default is still "Cover size" — changing it would silently alter the output
+of every saved workflow — but the panel now warns, loudly, when no media is set.
 
 ### `pdfrepair` PDF Repair
 
