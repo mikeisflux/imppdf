@@ -129,6 +129,12 @@ export function defaultSettings(type: StepType): StepSettings {
       return {
         trimWIn: 6, trimHIn: 9, pages: 200, caliperPerPageIn: 0.0025,
         coverAllowanceIn: 0, bleedIn: 0.125, frontPage: 1, backPage: 2,
+        /* THE PRESS SHEET, set by default. Leaving this unset makes the page
+           the wrap itself — a size no press has in its trays — and the RIP then
+           decides where the cover lands, which a Fiery answers by rotating and
+           scaling to taste. That is how a batch of finished covers came back
+           the wrong size. Set to the shop's default media; change it per job. */
+        mediaWIn: 11, mediaHIn: 17, mediaOrient: 'auto',
         spineText: '', addMarks: true, hingeIn: 0.1875,
         // Crease positions in mm along the top, inside the bleed — for whoever
         // sets the creaser, and trimmed off the finished cover.
@@ -151,7 +157,7 @@ export function defaultSettings(type: StepType): StepSettings {
       /* Centre a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
          tool exists to prevent, not a convenience. */
-      return { mediaWIn: 12, mediaHIn: 18, orient: 'auto', rotateArt: false,
+      return { mediaWIn: 11, mediaHIn: 17, orient: 'auto', rotateArt: false,
         shrinkOversize: false, alignX: 'center', alignY: 'center' };
     case 'pdfrepair':
       /* Repairs a finished PDF for the RIP WITHOUT touching the layout. This
@@ -595,12 +601,16 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         spineText: s.spineText || undefined, addMarks: s.addMarks !== false,
         markLenIn: s.markLenIn, markOffIn: s.markOffIn, markWeightPt: s.markWeightPt,
         hingeIn: s.hingeIn ?? 0.1875,
+        /* 0/absent is a deliberate choice in the panel ("Cover size"), so it is
+           passed through as-is rather than defaulted here — otherwise the panel
+           could not turn the sheet off. New steps get 11x17 above. */
+        mediaWIn: s.mediaWIn ?? 0, mediaHIn: s.mediaHIn ?? 0, mediaOrient: s.mediaOrient ?? 'auto',
         creaseLabels: s.creaseLabels !== false, creaseLabelPt: s.creaseLabelPt ?? 4,
       }); break;
       case 'mediafix': {
         const { imposeOnMedia } = await import('@/lib/imposition-toolkit/impose');
         b = (await imposeOnMedia(b, {
-          mediaWIn: s.mediaWIn ?? 12, mediaHIn: s.mediaHIn ?? 18,
+          mediaWIn: s.mediaWIn ?? 11, mediaHIn: s.mediaHIn ?? 17,
           orient: s.orient ?? 'auto', rotateArt: !!s.rotateArt,
           shrinkOversize: !!s.shrinkOversize,
           alignX: s.alignX ?? 'center', alignY: s.alignY ?? 'center',

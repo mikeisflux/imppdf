@@ -2426,7 +2426,7 @@ function PerfectCoverPanel({ s, up, onLoadSource, sourceBytes }: PanelProps) {
           <div className="pe-gang-warn" style={{ marginTop: 8 }}>
             ⚠ No media chosen, so the page is the wrap itself ({sheetW.toFixed(3)} × {sheetH.toFixed(3)}&quot;) — a size no press has in its trays.
             The RIP then decides where it lands, and a Fiery answers that by rotating and scaling to taste.
-            Pick the sheet that&apos;s actually loaded.
+            Pick the sheet that&apos;s actually loaded. New cover steps start on 11 × 17; this one predates that.
           </div>
         )}
       </Section>
@@ -2783,7 +2783,7 @@ function Line({ ok, label, detail }: { ok?: boolean; label: string; detail?: str
  * artwork is the right size in the PDF and the wrong size off the press. This
  * settles it in the file: name the media, centre the job on it at 1:1, done. */
 function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: PanelProps) {
-  const mw = s.mediaWIn ?? 12, mh = s.mediaHIn ?? 18;
+  const mw = s.mediaWIn ?? 11, mh = s.mediaHIn ?? 17;
   const MEDIA: [number, number, string][] = [
     [11, 17, '11 × 17'], [12, 18, '12 × 18'], [13, 19, '13 × 19'],
     [12.6, 17.72, 'SRA3'], [8.5, 11, '8.5 × 11'], [8.5, 14, '8.5 × 14'],
