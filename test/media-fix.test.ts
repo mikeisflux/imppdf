@@ -197,3 +197,51 @@ test("media fix: centering the ART instead of the page box is opt-in", async () 
   assert.deepEqual(off.report.noInk, [], "no ink scan runs by default");
   assert.deepEqual(off.report.inkIn, [], "and nothing is measured");
 });
+
+test("media fix: a page is placed by its CROP box, not its MediaBox", async () => {
+  /* The fault this catches: pdf-lib's page embedder reads MediaBox and ignores
+     CropBox. A file whose crop is 13.59 x 10.5 inside a 27.18 x 21 media reads
+     as 13.59 x 10.5 in Affinity/Acrobat — that IS the document — but embedded
+     at the media size it lands scaled and off-center, with the panel insisting
+     the numbers are right. The page the operator SEES is the page placed. */
+  const d = await PDFDocument.create();
+  const p = d.addPage([27.18 * PT, 21 * PT]);
+  p.drawRectangle({ x: 0, y: 0, width: 27.18 * PT, height: 21 * PT });
+  p.setCropBox(0, 0, 13.59 * PT, 10.5 * PT);
+  const { bytes, report } = await imposeOnMedia(await d.save(), { mediaWIn: 11, mediaHIn: 17 });
+
+  assert.deepEqual(report.oversize, [], "the CROP fits 11 x 17 turned, so nothing overhangs");
+  assert.deepEqual(report.scaled, [], "and nothing is scaled");
+  const doc = await PDFDocument.load(bytes);
+  const { width, height } = doc.getPage(0).getSize();
+  assert.ok(near(width, 17 * PT) && near(height, 11 * PT),
+    `17 x 11 horizontal, got ${(width / PT).toFixed(2)} x ${(height / PT).toFixed(2)}`);
+  const b = box(doc, 0, "BleedBox")!;
+  assert.ok(near(b[2]! - b[0]!, 13.59 * PT), "placed at the CROP width, not the media width");
+  assert.ok(near(b[0]!, ((17 - 13.59) / 2) * PT), "and centered on that");
+});
+
+test("media fix: portrait + turned artwork matches a portrait tray exactly", async () => {
+  /* The Fiery case. A 17 x 11 LANDSCAPE page sent to a press loaded with 11 x 17
+     PORTRAIT still leaves the RIP a decision, and this shop's Fiery answers it by
+     rotating and scaling to about half. The cure is to leave it no decision: emit
+     a page that IS the tray — 11 x 17 portrait — with the artwork turned inside
+     it at full size. Page size matches media, /Rotate is 0, nothing is scaled. */
+  const src = await pagePdf(13.59, 10.5, 0, 2);
+  const { bytes, report } = await imposeOnMedia(src, {
+    mediaWIn: 11, mediaHIn: 17, orient: "portrait", rotateArt: true,
+  });
+  assert.deepEqual(report.turned, [1, 2], "both pages turned");
+  assert.deepEqual(report.scaled, [], "and neither scaled");
+  const doc = await PDFDocument.load(bytes);
+  for (let i = 0; i < 2; i++) {
+    const p = doc.getPage(i), sz = p.getSize();
+    assert.ok(near(sz.width, 11 * PT) && near(sz.height, 17 * PT), `page ${i + 1} is 11 x 17 portrait`);
+    assert.equal(p.getRotation().angle % 360, 0, "no /Rotate for the RIP to interpret");
+    const b = box(doc, i, "BleedBox")!;
+    assert.ok(near(b[2]! - b[0]!, 10.5 * PT), "art at FULL size across (the wrap height)");
+    assert.ok(near(b[3]! - b[1]!, 13.59 * PT), "and full size down (the wrap width)");
+    assert.ok(near(b[0]!, ((11 - 10.5) / 2) * PT), "centered across");
+    assert.ok(near(b[1]!, ((17 - 13.59) / 2) * PT), "centered down");
+  }
+});

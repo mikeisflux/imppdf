@@ -4631,7 +4631,24 @@ export async function imposeOnMedia(
   const report: MediaFitReport = { pages: 0, turned: [], oversize: [], scaled: [], sheetIn: [], inkIn: [], noInk: [] };
 
   const pages = src.getPages();
-  const embeds = pages.length ? await out.embedPages(pages) : [];
+  /* Embed each page by its VISIBLE box, not its MediaBox.
+     pdf-lib's page embedder reads page.MediaBox() and ignores the CropBox, so a
+     file whose crop is smaller than its media gets placed at the media size —
+     while Affinity, Acrobat and every other viewer show, and measure, the crop.
+     The operator reads 13.59 x 10.5" off the document and the imposer works off
+     a box twice that, so the job lands scaled and off-center with every number
+     on screen insisting it is right. Passing the crop explicitly makes the page
+     the operator SEES the page that gets placed. */
+  const boxes = pages.map((p) => {
+    const m = p.getMediaBox(), c = p.getCropBox();
+    const left = Math.max(m.x, c.x), bottom = Math.max(m.y, c.y);
+    const right = Math.min(m.x + m.width, c.x + c.width);
+    const top = Math.min(m.y + m.height, c.y + c.height);
+    return (right - left > 1 && top - bottom > 1)
+      ? { left, bottom, right, top }
+      : { left: m.x, bottom: m.y, right: m.x + m.width, top: m.y + m.height };
+  });
+  const embeds = pages.length ? await out.embedPages(pages, boxes) : [];
   const ink = opts.centerArt ? await inkBoundsPt(bytes, opts.inkScanPx ?? 700) : [];
 
   for (let i = 0; i < pages.length; i++) {

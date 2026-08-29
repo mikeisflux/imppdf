@@ -339,6 +339,10 @@ export interface RepairReport {
   /** Page 1's visible size vs the size the press would image, in points. */
   visiblePt?: { wPt: number; hPt: number };
   mediaPt?: { wPt: number; hPt: number };
+  /** Page 1's raw boxes and /Rotate, verbatim. A tool that places a page has to
+   *  agree with the viewer about how big that page IS; when it does not, these
+   *  four numbers are what tell you why, and nothing else does. */
+  rawPt?: { media: number[]; crop: number[] | null; rotate: number; userUnit: number };
   /** Structure the finisher rewrites regardless. */
   hasThumb: boolean;
   hasId: boolean;
@@ -394,6 +398,13 @@ export async function inspectPdfForRepair(bytes: Uint8Array): Promise<RepairRepo
       if (i === 0) {
         rep.visiblePt = { wPt: vis[2]! - vis[0]!, hPt: vis[3]! - vis[1]! };
         rep.mediaPt = { wPt: media[2]! - media[0]!, hPt: media[3]! - media[1]! };
+      }
+      if (i === 0) {
+        const uu = page.node.lookup(PDFName.of('UserUnit'));
+        rep.rawPt = {
+          media, crop, rotate: ((page.getRotation().angle % 360) + 360) % 360,
+          userUnit: uu ? Number(uu.toString()) : 1,
+        };
       }
       if (page.node.get(PDFName.of('Thumb'))) rep.hasThumb = true;
     } catch { /* an unusual page is simply not reported on */ }

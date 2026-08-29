@@ -2784,6 +2784,20 @@ function Line({ ok, label, detail }: { ok?: boolean; label: string; detail?: str
  * settles it in the file: name the media, center the job on it at 1:1, done. */
 function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: PanelProps) {
   const mw = s.mediaWIn ?? 11, mh = s.mediaHIn ?? 17;
+  /* The file's RAW boxes. A tool that places a page has to agree with the viewer
+     about how big that page IS; when it does not, these numbers are the only
+     thing that says why. Shown so a screenshot of this panel is evidence. */
+  const [raw, setRaw] = useState<import('@/lib/imposition-toolkit/pdf-finish').RepairReport | null>(null);
+  useEffect(() => {
+    if (!sourceBytes) { setRaw(null); return; }
+    let dead = false;
+    import('@/lib/imposition-toolkit/pdf-finish')
+      .then(({ inspectPdfForRepair }) => inspectPdfForRepair(sourceBytes.slice()))
+      .then((r) => { if (!dead) setRaw(r); })
+      .catch(() => { if (!dead) setRaw(null); });
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceBytes, pageCount]);
   const MEDIA: [number, number, string][] = [
     [11, 17, '11 × 17'], [12, 18, '12 × 18'], [13, 19, '13 × 19'],
     [12.6, 17.72, 'SRA3'], [8.5, 11, '8.5 × 11'], [8.5, 14, '8.5 × 14'],
@@ -2881,6 +2895,21 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
             {first.turnArt && <div>Artwork turned 90° to fit.</div>}
           </div>
         )}
+        {raw?.rawPt && (() => {
+          const r = raw.rawPt!;
+          const inch = (b: number[]) => `${((b[2]! - b[0]!) / 72).toFixed(3)} × ${((b[3]! - b[1]!) / 72).toFixed(3)}"`;
+          const odd = r.rotate !== 0 || r.userUnit !== 1
+            || (r.crop ? Math.abs((r.crop[2]! - r.crop[0]!) - (r.media[2]! - r.media[0]!)) > 0.5 : false);
+          return (
+            <div className="pe-note pe-mono" style={{ marginTop: 10, lineHeight: 1.6, fontSize: 11 }}>
+              <div style={{ fontWeight: 700 }}>FILE AS READ · page 1</div>
+              <div>MediaBox {inch(r.media)}</div>
+              <div>CropBox&nbsp; {r.crop ? inch(r.crop) : '— none —'}</div>
+              <div>/Rotate {r.rotate}°{r.userUnit !== 1 ? ` · UserUnit ${r.userUnit}` : ''}</div>
+              {odd && <div style={{ color: '#f59e0b' }}>↑ this file&apos;s boxes disagree — that is what to send me</div>}
+            </div>
+          );
+        })()}
         {oversize > 0 && (
           <div className="pe-gang-warn" style={{ marginTop: 8 }}>
             ⚠ {oversize === rows.length ? 'The artwork is' : `${oversize} of ${rows.length} pages are`} bigger
