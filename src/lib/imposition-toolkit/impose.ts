@@ -4622,130 +4622,145 @@ export async function imposeOnMedia(
   bytes: Uint8Array, opts: MediaFitOptions,
 ): Promise<{ bytes: Uint8Array; report: MediaFitReport }> {
   const PL = await import('pdf-lib');
-  const { PDFDocument, degrees } = PL;
-  const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
-  const out = await PDFDocument.create();
+  const { PDFDocument, PDFName, PDFArray } = PL;
+
+  /* BUILD IT BY EDITING THE SOURCE PAGES, NOT BY RE-EMBEDDING THEM.
+     The first version made a new blank page per sheet and drew the source into
+     it as a Form XObject. That renders identically in every viewer — which is
+     exactly why it was hard to catch — but structurally it is a different
+     document: the page's own content stream is gone, replaced by a single
+     `/EmbeddedPdfPage-nnn Do`, with the real content nested one level down
+     behind a /BBox and /Matrix. A press controller does not just render a page;
+     it inspects it to decide paper, orientation and fit, and a page whose
+     content is one nested form gives it much less to go on.
+     Fiery Booklet, which this shop runs daily without trouble, edits the source
+     pages in place. So does the export finisher. This now does the same: the
+     original page object, its own content stream and its own resources are
+     kept, and the whole thing is wrapped in ONE transform that moves the
+     artwork to where it belongs on the bigger sheet. */
+  const doc = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
 
   const mw = Math.max(1, opts.mediaWIn) * PT, mh = Math.max(1, opts.mediaHIn) * PT;
   const EPS = 0.5;
   const report: MediaFitReport = { pages: 0, turned: [], oversize: [], scaled: [], sheetIn: [], inkIn: [], noInk: [] };
-
-  const pages = src.getPages();
-  /* Embed each page by its VISIBLE box, not its MediaBox.
-     pdf-lib's page embedder reads page.MediaBox() and ignores the CropBox, so a
-     file whose crop is smaller than its media gets placed at the media size —
-     while Affinity, Acrobat and every other viewer show, and measure, the crop.
-     The operator reads 13.59 x 10.5" off the document and the imposer works off
-     a box twice that, so the job lands scaled and off-center with every number
-     on screen insisting it is right. Passing the crop explicitly makes the page
-     the operator SEES the page that gets placed. */
-  const boxes = pages.map((p) => {
-    const m = p.getMediaBox(), c = p.getCropBox();
-    const left = Math.max(m.x, c.x), bottom = Math.max(m.y, c.y);
-    const right = Math.min(m.x + m.width, c.x + c.width);
-    const top = Math.min(m.y + m.height, c.y + c.height);
-    return (right - left > 1 && top - bottom > 1)
-      ? { left, bottom, right, top }
-      : { left: m.x, bottom: m.y, right: m.x + m.width, top: m.y + m.height };
-  });
-  const embeds = pages.length ? await out.embedPages(pages, boxes) : [];
   const ink = opts.centerArt ? await inkBoundsPt(bytes, opts.inkScanPx ?? 700) : [];
 
+  const pages = doc.getPages();
   for (let i = 0; i < pages.length; i++) {
-    const emb = embeds[i]!;
-    /* The page as the operator SEES it. A page carrying /Rotate images turned,
-       so its visible width is the height of its box — measure what prints, not
-       what the box says, or a rotated cover lands sideways on the sheet. */
-    const rot = ((pages[i]!.getRotation().angle % 360) + 360) % 360;
-    const swap = rot === 90 || rot === 270;
-    const aw = swap ? emb.height : emb.width;
-    const ah = swap ? emb.width : emb.height;
-
-    // Which way to describe the sheet.
-    const fits = (w: number, h: number) => aw <= w + EPS && ah <= h + EPS;
-    const slack = (w: number, h: number) => Math.min(w - aw, h - ah);
-    let turnSheet = false;
-    if (opts.orient === 'portrait') turnSheet = mw > mh;
-    else if (opts.orient === 'landscape') turnSheet = mh > mw;
-    else if (!fits(mw, mh)) turnSheet = fits(mh, mw) || slack(mh, mw) > slack(mw, mh);
-    let shW = turnSheet ? mh : mw, shH = turnSheet ? mw : mh;
-
-    // Turning the artwork is a separate, opt-in decision.
-    let turnArt = false;
-    if (opts.rotateArt && !fits(shW, shH) && ah <= shW + EPS && aw <= shH + EPS) turnArt = true;
-    let pw = turnArt ? ah : aw, ph = turnArt ? aw : ah;
-
-    let scale = 1;
-    if (pw > shW + EPS || ph > shH + EPS) {
-      report.oversize.push(i + 1);
-      if (opts.shrinkOversize) {
-        scale = Math.min(shW / pw, shH / ph);
-        report.scaled.push(i + 1);
-        pw *= scale; ph *= scale;
-      }
-    }
-    if (turnArt) report.turned.push(i + 1);
-
-    const page = out.addPage([shW, shH]);
-    const x = opts.alignX === 'left' ? 0 : opts.alignX === 'right' ? shW - pw : (shW - pw) / 2;
-    const y = opts.alignY === 'bottom' ? 0 : opts.alignY === 'top' ? shH - ph : (shH - ph) / 2;
-
-    /* embedPage takes the page's CONTENT and drops its /Rotate, so the rotation
-       has to be re-applied here or a rotated source lands sideways on the sheet.
-       Mind the sign: /Rotate is CLOCKWISE ("turn the page 90° to view it"),
-       while a PDF rotation operator — which is what drawPage's `rotate` becomes
-       — is counter-clockwise. Passing /Rotate straight through turns the
-       artwork the wrong way, which looks plausible on a square-ish page and is
-       obvious only once something has printed. */
-    const theta = ((360 - rot) + (turnArt ? 90 : 0)) % 360;
-    /* drawPage rotates the box about the placement point, so the anchor is the
-       corner the rotation sweeps the content AWAY from, not the bottom-left of
-       where it should end up. */
-    const place = { width: emb.width * scale, height: emb.height * scale };
-    const anchors: Record<number, { x: number; y: number }> = {
-      0: { x, y },
-      90: { x: x + pw, y },
-      180: { x: x + pw, y: y + ph },
-      270: { x, y: y + ph },
-    };
-    /* Shift so the INK is centered rather than the page box — see centerArt.
-       The ink rect is measured in visible page coordinates, so it is turned
-       with the artwork before being used. */
-    let dx = 0, dy = 0;
-    const ib = ink[i];
-    if (ib) {
-      const r = turnArt ? { x: ah - ib.y - ib.h, y: ib.x, w: ib.h, h: ib.w } : ib;
-      const ix = r.x * scale, iy = r.y * scale, iw = r.w * scale, ih = r.h * scale;
-      const wantX = opts.alignX === 'left' ? 0 : opts.alignX === 'right' ? shW - iw : (shW - iw) / 2;
-      const wantY = opts.alignY === 'bottom' ? 0 : opts.alignY === 'top' ? shH - ih : (shH - ih) / 2;
-      dx = wantX - (x + ix); dy = wantY - (y + iy);
-      report.inkIn.push({ wIn: r.w / PT, hIn: r.h / PT });
-    } else if (opts.centerArt) {
-      report.noInk.push(i + 1);
-    }
-
-    const a = anchors[theta] ?? anchors[0]!;
-    page.drawPage(emb, { ...place, x: a.x + dx, y: a.y + dy, rotate: degrees(theta) });
-
-    /* The artwork's footprint on the sheet, so downstream tools (and the RIP)
-       can tell the job from the paper around it.
-       BOTH Trim and Bleed, and both the same rect. ISO 32000 requires
-       Media > Bleed > Trim; setting only the Bleed left the TrimBox at the full
-       sheet, i.e. a trim LARGER than the bleed inside it, which is invalid. A
-       RIP is entitled to fit to those boxes, so an invalid pair is not a
-       cosmetic fault — it is an instruction that contradicts itself. */
+    const page = pages[i]!;
     try {
-      const bx = Math.max(0, x + dx), by = Math.max(0, y + dy);
-      const bw = Math.min(pw, shW - bx), bh = Math.min(ph, shH - by);
-      if (bw > 1 && bh > 1) { page.setBleedBox(bx, by, bw, bh); page.setTrimBox(bx, by, bw, bh); }
-    } catch { /* nicety */ }
+      /* The page's own box, read directly rather than through an embedder —
+         the CROP is what every viewer shows and measures, so it is the page. */
+      const read = (name: string): number[] | null => {
+        let node = page.node;
+        for (let guard = 0; node && guard < 8; guard++) {
+          const v = node.lookup(PDFName.of(name));
+          if (v instanceof PDFArray) return v.asArray().map((n) => Number(n.toString()));
+          node = node.lookup(PDFName.of('Parent')) as typeof node;
+        }
+        return null;
+      };
+      const media = read('MediaBox');
+      if (!media) continue;
+      const crop = read('CropBox');
+      const vis = crop ?? media;
+      const vx = Math.max(media[0]!, vis[0]!), vy = Math.max(media[1]!, vis[1]!);
+      const bw = Math.min(media[2]!, vis[2]!) - vx, bh = Math.min(media[3]!, vis[3]!) - vy;
+      if (!(bw > 1 && bh > 1)) continue;
 
-    report.sheetIn.push({ wIn: shW / PT, hIn: shH / PT });
+      /* A page carrying /Rotate PRINTS with its sides swapped, so that is the
+         size the sheet has to accommodate. The rotation itself is left exactly
+         as it is — the artwork is not re-oriented behind the operator's back. */
+      const rot = ((page.getRotation().angle % 360) + 360) % 360;
+      const swap = rot === 90 || rot === 270;
+      const aw = swap ? bh : bw, ah = swap ? bw : bh;
+
+      const fits = (w: number, h: number) => aw <= w + EPS && ah <= h + EPS;
+      const slack = (w: number, h: number) => Math.min(w - aw, h - ah);
+      let turnSheet = false;
+      if (opts.orient === 'portrait') turnSheet = mw > mh;
+      else if (opts.orient === 'landscape') turnSheet = mh > mw;
+      else if (!fits(mw, mh)) turnSheet = fits(mh, mw) || slack(mh, mw) > slack(mw, mh);
+      const shW = turnSheet ? mh : mw, shH = turnSheet ? mw : mh;
+
+      let turnArt = false;
+      if (opts.rotateArt && !fits(shW, shH) && ah <= shW + EPS && aw <= shH + EPS) turnArt = true;
+      let pw = turnArt ? ah : aw, ph = turnArt ? aw : ah;
+
+      let s = 1;
+      if (pw > shW + EPS || ph > shH + EPS) {
+        report.oversize.push(i + 1);
+        if (opts.shrinkOversize) { s = Math.min(shW / pw, shH / ph); report.scaled.push(i + 1); pw *= s; ph *= s; }
+      }
+      if (turnArt) report.turned.push(i + 1);
+
+      /* BAKE every rotation into the content and ship /Rotate 0.
+         A page box of 12x18 carrying /Rotate 90 prints as 18x12 and is perfectly
+         legal — but this file exists to leave a press nothing to interpret, and
+         a non-zero /Rotate is one more thing for it to act on. So the source's
+         own rotation is folded into the same transform that positions the
+         artwork, and the page ships square: box = what prints, /Rotate 0.
+         /Rotate is CLOCKWISE, a PDF matrix is counter-clockwise, hence 360-rot. */
+      const theta = ((360 - rot) + (turnArt ? 90 : 0)) % 360;
+      const quarter = theta === 90 || theta === 270;
+      const uw = shW, uh = shH;
+      const placedW = (quarter ? bh : bw) * s, placedH = (quarter ? bw : bh) * s;
+      let mx = opts.alignX === 'left' ? 0 : opts.alignX === 'right' ? uw - placedW : (uw - placedW) / 2;
+      let my = opts.alignY === 'bottom' ? 0 : opts.alignY === 'top' ? uh - placedH : (uh - placedH) / 2;
+
+      // Center the INK rather than the box, when asked and when measurable.
+      const ib = ink[i];
+      if (ib) {
+        const r = quarter ? { x: bh - ib.y - ib.h, y: ib.x, w: ib.h, h: ib.w } : ib;
+        const iw = r.w * s, ih = r.h * s;
+        const wantX = opts.alignX === 'left' ? 0 : opts.alignX === 'right' ? uw - iw : (uw - iw) / 2;
+        const wantY = opts.alignY === 'bottom' ? 0 : opts.alignY === 'top' ? uh - ih : (uh - ih) / 2;
+        mx += wantX - (mx + r.x * s); my += wantY - (my + r.y * s);
+        report.inkIn.push({ wIn: r.w / PT, hIn: r.h / PT });
+      } else if (opts.centerArt) report.noInk.push(i + 1);
+
+      /* ONE transform, wrapped round the page's existing content: rotate by
+         theta, scale by s, then put the result at (mx, my). Each row is derived
+         from where the source box's corners land under that rotation — e.g. at
+         90 degrees (x,y) -> (-y,x), so x runs -(vy+bh)s..-vy*s and y runs
+         vx*s..(vx+bw)s, and the offsets bring those back to mx and my. */
+      const M: Record<number, [number, number, number, number, number, number]> = {
+        0:   [s, 0, 0, s, mx - vx * s, my - vy * s],
+        90:  [0, s, -s, 0, mx + (vy + bh) * s, my - vx * s],
+        180: [-s, 0, 0, -s, mx + (vx + bw) * s, my + (vy + bh) * s],
+        270: [0, -s, s, 0, mx - vy * s, my + (vx + bw) * s],
+      };
+      const m = M[theta] ?? M[0]!;
+      /* getContentStream/createContentStream are marked private in pdf-lib's
+         typings but are the documented mechanism its own translateContent uses;
+         there is no public way to prepend a matrix. Reached through a narrow
+         typed view rather than `any`, so a signature change still fails here. */
+      const inner = page as unknown as {
+        getContentStream(): unknown;
+        createContentStream(...ops: unknown[]): Parameters<typeof doc.context.register>[0];
+      };
+      page.node.normalize();
+      inner.getContentStream();
+      const startRef = doc.context.register(inner.createContentStream(
+        PL.pushGraphicsState(), PL.concatTransformationMatrix(...m),
+      ));
+      const endRef = doc.context.register(inner.createContentStream(PL.popGraphicsState()));
+      page.node.wrapContentStreams(startRef, endRef);
+
+      page.setRotation(PL.degrees(0));            // the rotation now lives in the content
+      page.setMediaBox(0, 0, uw, uh);
+      page.setCropBox(0, 0, uw, uh);
+      /* Media > Bleed > Trim, both on the artwork: the trim IS the job, and an
+         invalid nesting is an instruction that contradicts itself. */
+      const bx = Math.max(0, mx), by = Math.max(0, my);
+      const tw = Math.min(placedW, uw - bx), th = Math.min(placedH, uh - by);
+      if (tw > 1 && th > 1) { page.setBleedBox(bx, by, tw, th); page.setTrimBox(bx, by, tw, th); }
+
+      report.sheetIn.push({ wIn: shW / PT, hIn: shH / PT });
+    } catch { /* an unusual page is left as it is rather than risking its geometry */ }
   }
   report.pages = pages.length;
-
-  await carryColorContext(src, out);
-  return { bytes: await out.save(), report };
+  return { bytes: await doc.save(), report };
 }
 
 // ── Raised metal ────────────────────────────────────────────────────────────
