@@ -4530,8 +4530,29 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
 export interface DivinityCardOptions {
   /** 'a3' (default) is the doubled sheet; 'a4' is a single block of ten. */
   sheet?: 'a4' | 'a3';
-  /** 1-based page of the uploaded file to use as the card. */
+  /** 1-based page of the uploaded file to use as the card FRONT. */
   page?: number;
+  /* BACKS. Give the tool a second page and it emits a second sheet of backs
+     that registers with the fronts. Defaults to page 2 when the file has one.
+
+     The card POSITIONS need nothing done to them: the grid is symmetric about
+     both sheet axes (13.5 / 13.5 across, 7.5 / 7.5 down), so every card has a
+     partner at the mirrored position and the sheet backs up under either flip.
+     Asserted in test/fit-divinity-cards.test.ts, because it is the property the
+     whole duplex story rests on.
+
+     What DOES need handling is the quarter turn. Portrait art lies on its side
+     in a 90 x 54 cell, so its "up" points along the sheet's x-axis — and a
+     long-edge flip reverses x. Print the back with the same turn as the front
+     and it comes out inverted relative to it. So the back is turned the other
+     way for a long-edge flip, and the same way for a short-edge flip, where the
+     x-axis survives. */
+  backPage?: number;
+  /** Off suppresses the backs sheet even when the file has a second page. */
+  backs?: boolean;
+  /** How the press turns the sheet over. 'long' = flipped about the vertical
+   *  axis (Fiery's "open to left"); 'short' = about the horizontal axis. */
+  flip?: 'long' | 'short';
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
   markLenMm?: number;      // default 3
@@ -4551,44 +4572,68 @@ export async function imposeDivinityCards(
 
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();
-  const pg = out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)]);
 
   const srcPages = src.getPages();
-  const idx = Math.min(srcPages.length, Math.max(1, Math.round(opts.page ?? 1))) - 1;
-  const cardPage = srcPages[idx];
-  if (!cardPage) return out.save();
-  const [card] = await out.embedPages([cardPage]);
-  if (!card) return out.save();
+  const frontIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.page ?? 1))) - 1;
+  const frontPage = srcPages[frontIdx];
+  if (!frontPage) return out.save();
+
+  const backIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.backPage ?? 2))) - 1;
+  const wantBacks = opts.backs !== false && srcPages.length > 1 && backIdx !== frontIdx;
+  const backPage = wantBacks ? srcPages[backIdx] : null;
+
+  const embeds = await out.embedPages(backPage ? [frontPage, backPage] : [frontPage]);
+  const front = embeds[0];
+  if (!front) return out.save();
+  const back = backPage ? embeds[1] : null;
 
   /* Turn PORTRAIT artwork a quarter turn so it lands in the 90 x 54 cell the
      right way up. Art already supplied landscape is left alone — the operator
      may have exported it that way, and turning it again would stand it on its
      head. Judged from the artwork's own aspect, not from its exact size, so a
      card with a millimetre of slop still reads correctly. */
-  const turn = card.height > card.width;
-  const artW = turn ? card.height : card.width;
-  const artH = turn ? card.width : card.height;
-
-  for (const c of fit.cells) {
-    const cw = mm(c.wMm), ch = mm(c.hMm);
-    /* COVER-fit and clip: a card is trimmed on all four sides, so the art must
-       reach every edge of the cell. Contain would leave white slivers inside
-       the trim, which on a card reads as a printing fault. */
-    const scale = Math.max(cw / artW, ch / artH);
-    const dw = artW * scale, dh = artH * scale;
-    const x = mm(c.xMm) + (cw - dw) / 2, y = mm(c.yMm) + (ch - dh) / 2;
-    pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(mm(c.xMm), mm(c.yMm), cw, ch), PL.clip(), PL.endPath());
-    if (turn) {
-      // Rotating about the placement point sweeps the box up and to the left,
-      // so the anchor is the bottom-RIGHT of where the card should end up.
-      pg.drawPage(card, { x: x + dw, y, width: card.width * scale, height: card.height * scale, rotate: degrees(90) });
-    } else {
-      pg.drawPage(card, { x, y, width: dw, height: dh });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const drawSheet = (pg: any, card: any, quarter: 0 | 90 | -90) => {
+    const turn = quarter !== 0;
+    const artW = turn ? card.height : card.width;
+    const artH = turn ? card.width : card.height;
+    for (const c of fit.cells) {
+      const cw = mm(c.wMm), ch = mm(c.hMm);
+      /* COVER-fit and clip: a card is trimmed on all four sides, so the art must
+         reach every edge of the cell. Contain would leave white slivers inside
+         the trim, which on a card reads as a printing fault. */
+      const scale = Math.max(cw / artW, ch / artH);
+      const dw = artW * scale, dh = artH * scale;
+      const x = mm(c.xMm) + (cw - dw) / 2, y = mm(c.yMm) + (ch - dh) / 2;
+      const w = card.width * scale, h = card.height * scale;
+      pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(mm(c.xMm), mm(c.yMm), cw, ch), PL.clip(), PL.endPath());
+      /* Rotating sweeps the box away from the placement point, so the anchor is
+         the corner it sweeps FROM: bottom-right at +90, top-left at -90. */
+      if (quarter === 90) pg.drawPage(card, { x: x + dw, y, width: w, height: h, rotate: degrees(90) });
+      else if (quarter === -90) pg.drawPage(card, { x, y: y + dh, width: w, height: h, rotate: degrees(-90) });
+      else pg.drawPage(card, { x, y, width: dw, height: dh });
+      pg.pushOperators(PL.popGraphicsState());
     }
-    pg.pushOperators(PL.popGraphicsState());
+  };
+
+  const frontTurn: 0 | 90 | -90 = front.height > front.width ? 90 : 0;
+  const pages = [out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)])];
+  drawSheet(pages[0], front, frontTurn);
+
+  if (back) {
+    /* A long-edge flip reverses the sheet's x-axis, and a turned card's "up"
+       points along x — so the back has to be turned the OTHER way to come out
+       upright against its front. A short-edge flip leaves x alone, so the back
+       keeps the same turn. Get this wrong and the backs are upside down on
+       every card, which is only visible after cutting. */
+    const backTurn: 0 | 90 | -90 = back.height > back.width
+      ? ((opts.flip ?? 'long') === 'long' ? -90 : 90) : 0;
+    const bp = out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)]);
+    drawSheet(bp, back, backTurn);
+    pages.push(bp);
   }
 
-  if (opts.addMarks !== false) {
+  for (const pg of pages) if (opts.addMarks !== false) {
     const len = mm(opts.markLenMm ?? 3), off = mm(opts.markOffMm ?? 1.5);
     const w0 = opts.markWeightPt ?? 0.25;
     const line = (x1: number, y1: number, x2: number, y2: number) =>

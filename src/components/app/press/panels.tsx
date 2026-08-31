@@ -2984,6 +2984,42 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         )}
       </Section>
 
+      <Section label="// BACKS" help="Give the tool a second page and it emits a sheet of backs that registers with the fronts.">
+        {pageCount > 1 ? (
+          <>
+            <Check icon="flip" label="Print backs from page 2"
+              sub="A second sheet, so you can duplex fronts to backs"
+              checked={s.backs !== false} onChange={(v) => up({ backs: v })} />
+            {s.backs !== false && (
+              <>
+                <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                  <span className="pe-label" style={{ width: 76 }}>Flip</span>
+                  <button className="pe-chipbtn" style={pickStyle((s.flip ?? 'long') === 'long')} onClick={() => up({ flip: 'long' })}>Long edge</button>
+                  <button className="pe-chipbtn" style={pickStyle(s.flip === 'short')} onClick={() => up({ flip: 'short' })}>Short edge</button>
+                </div>
+                <div className="pe-note" style={{ marginTop: 8 }}>
+                  <b>Long edge</b> is the Fiery&apos;s &ldquo;open to left&rdquo;. It reverses the sheet&apos;s
+                  x-axis, and a card lying on its side has its <i>top</i> along that axis — so the
+                  backs are turned the other way to come out upright against their fronts.
+                  Short edge leaves x alone, so they keep the same turn. If your proof has the
+                  backs upside down, switch this rather than re-exporting the art.
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <div className="pe-note">
+            Single-sided. Upload a <b>two-page</b> file — front on page 1, back on page 2 — and
+            you&apos;ll get a second sheet of backs.
+          </div>
+        )}
+        <div className="pe-note" style={{ marginTop: 8 }}>
+          Card positions are <b>absolute and symmetric</b> — 13.5 mm at both sides, 7.5 mm top
+          and bottom — so the grid backs up under either flip. Only the quarter turn depends on
+          which way the press turns the sheet.
+        </div>
+      </Section>
+
       <Section label="// MARKS" help="Cut marks are ruled off the sheet edges, never into the gutters — a mark long enough to be useful in a 3 mm gutter would run onto the next card.">
         <Check icon="crop" label="Cut marks" sub="At every card edge, in the sheet margins, plus the half-sheet cut on A3"
           checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />

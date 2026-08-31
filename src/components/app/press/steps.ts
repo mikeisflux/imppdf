@@ -156,7 +156,7 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'divinitycards':
       // The shop's card template, to the printer's spec sheet: 54 x 90 mm card,
       // ten to an A4, the A4 block doubled onto an A3 that cuts into two A4s.
-      return { sheet: 'a3', page: 1, addMarks: true };
+      return { sheet: 'a3', page: 1, backPage: 2, backs: true, flip: 'long', addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
@@ -615,6 +615,8 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         const { imposeDivinityCards } = await import('@/lib/imposition-toolkit/impose');
         b = await imposeDivinityCards(b, {
           sheet: s.sheet === 'a4' ? 'a4' : 'a3', page: s.page ?? 1,
+          backPage: s.backPage ?? 2, backs: s.backs !== false,
+          flip: s.flip === 'short' ? 'short' : 'long',
           addMarks: s.addMarks !== false,
         });
         break;
