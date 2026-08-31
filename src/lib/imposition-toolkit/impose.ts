@@ -4516,6 +4516,105 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   return out.save();
 }
 
+/* ── Divinity trading cards ─────────────────────────────────────────────────
+
+   The shop's own card template, to the printer's spec sheet: a 54 x 90 mm card,
+   ten to an A4, and the A4 block doubled onto an A3 so one sheet yields twenty
+   and cuts in half into two A4s.
+
+   The card lies on its SIDE — placed 90 across by 54 down — so portrait
+   artwork is turned a quarter turn on the way onto the sheet. Geometry lives in
+   fit/divinity-cards.ts, in millimetres, because that is how the spec is
+   written; see the diagram there.                                            */
+
+export interface DivinityCardOptions {
+  /** 'a3' (default) is the doubled sheet; 'a4' is a single block of ten. */
+  sheet?: 'a4' | 'a3';
+  /** 1-based page of the uploaded file to use as the card. */
+  page?: number;
+  /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
+  addMarks?: boolean;
+  markLenMm?: number;      // default 3
+  markOffMm?: number;      // default 1.5 — clear of the trim so it never prints on a card
+  markWeightPt?: number;   // default 0.25
+}
+
+export async function imposeDivinityCards(
+  bytes: Uint8Array, opts: DivinityCardOptions = {},
+): Promise<Uint8Array> {
+  const PL = await import('pdf-lib');
+  const { PDFDocument, rgb, degrees } = PL;
+  const { fitDivinityCards, PT_PER_MM } = await import('./fit/divinity-cards.ts');
+
+  const fit = fitDivinityCards(opts.sheet ?? 'a3');
+  const mm = (v: number) => v * PT_PER_MM;
+
+  const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
+  const out = await PDFDocument.create();
+  const pg = out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)]);
+
+  const srcPages = src.getPages();
+  const idx = Math.min(srcPages.length, Math.max(1, Math.round(opts.page ?? 1))) - 1;
+  const cardPage = srcPages[idx];
+  if (!cardPage) return out.save();
+  const [card] = await out.embedPages([cardPage]);
+  if (!card) return out.save();
+
+  /* Turn PORTRAIT artwork a quarter turn so it lands in the 90 x 54 cell the
+     right way up. Art already supplied landscape is left alone — the operator
+     may have exported it that way, and turning it again would stand it on its
+     head. Judged from the artwork's own aspect, not from its exact size, so a
+     card with a millimetre of slop still reads correctly. */
+  const turn = card.height > card.width;
+  const artW = turn ? card.height : card.width;
+  const artH = turn ? card.width : card.height;
+
+  for (const c of fit.cells) {
+    const cw = mm(c.wMm), ch = mm(c.hMm);
+    /* COVER-fit and clip: a card is trimmed on all four sides, so the art must
+       reach every edge of the cell. Contain would leave white slivers inside
+       the trim, which on a card reads as a printing fault. */
+    const scale = Math.max(cw / artW, ch / artH);
+    const dw = artW * scale, dh = artH * scale;
+    const x = mm(c.xMm) + (cw - dw) / 2, y = mm(c.yMm) + (ch - dh) / 2;
+    pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(mm(c.xMm), mm(c.yMm), cw, ch), PL.clip(), PL.endPath());
+    if (turn) {
+      // Rotating about the placement point sweeps the box up and to the left,
+      // so the anchor is the bottom-RIGHT of where the card should end up.
+      pg.drawPage(card, { x: x + dw, y, width: card.width * scale, height: card.height * scale, rotate: degrees(90) });
+    } else {
+      pg.drawPage(card, { x, y, width: dw, height: dh });
+    }
+    pg.pushOperators(PL.popGraphicsState());
+  }
+
+  if (opts.addMarks !== false) {
+    const len = mm(opts.markLenMm ?? 3), off = mm(opts.markOffMm ?? 1.5);
+    const w0 = opts.markWeightPt ?? 0.25;
+    const line = (x1: number, y1: number, x2: number, y2: number) =>
+      pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w0, color: rgb(0, 0, 0) });
+    /* Marks live OUTSIDE the cards, in the sheet margins only. Every card edge
+       is shared with its neighbour across a 3 mm gutter, so a mark long enough
+       to be useful in the gutter would run onto the card next to it. Ruling the
+       lines off the sheet edges instead gives the guillotine the same cut. */
+    const xs = new Set<number>(), ys = new Set<number>();
+    for (const c of fit.cells) {
+      xs.add(mm(c.xMm)); xs.add(mm(c.xMm + c.wMm));
+      ys.add(mm(c.yMm)); ys.add(mm(c.yMm + c.hMm));
+    }
+    const sheetH = mm(fit.sheetHMm), sheetW = mm(fit.sheetWMm);
+    for (const x of xs) { line(x, 0, x, len); line(x, sheetH, x, sheetH - len); }
+    for (const y of ys) { line(0, y, len, y); line(sheetW, y, sheetW - len, y); }
+    // The half-sheet cut on an A3, marked top and bottom so it cannot be missed.
+    for (const cx of fit.cutXMm) {
+      line(mm(cx), 0, mm(cx), len + off); line(mm(cx), sheetH, mm(cx), sheetH - len - off);
+    }
+  }
+
+  await carryColorContext(src, out);
+  return out.save();
+}
+
 /* ── Media Size Fix ─────────────────────────────────────────────────────────
 
    Put a FINISHED file onto the sheet it actually prints on, and center it there

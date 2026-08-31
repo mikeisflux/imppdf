@@ -31,7 +31,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair' | 'mediafix';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair' | 'mediafix' | 'divinitycards';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -153,6 +153,10 @@ export function defaultSettings(type: StepType): StepSettings {
         toneGain: 0.18, floor: 24, gamma: 1,
         spotName: 'V1', whiteName: 'W1', subjectOnly: false, matteTighten: 2.5,
       };
+    case 'divinitycards':
+      // The shop's card template, to the printer's spec sheet: 54 x 90 mm card,
+      // ten to an A4, the A4 block doubled onto an A3 that cuts into two A4s.
+      return { sheet: 'a3', page: 1, addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
@@ -607,6 +611,14 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         mediaWIn: s.mediaWIn ?? 0, mediaHIn: s.mediaHIn ?? 0, mediaOrient: s.mediaOrient ?? 'auto',
         creaseLabels: s.creaseLabels !== false, creaseLabelPt: s.creaseLabelPt ?? 4,
       }); break;
+      case 'divinitycards': {
+        const { imposeDivinityCards } = await import('@/lib/imposition-toolkit/impose');
+        b = await imposeDivinityCards(b, {
+          sheet: s.sheet === 'a4' ? 'a4' : 'a3', page: s.page ?? 1,
+          addMarks: s.addMarks !== false,
+        });
+        break;
+      }
       case 'mediafix': {
         const { imposeOnMedia } = await import('@/lib/imposition-toolkit/impose');
         b = (await imposeOnMedia(b, {

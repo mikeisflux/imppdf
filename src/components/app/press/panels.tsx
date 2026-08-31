@@ -2923,10 +2923,80 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
   );
 }
 
+/* Divinity Trading Cards — the shop's card template, to the printer's spec.
+ * The geometry is FIXED (fit/divinity-cards.ts), so this panel is mostly a
+ * statement of what you are going to get rather than a set of dials. The one
+ * real decision is which sheet. */
+function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
+  const a3 = s.sheet !== 'a4';
+  const MM = 25.4 / 72;
+  const src = pageSizes[Math.max(0, Math.min(pageSizes.length - 1, (s.page ?? 1) - 1))];
+  const wMm = src ? src.wPt * MM : 0, hMm = src ? src.hPt * MM : 0;
+  // Judged on aspect, not exact size, so a card with a millimetre of slop still
+  // reads as correct — same rule the engine uses to decide the quarter turn.
+  const ratio = wMm && hMm ? Math.max(wMm, hMm) / Math.min(wMm, hMm) : 0;
+  const wanted = 90 / 54;
+  const off = ratio ? Math.abs(ratio - wanted) / wanted : 0;
+
+  return (
+    <>
+      <div className="pe-note" style={{ marginBottom: 12 }}>
+        Upload <b>one card</b> and it fills the sheet. The card is <b>54 × 90 mm</b> and
+        lies on its side, ten to an A4, at the printer&apos;s spec: 3 mm gutters,
+        13.5 mm at the sides and 7.5 mm top and bottom.
+      </div>
+
+      <Section label="// SHEET" help="A3 is the A4 block printed twice, side by side. Cut it in half and you have two identical A4s.">
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <button className="pe-btn" style={pickStyle(a3)} onClick={() => up({ sheet: 'a3' })}>A3 · 20 cards</button>
+          <button className="pe-btn" style={pickStyle(!a3)} onClick={() => up({ sheet: 'a4' })}>A4 · 10 cards</button>
+        </div>
+        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
+          <div>Sheet <b>{a3 ? '420 × 297 mm (A3)' : '210 × 297 mm (A4)'}</b></div>
+          <div>Grid <b>{a3 ? '2 blocks of 2 × 5' : '2 × 5'}</b> — <b>{a3 ? 20 : 10} cards</b>, each 90 × 54 mm</div>
+          {a3 && <div>Cut at <b>210 mm</b> for two A4s, marked top and bottom</div>}
+        </div>
+      </Section>
+
+      <Section label="// CARD" help="Which page of the uploaded file is the card. Portrait art is turned a quarter turn to lie in the cell.">
+        {pageCount > 1 && (
+          <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <span className="pe-label" style={{ flex: 1 }}>Page<span className="pe-label-sm"> · of {pageCount}</span></span>
+            <NumRaw value={s.page ?? 1} onValue={(v) => up({ page: Math.max(1, Math.min(pageCount, Math.round(v))) })} w={70} />
+          </div>
+        )}
+        {src ? (
+          <div className="pe-note" style={{ lineHeight: 1.7 }}>
+            <div>Your card measures <b>{wMm.toFixed(1)} × {hMm.toFixed(1)} mm</b></div>
+            {off > 0.02 && (
+              <div style={{ marginTop: 4 }}>
+                Its shape doesn&apos;t match a 54 × 90 card, so it will be filled to the
+                cell and the overflow trimmed. Re-export it at 54 × 90 mm to keep
+                everything inside the trim.
+              </div>
+            )}
+          </div>
+        ) : <div className="pe-note">Add the card artwork to check its size.</div>}
+        {off > 0.02 && src && (
+          <div className="pe-gang-warn" style={{ marginTop: 8 }}>
+            ⚠ Card is {wMm.toFixed(1)} × {hMm.toFixed(1)} mm, not 54 × 90.
+          </div>
+        )}
+      </Section>
+
+      <Section label="// MARKS" help="Cut marks are ruled off the sheet edges, never into the gutters — a mark long enough to be useful in a 3 mm gutter would run onto the next card.">
+        <Check icon="crop" label="Cut marks" sub="At every card edge, in the sheet margins, plus the half-sheet cut on A3"
+          checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />
+      </Section>
+    </>
+  );
+}
+
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
   if (type === 'pdfrepair') return <PdfRepairPanel {...props} />;
   if (type === 'mediafix') return <MediaFixPanel {...props} />;
+  if (type === 'divinitycards') return <DivinityCardsPanel {...props} />;
   if (type === 'raisedmetal') return <RaisedMetalPanel {...props} />;
   if (type === 'pbcover') return <PerfectCoverPanel {...props} />;
   if (type === 'removebg') return <RemoveBgPanel {...props} />;
