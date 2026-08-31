@@ -2935,25 +2935,25 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
   // Judged on aspect, not exact size, so a card with a millimetre of slop still
   // reads as correct — same rule the engine uses to decide the quarter turn.
   const ratio = wMm && hMm ? Math.max(wMm, hMm) / Math.min(wMm, hMm) : 0;
-  const wanted = 90 / 54;
+  const wanted = 88.9 / 63.5;   // a 2.5 x 3.5 card, either way round
   const off = ratio ? Math.abs(ratio - wanted) / wanted : 0;
 
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Upload <b>one card</b> and it fills the sheet. The card is <b>54 × 90 mm</b> and
-        lies on its side, ten to an A4, at the printer&apos;s spec: 3 mm gutters,
-        13.5 mm at the sides and 7.5 mm top and bottom.
+        Upload <b>one card</b> and it fills the sheet. Standard <b>2.5 × 3.5&quot;</b>
+        (63.5 × 88.9 mm), standing upright, nine to an A4 — 3 mm gutters, 6.75 mm
+        at the sides and 12.15 mm top and bottom.
       </div>
 
       <Section label="// SHEET" help="A3 is the A4 block printed twice, side by side. Cut it in half and you have two identical A4s.">
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <button className="pe-btn" style={pickStyle(a3)} onClick={() => up({ sheet: 'a3' })}>A3 · 20 cards</button>
-          <button className="pe-btn" style={pickStyle(!a3)} onClick={() => up({ sheet: 'a4' })}>A4 · 10 cards</button>
+          <button className="pe-btn" style={pickStyle(a3)} onClick={() => up({ sheet: 'a3' })}>A3 · 18 cards</button>
+          <button className="pe-btn" style={pickStyle(!a3)} onClick={() => up({ sheet: 'a4' })}>A4 · 9 cards</button>
         </div>
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
           <div>Sheet <b>{a3 ? '420 × 297 mm (A3)' : '210 × 297 mm (A4)'}</b></div>
-          <div>Grid <b>{a3 ? '2 blocks of 2 × 5' : '2 × 5'}</b> — <b>{a3 ? 20 : 10} cards</b>, each 90 × 54 mm</div>
+          <div>Grid <b>{a3 ? '2 blocks of 3 × 3' : '3 × 3'}</b> — <b>{a3 ? 18 : 9} cards</b>, each 2.5 × 3.5&quot;</div>
           {a3 && <div>Cut at <b>210 mm</b> for two A4s, marked top and bottom</div>}
         </div>
       </Section>
@@ -2970,16 +2970,16 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
             <div>Your card measures <b>{wMm.toFixed(1)} × {hMm.toFixed(1)} mm</b></div>
             {off > 0.02 && (
               <div style={{ marginTop: 4 }}>
-                Its shape doesn&apos;t match a 54 × 90 card, so it will be filled to the
-                cell and the overflow trimmed. Re-export it at 54 × 90 mm to keep
-                everything inside the trim.
+                Its shape doesn&apos;t match a 2.5 × 3.5&quot; card, so it will be filled to
+                the cell and the overflow trimmed. Re-export it at 63.5 × 88.9 mm to
+                keep everything inside the trim.
               </div>
             )}
           </div>
         ) : <div className="pe-note">Add the card artwork to check its size.</div>}
         {off > 0.02 && src && (
           <div className="pe-gang-warn" style={{ marginTop: 8 }}>
-            ⚠ Card is {wMm.toFixed(1)} × {hMm.toFixed(1)} mm, not 54 × 90.
+            ⚠ Card is {wMm.toFixed(1)} × {hMm.toFixed(1)} mm, not 63.5 × 88.9 (2.5 × 3.5&quot;).
           </div>
         )}
       </Section>
@@ -2998,11 +2998,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
                   <button className="pe-chipbtn" style={pickStyle(s.flip === 'short')} onClick={() => up({ flip: 'short' })}>Short edge</button>
                 </div>
                 <div className="pe-note" style={{ marginTop: 8 }}>
-                  <b>Long edge</b> is the Fiery&apos;s &ldquo;open to left&rdquo;. It reverses the sheet&apos;s
-                  x-axis, and a card lying on its side has its <i>top</i> along that axis — so the
-                  backs are turned the other way to come out upright against their fronts.
-                  Short edge leaves x alone, so they keep the same turn. If your proof has the
-                  backs upside down, switch this rather than re-exporting the art.
+                  Only matters if your art is <b>landscape</b>, which has to be turned to fit
+                  the upright cell. <b>Long edge</b> (the Fiery&apos;s &ldquo;open to left&rdquo;) reverses
+                  the sheet&apos;s x-axis, so the backs are turned the other way to come out
+                  upright against their fronts; short edge leaves x alone. Portrait art is
+                  never turned, so this changes nothing for it.
                 </div>
               </>
             )}
@@ -3014,9 +3014,10 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           </div>
         )}
         <div className="pe-note" style={{ marginTop: 8 }}>
-          Card positions are <b>absolute and symmetric</b> — 13.5 mm at both sides, 7.5 mm top
-          and bottom — so the grid backs up under either flip. Only the quarter turn depends on
-          which way the press turns the sheet.
+          Card positions are <b>absolute and symmetric</b> — 6.75 mm at both sides, 12.15 mm top
+          and bottom — so the grid backs up under either flip. And an upright card needs no
+          quarter turn at all, so with portrait artwork there is nothing left for the flip to
+          get wrong.
         </div>
       </Section>
 

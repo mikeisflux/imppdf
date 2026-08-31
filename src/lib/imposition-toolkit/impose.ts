@@ -4518,17 +4518,15 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
 
 /* ── Divinity trading cards ─────────────────────────────────────────────────
 
-   The shop's own card template, to the printer's spec sheet: a 54 x 90 mm card,
-   ten to an A4, and the A4 block doubled onto an A3 so one sheet yields twenty
-   and cuts in half into two A4s.
+   A standard 2.5 x 3.5" trading card, nine to an A4, with the A4 block doubled
+   onto an A3 so one sheet yields eighteen and cuts in half into two A4s.
 
-   The card lies on its SIDE — placed 90 across by 54 down — so portrait
-   artwork is turned a quarter turn on the way onto the sheet. Geometry lives in
-   fit/divinity-cards.ts, in millimetres, because that is how the spec is
-   written; see the diagram there.                                            */
+   The card stands UPRIGHT: worked both ways round, portrait gives 3 x 3 = 9 and
+   landscape only 2 x 4 = 8, so upright wins — and portrait artwork then needs no
+   turn at all. Geometry, and that arithmetic, live in fit/divinity-cards.ts. */
 
 export interface DivinityCardOptions {
-  /** 'a3' (default) is the doubled sheet; 'a4' is a single block of ten. */
+  /** 'a3' (default) is the doubled sheet; 'a4' is a single block of nine. */
   sheet?: 'a4' | 'a3';
   /** 1-based page of the uploaded file to use as the card FRONT. */
   page?: number;
@@ -4587,11 +4585,16 @@ export async function imposeDivinityCards(
   if (!front) return out.save();
   const back = backPage ? embeds[1] : null;
 
-  /* Turn PORTRAIT artwork a quarter turn so it lands in the 90 x 54 cell the
-     right way up. Art already supplied landscape is left alone — the operator
-     may have exported it that way, and turning it again would stand it on its
-     head. Judged from the artwork's own aspect, not from its exact size, so a
-     card with a millimetre of slop still reads correctly. */
+  /* Turn the artwork a quarter turn only when its orientation DISAGREES with
+     the cell's. The cell is portrait now (a 2.5 x 3.5 card stands upright), so
+     portrait art needs nothing doing to it and landscape art gets turned.
+     Compared aspect-to-aspect rather than against a hard-coded orientation —
+     hard-coding "turn if portrait" is exactly what went stale when the card
+     size changed, and this cannot go stale the same way. A square-ish card is
+     left alone, since turning it would gain nothing and could only surprise. */
+  const cellPortrait = fit.cells[0] ? fit.cells[0].hMm >= fit.cells[0].wMm : true;
+  const needsTurn = (c: { width: number; height: number }) =>
+    (c.height >= c.width) !== cellPortrait;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const drawSheet = (pg: any, card: any, quarter: 0 | 90 | -90) => {
     const turn = quarter !== 0;
@@ -4616,7 +4619,7 @@ export async function imposeDivinityCards(
     }
   };
 
-  const frontTurn: 0 | 90 | -90 = front.height > front.width ? 90 : 0;
+  const frontTurn: 0 | 90 | -90 = needsTurn(front) ? 90 : 0;
   const pages = [out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)])];
   drawSheet(pages[0], front, frontTurn);
 
@@ -4626,7 +4629,7 @@ export async function imposeDivinityCards(
        upright against its front. A short-edge flip leaves x alone, so the back
        keeps the same turn. Get this wrong and the backs are upside down on
        every card, which is only visible after cutting. */
-    const backTurn: 0 | 90 | -90 = back.height > back.width
+    const backTurn: 0 | 90 | -90 = needsTurn(back)
       ? ((opts.flip ?? 'long') === 'long' ? -90 : 90) : 0;
     const bp = out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)]);
     drawSheet(bp, back, backTurn);

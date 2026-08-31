@@ -1,11 +1,14 @@
-/* Divinity trading cards — the numbers off the printer's spec sheet.
+/* Divinity trading cards — a standard 2.5 x 3.5" card on A4, doubled to A3.
  *
- *   A4 210 x 297, card placed 90 x 54, pitch 93 x 57 (so a 3 mm gutter),
- *   2 across x 5 down = ten, centred: 13.5 mm sides, 7.5 mm top and bottom.
- *   The A4 block doubled onto an A3 420 x 297 = twenty, cut at 210.
+ *   card 63.5 x 88.9 mm, standing UPRIGHT, 3 mm gutter
+ *   A4 210 x 297  ->  3 across x 3 down =  9, margins 6.75 / 12.15
+ *   A3 420 x 297  ->  the A4 block twice = 18, cut at 210
  *
- * These are exact by definition — 93 - 90 is 3, not 2.9998 — so they are
- * asserted exactly, in millimetres, which is how the spec is written.        */
+ * The card is stated in inches because that is what "standard trading card"
+ * means; the sheet in mm because A-sizes are metric. Card figures come from an
+ * inch conversion, so they are compared with a tolerance rather than exactly —
+ * 3.5 x 25.4 does not land on 88.9 in binary floating point. The pure-mm
+ * figures (the gutter, the sheet) ARE exact and are asserted as such.        */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,30 +18,43 @@ import {
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
 import { imposeDivinityCards } from '../src/lib/imposition-toolkit/impose.ts';
 
-test('the card is 54 x 90 as artwork and lies 90 x 54 on the sheet', () => {
-  assert.equal(CARD_W_MM, 54);
-  assert.equal(CARD_H_MM, 90);
-  assert.equal(PLACED_W_MM, 90, 'placed long edge across');
-  assert.equal(PLACED_H_MM, 54);
-  assert.equal(GUTTER_MM, 3, '93 pitch - 90 card, and 57 - 54');
+const close = (a: number, b: number, tol = 1e-6) => Math.abs(a - b) <= tol;
+
+test('the card is a standard 2.5 x 3.5in, standing upright on the sheet', () => {
+  assert.ok(close(CARD_W_MM, 63.5), `2.5in = 63.5mm, got ${CARD_W_MM}`);
+  assert.ok(close(CARD_H_MM, 88.9), `3.5in = 88.9mm, got ${CARD_H_MM}`);
+  assert.ok(close(PLACED_W_MM, CARD_W_MM), 'placed upright — no quarter turn');
+  assert.ok(close(PLACED_H_MM, CARD_H_MM));
+  assert.equal(GUTTER_MM, 3, "the shop's cutting allowance");
 });
 
-test('A4: ten cards, 2 across x 5 down, centred 13.5 / 7.5', () => {
+test('upright really is the better fit — 9 beats 8', () => {
+  /* The reason the card stands up rather than lying down, checked rather than
+     asserted in a comment. Landscape would give 2 across x 4 down. */
+  const fits = (w: number, h: number) =>
+    Math.floor((210 + GUTTER_MM) / (w + GUTTER_MM)) * Math.floor((297 + GUTTER_MM) / (h + GUTTER_MM));
+  assert.equal(fits(63.5, 88.9), 9, 'upright: 3 x 3');
+  assert.equal(fits(88.9, 63.5), 8, 'on its side: 2 x 4');
+});
+
+test('A4: nine cards, 3 across x 3 down, centred 6.75 / 12.15', () => {
   const f = fitDivinityCards('a4');
   assert.equal(f.sheetWMm, 210);
   assert.equal(f.sheetHMm, 297);
-  assert.equal(f.n, 10, 'ten to an A4, as the spec sheet says');
-  assert.equal(f.cells.length, 10);
-  assert.equal(f.marginXMm, 13.5, '(210 - (2*90 + 3)) / 2');
-  assert.equal(f.marginYMm, 7.5, '(297 - (5*54 + 4*3)) / 2');
+  assert.equal(f.n, 9);
+  assert.equal(f.cells.length, 9);
+  assert.ok(close(f.marginXMm, 6.75), `(210 - (3*63.5 + 2*3)) / 2, got ${f.marginXMm}`);
+  assert.ok(close(f.marginYMm, 12.15), `(297 - (3*88.9 + 2*3)) / 2, got ${f.marginYMm}`);
 
-  // Column pitch is 93 and row pitch is 57, exactly as drawn.
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  assert.deepEqual(xs, [13.5, 106.5], 'two columns, 93 apart');
-  assert.equal(ys.length, 5, 'five rows');
+  assert.equal(xs.length, 3, 'three columns');
+  assert.equal(ys.length, 3, 'three rows');
+  for (let i = 1; i < xs.length; i++) {
+    assert.ok(close(xs[i]! - xs[i - 1]!, 66.5), `column pitch 63.5 + 3, got ${xs[i]! - xs[i - 1]!}`);
+  }
   for (let i = 1; i < ys.length; i++) {
-    assert.ok(Math.abs((ys[i - 1]! - ys[i]!) - 57) < 1e-9, `row pitch 57, got ${ys[i - 1]! - ys[i]!}`);
+    assert.ok(close(ys[i - 1]! - ys[i]!, 91.9), `row pitch 88.9 + 3, got ${ys[i - 1]! - ys[i]!}`);
   }
 });
 
@@ -58,28 +74,28 @@ test('A4: every card is inside the sheet, and none overlaps another', () => {
   }
 });
 
-test('A3: the A4 block doubled — twenty cards, cut at 210', () => {
+test('A3: the A4 block doubled — eighteen cards, cut at 210', () => {
   const f = fitDivinityCards('a3');
   assert.equal(f.sheetWMm, 420, 'two A4 portraits side by side');
   assert.equal(f.sheetHMm, 297);
-  assert.equal(f.n, 20);
+  assert.equal(f.n, 18);
   assert.deepEqual(f.cutXMm, [210], 'cut down the middle to make two A4s');
 
   // The right half is the left half, moved over exactly one A4 width.
   const a4 = fitDivinityCards('a4');
-  const left = f.cells.slice(0, 10), right = f.cells.slice(10);
-  for (let i = 0; i < 10; i++) {
-    assert.equal(left[i]!.xMm, a4.cells[i]!.xMm, `left card ${i} matches the A4`);
-    assert.equal(right[i]!.xMm, a4.cells[i]!.xMm + 210, `right card ${i} is the same, +210`);
-    assert.equal(left[i]!.yMm, right[i]!.yMm, 'and at the same height');
+  const left = f.cells.slice(0, 9), right = f.cells.slice(9);
+  for (let i = 0; i < 9; i++) {
+    assert.ok(close(left[i]!.xMm, a4.cells[i]!.xMm), `left card ${i} matches the A4`);
+    assert.ok(close(right[i]!.xMm, a4.cells[i]!.xMm + 210), `right card ${i} is the same, +210`);
+    assert.ok(close(left[i]!.yMm, right[i]!.yMm), 'and at the same height');
   }
-  // So each half, cut free, is a correct A4: 13.5 mm in from its own edges.
-  assert.equal(Math.min(...right.map((c) => c.xMm)) - 210, 13.5);
-  assert.equal(420 - Math.max(...right.map((c) => c.xMm + c.wMm)), 13.5);
+  // So each half, cut free, is a correct A4: 6.75 mm in from its own edges.
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 6.75));
+  assert.ok(close(420 - Math.max(...right.map((c) => c.xMm + c.wMm)), 6.75));
 });
 
 /** A 54 x 90 mm portrait card, with a marker so its orientation is checkable. */
-async function cardPdf(wMm = 54, hMm = 90) {
+async function cardPdf(wMm = 63.5, hMm = 88.9) {
   const d = await PDFDocument.create();
   const w = wMm * PT_PER_MM, h = hMm * PT_PER_MM;
   const p = d.addPage([w, h]);
@@ -122,11 +138,12 @@ test('the grid is symmetric about both sheet axes, so it backs up', () => {
   }
 });
 
-/** Two pages: a front and a back, both portrait so both get the quarter turn. */
+/** Two pages, front and back, both portrait — the normal case, and the one
+ *  that needs NO turn now that the card stands upright. */
 async function frontBackPdf() {
   const d = await PDFDocument.create();
   for (const col of [rgb(0.15, 0.2, 0.55), rgb(0.6, 0.15, 0.2)]) {
-    const w = 54 * PT_PER_MM, h = 90 * PT_PER_MM;
+    const w = 63.5 * PT_PER_MM, h = 88.9 * PT_PER_MM;
     const p = d.addPage([w, h]);
     p.drawRectangle({ x: 0, y: 0, width: w, height: h, color: col });
   }
@@ -172,24 +189,48 @@ test('a second page becomes a sheet of backs', async () => {
   }
 });
 
-test('backs are turned the OTHER way for a long-edge flip', async () => {
+test('upright card, portrait art: nothing is turned on either side', async () => {
+  /* The normal case, and the whole reason the card stands up: with the art and
+     the cell both portrait there is no quarter turn to get wrong, so fronts and
+     backs register whichever way the press flips the sheet. */
+  for (const flip of ['long', 'short'] as const) {
+    const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip });
+    const front = await turnsOnPage(out, 0), back = await turnsOnPage(out, 1);
+    assert.deepEqual(front, { ccw: 0, cw: 0 }, `${flip}: fronts untouched`);
+    assert.deepEqual(back, { ccw: 0, cw: 0 }, `${flip}: backs untouched`);
+  }
+});
+
+/** Two LANDSCAPE pages — art exported the wrong way round, which does get
+ *  turned, and is where the flip rule still bites. */
+async function landscapeFrontBackPdf() {
+  const d = await PDFDocument.create();
+  for (const col of [rgb(0.15, 0.2, 0.55), rgb(0.6, 0.15, 0.2)]) {
+    const w = 88.9 * PT_PER_MM, h = 63.5 * PT_PER_MM;
+    const p = d.addPage([w, h]);
+    p.drawRectangle({ x: 0, y: 0, width: w, height: h, color: col });
+  }
+  return d.save();
+}
+
+test('landscape art IS turned, and the backs turn the other way on a long flip', async () => {
   /* A long-edge flip reverses the sheet's x-axis, and a turned card's "up"
      points along x — so printing the back with the same turn as the front puts
      every back upside down, which only shows up after cutting. */
-  const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'long' });
+  const out = await imposeDivinityCards(await landscapeFrontBackPdf(), { sheet: 'a4', flip: 'long' });
   const front = await turnsOnPage(out, 0), back = await turnsOnPage(out, 1);
-  assert.equal(front.ccw, 10, 'ten fronts, all turned one way');
+  assert.equal(front.ccw, 9, 'nine fronts, all turned one way');
   assert.equal(front.cw, 0);
-  assert.equal(back.cw, 10, 'ten backs, turned the other way');
+  assert.equal(back.cw, 9, 'nine backs, turned the other way');
   assert.equal(back.ccw, 0);
 });
 
-test('backs keep the SAME turn for a short-edge flip', async () => {
+test('landscape art: backs keep the SAME turn on a short flip', async () => {
   // A short-edge flip leaves the x-axis alone, so the turn must not change.
-  const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'short' });
+  const out = await imposeDivinityCards(await landscapeFrontBackPdf(), { sheet: 'a4', flip: 'short' });
   const front = await turnsOnPage(out, 0), back = await turnsOnPage(out, 1);
-  assert.equal(front.ccw, 10);
-  assert.equal(back.ccw, 10, 'same turn as the front');
+  assert.equal(front.ccw, 9);
+  assert.equal(back.ccw, 9, 'same turn as the front');
   assert.equal(back.cw, 0);
 });
 

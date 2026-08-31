@@ -18,7 +18,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 
 | Tool | Piece | Default sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
-| `divinitycards` Divinity Trading Cards | 54 × 90 mm | A3 420 × 297 | [x] | [x] | [x] | [x] | 20-up, 2 blocks of 2×5 |
+| `divinitycards` Divinity Trading Cards | 2.5 × 3.5" | A3 420 × 297 | [x] | [x] | [x] | [x] | 18-up, 2 blocks of 3×3 |
 | `indexcard` Index Cards | 3 × 5" | 17 × 11 | [x] | [x] | [x] | [x] | 10-up 5×2 |
 | `business` Business Cards | 3.5 × 2" | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `postcard` Postcards | 6 × 4" | 8.5 × 11 | [x] | [x] | [x] | [x] |
@@ -290,25 +290,34 @@ Newest first. Every entry records a **measured** number, not a claim.
 
 ### `divinitycards` Divinity Trading Cards
 
-The shop's own card template, to the printer's spec sheet. Geometry is FIXED and
-stated in millimetres in `fit/divinity-cards.ts`, because that is how the spec is
-written and the numbers are exact by definition (93 pitch − 90 card = 3, not
-2.9998; converting through inches would put rounding into them).
+A standard 2.5 × 3.5" trading card ganged on A4 and doubled onto A3, so one
+sheet cuts in half into two identical A4s. Geometry in `fit/divinity-cards.ts`.
 
-    card artwork  54 × 90 mm, placed 90 × 54 (it lies on its side)
-    A4  210 × 297   2 across × 5 down = 10, gutters 3 mm, margins 13.5 / 7.5
-    A3  420 × 297   the A4 block twice = 20, cut at 210 into two A4s
+    card  63.5 × 88.9 mm (2.5 × 3.5"), UPRIGHT, 3 mm gutter
+    A4  210 × 297   3 across × 3 down =  9, margins 6.75 / 12.15
+    A3  420 × 297   the A4 block twice = 18, cut at 210
 
-Cut marks are ruled off the SHEET EDGES only, never into the gutters: every card
+Upright because it was worked both ways round rather than assumed: portrait
+gives 3 × 3 = 9, landscape only 2 × 4 = 8. That also means portrait artwork needs
+**no quarter turn**, which removes the one thing duplex could get wrong. The
+comparison itself is a test, so the choice can't silently stop being true.
+
+Positions are symmetric about **both** sheet axes (6.75/6.75 across, 12.15/12.15
+down), so every card has a partner at the mirrored position and the sheet backs
+up whichever way the press turns it. That property is asserted, not assumed — it
+is what the whole duplex story rests on.
+
+A two-page upload becomes fronts on sheet 1 and backs on sheet 2. Landscape art
+does get turned, and then the flip matters: long-edge reverses the sheet's
+x-axis so the backs turn the other way; short-edge leaves it alone.
+
+Cut marks are ruled off the sheet EDGES only, never into the gutters — every card
 edge is shared with its neighbour across 3 mm, so a mark long enough to be useful
-in that gap would run onto the card beside it. The A3 half-sheet cut is ticked
-top and bottom.
+there would run onto the card beside it. The A3 half-sheet cut is ticked top and
+bottom.
 
-Cover-fit and clipped, not contained — a card trims on all four sides, so white
-slivers inside the trim would read as a printing fault.
+Cover-fit and clipped, not contained: a card trims on all four sides, so a white
+sliver inside the trim reads as a printing fault.
 
-Counted from the RENDERED sheet, not from the calculator: A4 → 10 cards measured
-at 89.9 × 54.0 mm with a 13.5 mm left margin; A3 → 20. Six assertions in
-`test/fit-divinity-cards.test.ts` cover the pitch, the margins, that no two cards
-overlap, that all sit inside the sheet, and that each half of the A3 is a correct
-A4 once cut free.
+Counted from the RENDERED sheet, not the calculator: A4 → 9 cards measured at
+63.7 × 88.8 mm; A3 → 18. Thirteen assertions in `test/fit-divinity-cards.test.ts`.
