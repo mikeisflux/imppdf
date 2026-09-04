@@ -73,6 +73,23 @@ export async function setUserPassword(userId: number, password: string) {
     .run(hash, Date.now(), userId);
 }
 
+/** Permanently remove a user. Their subscriptions and API keys go with them
+ *  (both declare ON DELETE CASCADE); usage_events survive with user_id set to
+ *  NULL, so the download history stays intact for reporting without keeping a
+ *  pointer to a person who asked to be removed. Foreign keys are enforced
+ *  (`PRAGMA foreign_keys = ON` in db.ts), so those rules actually fire. */
+export function deleteUser(userId: number) {
+  getDb().prepare('DELETE FROM users WHERE id = ?').run(userId);
+}
+
+/** Admins currently on the system. Used to refuse deleting the last one. */
+export function countAdmins(): number {
+  const r = getDb()
+    .prepare("SELECT COUNT(*) AS c FROM users WHERE role = 'admin'")
+    .get() as { c: number };
+  return r.c;
+}
+
 export function listUsers(): UserRow[] {
   return getDb().prepare('SELECT * FROM users ORDER BY created_at DESC').all() as UserRow[];
 }

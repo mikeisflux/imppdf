@@ -39,6 +39,57 @@ export function UsersTable({ users: initial }: { users: AdminUser[] }) {
   const [createErr, setCreateErr] = useState('');
   const [creating, setCreating] = useState(false);
 
+  /* Password reset. `resetFor` is the row whose panel is open; the value is
+     typed or generated. It is held only for as long as the panel is open and
+     is never written anywhere but the request body. */
+  const [resetFor, setResetFor] = useState<number | null>(null);
+  const [newPw, setNewPw] = useState('');
+  const [resetMsg, setResetMsg] = useState('');
+
+  /* Generated in the BROWSER with crypto.getRandomValues — never Math.random,
+     which is not a cryptographic source and is seeded predictably enough that
+     generated passwords could be guessed. The alphabet drops the characters
+     that get misread when a password is dictated over the phone or copied off
+     a screen: 0/O, 1/l/I. */
+  function generatePw(len = 16) {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+    const bytes = new Uint32Array(len);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+  }
+
+  async function resetPassword(id: number) {
+    const pw = newPw;
+    if (pw.length < 8) { setResetMsg('Password must be at least 8 characters.'); return; }
+    setBusy(id); setResetMsg('');
+    const res = await fetch(`/api/admin/users/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    });
+    setBusy(null);
+    if (!res.ok) { setResetMsg((await res.json()).error || 'Reset failed.'); return; }
+    setResetMsg('Password changed.');
+  }
+
+  async function removeUser(u: AdminUser) {
+    /* Typed confirmation, not an OK/Cancel. This is unrecoverable — the account,
+       its subscriptions and its API keys go — and a misplaced click on the wrong
+       row of a table is exactly how that happens by accident. */
+    const typed = prompt(
+      `Permanently delete ${u.email}?\n\n`
+      + 'This removes the account, its subscription and its API keys. It cannot be undone.\n'
+      + 'Type the email address to confirm:',
+    );
+    if (typed === null) return;
+    if (typed.trim().toLowerCase() !== u.email.toLowerCase()) { alert('That did not match — nothing was deleted.'); return; }
+    setBusy(u.id);
+    const res = await fetch(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+    setBusy(null);
+    if (!res.ok) { alert((await res.json()).error || 'Delete failed.'); return; }
+    setUsers((us) => us.filter((x) => x.id !== u.id));
+    router.refresh();
+  }
+
   async function patch(id: number, patch: Record<string, unknown>, reload = false) {
     setBusy(id);
     const res = await fetch(`/api/admin/users/${id}`, {
@@ -153,7 +204,57 @@ export function UsersTable({ users: initial }: { users: AdminUser[] }) {
                       onClick={() => patch(u.id, { status: u.status === 'active' ? 'suspended' : 'active' })}>
                       {u.status === 'active' ? 'Suspend' : 'Reinstate'}
                     </button>
+                    <button className="btn btn-ghost btn-plain admin-btn-sm"
+                      onClick={() => {
+                        const open = resetFor === u.id;
+                        setResetFor(open ? null : u.id);
+                        setNewPw(''); setResetMsg('');
+                      }}>
+                      {resetFor === u.id ? 'Close' : 'Password'}
+                    </button>
+                    <button className="btn btn-ghost btn-plain admin-btn-sm"
+                      style={{ color: '#ef4444' }} onClick={() => removeUser(u)}>
+                      Delete
+                    </button>
                   </div>
+
+                  {resetFor === u.id && (
+                    <div style={{ marginTop: 10, padding: 10, border: '1px solid var(--border, #333)', borderRadius: 8 }}>
+                      <div className="admin-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
+                        {/* type="text" on purpose: an admin setting a password
+                            for someone else needs to READ it to pass it on, and
+                            masking it only invites a typo they cannot see. */}
+                        <input
+                          className="admin-select" type="text" autoComplete="off" spellCheck={false}
+                          style={{ minWidth: 260, fontFamily: 'ui-monospace, monospace' }}
+                          placeholder="Type a password, or generate one"
+                          value={newPw}
+                          onChange={(e) => { setNewPw(e.target.value); setResetMsg(''); }}
+                        />
+                        <button className="btn btn-ghost btn-plain admin-btn-sm"
+                          onClick={() => { setNewPw(generatePw()); setResetMsg(''); }}>
+                          Generate
+                        </button>
+                        <button className="btn btn-ghost btn-plain admin-btn-sm"
+                          disabled={!newPw}
+                          onClick={() => { navigator.clipboard?.writeText(newPw).catch(() => {}); }}>
+                          Copy
+                        </button>
+                        <button className="btn btn-primary btn-plain admin-btn-sm"
+                          disabled={busy === u.id || newPw.length < 8}
+                          onClick={() => resetPassword(u.id)}>
+                          {busy === u.id ? 'Setting…' : 'Set password'}
+                        </button>
+                      </div>
+                      <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
+                        {resetMsg
+                          ? resetMsg
+                          : newPw.length > 0 && newPw.length < 8
+                            ? `${8 - newPw.length} more character${8 - newPw.length === 1 ? '' : 's'} needed`
+                            : 'Minimum 8 characters. Copy it before you close this — it is not stored anywhere you can read it back.'}
+                      </div>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
