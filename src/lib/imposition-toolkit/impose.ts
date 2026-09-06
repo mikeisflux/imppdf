@@ -744,6 +744,11 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
       if (!turn) { sheet.drawPage(emb, { x: dx, y: dy, width: dw, height: dh }); return; }
       sheet.drawPage(emb, { x: dx, y: dy + dh, width: dh, height: dw, rotate: degrees(-90) });
     };
+    /* `placed` rather than an early return: the crop marks are drawn at the END
+       of this function, and returning from here skipped them for every page —
+       a whole book with no trim marks. Placement and marks are independent
+       concerns and must not share an exit. */
+    let placed = false;
     /* DOC BLEED placement: 1:1, TRIM aligned to the cell, bleed OVERPRINTING
        past it. Never scaled — a page exported at trim + bleed contained into a
        trim cell comes out ~96% and prints a whole book small, which is the bug
@@ -758,9 +763,10 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
       const dx = x - (spineLeft ? 0 : bd.l);
       const dy = y - bd.b;
       sheet.drawPage(src, { x: dx, y: dy, width: src.width, height: src.height });
-      return;
+      placed = true;
     }
-    if (fit === 'stretch' || !sw || !sh) {
+    if (placed) { /* nothing more to draw — marks still run below */ }
+    else if (fit === 'stretch' || !sw || !sh) {
       draw(x, y, cellW, cellH);
     } else {
       const base = fit === 'contain' ? Math.min(cellW / sw, cellH / sh) : Math.max(cellW / sw, cellH / sh);

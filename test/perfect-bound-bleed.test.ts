@@ -140,3 +140,44 @@ test('bleedFromDoc off: unchanged, so every other N-up tool is untouched', async
     .map((m) => Number(m[1])).filter((v) => Math.abs(v - 1) > 1e-6);
   assert.ok(scales.length > 0, 'still contains-and-scales without the flag, as it always did');
 });
+
+/** Stroked line segments on a sheet — what a crop mark actually is. */
+async function markSegments(bytes: Uint8Array, pageIndex: number) {
+  const t = await contentOf(bytes, pageIndex);
+  return [...t.matchAll(/([-\d.]+) ([-\d.]+) m\s*\n?([-\d.]+) ([-\d.]+) l/g)].length;
+}
+
+test('doc bleed: the crop marks are still drawn', async () => {
+  /* The first version of the doc-bleed branch RETURNED after placing the page,
+     and the crop marks are drawn at the end of the same function — so every
+     page came out with no trim marks at all. Placement and marks are separate
+     concerns and must not share an exit. Counted against the unchanged path so
+     this cannot pass by drawing some other number of lines. */
+  const src = await bookPages();
+  const on = await imposeNUp(src, { ...PB, bleedFromDoc: true });
+  const off = await imposeNUp(src, { ...PB, bleedFromDoc: false });
+  const onN = await markSegments(on, 0), offN = await markSegments(off, 0);
+  assert.ok(onN > 0, 'doc bleed still draws crop marks');
+  assert.equal(onN, offN, `same marks either way (${onN} vs ${offN})`);
+});
+
+test('doc bleed: center marks are drawn too', async () => {
+  const src = await bookPages();
+  const plain = await markSegments(await imposeNUp(src, { ...PB, bleedFromDoc: true }), 0);
+  const centered = await markSegments(
+    await imposeNUp(src, { ...PB, bleedFromDoc: true, centerMarks: true }), 0);
+  assert.ok(centered > plain, `center marks add segments (${centered} vs ${plain})`);
+});
+
+test('doc bleed: marks are not buried under the neighbour\'s bleed', async () => {
+  /* The kept bleed overhangs into the gutter, and each cell draws its art then
+     its marks — so a later cell's overhang could paint over an earlier cell's
+     marks. On a BACK sheet the versos keep their LEFT bleed, which is the side
+     that reaches back toward the previous cell, so that is the one to check. */
+  const out = await imposeNUp(await bookPages(), { ...PB, bleedFromDoc: true });
+  const t = await contentOf(out, 1);
+  const lastDraw = t.lastIndexOf(' Do');
+  const lastStroke = t.lastIndexOf('\nS');
+  assert.ok(lastStroke > lastDraw,
+    'the final stroke comes after the final page draw, so marks sit on top');
+});
