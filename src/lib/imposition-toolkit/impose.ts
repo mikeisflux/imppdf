@@ -547,6 +547,18 @@ export interface NUpOptions {
   // Bleed-aware marks: art fills the whole cell, but crop marks are drawn at the
   // trim, i.e. inset by this many inches on every side. 0 = marks at cell edge.
   bleedIn?: number;
+  /* CROP each page to its own TrimBox before placing it, so the TRIM lands in
+     the cell at 1:1 and the bleed is cut away.
+
+     Without this a page exported at trim + bleed (a 6.625 x 10.25 comic page
+     saved as 6.875 x 10.5) is treated as artwork in its entirety and CONTAINED
+     into a trim-sized cell — which scales the whole thing to 96.4% and prints a
+     book with every page 3.6% small. The bleed is not removed; the art is
+     shrunk to make room for it. That is what this exists to stop.
+
+     Falls back to the full page when a source carries no TrimBox, so a file
+     without one is placed exactly as before rather than guessed at. */
+  bleedFromDoc?: boolean;
   // Double-sided (duplex): source pages are interpreted as front,back,front,back…
   // Fronts land on odd output sheets; backs on even sheets with the column order
   // mirrored so a long-edge duplex flip lines the back up behind its front.
@@ -624,7 +636,7 @@ export function computeNUpGrid(opts: NUpOptions): NUpGrid {
 }
 
 export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Uint8Array> {
-  const { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } = await import('pdf-lib');
+  const { PDFDocument, PDFName, PDFArray, rgb, degrees, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } = await import('pdf-lib');
   const srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const srcPages = srcDoc.getPages();
   const N = srcPages.length;
@@ -644,7 +656,57 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
   const totalItems=duplex?Math.ceil(N/2):N;
   const numSheets=opts.repeatFirst?1:Math.max(1,Math.ceil(totalItems/perSheet));
   const outDoc=await PDFDocument.create();
+  /* DOC BLEED. Each page's bleed, as the inset of its TrimBox inside its
+     MediaBox, per side. Null where a page states no usable TrimBox — that page
+     is then placed exactly as before rather than guessed at. */
+  type Bleed = { l: number; b: number; r: number; t: number; trimW: number; trimH: number };
+  const bleedOf = (p: typeof srcPages[number]): Bleed | null => {
+    try {
+      const arr = p.node.lookup(PDFName.of('TrimBox'), PDFArray);
+      if (!arr) return null;
+      const [x0, y0, x1, y1] = arr.asArray().map((n: { toString(): string }) => Number(n.toString()));
+      const m = p.getMediaBox();
+      const trimW = (x1 ?? 0) - (x0 ?? 0), trimH = (y1 ?? 0) - (y0 ?? 0);
+      if (!(trimW > 1 && trimH > 1)) return null;
+      const l = (x0 ?? 0) - m.x, b = (y0 ?? 0) - m.y;
+      const r = (m.x + m.width) - (x1 ?? 0), t = (m.y + m.height) - (y1 ?? 0);
+      if (l < -0.5 || b < -0.5 || r < -0.5 || t < -0.5) return null;      // trim outside the page
+      if (l + b + r + t < 0.5) return null;                               // no bleed to speak of
+      return { l, b, r, t, trimW, trimH };
+    } catch { return null; }
+  };
+  const bleeds = opts.bleedFromDoc ? srcPages.map(bleedOf) : null;
+
+  /* Crop the SPINE side only. Every other side keeps its bleed so there is
+     something to trim into — cropping all four would leave a full-bleed page
+     with no allowance at all, and any drift on the guillotine shows white.
+
+     Which side is the spine follows from the imposition rather than the page:
+     duplex pairs a leaf as odd/even, so the FRONT of every sheet carries recto
+     pages (spine left) and the BACK carries versos (spine right). RTL binding
+     swaps that. */
+  const spineLeftOnFront = !opts.rtl;
+  const cropFor = (pi: number, isBack: boolean) => {
+    const bd = bleeds?.[pi];
+    if (!bd) return undefined;
+    const m = srcPages[pi]!.getMediaBox();
+    const spineLeft = isBack ? !spineLeftOnFront : spineLeftOnFront;
+    return {
+      left: m.x + (spineLeft ? bd.l : 0),
+      bottom: m.y,
+      right: m.x + m.width - (spineLeft ? 0 : bd.r),
+      top: m.y + m.height,
+    };
+  };
+  /* Two embeds per page when doc-bleed is on — one cropped for a front, one for
+     a back — because the spine is on opposite sides of the two. */
   const embeds=await outDoc.embedPages(srcPages);
+  const frontEmbeds = bleeds
+    ? await outDoc.embedPages(srcPages, srcPages.map((_, i) => cropFor(i, false)))
+    : null;
+  const backEmbeds = bleeds
+    ? await outDoc.embedPages(srcPages, srcPages.map((_, i) => cropFor(i, true)))
+    : null;
   const off=opts.markOffIn*PT, len=opts.markLenIn*PT, bl=(opts.bleedIn??0)*PT;
   const markStyle: MarkStyle = { center: !!opts.centerMarks, weight: opts.markWeightPt };
   const shortEdge=opts.duplexFlip==='short';
@@ -682,6 +744,22 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
       if (!turn) { sheet.drawPage(emb, { x: dx, y: dy, width: dw, height: dh }); return; }
       sheet.drawPage(emb, { x: dx, y: dy + dh, width: dh, height: dw, rotate: degrees(-90) });
     };
+    /* DOC BLEED placement: 1:1, TRIM aligned to the cell, bleed OVERPRINTING
+       past it. Never scaled — a page exported at trim + bleed contained into a
+       trim cell comes out ~96% and prints a whole book small, which is the bug
+       this branch exists to stop. Never clipped either: the kept bleed has to
+       run over the trim strip between pages, which is what it is for. */
+    const bd = bleeds?.[pi];
+    if (bd && !turn) {
+      const spineLeft = isBack ? !spineLeftOnFront : spineLeftOnFront;
+      const src = (isBack ? backEmbeds : frontEmbeds)?.[pi] ?? emb;
+      // Within the cropped art the trim starts at 0 on the spine side and after
+      // the kept bleed on the other; line that trim up with the cell.
+      const dx = x - (spineLeft ? 0 : bd.l);
+      const dy = y - bd.b;
+      sheet.drawPage(src, { x: dx, y: dy, width: src.width, height: src.height });
+      return;
+    }
     if (fit === 'stretch' || !sw || !sh) {
       draw(x, y, cellW, cellH);
     } else {

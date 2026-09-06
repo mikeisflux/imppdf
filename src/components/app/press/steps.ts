@@ -432,6 +432,11 @@ function nupOpts(s: StepSettings) {
     duplex: !!s.duplex, addMarks: !!s.addMarks, markLenIn: s.markLenIn, markOffIn: s.markOffIn,
     centerMarks: !!s.centerMarks, markWeightPt: s.markWeightPt,
     bleedIn: s.bleedMode === 'fixed' ? s.bleedIn : 0,
+    /* 'doc' means the pages carry their own bleed: crop each to its TrimBox so
+       the TRIM lands 1:1 in the cell. This flag was being DROPPED here — only
+       the fixed-bleed number was forwarded — so a bleed page was contained into
+       a trim cell and the whole book came out 3.6% small. */
+    bleedFromDoc: s.bleedMode === 'doc',
     fit: s.fit ?? 'contain', imageZoom: s.imageZoom, imageOffsetX: s.imageOffsetX, imageOffsetY: s.imageOffsetY,
     // The crop dialog stores per-image {fit,zoom,offsetX,offsetY}; map it to the
     // engine's {fit,imageZoom,imageOffsetX,imageOffsetY} shape.
