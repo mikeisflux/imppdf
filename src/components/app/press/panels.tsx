@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import '@/lib/polyfills';
-import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, type ZineFormat } from '@/lib/imposition-toolkit/impose';
+import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, RAISED_METAL_DEFAULTS as RM, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
 import { ImageFitModal } from './image-fit-modal';
@@ -2462,15 +2462,16 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
   const run = async (pass: 'varnish' | 'color') => {
     setBusy(pass); setErr('');
     try {
-      const { raisedMetalTiff, downloadFile } = await import('@/lib/imposition-toolkit/impose');
+      const { raisedMetalTiff, downloadFile, RAISED_METAL_DEFAULTS: D } =
+        await import('@/lib/imposition-toolkit/impose');
       const src = sourceBytes;
       if (!src) { setErr('Load the artwork first.'); return; }
+      /* Spread the shop defaults, then let anything the operator actually
+         changed win. Listing each fallback by hand here is what let the export
+         drift from the sliders. */
       const tiff = await raisedMetalTiff(src, {
-        dpi: s.dpi ?? 300, edgeGain: s.edgeGain ?? 1, highlightGain: s.highlightGain ?? 0.6,
-        highlightFrom: s.highlightFrom ?? 200, toneGain: s.toneGain ?? 0.18,
-        floor: s.floor ?? 24, gamma: s.gamma ?? 1, subjectOnly: !!s.subjectOnly,
-        spotName: s.spotName || 'V1', whiteName: s.whiteName || 'W1', pass,
-        matteTighten: s.matteTighten ?? 2.5,     // the plate must match the preview
+        ...D, ...s, subjectOnly: !!s.subjectOnly,
+        spotName: s.spotName || D.spotName, whiteName: s.whiteName || D.whiteName, pass,
       });
       downloadFile(tiff, pass === 'varnish' ? 'raised-metal-1-varnish.tif'
         : 'raised-metal-2-color.tif', 'image/tiff');
@@ -2632,15 +2633,15 @@ function RaisedMetalPanel({ s, up, sourceBytes }: PanelProps) {
         </div>
       </Section>
       <Section label="// PLATE" help="How the varnish plate is derived from the artwork. Edges give you the linework, highlights catch the speculars, and the gray tone modulates the relief with the art's own shading.">
-        {rng('Line art', 'edgeGain', s.edgeGain ?? 1, 0, 3, 0.1, 'edge strength')}
-        {rng('Highlights', 'highlightGain', s.highlightGain ?? 0.6, 0, 2, 0.1, 'speculars')}
-        {rng('Highlight point', 'highlightFrom', s.highlightFrom ?? 200, 120, 250, 5, 'luminance')}
-        {rng('Gray tone', 'toneGain', s.toneGain ?? 0.18, 0, 1, 0.02, 'slight, from shading')}
-        {rng('Noise floor', 'floor', s.floor ?? 24, 0, 128, 2, 'drop weak specks')}
-        {rng('Line weight', 'gamma', s.gamma ?? 1, 0.4, 2, 0.05, '<1 fatter, >1 thinner')}
+        {rng('Line art', 'edgeGain', s.edgeGain ?? RM.edgeGain, 0, 3, 0.1, 'edge strength')}
+        {rng('Highlights', 'highlightGain', s.highlightGain ?? RM.highlightGain, 0, 2, 0.1, 'speculars')}
+        {rng('Highlight point', 'highlightFrom', s.highlightFrom ?? RM.highlightFrom, 120, 250, 5, 'luminance')}
+        {rng('Gray tone', 'toneGain', s.toneGain ?? RM.toneGain, 0, 1, 0.02, 'slight, from shading')}
+        {rng('Noise floor', 'floor', s.floor ?? RM.floor, 0, 128, 2, 'drop weak specks')}
+        {rng('Line weight', 'gamma', s.gamma ?? RM.gamma, 0.4, 2, 0.05, '<1 fatter, >1 thinner')}
         <Check icon="crop" label="Subject only" sub="Plate the subject and leave the background flat (needs the models)" checked={!!s.subjectOnly} onChange={(v) => up({ subjectOnly: v })} />
         {s.subjectOnly ? <>
-          {rng('Edge tightness', 'matteTighten', s.matteTighten ?? 2.5, 1, 6, 0.1, 'pull the fringe in')}
+          {rng('Edge tightness', 'matteTighten', s.matteTighten ?? RM.matteTighten, 1, 6, 0.1, 'pull the fringe in')}
           <div className="pe-note" style={{ marginTop: 8 }}>
             A subject-matting model does the separation — no prompt, so it cannot come back inverted, and it returns soft coverage rather than an in-or-out mask, which is what keeps the plate edge from stair-stepping. <b>Edge tightness</b> deals with the halo round hair: the fringe sits in the middle of the matte&apos;s range while the hair itself sits near the top, so raising this collapses the fringe and leaves the solid parts alone. It is a curve, not a cut — it cannot put a step in the edge. Raise it if the plate takes the background around her hair; drop it to 1 for the model&apos;s own edge.
           </div>

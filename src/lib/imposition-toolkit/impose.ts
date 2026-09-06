@@ -4922,6 +4922,25 @@ export async function imposeOnMedia(
 // metal a pixel gets), not a hard on/off — the plate follows the artwork's
 // linework and specular highlights, which is where foil actually reads.
 
+/* The shop's settled raised-metal plate, tuned on press and set as the default
+   on 2026-09-06. ONE definition: the engine falls back to these, the step's
+   defaults come from them, and the panel's sliders read them. Four separate
+   copies of these numbers existed before, which is how a default silently stops
+   matching what the tool actually does. */
+export const RAISED_METAL_DEFAULTS = {
+  dpi: 300,
+  edgeGain: 1,          // line art — edge strength
+  highlightGain: 0.3,   // speculars, kept well back so they don't fight the tone
+  highlightFrom: 200,   // luminance at which a highlight starts counting
+  toneGain: 0.8,        // gray tone: the relief follows the art's own shading
+  floor: 24,            // noise floor — drop weak specks
+  gamma: 0.6,           // line weight, <1 fatter
+  matteTighten: 2.5,
+  subjectOnly: false,
+  spotName: 'V1',
+  whiteName: 'W1',
+} as const;
+
 export interface RaisedMetalTuning {
   edgeGain?: number;        // weight of the linework (default 1)
   highlightGain?: number;   // weight of specular highlights (default 0.6)
@@ -4969,9 +4988,10 @@ function blurPlane(src: Float32Array, w: number, h: number, radius: number): Flo
 export function metalMaskFromPixels(
   rgba: Uint8ClampedArray | Uint8Array, w: number, h: number, t?: RaisedMetalTuning,
 ): Uint8Array {
-  const edgeGain = t?.edgeGain ?? 1, hlGain = t?.highlightGain ?? 0.6;
-  const hlFrom = t?.highlightFrom ?? 200, floor = t?.floor ?? 24, gamma = t?.gamma ?? 1;
-  const toneGain = t?.toneGain ?? 0.18;
+  const D = RAISED_METAL_DEFAULTS;
+  const edgeGain = t?.edgeGain ?? D.edgeGain, hlGain = t?.highlightGain ?? D.highlightGain;
+  const hlFrom = t?.highlightFrom ?? D.highlightFrom, floor = t?.floor ?? D.floor, gamma = t?.gamma ?? D.gamma;
+  const toneGain = t?.toneGain ?? D.toneGain;
   const lum = new Float32Array(w * h);
   for (let i = 0, p = 0; i < w * h; i++, p += 4) {
     // Transparent artwork gets no metal at all.

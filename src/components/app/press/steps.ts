@@ -13,6 +13,7 @@ import {
   addBackdropFile, applyColorEffects, applyColorManagement, addBarcodeStamp,
   addDimensions, addWhiteVarnish, addBraille, optimizePdf, repairPdf, decryptPdf, setLayers,
   replicateFill, imposeDivinityBox, trimToArtwork, removeBackground, imposePerfectCover, computeNUpGrid,
+  RAISED_METAL_DEFAULTS,
 } from '@/lib/imposition-toolkit/impose';
 import type { PdfJobInfo, GangJob, CustomCell, LayerState } from '@/lib/imposition-toolkit/impose';
 
@@ -148,11 +149,8 @@ export function defaultSettings(type: StepType): StepSettings {
       // Two-pass raised metal: a varnish-only plate built from the artwork's
       // line art plus a slight gray tone, then the color + white printed on
       // top of the cured relief.
-      return {
-        dpi: 300, edgeGain: 1, highlightGain: 0.6, highlightFrom: 200,
-        toneGain: 0.18, floor: 24, gamma: 1,
-        spotName: 'V1', whiteName: 'W1', subjectOnly: false, matteTighten: 2.5,
-      };
+      // From RAISED_METAL_DEFAULTS, so the panel, the engine and this agree.
+      return { ...RAISED_METAL_DEFAULTS };
     case 'divinitycards':
       // The shop's card template, to the printer's spec sheet: 54 x 90 mm card,
       // ten to an A4, the A4 block doubled onto an A3 that cuts into two A4s.

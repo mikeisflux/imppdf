@@ -540,7 +540,11 @@ test('metalMaskFromPixels: the noise floor ramps to zero, it does not cut', asyn
     px[p] = px[p + 1] = px[p + 2] = x;                 // 0..255 left to right
     px[p + 3] = 255;
   }
-  const m = metalMaskFromPixels(px, w, h, { toneGain: 1, edgeGain: 0, highlightGain: 0, floor: 24 });
+  /* gamma is PINNED at 1 here. This test is about the FLOOR — that it ramps to
+     nothing instead of cutting — and inheriting the shop's default line weight
+     made it fail the moment that default moved, which tested the default rather
+     than the floor. See the gamma-specific assertion below. */
+  const m = metalMaskFromPixels(px, w, h, { toneGain: 1, edgeGain: 0, highlightGain: 0, floor: 24, gamma: 1 });
   const row = Array.from(m.slice(w, 2 * w));
   const nonZero = row.filter((v) => v > 0);
   assert.ok(nonZero.length > 0, 'the ramp plates');
@@ -550,6 +554,37 @@ test('metalMaskFromPixels: the noise floor ramps to zero, it does not cut', asyn
   let biggest = 0;
   for (let i = 1; i < row.length; i++) biggest = Math.max(biggest, Math.abs(row[i]! - row[i - 1]!));
   assert.ok(biggest <= 8, `no step along the ramp (largest ${biggest})`);
+});
+
+test('metalMaskFromPixels: a fattened line weight lifts the floor onset', async () => {
+  /* Not a fault, but worth pinning: the shop default is gamma 0.6 (fatter
+     lines), and gamma < 1 boosts small values hardest. The plate therefore
+     starts at roughly 10/255 just above the noise floor rather than fading in
+     from 1. That is ~4% coverage appearing at the floor edge — below what the
+     press lays down, which is what the floor is for — but if a faint contour
+     ever shows on a curved edge, THIS is where it comes from, not a threshold.
+     The mask is still continuous: no hard cut, and it still reaches zero. */
+  const { metalMaskFromPixels, RAISED_METAL_DEFAULTS } =
+    await import('../src/lib/imposition-toolkit/impose.ts');
+  assert.equal(RAISED_METAL_DEFAULTS.gamma, 0.6, 'the shop default this describes');
+
+  const w = 256, h = 4;
+  const px = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const p = (y * w + x) * 4;
+    px[p] = px[p + 1] = px[p + 2] = x;
+    px[p + 3] = 255;
+  }
+  const at = (gamma: number) => {
+    const m = metalMaskFromPixels(px, w, h, { toneGain: 1, edgeGain: 0, highlightGain: 0, floor: 24, gamma });
+    const row = Array.from(m.slice(w, 2 * w));
+    const nz = row.filter((v) => v > 0);
+    return { min: Math.min(...nz), zeros: row.filter((v) => v === 0).length };
+  };
+  const fat = at(0.6), plain = at(1);
+  assert.ok(fat.min > plain.min, `0.6 starts higher than 1 (${fat.min} vs ${plain.min})`);
+  assert.ok(fat.min <= 16, `but only just — ${fat.min}/255 is still under 7% coverage`);
+  assert.ok(fat.zeros > 0, 'and the plate still reaches zero below the floor');
 });
 
 test('orientSubjectMask: a mask holding the corners is the background, so flip it', async () => {
