@@ -2933,8 +2933,12 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
  * will be, and which page the second (backs) pass starts on, so both are
  * computed here from the page count rather than waiting for the export. */
 function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
-  const PER_SHEET = 9;
   const MM = 25.4 / 72;
+  /* Kept in step with fit/divinity-deck.ts: upright 4 x 2, turned 3 x 3 on the
+     same 297 x 210 sheet. Worked there, restated here only to label the chips. */
+  const turned = s.orient === 'turned';
+  const COLS = turned ? 3 : 4, ROWS = turned ? 3 : 2;
+  const PER_SHEET = COLS * ROWS;
   // Same rule as the engine: the named back page, or the last page.
   const backPg = s.backPage && s.backPage > 0
     ? Math.max(1, Math.min(pageCount, Math.round(s.backPage)))
@@ -2956,14 +2960,37 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload the <b>whole deck</b> — one card per page, the <b>last page the shared
-        back</b>. Cards go nine to an <b>A4 fed long edge first</b> (297 × 210 mm),
+        back</b>. Cards go {PER_SHEET} to an <b>A4 fed long edge first</b> (297 × 210 mm),
         standard <b>2.5 × 3.5&quot;</b>, 3 mm gutters.
       </div>
+
+      <Section label="// CARD DIRECTION" help="Which way round the cards sit on the sheet. Set this to match your cutter, not to save paper.">
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <button className="pe-chipbtn" style={pickStyle(!turned)} onClick={() => up({ orient: 'upright' })}>Upright · 8-up</button>
+          <button className="pe-chipbtn" style={pickStyle(turned)} onClick={() => up({ orient: 'turned' })}>On its side · 9-up</button>
+        </div>
+        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
+          <div>Grid <b>{COLS} across × {ROWS} down</b> = <b>{PER_SHEET} cards</b>, each 2.5 × 3.5&quot;</div>
+          {turned ? (
+            <div style={{ marginTop: 4 }}>
+              One more per sheet, but the cards come off the guillotine turned a quarter
+              turn from upright. Only worth it if your cutter wants them that way.
+            </div>
+          ) : (
+            <div style={{ marginTop: 4 }}>
+              The way the shop&apos;s cutter takes them. One fewer per sheet than lying them
+              down{cards ? <> — {sheets} sheets instead of {Math.ceil(cards / 9)}</> : null}, and worth it.
+              Upright art in an upright cell is also <b>never turned</b>, so there is nothing
+              for the backs pass to get wrong.
+            </div>
+          )}
+        </div>
+      </Section>
 
       <Section label="// DECK" help="Read straight off the file: every page except the back is a card.">
         {pageCount > 1 ? (
           <div className="pe-note" style={{ lineHeight: 1.8 }}>
-            <div><b>{cards} cards</b> on <b>{sheets} sheets</b>, nine to a sheet</div>
+            <div><b>{cards} cards</b> on <b>{sheets} sheets</b>, {PER_SHEET} to a sheet</div>
             <div>Back art is <b>page {backPg}</b>{s.backPage ? '' : ' (the last page)'}</div>
             {blanks > 0 && <div>Last sheet has <b>{blanks} empty {blanks === 1 ? 'cell' : 'cells'}</b> — no back is printed there either</div>}
             <div>Output is <b>{total} pages</b></div>
@@ -2989,8 +3016,8 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
         <div className="pe-note" style={{ lineHeight: 1.7 }}>
           The sheet is <b>A4 turned on its side</b> — same paper, fed <b>long edge first</b>
           through the bypass so heavy stock never wears a band across the fuser that
-          would show on 11 × 17 afterwards. Cards lie on their side to get nine up;
-          upright would only give eight.
+          would show on 11 × 17 afterwards. That part doesn&apos;t change; the card
+          direction above only decides how the cards sit on it.
         </div>
       </Section>
 
@@ -3023,9 +3050,14 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
             </div>
             <div className="pe-note" style={{ marginTop: 8 }}>
               How the stack goes back in. The grid is <b>symmetric</b>, so the positions land
-              on themselves either way — but a card lying on its side has its &ldquo;up&rdquo;
-              along the axis a <b>long-edge</b> flip reverses, so the back art is turned the
-              other way to come out upright against its front.
+              on themselves either way.{turned ? (
+                <> A card <b>on its side</b> has its &ldquo;up&rdquo; along the axis a
+                  long-edge flip reverses, so the back art is turned the other way to come
+                  out upright against its front.</>
+              ) : (
+                <> With the cards <b>upright</b> nothing is turned at all, so this changes
+                  nothing — it only matters if you switch to 9-up.</>
+              )}
             </div>
           </>
         )}

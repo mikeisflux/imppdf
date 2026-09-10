@@ -19,7 +19,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 | Tool | Piece | Default sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
 | `divinitycards` Divinity Trading Cards | 2.5 × 3.5" | A3 420 × 297 | [x] | [x] | [x] | [x] | 18-up, 2 blocks of 3×3 |
-| `divinitydeck` Divinity Trading Card Deck | 2.5 × 3.5" | A4 297 × 210 | [x] | [x] | [x] | [x] | 9-up turned, N sheets, backs 2nd pass |
+| `divinitydeck` Divinity Trading Card Deck | 2.5 × 3.5" | A4 297 × 210 | [x] | [x] | [x] | [x] | 8-up upright, N sheets, backs 2nd pass |
 | `indexcard` Index Cards | 3 × 5" | 17 × 11 | [x] | [x] | [x] | [x] | 10-up 5×2 |
 | `business` Business Cards | 3.5 × 2" | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `postcard` Postcards | 6 × 4" | 8.5 × 11 | [x] | [x] | [x] | [x] |
@@ -327,21 +327,34 @@ Counted from the RENDERED sheet, not the calculator: A4 → 9 cards measured at
 
 A whole deck out of **one** file — a card per page, the last page the shared
 back — ganged onto as many A4 sheets as the deck needs. 172 cards comes out at
-20 sheets. Geometry in `fit/divinity-deck.ts`.
+22 sheets. Geometry in `fit/divinity-deck.ts`.
 
-    card   63.5 × 88.9 mm (2.5 × 3.5"), placed TURNED (88.9 × 63.5), 3 mm gutter
+    card   63.5 × 88.9 mm (2.5 × 3.5"), 3 mm gutter
     sheet  297 × 210 — A4 fed LONG EDGE FIRST
-    grid   3 across × 3 down = 9, margins 12.15 / 6.75
+
+    UPRIGHT (default)  63.5 × 88.9   4 across × 2 down = 8   margins 17.00 / 14.60
+    TURNED             88.9 × 63.5   3 across × 3 down = 9   margins 12.15 /  6.75
 
 **Fed long edge first on purpose.** Heavy card stock run short-edge-first wears
 a band across the fuser, and that band then shows on 11 × 17 work afterwards. So
-the page is described 297 × 210: the same sheet of paper, fed the other way.
+the page is described 297 × 210: the same sheet of paper, fed the other way. The
+orientation option does not touch that — it turns the CARD, not the paper.
 
-Nine-up was worked all four ways rather than assumed — portrait/upright 9,
-portrait/turned 8, landscape/upright 8, landscape/turned 9. Landscape ties at
-nine and wins on the fuser, so the card lies on its side. It is cut out
-afterwards, so the turn costs nothing. The comparison is a test, so the choice
-can't silently stop being true.
+**Upright by default, at 8-up, because that is the way round the shop cuts.**
+Turning the card fits nine and saves two sheets on a 172-card deck, but hands
+the guillotine its cards a quarter turn from how it takes them. Owner: *"it cuts
+8 cards from one A4 — I want that to be the default."* Nine-up stays available
+as an option.
+
+There is no 9-up-and-upright to be had. A portrait A4 laid out 3 × 3 upright is
+the *same physical sheet* rotated, so its cards come off lying down too — the
+geometry does not care which way the page happens to be described. The counts
+are worked in the fit module rather than hard-coded, and all four combinations
+are asserted, so a size change can't leave a stale number behind.
+
+Upright has a second, quieter advantage: portrait artwork in a portrait cell
+needs **no quarter turn at all**, so there is nothing for the backs pass to get
+wrong whichever way the stack is turned over.
 
 **No duplex.** The printer will not turn stock this thick, so the backs are a
 separate pass: every front, then every back (`order: 'grouped'`, the default).
@@ -349,20 +362,21 @@ The panel names the page the second pass starts on, so the operator prints
 1–N, takes the stack out, turns it over and prints N+1–2N. `'interleaved'` is
 there for a press that *can* duplex and is opt-in.
 
-Positions are symmetric about **both** sheet axes (12.15/12.15 across,
-6.75/6.75 down), so every cell has a partner at the mirrored position and the
-sheet backs up whichever way the stack is turned over. That is asserted, not
-assumed — it is what the whole two-pass workflow rests on. A card lying on its
-side does have its "up" along the axis a **long-edge** flip reverses, so the
-back art is turned the opposite way; short-edge leaves it alone.
+Positions are symmetric about **both** sheet axes (17/17 across, 14.6/14.6
+down), so every cell has a partner at the mirrored position and the sheet backs
+up whichever way the stack is turned over. That is asserted for both
+orientations, not assumed — it is what the whole two-pass workflow rests on.
+When the card *is* turned, its "up" runs along the axis a **long-edge** flip
+reverses, so the back art is turned the opposite way; short-edge leaves it
+alone. Upright art is never turned, so the flip is a no-op for it.
 
 Cards fall **sequentially**, not cut-and-stack: a deck is collated by hand off
-the guillotine, so sheet 1 holding cards 1–9 is what makes the stack checkable.
+the guillotine, so sheet 1 holding cards 1–8 is what makes the stack checkable.
 
 The short last sheet gets no ink in its empty cells, front **or** back. Cut
 marks are ruled off the sheet edges only, never into the 3 mm gutters. Cover-fit
 and clipped, like the single-card tool.
 
-Counted from the RENDERED sheet: 172 cards → 20 front + 20 back pages, 9 turned
-cards on sheet 1 in reading order, 1 on the last. Seventeen assertions in
-`test/fit-divinity-deck.test.ts`.
+Counted from the RENDERED sheet: 172 cards → 22 front + 22 back pages, 8 upright
+cards on sheet 1 in reading order on a 66.5 × 91.9 mm pitch, 4 on the last.
+Twenty-two assertions in `test/fit-divinity-deck.test.ts`.

@@ -4609,7 +4609,11 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
    FED LONG EDGE FIRST, so the page is 297 x 210. That is the shop's deliberate
    choice: heavy card stock run short-edge-first wears a band across the fuser,
    and the band then shows on 11x17 work afterwards. Geometry, and the fit
-   arithmetic behind nine-up, live in fit/divinity-deck.ts.
+   arithmetic, live in fit/divinity-deck.ts.
+
+   The card sits UPRIGHT by default — 4 across x 2 down = 8 — because that is
+   the way round the shop's guillotine cuts. Turning it fits nine, but hands the
+   cutter its cards sideways, so the ninth card costs a sheet and is opt-in.
 
    NO DUPLEX. The printer will not turn stock this thick, so the backs are a
    SEPARATE PASS: all the fronts first, then all the backs, grouped rather than
@@ -4622,9 +4626,12 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
    ART is turned the opposite way for a long-edge flip because a card lying on
    its side has its "up" along the axis the flip reverses.                    */
 
-import type { DeckCellMm } from './fit/divinity-deck.ts';
+import type { DeckCellMm, DeckOrient } from './fit/divinity-deck.ts';
 
 export interface DivinityDeckOptions {
+  /** How the card sits on the sheet. 'upright' (default) is 8-up and is the way
+   *  round the cutter wants; 'turned' is 9-up lying on its side. */
+  orient?: DeckOrient;
   /** 1-based page holding the shared card back. Defaults to the LAST page. */
   backPage?: number;
   /** Emit the back sheets at all. Default true. */
@@ -4643,6 +4650,10 @@ export interface DivinityDeckReport {
   cards: number;
   sheets: number;
   perSheet: number;
+  /** How the card was laid down, and the grid that followed from it. */
+  orient: DeckOrient;
+  cols: number;
+  rows: number;
   /** Empty cells on the final sheet. */
   blanksOnLastSheet: number;
   /** 1-based page of the output where the BACK sheets begin, for the 2nd pass. */
@@ -4661,9 +4672,10 @@ export async function imposeDivinityDeck(
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();
   const pages = src.getPages();
+  const L = F.deckLayout(opts.orient === 'turned' ? 'turned' : F.DEFAULT_ORIENT);
   const empty: DivinityDeckReport = {
-    cards: 0, sheets: 0, perSheet: F.PER_SHEET, blanksOnLastSheet: 0,
-    backsStartPage: null, totalPages: 0,
+    cards: 0, sheets: 0, perSheet: L.perSheet, orient: L.orient, cols: L.cols, rows: L.rows,
+    blanksOnLastSheet: 0, backsStartPage: null, totalPages: 0,
   };
   if (pages.length < 2) return { bytes: await out.save(), report: empty };
 
@@ -4673,16 +4685,17 @@ export async function imposeDivinityDeck(
   const backIdx = Math.min(pages.length, Math.max(1, Math.round(opts.backPage ?? pages.length))) - 1;
   const cardIdx = pages.map((_, i) => i).filter((i) => i !== backIdx);
   const cardCount = cardIdx.length;
-  const sheets = F.deckSheets(cardCount);
-  const cells = F.deckCells();
+  const sheets = F.deckSheets(cardCount, L.perSheet);
+  const cells = L.cells;
 
   const cardEmbeds = await out.embedPages(cardIdx.map((i) => pages[i]!));
   const [backEmb] = await out.embedPages([pages[backIdx]!]);
 
-  /* Turned to lie in the 88.9 x 63.5 cell. Judged by comparing the artwork's
-     aspect with the CELL's rather than testing for portrait — a hard-coded
-     orientation is what goes stale when a size changes. */
-  const cellPortrait = F.PLACED_H_MM >= F.PLACED_W_MM;
+  /* Judged by comparing the artwork's aspect with the CELL's rather than
+     testing for portrait — a hard-coded orientation is what goes stale when a
+     size changes. With the card upright the cell is portrait like the art, so
+     nothing is turned and the flip has nothing left to get wrong. */
+  const cellPortrait = L.placedHMm >= L.placedWMm;
   const needsTurn = (c: { width: number; height: number }) =>
     (c.height >= c.width) !== cellPortrait;
 
@@ -4739,7 +4752,7 @@ export async function imposeDivinityDeck(
     const pg = out.addPage([mm(F.SHEET_W_MM), mm(F.SHEET_H_MM)]);
     const used: DeckCellMm[] = [];
     cells.forEach((cell, ci) => {
-      const ci2 = F.deckCardAt(si, ci, cardCount);
+      const ci2 = F.deckCardAt(si, ci, cardCount, L.perSheet);
       if (ci2 < 0) return;
       const art = cardEmbeds[ci2];
       if (!art) return;
@@ -4756,7 +4769,7 @@ export async function imposeDivinityDeck(
     cells.forEach((cell, ci) => {
       // Only where the front actually carries a card — no point laying ink on
       // the blank cells of a short last sheet.
-      if (F.deckCardAt(si, ci, cardCount) < 0) return;
+      if (F.deckCardAt(si, ci, cardCount, L.perSheet) < 0) return;
       if (backEmb) drawInto(pg, backEmb, cell, backTurn);
       used.push(cell);
     });
@@ -4776,8 +4789,9 @@ export async function imposeDivinityDeck(
 
   await carryColorContext(src, out);
   const report: DivinityDeckReport = {
-    cards: cardCount, sheets, perSheet: F.PER_SHEET,
-    blanksOnLastSheet: sheets ? F.PER_SHEET - F.cardsOnSheet(sheets - 1, cardCount) : 0,
+    cards: cardCount, sheets, perSheet: L.perSheet,
+    orient: L.orient, cols: L.cols, rows: L.rows,
+    blanksOnLastSheet: sheets ? L.perSheet - F.cardsOnSheet(sheets - 1, cardCount, L.perSheet) : 0,
     backsStartPage: wantBacks && (opts.order ?? 'grouped') === 'grouped' && sheets ? sheets + 1 : null,
     totalPages: out.getPageCount(),
   };
