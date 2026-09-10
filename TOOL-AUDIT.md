@@ -19,6 +19,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 | Tool | Piece | Default sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
 | `divinitycards` Divinity Trading Cards | 2.5 × 3.5" | A3 420 × 297 | [x] | [x] | [x] | [x] | 18-up, 2 blocks of 3×3 |
+| `divinitydeck` Divinity Trading Card Deck | 2.5 × 3.5" | A4 297 × 210 | [x] | [x] | [x] | [x] | 9-up turned, N sheets, backs 2nd pass |
 | `indexcard` Index Cards | 3 × 5" | 17 × 11 | [x] | [x] | [x] | [x] | 10-up 5×2 |
 | `business` Business Cards | 3.5 × 2" | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `postcard` Postcards | 6 × 4" | 8.5 × 11 | [x] | [x] | [x] | [x] |
@@ -321,3 +322,47 @@ sliver inside the trim reads as a printing fault.
 
 Counted from the RENDERED sheet, not the calculator: A4 → 9 cards measured at
 63.7 × 88.8 mm; A3 → 18. Thirteen assertions in `test/fit-divinity-cards.test.ts`.
+
+### `divinitydeck` Divinity Trading Card Deck
+
+A whole deck out of **one** file — a card per page, the last page the shared
+back — ganged onto as many A4 sheets as the deck needs. 172 cards comes out at
+20 sheets. Geometry in `fit/divinity-deck.ts`.
+
+    card   63.5 × 88.9 mm (2.5 × 3.5"), placed TURNED (88.9 × 63.5), 3 mm gutter
+    sheet  297 × 210 — A4 fed LONG EDGE FIRST
+    grid   3 across × 3 down = 9, margins 12.15 / 6.75
+
+**Fed long edge first on purpose.** Heavy card stock run short-edge-first wears
+a band across the fuser, and that band then shows on 11 × 17 work afterwards. So
+the page is described 297 × 210: the same sheet of paper, fed the other way.
+
+Nine-up was worked all four ways rather than assumed — portrait/upright 9,
+portrait/turned 8, landscape/upright 8, landscape/turned 9. Landscape ties at
+nine and wins on the fuser, so the card lies on its side. It is cut out
+afterwards, so the turn costs nothing. The comparison is a test, so the choice
+can't silently stop being true.
+
+**No duplex.** The printer will not turn stock this thick, so the backs are a
+separate pass: every front, then every back (`order: 'grouped'`, the default).
+The panel names the page the second pass starts on, so the operator prints
+1–N, takes the stack out, turns it over and prints N+1–2N. `'interleaved'` is
+there for a press that *can* duplex and is opt-in.
+
+Positions are symmetric about **both** sheet axes (12.15/12.15 across,
+6.75/6.75 down), so every cell has a partner at the mirrored position and the
+sheet backs up whichever way the stack is turned over. That is asserted, not
+assumed — it is what the whole two-pass workflow rests on. A card lying on its
+side does have its "up" along the axis a **long-edge** flip reverses, so the
+back art is turned the opposite way; short-edge leaves it alone.
+
+Cards fall **sequentially**, not cut-and-stack: a deck is collated by hand off
+the guillotine, so sheet 1 holding cards 1–9 is what makes the stack checkable.
+
+The short last sheet gets no ink in its empty cells, front **or** back. Cut
+marks are ruled off the sheet edges only, never into the 3 mm gutters. Cover-fit
+and clipped, like the single-card tool.
+
+Counted from the RENDERED sheet: 172 cards → 20 front + 20 back pages, 9 turned
+cards on sheet 1 in reading order, 1 on the last. Seventeen assertions in
+`test/fit-divinity-deck.test.ts`.

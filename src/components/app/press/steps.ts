@@ -32,7 +32,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair' | 'mediafix' | 'divinitycards';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair' | 'mediafix' | 'divinitycards' | 'divinitydeck';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -155,6 +155,14 @@ export function defaultSettings(type: StepType): StepSettings {
       // The shop's card template, to the printer's spec sheet: 54 x 90 mm card,
       // ten to an A4, the A4 block doubled onto an A3 that cuts into two A4s.
       return { sheet: 'a3', page: 1, backPage: 2, backs: true, flip: 'long', addMarks: true };
+    case 'divinitydeck':
+      /* A whole deck out of one file — a card per page, the LAST page the shared
+         back — nine to an A4 fed LONG EDGE FIRST (heavy stock short-edge-first
+         wears a band across the fuser that then shows on 11x17 work).
+         'grouped' because the printer will not duplex stock this thick: every
+         front prints, the stack comes out and goes back in, then every back.
+         backPage 0 means "the last page", so it tracks a deck that grows. */
+      return { backPage: 0, backs: true, order: 'grouped', flip: 'long', addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
@@ -622,6 +630,19 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           flip: s.flip === 'short' ? 'short' : 'long',
           addMarks: s.addMarks !== false,
         });
+        break;
+      }
+      case 'divinitydeck': {
+        const { imposeDivinityDeck } = await import('@/lib/imposition-toolkit/impose');
+        b = (await imposeDivinityDeck(b, {
+          // 0/absent = the last page, which is where the shared back lives in
+          // the shop's export. A real page number overrides it.
+          backPage: s.backPage && s.backPage > 0 ? s.backPage : undefined,
+          backs: s.backs !== false,
+          order: s.order === 'interleaved' ? 'interleaved' : 'grouped',
+          flip: s.flip === 'short' ? 'short' : 'long',
+          addMarks: s.addMarks !== false,
+        })).bytes;
         break;
       }
       case 'mediafix': {

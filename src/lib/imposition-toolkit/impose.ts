@@ -4600,6 +4600,190 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
   return out.save();
 }
 
+/* ── Divinity trading card DECK ─────────────────────────────────────────────
+
+   One multi-page PDF — a card per page, the LAST page being the shared back —
+   ganged onto as many A4 sheets as the deck needs. 172 cards comes out at 20
+   sheets, nine to a sheet.
+
+   FED LONG EDGE FIRST, so the page is 297 x 210. That is the shop's deliberate
+   choice: heavy card stock run short-edge-first wears a band across the fuser,
+   and the band then shows on 11x17 work afterwards. Geometry, and the fit
+   arithmetic behind nine-up, live in fit/divinity-deck.ts.
+
+   NO DUPLEX. The printer will not turn stock this thick, so the backs are a
+   SEPARATE PASS: all the fronts first, then all the backs, grouped rather than
+   interleaved. Print pages 1..N, take the stack out, turn it over, feed it
+   again and print the rest. Interleaving would be right for a duplex press and
+   useless here — it would put a back between every pair of fronts.
+
+   The backs are laid out to register after that turn: the grid is symmetric, so
+   positions land on themselves whichever way the stack is flipped, and the back
+   ART is turned the opposite way for a long-edge flip because a card lying on
+   its side has its "up" along the axis the flip reverses.                    */
+
+import type { DeckCellMm } from './fit/divinity-deck.ts';
+
+export interface DivinityDeckOptions {
+  /** 1-based page holding the shared card back. Defaults to the LAST page. */
+  backPage?: number;
+  /** Emit the back sheets at all. Default true. */
+  backs?: boolean;
+  /** 'grouped' (default) = every front, then every back — two print passes.
+   *  'interleaved' = front, back, front, back, for a press that CAN duplex. */
+  order?: 'grouped' | 'interleaved';
+  /** How the stack is turned over between passes. Long edge is the usual. */
+  flip?: 'long' | 'short';
+  addMarks?: boolean;
+  markLenMm?: number;      // default 3
+  markWeightPt?: number;   // default 0.25
+}
+
+export interface DivinityDeckReport {
+  cards: number;
+  sheets: number;
+  perSheet: number;
+  /** Empty cells on the final sheet. */
+  blanksOnLastSheet: number;
+  /** 1-based page of the output where the BACK sheets begin, for the 2nd pass. */
+  backsStartPage: number | null;
+  totalPages: number;
+}
+
+export async function imposeDivinityDeck(
+  bytes: Uint8Array, opts: DivinityDeckOptions = {},
+): Promise<{ bytes: Uint8Array; report: DivinityDeckReport }> {
+  const PL = await import('pdf-lib');
+  const { PDFDocument, rgb, degrees } = PL;
+  const F = await import('./fit/divinity-deck.ts');
+  const mm = (v: number) => v * F.PT_PER_MM;
+
+  const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
+  const out = await PDFDocument.create();
+  const pages = src.getPages();
+  const empty: DivinityDeckReport = {
+    cards: 0, sheets: 0, perSheet: F.PER_SHEET, blanksOnLastSheet: 0,
+    backsStartPage: null, totalPages: 0,
+  };
+  if (pages.length < 2) return { bytes: await out.save(), report: empty };
+
+  /* The back defaults to the LAST page, and the cards are everything before it.
+     Naming a different page keeps the pages after it as cards, so a file with
+     the back somewhere else still works without reordering the source. */
+  const backIdx = Math.min(pages.length, Math.max(1, Math.round(opts.backPage ?? pages.length))) - 1;
+  const cardIdx = pages.map((_, i) => i).filter((i) => i !== backIdx);
+  const cardCount = cardIdx.length;
+  const sheets = F.deckSheets(cardCount);
+  const cells = F.deckCells();
+
+  const cardEmbeds = await out.embedPages(cardIdx.map((i) => pages[i]!));
+  const [backEmb] = await out.embedPages([pages[backIdx]!]);
+
+  /* Turned to lie in the 88.9 x 63.5 cell. Judged by comparing the artwork's
+     aspect with the CELL's rather than testing for portrait — a hard-coded
+     orientation is what goes stale when a size changes. */
+  const cellPortrait = F.PLACED_H_MM >= F.PLACED_W_MM;
+  const needsTurn = (c: { width: number; height: number }) =>
+    (c.height >= c.width) !== cellPortrait;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const drawInto = (pg: any, art: any, cell: DeckCellMm, quarter: 0 | 90 | -90) => {
+    const cw = mm(cell.wMm), ch = mm(cell.hMm);
+    const turn = quarter !== 0;
+    const aw = turn ? art.height : art.width, ah = turn ? art.width : art.height;
+    /* COVER-fit and clip: a card trims on all four sides, so the art must reach
+       every edge. Contain would leave white slivers inside the trim, which on a
+       card reads as a printing fault rather than a margin. */
+    const scale = Math.max(cw / aw, ch / ah);
+    const dw = aw * scale, dh = ah * scale;
+    const x = mm(cell.xMm) + (cw - dw) / 2, y = mm(cell.yMm) + (ch - dh) / 2;
+    const w = art.width * scale, h = art.height * scale;
+    pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(mm(cell.xMm), mm(cell.yMm), cw, ch), PL.clip(), PL.endPath());
+    // Rotating sweeps the box away from the placement point, so the anchor is
+    // the corner it sweeps FROM: bottom-right at +90, top-left at -90.
+    if (quarter === 90) pg.drawPage(art, { x: x + dw, y, width: w, height: h, rotate: degrees(90) });
+    else if (quarter === -90) pg.drawPage(art, { x, y: y + dh, width: w, height: h, rotate: degrees(-90) });
+    else pg.drawPage(art, { x, y, width: dw, height: dh });
+    pg.pushOperators(PL.popGraphicsState());
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const marksOn = (pg: any, used: DeckCellMm[]) => {
+    if (opts.addMarks === false || !used.length) return;
+    const len = mm(opts.markLenMm ?? 3);
+    const w0 = opts.markWeightPt ?? 0.25;
+    const line = (x1: number, y1: number, x2: number, y2: number) =>
+      pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w0, color: rgb(0, 0, 0) });
+    /* Ruled off the SHEET EDGES only, never into the gutters: card edges are
+       shared across a 3 mm gap, so a mark long enough to be useful there would
+       run onto the card beside it. The guillotine gets the same cut line. */
+    const xs = new Set<number>(), ys = new Set<number>();
+    for (const c of used) {
+      xs.add(mm(c.xMm)); xs.add(mm(c.xMm + c.wMm));
+      ys.add(mm(c.yMm)); ys.add(mm(c.yMm + c.hMm));
+    }
+    const sw = mm(F.SHEET_W_MM), sh = mm(F.SHEET_H_MM);
+    for (const x of xs) { line(x, 0, x, len); line(x, sh, x, sh - len); }
+    for (const y of ys) { line(0, y, len, y); line(sw, y, sw - len, y); }
+  };
+
+  const frontTurn: 0 | 90 | -90 = cardEmbeds[0] && needsTurn(cardEmbeds[0]) ? 90 : 0;
+  /* A long-edge flip reverses the axis a turned card's "up" points along, so
+     the back is turned the other way to come out upright against its front. A
+     short-edge flip leaves that axis alone, so the turn is unchanged. */
+  const backTurn: 0 | 90 | -90 = backEmb && needsTurn(backEmb)
+    ? ((opts.flip ?? 'long') === 'long' ? -90 : 90) : 0;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const frontSheet = (si: number): any => {
+    const pg = out.addPage([mm(F.SHEET_W_MM), mm(F.SHEET_H_MM)]);
+    const used: DeckCellMm[] = [];
+    cells.forEach((cell, ci) => {
+      const ci2 = F.deckCardAt(si, ci, cardCount);
+      if (ci2 < 0) return;
+      const art = cardEmbeds[ci2];
+      if (!art) return;
+      drawInto(pg, art, cell, frontTurn);
+      used.push(cell);
+    });
+    marksOn(pg, used);
+    return pg;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const backSheet = (si: number): any => {
+    const pg = out.addPage([mm(F.SHEET_W_MM), mm(F.SHEET_H_MM)]);
+    const used: DeckCellMm[] = [];
+    cells.forEach((cell, ci) => {
+      // Only where the front actually carries a card — no point laying ink on
+      // the blank cells of a short last sheet.
+      if (F.deckCardAt(si, ci, cardCount) < 0) return;
+      if (backEmb) drawInto(pg, backEmb, cell, backTurn);
+      used.push(cell);
+    });
+    marksOn(pg, used);
+    return pg;
+  };
+
+  const wantBacks = opts.backs !== false;
+  if (!wantBacks) {
+    for (let si = 0; si < sheets; si++) frontSheet(si);
+  } else if ((opts.order ?? 'grouped') === 'interleaved') {
+    for (let si = 0; si < sheets; si++) { frontSheet(si); backSheet(si); }
+  } else {
+    for (let si = 0; si < sheets; si++) frontSheet(si);
+    for (let si = 0; si < sheets; si++) backSheet(si);
+  }
+
+  await carryColorContext(src, out);
+  const report: DivinityDeckReport = {
+    cards: cardCount, sheets, perSheet: F.PER_SHEET,
+    blanksOnLastSheet: sheets ? F.PER_SHEET - F.cardsOnSheet(sheets - 1, cardCount) : 0,
+    backsStartPage: wantBacks && (opts.order ?? 'grouped') === 'grouped' && sheets ? sheets + 1 : null,
+    totalPages: out.getPageCount(),
+  };
+  return { bytes: await out.save(), report };
+}
+
 /* ── Divinity trading cards ─────────────────────────────────────────────────
 
    A standard 2.5 x 3.5" trading card, nine to an A4, with the A4 block doubled
