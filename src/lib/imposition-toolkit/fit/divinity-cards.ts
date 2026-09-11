@@ -1,9 +1,14 @@
 /* Divinity trading cards — one card artwork ganged 8-up on A4 and the block
  * duplicated onto A3, so one A3 cuts in half into two identical A4s to run.
  *
- * THE CELL IS ALWAYS A TRUE 2.5 x 3.5" CARD, laid sideways (88.9 x 63.5).
- * Never derived, never adjusted to make a margin come out: a cell that is not a
- * card cuts cards that are the wrong size.
+ * THE CELL IS THE CARD PLUS 1.5 mm, laid sideways: 90.4 x 65. A 2.5 x 3.5"
+ * card is 88.9 x 63.5, and the shop cuts it 1.5 over on each dimension — the
+ * cell size is the CUT size, stated by the operator off the machine. Never
+ * derived and never nudged to make a margin come out: a cell that is not the
+ * cut size cuts cards that are the wrong size.
+ *
+ * THE COLUMNS TOUCH. B is 0 — one cut line down the middle serves both columns,
+ * the same way the rows already share theirs.
  *
  * EVERY GAP IS A SETTING, and C and H can be typed as readily as A and D — they
  * are the far end of the same two spans, so entering one just places the block
@@ -13,11 +18,11 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 14   B 10   D 8   sheet LETTER    (there is no row gutter)
- *     C and H then fall out at 14.10 and 17.40.
+ *     A 14   B 0   D 8   sheet LETTER   (no column gutter, no row gutter)
+ *     C and H then fall out at 21.10 and 11.40.
  *
- *     across  14 + 88.9 + 10 + 88.9 + 14.1 = 215.9
- *     down    8 + 4(63.5) + 17.4           = 279.4
+ *     across  14 + 90.4 + 0 + 90.4 + 21.1 = 215.9
+ *     down    8 + 4(65)                   + 11.4 = 279.4
  *
  * EVERY GAP IS 1.5 SMALLER THAN THE RULER READING, because the ruler reads the
  * paper between the ART and the art runs 1.5 past the cut. The CUT LINES are
@@ -28,8 +33,9 @@
  * without it cuts white edges, which is the fault this template was rebuilt to
  * remove.
  *
- * THE ROWS BUTT — no gutter at all. One cut line serves both cards, and the
- * 1.5 mm bleed laps onto the neighbour, which is the same artwork.
+ * THE ROWS AND THE COLUMNS BOTH BUTT — no gutter either way. One cut line
+ * serves both cards, and the 1.5 mm bleed laps onto the neighbour, which is the
+ * same artwork.
  *
  * A IS NOT EQUAL TO C, and that is not a mistake. An earlier set (A 14, D 6.5,
  * with 3 mm between the rows) was validated on TEST stock and did not hold when
@@ -60,8 +66,8 @@ export const CARD_H_MM = CARD_H_IN * MM_PER_IN;   // 88.9
    measured a correct A4 all the way through and the paper was never A4.
 
    It is also the sheet the production template closes on, to the millimetre:
-     across  A 14 + 88.9 + B 10 + 88.9 + C 14.1 = 215.9
-     down    D 8  + 4(63.5)      + H 17.4       = 279.4                     */
+     across  A 14 + 90.4 + B 0 + 90.4 + C 21.1 = 215.9
+     down    D 8  + 4(65)              + H 11.4 = 279.4                     */
 export const LETTER_W_MM = 8.5 * MM_PER_IN;    // 215.9
 export const LETTER_H_MM = 11 * MM_PER_IN;     // 279.4
 export const TABLOID_W_MM = 17 * MM_PER_IN;    // 431.8 — two Letters side by side
@@ -94,26 +100,30 @@ const COLS_N = 2, ROWS_N = 4;
 export const DEF_MARGIN_X_MM = 14;    // A — sheet edge to the first cut line
 export const DEF_MARGIN_TOP_MM = 8;   // D — head margin
 
-export const DEF_GUTTER_X_MM = 10;    // B — between the columns
-/* THERE IS NO ROW GUTTER. Not zero-by-default — gone. The rows BUTT: one cut
-   line serves both cards, and the 1.5 mm bleed laps onto the neighbour, which is
-   the same artwork. A strip between the rows consumed sheet and bought nothing
-   once the art already met edge to edge, so the setting is deleted rather than
-   defaulted, and the row pitch IS the card height. */
+export const DEF_GUTTER_X_MM = 0;     // B — the columns TOUCH
+/* THERE IS NO ROW GUTTER AT ALL. Not zero-by-default — gone, no setting. The
+   rows BUTT: one cut line serves both cards, and the 1.5 mm bleed laps onto the
+   neighbour, which is the same artwork. B survives as a setting and defaults to
+   0, so the columns butt the same way; the row pitch IS the cell height. */
 
-/* The vertical chain with the rows butted is four cards and nothing between:
+/* The vertical chain with the rows butted is four cells and nothing between:
 
-     D 8 + 4(63.5) + H  =  8 + 254 + H       on a 279.4 sheet  ->  H 17.4
+     D 8 + 4(65) + H  =  8 + 260 + H         on a 279.4 sheet  ->  H 11.4
 
    The bleed is not a term in it. Bleed is drawn OUTSIDE each cell — it laps over
    the neighbouring card and over the margin — so it never moves a cut line and
    never consumes sheet. That is what "let the bleed spill over" means in the
    geometry: the cells are the cards, full stop. */
 
-/** The cell IS the card, laid sideways. Never derived, never adjusted to make a
- *  margin come out — a card that is not 2.5 x 3.5 is not a trading card. */
-export const PLACED_W_MM = CARD_H_MM;             // 88.9
-export const PLACED_H_MM = CARD_W_MM;             // 63.5
+/** How much bigger the CUT is than the nominal card, on each dimension. The
+ *  shop's machine cuts 1.5 over, so that is the cell — not a bleed allowance and
+ *  not a fudge: it is the size the finished card comes off the guillotine. */
+export const CELL_OVERSIZE_MM = 1.5;
+
+/** The cell: the card laid sideways, 1.5 over on both dimensions. Never derived,
+ *  never adjusted to make a margin come out — the cell IS the cut size. */
+export const PLACED_W_MM = CARD_H_MM + CELL_OVERSIZE_MM;   // 90.4
+export const PLACED_H_MM = CARD_W_MM + CELL_OVERSIZE_MM;   // 65
 
 export const COLS = COLS_N;
 export const ROWS = ROWS_N;
