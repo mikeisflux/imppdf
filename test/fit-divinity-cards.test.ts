@@ -54,21 +54,37 @@ test('B is a setting, and the cell never moves with it', () => {
   assert.equal(wide.n, 8, 'and it still fits eight');
 });
 
-test('the ROWS touch and the COLUMNS do not — B 7 down the middle', () => {
+test('B 7 down the middle, E F G 0.5 between the rows', () => {
   const f = fitDivinityCards('letter');
   assert.ok(close(DEF_GUTTER_X_MM, 7), 'B defaults to 7');
+  assert.deepEqual(f.rowGapsMm, [0.5, 0.5, 0.5], 'E F G default to half a millimetre each');
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
   assert.ok(close(xs[1]! - xs[0]!, PLACED_W_MM + 7), 'column pitch = cell + B');
   for (let i = 1; i < ys.length; i++)
-    assert.ok(close(ys[i - 1]! - ys[i]!, PLACED_H_MM), 'row pitch IS the cell — no gap');
+    assert.ok(close(ys[i - 1]! - ys[i]!, PLACED_H_MM + 0.5), 'row pitch = cell + its gap');
+});
+
+test('E F G are set INDEPENDENTLY, and H takes up whatever they leave', () => {
+  /* Three gaps, three boxes — the operator measures three, not one three times,
+     and a press that drifts down the sheet needs them to differ. */
+  const f = fitDivinityCards('letter', { gutterEMm: 3, gutterFMm: 2, gutterGMm: 1 });
+  assert.deepEqual(f.rowGapsMm, [3, 2, 1], 'each one lands where it was typed');
+  const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
+  assert.ok(close(ys[0]! - ys[1]!, PLACED_H_MM + 3), 'E between rows 1 and 2');
+  assert.ok(close(ys[1]! - ys[2]!, PLACED_H_MM + 2), 'F between rows 2 and 3');
+  assert.ok(close(ys[2]! - ys[3]!, PLACED_H_MM + 1), 'G between rows 3 and 4');
+  const plain = fitDivinityCards('letter');
+  assert.ok(close(plain.marginBottomMm - f.marginBottomMm, 6 - 1.5),
+    'H closes up by exactly what the three gaps opened');
 });
 
 test('both sums close on A4 exactly — the check the template is right', () => {
   const f = fitDivinityCards('a4');
   assert.ok(close(f.marginXMm + COLS * PLACED_W_MM + (COLS - 1) * DEF_GUTTER_X_MM + f.marginRightMm, 210));
-  /* No row-gutter term: the rows BUTT, so the vertical chain is D + 4 cards + H. */
-  assert.ok(close(f.marginTopMm + ROWS * PLACED_H_MM + f.marginBottomMm, 297));
+  /* The vertical chain is D + 4 cells + E + F + G + H. */
+  const rowSum = f.rowGapsMm[0] + f.rowGapsMm[1] + f.rowGapsMm[2];
+  assert.ok(close(f.marginTopMm + ROWS * PLACED_H_MM + rowSum + f.marginBottomMm, 297));
 });
 
 test('cover-fit into the oversized cell loses well under a millimetre', () => {
@@ -84,7 +100,7 @@ test('cover-fit into the oversized cell loses well under a millimetre', () => {
   assert.ok(Math.max(offW, offH) < 1, `under a millimetre lost, got ${Math.max(offW, offH)}`);
 });
 
-test('A4: eight cards, 2 across x 4 down, rows butting', () => {
+test('A4: eight cards, 2 across x 4 down', () => {
   const f = fitDivinityCards('a4');
   assert.equal(f.sheetWMm, 210);
   assert.equal(f.sheetHMm, 297);
@@ -96,8 +112,8 @@ test('A4: eight cards, 2 across x 4 down, rows butting', () => {
   assert.ok(close(xs[0]!, 14), `A at 14, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
   assert.ok(close(xs[1]! - xs[0]!, 97.4), 'column pitch = the cell + B 7');
-  for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 65), 'row pitch = the cell, butting');
-  assert.ok(close(Math.min(...ys), 297 - 8 - 260), 'the last row sits on H');
+  for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 65.5), 'row pitch = cell + 0.5');
+  assert.ok(close(Math.min(...ys), 297 - 8 - 260 - 1.5), 'the last row sits on H');
 });
 
 test('A4: every card is inside the sheet, and none overlaps another', () => {
