@@ -2975,48 +2975,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         )}
       </Section>
 
-      <Section label="// BACKS" help="A second sheet of backs that registers with the fronts. Page 2 is the back art when the file has one; otherwise page 1 is used so you can still see and set up the sheet.">
-        {true ? (
-          <>
-            <Check icon="flip" label={pageCount > 1 ? 'Print backs from page 2' : 'Print backs from page 1'}
-              sub={pageCount > 1
-                ? 'A second sheet, so you can duplex fronts to backs'
-                : 'No second page in this file, so page 1 is standing in as the back'}
-              checked={s.backs !== false} onChange={(v) => up({ backs: v })} />
-            {s.backs !== false && (
-              <>
-                <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                  <span className="pe-label" style={{ width: 76 }}>Flip</span>
-                  <button className="pe-chipbtn" style={pickStyle((s.flip ?? 'long') === 'long')} onClick={() => up({ flip: 'long' })}>Long edge</button>
-                  <button className="pe-chipbtn" style={pickStyle(s.flip === 'short')} onClick={() => up({ flip: 'short' })}>Short edge</button>
-                </div>
-                <div style={{ marginTop: 10 }}>
-                  <Check icon="rotate" label="Spin backs 180°"
-                    sub="Tick this if the backs come out upside down against their fronts"
-                    checked={!!s.spinBacks} onChange={(v) => up({ spinBacks: v })} />
-                </div>
-                <div className="pe-note" style={{ marginTop: 8 }}>
-                  <b>Portrait</b> art gets a quarter turn to lie across the cell, and then
-                  this matters. <b>Long edge</b> (the Fiery&apos;s &ldquo;open to left&rdquo;)
-                  reverses the sheet&apos;s x-axis, so the backs are turned the other way to
-                  come out upright against their fronts; short edge leaves x alone.
-                  Landscape art is already the cell&apos;s way round and is never turned.
-                </div>
-              </>
-            )}
-          </>
-        ) : null}
-        {pageCount === 1 && s.backs !== false && (
-          <div className="pe-note" style={{ marginTop: 8 }}>
-            This file has <b>one page</b>, so the back sheet is showing page 1. Upload a
-            <b> two-page</b> file — front on page 1, back on page 2 — for the real back.
-          </div>
-        )}
-        <div className="pe-note" style={{ marginTop: 8 }}>
-          Card positions are <b>absolute</b>, and symmetric across (11 mm both sides) so the
-          grid backs up on a <b>long-edge</b> flip. The block sits <b>6.5 mm off the head</b>
-          with the remainder at the foot, so it does <b>not</b> back up end-for-end.
-        </div>
+      <Section label="// BACKS" help="Spins the back artwork half a turn in its cell.">
+        <Check icon="rotate" label="Spin backs 180°"
+          checked={!!s.spinBacks} onChange={(v) => up({ spinBacks: v })} />
       </Section>
 
       <Section label="// MARKS" help="Cut marks are ruled off the sheet edges rather than into the gutters, so nothing can print on a neighbouring card.">
