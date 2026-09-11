@@ -11,8 +11,7 @@
  *   down    6.5 + 63 + 3 + 63 + 3 + 63 + 3 + 63 + 29.5 = 297
  *
  * The cell and the gutters were MEASURED off the shop's cut machine and are the
- * input; the margins are the remainder. Same template as fit/divinity-deck.ts,
- * asserted here so the two tools can never drift apart.                      */
+ * input; the margins are the remainder.                      */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +20,6 @@ import {
   fitDivinityCards, PT_PER_MM, CARD_W_MM, CARD_H_MM, PLACED_W_MM, PLACED_H_MM,
   GUTTER_X_MM, GUTTER_Y_MM, MARGIN_X_MM, MARGIN_TOP_MM, MARGIN_BOTTOM_MM, COLS, ROWS,
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
-import * as DECK from '../src/lib/imposition-toolkit/fit/divinity-deck.ts';
 import { imposeDivinityCards } from '../src/lib/imposition-toolkit/impose.ts';
 
 const close = (a: number, b: number, tol = 1e-6) => Math.abs(a - b) <= tol;
@@ -44,20 +42,6 @@ test('the measured gaps are what the file says they are', () => {
 test('the outer margins are the WASTE — derived, never stated', () => {
   assert.ok(close(MARGIN_X_MM, 11.1));
   assert.ok(close(MARGIN_BOTTOM_MM, 27.5));
-});
-
-test('it is the SAME template as the deck tool, so both cut alike', () => {
-  /* The two tools share a cut machine, not a code path. Asserting the numbers
-     match is what stops one being re-tuned without the other. */
-  assert.equal(PLACED_W_MM, DECK.CELL_W_MM);
-  assert.equal(PLACED_H_MM, DECK.CELL_H_MM);
-  assert.equal(MARGIN_X_MM, DECK.MARGIN_X_MM);
-  assert.equal(GUTTER_X_MM, DECK.GUTTER_X_MM);
-  assert.equal(GUTTER_Y_MM, DECK.GUTTER_Y_MM);
-  assert.equal(MARGIN_X_MM, DECK.MARGIN_X_MM);
-  assert.equal(MARGIN_TOP_MM, DECK.MARGIN_TOP_MM);
-  assert.equal(MARGIN_BOTTOM_MM, DECK.MARGIN_BOTTOM_MM);
-  assert.equal(COLS * ROWS, DECK.PER_SHEET);
 });
 
 test('both sums close on A4 exactly — the check the template is right', () => {
@@ -208,7 +192,8 @@ test('a second page becomes a sheet of backs', async () => {
 });
 
 test('portrait art IS turned, and SPIN BACKS picks the other turn', async () => {
-  /* Same switch as imposeDivinityDeck, kept in step deliberately. Default ON. */
+  /* The two quarter turns are 180 apart, so the switch simply picks the other
+     one. Default ON — what the shop's own cut sheets showed. */
   const on = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'long' });
   const f = await turnsOnPage(on, 0), b = await turnsOnPage(on, 1);
   assert.equal(f.ccw, 8, 'eight fronts, all turned one way');

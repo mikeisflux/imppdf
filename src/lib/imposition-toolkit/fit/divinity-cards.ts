@@ -13,7 +13,6 @@
  *   across  11.1 + 88.9 + 10 + 88.9 + 11.1  = 210
  *   down    6.5 + 4(63.5) + 3(3) + 27.5       = 297
  *
- * Same template as fit/divinity-deck.ts, asserted so the two cannot drift.
  * The block is PINNED TO THE HEAD, so the sheet backs up on a LONG-EDGE flip
  * but not end-for-end.
  *

@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import '@/lib/polyfills';
 import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, RAISED_METAL_DEFAULTS as RM, type ZineFormat } from '@/lib/imposition-toolkit/impose';
-import { deckLayout } from '@/lib/imposition-toolkit/fit/divinity-deck';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
 import { ImageFitModal } from './image-fit-modal';
@@ -2929,127 +2928,6 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
  * The geometry is FIXED (fit/divinity-cards.ts), so this panel is mostly a
  * statement of what you are going to get rather than a set of dials. The one
  * real decision is which sheet. */
-/* Divinity Trading Card DECK — one file of ~172 cards onto as many A4s as it
- * takes. The two things the shop needs off this panel are how many sheets it
- * will be, and which page the second (backs) pass starts on, so both are
- * computed here from the page count rather than waiting for the export. */
-function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
-  const MM = 25.4 / 72;
-  /* Read straight from the fit module rather than restated here — the counts
-     move with the gutter, and a second copy of them is exactly what goes stale. */
-  const LAY = deckLayout();
-  const { cols: COLS, rows: ROWS, perSheet: PER_SHEET } = LAY;
-  // Same rule as the engine: the named back page, or the last page.
-  const backPg = s.backPage && s.backPage > 0
-    ? Math.max(1, Math.min(pageCount, Math.round(s.backPage)))
-    : pageCount;
-  const cards = Math.max(0, pageCount - 1);
-  const sheets = Math.ceil(cards / PER_SHEET);
-  const blanks = sheets ? sheets * PER_SHEET - cards : 0;
-  const backs = s.backs !== false;
-  const grouped = (s.order ?? 'grouped') !== 'interleaved';
-  const total = sheets * (backs ? 2 : 1);
-
-  const src = pageSizes[Math.max(0, Math.min(pageSizes.length - 1, 0))];
-  const wMm = src ? src.wPt * MM : 0, hMm = src ? src.hPt * MM : 0;
-  // Aspect, not exact size — a card a millimetre out still reads as correct.
-  const ratio = wMm && hMm ? Math.max(wMm, hMm) / Math.min(wMm, hMm) : 0;
-  const off = ratio ? Math.abs(ratio - 88.9 / 63.5) / (88.9 / 63.5) : 0;
-
-  return (
-    <>
-      <div className="pe-note" style={{ marginBottom: 12 }}>
-        Upload the <b>whole deck</b> — one card per page, the <b>last page the shared
-        back</b>. {PER_SHEET} to a <b>portrait A4</b>, {COLS} across × {ROWS} down, cards
-        <b>lying sideways</b> in an <b>89 × 63 mm</b> cell — the cut machine&apos;s own
-        template.
-      </div>
-
-      <Section label="// DECK" help="Read straight off the file: every page except the back is a card.">
-        {pageCount > 1 ? (
-          <div className="pe-note" style={{ lineHeight: 1.8 }}>
-            <div><b>{cards} cards</b> on <b>{sheets} sheets</b>, {PER_SHEET} to a sheet</div>
-            <div>Back art is <b>page {backPg}</b>{s.backPage ? '' : ' (the last page)'}</div>
-            {blanks > 0 && <div>Last sheet has <b>{blanks} empty {blanks === 1 ? 'cell' : 'cells'}</b> — no back is printed there either</div>}
-            <div>Output is <b>{total} pages</b></div>
-          </div>
-        ) : (
-          <div className="pe-note">Add the deck PDF to see the sheet count.</div>
-        )}
-        {pageCount > 1 && (
-          <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
-            <span className="pe-label" style={{ flex: 1 }}>Back page<span className="pe-label-sm"> · 0 = last</span></span>
-            <NumRaw value={s.backPage ?? 0} onValue={(v) => up({ backPage: Math.max(0, Math.min(pageCount, Math.round(v))) })} w={70} />
-          </div>
-        )}
-        {off > 0.02 && src && (
-          <div className="pe-gang-warn" style={{ marginTop: 8 }}>
-            ⚠ Page 1 is {wMm.toFixed(1)} × {hMm.toFixed(1)} mm, not 63.5 × 88.9 (2.5 × 3.5&quot;).
-            It will be filled to the cell and the overflow trimmed.
-          </div>
-        )}
-      </Section>
-
-      <Section label="// FEED" help="The sheet is described 297 × 210 because that is how it goes into the tray.">
-        <div className="pe-note" style={{ lineHeight: 1.7 }}>
-          The page is a plain <b>portrait A4</b>, 210 × 297 mm. Which edge goes into the
-          tray first is a printer setting, not something the file decides — feed it
-          <b> long edge first</b> through the bypass as usual for heavy stock.<br />
-          Across <b>11 + 89 + 10 + 89 + 11 = 210</b>. Down <b>6.5 + 4×63 + 3×3 + 29.5 = 297</b>
-          — the block is pinned <b>6.5 mm off the head</b>, so flip the stack <b>long edge</b>.
-        </div>
-      </Section>
-
-      <Section label="// BACKS" help="Two passes, because card stock this thick won't go through the duplexer.">
-        <Check icon="flip" label="Print the backs" sub="A matching back sheet for every front sheet"
-          checked={backs} onChange={(v) => up({ backs: v })} />
-        {backs && (
-          <>
-            <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              <span className="pe-label" style={{ width: 76 }}>Order</span>
-              <button className="pe-chipbtn" style={pickStyle(grouped)} onClick={() => up({ order: 'grouped' })}>Two passes</button>
-              <button className="pe-chipbtn" style={pickStyle(!grouped)} onClick={() => up({ order: 'interleaved' })}>Duplex</button>
-            </div>
-            <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
-              {grouped ? (
-                <>
-                  <div>All <b>{sheets || 'the'} front{sheets === 1 ? '' : 's'} first</b>{sheets ? <> — pages <b>1–{sheets}</b></> : null}.</div>
-                  <div>Then take the stack out, turn it over, feed it again and print
-                    {sheets ? <> pages <b>{sheets + 1}–{total}</b></> : ' the rest'}.</div>
-                </>
-              ) : (
-                <div>Front, back, front, back — for a press that <b>can</b> duplex the stock.
-                  Card stock this thick usually can&apos;t, which is why two passes is the default.</div>
-              )}
-            </div>
-            <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              <span className="pe-label" style={{ width: 76 }}>Flip</span>
-              <button className="pe-chipbtn" style={pickStyle((s.flip ?? 'long') === 'long')} onClick={() => up({ flip: 'long' })}>Long edge</button>
-              <button className="pe-chipbtn" style={pickStyle(s.flip === 'short')} onClick={() => up({ flip: 'short' })}>Short edge</button>
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <Check icon="rotate" label="Spin backs 180°"
-                sub="Turn this off if the backs come out upside down against their fronts"
-                checked={s.spinBacks !== false} onChange={(v) => up({ spinBacks: v })} />
-            </div>
-            <div className="pe-note" style={{ marginTop: 8 }}>
-              How the stack goes back in. The grid is <b>symmetric</b>, so the positions land
-              on themselves either way. A card lying <b>sideways</b> has its
-              &ldquo;up&rdquo; along the axis a long-edge flip reverses, so the back art is
-              turned the other way to come out upright against its front.
-            </div>
-          </>
-        )}
-      </Section>
-
-      <Section label="// MARKS" help="Cut marks are ruled off the sheet edges rather than into the gutters, so nothing can print on a neighbouring card.">
-        <Check icon="crop" label="Cut marks" sub="At every card edge, in the sheet margins"
-          checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />
-      </Section>
-    </>
-  );
-}
-
 function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
   const a3 = s.sheet !== 'a4';
   const MM = 25.4 / 72;
@@ -3082,8 +2960,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           {a3 && <div>Cut down at <b>210 mm</b> for two A4s, marked top and bottom</div>}
           <div style={{ marginTop: 4 }}>
             A plain <b>portrait A4</b> with the cards lying <b>across</b> it. Eight is what
-            the cutter takes off one A4, and it matches <b>Divinity Trading Card Deck</b>
-            so both cut the same.
+            the cutter takes off one A4.
           </div>
         </div>
       </Section>
@@ -3144,8 +3021,19 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           </>
         ) : (
           <div className="pe-note">
-            Single-sided. Upload a <b>two-page</b> file — front on page 1, back on page 2 — and
-            you&apos;ll get a second sheet of backs.
+            Single-sided right now. Upload a <b>two-page</b> file — front on page 1, back on
+            page 2 — and you&apos;ll get a second sheet of backs. The setting below is saved
+            either way, so you can set it before you load the back.
+          </div>
+        )}
+        {/* ALWAYS shown, even on a one-page upload. It used to live inside the
+            two-page branch, which meant the control the operator most needs to
+            set was invisible exactly when they were setting the job up. */}
+        {pageCount <= 1 && (
+          <div style={{ marginTop: 10 }}>
+            <Check icon="rotate" label="Spin backs 180°"
+              sub="Turn this off if the backs come out upside down against their fronts"
+              checked={s.spinBacks !== false} onChange={(v) => up({ spinBacks: v })} />
           </div>
         )}
         <div className="pe-note" style={{ marginTop: 8 }}>
@@ -3168,7 +3056,6 @@ export function StepPanelBody(props: PanelProps & { type: StepType }) {
   if (type === 'pdfrepair') return <PdfRepairPanel {...props} />;
   if (type === 'mediafix') return <MediaFixPanel {...props} />;
   if (type === 'divinitycards') return <DivinityCardsPanel {...props} />;
-  if (type === 'divinitydeck') return <DivinityDeckPanel {...props} />;
   if (type === 'raisedmetal') return <RaisedMetalPanel {...props} />;
   if (type === 'pbcover') return <PerfectCoverPanel {...props} />;
   if (type === 'removebg') return <RemoveBgPanel {...props} />;

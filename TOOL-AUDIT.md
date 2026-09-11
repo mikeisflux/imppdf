@@ -1,4 +1,4 @@
-# Tool audit — 94 tools
+# Tool audit — 93 tools
 
 Working one tool at a time. A tool is only ticked when **all four** are true:
 
@@ -19,7 +19,6 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 | Tool | Piece | Default sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
 | `divinitycards` Divinity Trading Cards | 88.9 × 63.5 cell | A3 420 × 297 | [x] | [x] | [x] | [x] | 16-up, 2 blocks of 2×4 |
-| `divinitydeck` Divinity Trading Card Deck | 88.9 × 63.5 cell | A4 210 × 297 | [x] | [x] | [x] | [x] | 8-up sideways, N sheets, backs 2nd pass |
 | `indexcard` Index Cards | 3 × 5" | 17 × 11 | [x] | [x] | [x] | [x] | 10-up 5×2 |
 | `business` Business Cards | 3.5 × 2" | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `postcard` Postcards | 6 × 4" | 8.5 × 11 | [x] | [x] | [x] | [x] |
@@ -289,11 +288,10 @@ Newest first. Every entry records a **measured** number, not a claim.
 - **`prooflabel`** — fixed 3 × 10 die, never computed; art stretched to the cell.
   `fit/proof-labels.ts` + test.
 
-### `divinitycards` / `divinitydeck` — the shared cut-machine template
+### `divinitycards` Divinity Trading Cards — the cut-machine template
 
-Both Divinity card tools lay out to the SAME template, because they share a cut
-machine. `fit/divinity-cards.ts` and `fit/divinity-deck.ts` hold it, and a test
-asserts the two files agree so neither can be re-tuned without the other.
+One card artwork ganged 8-up on A4, the block duplicated onto A3 so one sheet
+cuts in half into two identical A4s to run. Geometry in `fit/divinity-cards.ts`.
 
     sheet   210 × 297 (A4) · 420 × 297 (A3, the A4 block twice, cut down at 210)
     cell    88.9 × 63.5 — a 2.5 × 3.5" card laid SIDEWAYS, exactly
@@ -305,7 +303,7 @@ asserts the two files agree so neither can be re-tuned without the other.
 **The card size is the INPUT; the outer margins are the remainder.** This took
 several wrong turns to land, so the reasoning is worth keeping: eight gaps and a
 card size cannot all be dictated at once, because they have to sum to the sheet.
-Earlier builds made the margins the input and let the cell fall out, which
+An earlier build made the margins the input and let the cell fall out, which
 produced an 86 × 67.6 cell — and cut cards that measured wrong. The margins are
 the right thing to give, because they are **waste**: a millimetre there gets
 trimmed off and binned, a millimetre on the card is a card that is the wrong
@@ -318,41 +316,25 @@ are genuinely different numbers and stay separate constants.
 
 **The block is pinned to the head** — 6.5 at the top, all the slack (27.5) at
 the foot — so the sheet is symmetric across (11.1 / 11.1) but not down. It backs
-up on a **long-edge** flip and *not* end-for-end; both halves are asserted so
-nobody re-centres it and quietly breaks the cut.
+up on a **long-edge** flip and *not* end-for-end.
 
-**Spin backs 180° — a checkbox, default ON.** Portrait art takes a quarter turn
-into the sideways cell, and the back needs one of the two quarter turns, which
-are exactly 180° apart. Which one is right depends on how the operator turns the
-stack over by hand, and a hand-turned stack of heavy card does not land the way
-a perfecting press would — proven on the shop's own cut sheets. That is a
-property of the workflow, not something the file can derive, so it is a switch:
-if the backs come out upside down against their fronts, untick it. Both states
-are asserted.
+**Spin backs 180° — a checkbox, default ON, and ALWAYS VISIBLE.** Portrait art
+takes a quarter turn into the sideways cell, and the back needs one of the two
+quarter turns, which are exactly 180° apart. Which one is right depends on how
+the operator turns the stack over by hand, and a hand-turned stack of heavy card
+does not land the way a perfecting press would. That is a property of the
+workflow, not something the file can derive, so it is a switch: if the backs
+come out upside down against their fronts, untick it. It used to be nested
+inside the two-page branch, which hid the control exactly when the operator was
+setting the job up with a single card loaded — it now renders either way and
+both states are asserted.
 
-Cut marks are ruled off the sheet edges only, never into the gutters; the A3
-half-sheet cut is ticked top and bottom.
+A two-page upload becomes fronts on sheet 1 and backs on sheet 2. Cut marks are
+ruled off the sheet edges only, never into the gutters; the A3 half-sheet cut is
+ticked top and bottom. Cover-fit and clipped: a card trims on all four sides, so
+a white sliver inside the trim reads as a printing fault.
 
-#### `divinitycards` — one card, filled across the sheet
-
-A3 (default) gives 16 and cuts into two A4s that each stand on their own. A4
-gives 8. A two-page upload becomes fronts on sheet 1 and backs on sheet 2.
 Sixteen assertions in `test/fit-divinity-cards.test.ts`.
 
-#### `divinitydeck` — a whole deck out of one file
-
-One card per page, the last page the shared back, over as many A4 sheets as the
-deck needs. 172 cards comes out at 22 sheets.
-
-**No duplex.** The printer will not turn stock this thick, so the backs are a
-separate pass: every front, then every back (`order: 'grouped'`, the default).
-The panel names the page the second pass starts on, so the operator prints 1–N,
-takes the stack out, turns it over and prints N+1–2N. `'interleaved'` is there
-for a press that *can* duplex and is opt-in.
-
-Cards fall **sequentially**, not cut-and-stack: a deck is collated by hand off
-the guillotine, so sheet 1 holding cards 1–8 is what makes the stack checkable.
-The short last sheet gets no ink in its empty cells, front **or** back.
-
-172 cards → 22 front + 22 back pages, second pass at page 23. Twenty-one
-assertions in `test/fit-divinity-deck.test.ts`.
+**Divinity Trading Card Deck was removed** at the owner's instruction — one card
+tool, not two.
