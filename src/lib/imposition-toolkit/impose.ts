@@ -4655,6 +4655,9 @@ export interface DivinityCardOptions {
   /** Centre the block. Default ON; turn it off to pin it by the margins below. */
   centre?: boolean;
   /** A and C, when `centre` is off. */ marginXMm?: number;
+  /** Nudge the block: +x right (C shrinks, A grows), +y down. */
+  shiftXMm?: number;
+  shiftYMm?: number;
   /** D, when `centre` is off. */       marginTopMm?: number;
   /** B — between the columns. */       gutterXMm?: number;
   /** E/F/G — between the rows. */      gutterYMm?: number;
@@ -4680,6 +4683,7 @@ export async function imposeDivinityCards(
   const fit = fitDivinityCards(opts.sheet ?? 'letter', {
     centre: opts.centre, marginXMm: opts.marginXMm, marginTopMm: opts.marginTopMm,
     gutterXMm: opts.gutterXMm, gutterYMm: opts.gutterYMm,
+    shiftXMm: opts.shiftXMm, shiftYMm: opts.shiftYMm,
   });
   const mm = (v: number) => v * PT_PER_MM;
 

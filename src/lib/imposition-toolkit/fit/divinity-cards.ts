@@ -35,7 +35,7 @@ export const CARD_H_MM = CARD_H_IN * MM_PER_IN;   // 88.9
    measured a correct A4 all the way through and the paper was never A4.
 
    It is also the sheet on which the owner's measured template closes:
-     across  14.55 + 88.9 + 9 + 88.9 + 14.55 = 215.9  (Letter, exactly)
+     across  12.55 + 88.9 + 13 + 88.9 + 12.55 = 215.9  (Letter, exactly)
      down    6.5 + 4(63.5) + 3(3) + 11  = 280.5  (Letter is 279.4)
    Those same margins need 215.8 mm of a 210 mm A4, which is why they could
    never be honoured there.                                                 */
@@ -64,10 +64,17 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
    CELL is never one of them: it is always a true 2.5 x 3.5" card, because a
    cell that is not a card cuts cards that are the wrong size.               */
 export const DEF_MARGIN_X_MM = 14;    // A and C — sheet edge to the first cut line
-export const DEF_GUTTER_X_MM = 9;     // B — between the columns
+/* B — between the columns. 13, not 9: the owner asked for A and C each 2 mm
+   tighter, and with the card size fixed the only place those 4 mm can go is
+   between the columns. Centred on Letter that lands A = C = 12.55 exactly. */
+export const DEF_GUTTER_X_MM = 13;
 /** D — head margin. Only used when `centre` is off. */
 export const DEF_MARGIN_TOP_MM = 6.5;
 export const DEF_GUTTER_Y_MM = 3;     // E/F/G — between the rows
+/** Nudge off centre. +x right (C shrinks, A grows), +y down. Zero by default —
+ *  the shop wants A and C equal, which is what centring gives. */
+export const DEF_SHIFT_X_MM = 0;
+export const DEF_SHIFT_Y_MM = 0;
 
 /** The cell IS the card, laid sideways. Never derived, never adjusted to make a
  *  margin come out. */
@@ -82,6 +89,13 @@ export interface DivinityCardTemplate {
   /** B. */       gutterXMm?: number;
   /** D. */       marginTopMm?: number;
   /** E/F/G. */   gutterYMm?: number;
+  /** Nudge the whole block after centring. +x moves it RIGHT, which shrinks C
+   *  and grows A by the same amount; +y moves it DOWN, shrinking the foot and
+   *  growing the head. There is only ONE degree of freedom per axis — A and C
+   *  must sum with the block to the sheet — so a nudge is the honest control:
+   *  asking for "C smaller by 4" IS asking for the block 4 mm to the right. */
+  shiftXMm?: number;
+  shiftYMm?: number;
   /** Centre the block on the sheet instead of pinning it by A and D. DEFAULT
    *  ON, and it is the default for a printing reason, not a tidiness one: a
    *  block pinned 6.5 mm off the head puts the top row inside the unprintable
@@ -122,8 +136,10 @@ export function fitDivinityCards(
   const blockH = ROWS * PLACED_H_MM + (ROWS - 1) * gY;
 
   const centre = t.centre !== false;
-  const mX = centre ? (spec.blockWMm - blockW) / 2 : (t.marginXMm ?? DEF_MARGIN_X_MM);
-  const mTop = centre ? (spec.hMm - blockH) / 2 : (t.marginTopMm ?? DEF_MARGIN_TOP_MM);
+  const baseX = centre ? (spec.blockWMm - blockW) / 2 : (t.marginXMm ?? DEF_MARGIN_X_MM);
+  const baseY = centre ? (spec.hMm - blockH) / 2 : (t.marginTopMm ?? DEF_MARGIN_TOP_MM);
+  const mX = baseX + (t.shiftXMm ?? DEF_SHIFT_X_MM);
+  const mTop = baseY + (t.shiftYMm ?? DEF_SHIFT_Y_MM);
   const mBot = spec.hMm - mTop - blockH;
 
   /** One block, offset by `originXMm` on the sheet. */

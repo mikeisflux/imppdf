@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import '@/lib/polyfills';
 import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, RAISED_METAL_DEFAULTS as RM, type ZineFormat } from '@/lib/imposition-toolkit/impose';
+import { fitDivinityCards, type DivinityCardSheet } from '@/lib/imposition-toolkit/fit/divinity-cards';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
 import { ImageFitModal } from './image-fit-modal';
@@ -2899,6 +2900,13 @@ const SHEET_LABEL: Record<string, string> = {
 const DOUBLED = new Set(['tabloid', 'a3']);
 
 function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
+  /* Live from the fit module so the panel can never quote a margin the engine
+     is not actually using — that is how it came to advertise an 89 x 63 cell. */
+  const FIT = fitDivinityCards((s.sheet ?? 'letter') as DivinityCardSheet, {
+    centre: s.centre !== false, marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
+    gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
+    shiftXMm: s.shiftXMm, shiftYMm: s.shiftYMm,
+  });
   const MM = 25.4 / 72;
   const src = pageSizes[Math.max(0, Math.min(pageSizes.length - 1, (s.page ?? 1) - 1))];
   const wMm = src ? src.wPt * MM : 0, hMm = src ? src.hPt * MM : 0;
@@ -2941,7 +2949,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         )}
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
           <span className="pe-label" style={{ flex: 1 }}>Column gutter<span className="pe-label-sm"> · B, mm</span></span>
-          <NumRaw value={s.gutterXMm ?? 9} onValue={(v) => up({ gutterXMm: v })} w={70} />
+          <NumRaw value={s.gutterXMm ?? 13} onValue={(v) => up({ gutterXMm: v })} w={70} />
         </div>
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
           <span className="pe-label" style={{ flex: 1 }}>Row gutter<span className="pe-label-sm"> · E / F / G, mm</span></span>
@@ -2950,6 +2958,18 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
           <span className="pe-label" style={{ flex: 1 }}>Bleed<span className="pe-label-sm"> · past the cut, mm</span></span>
           <NumRaw value={s.bleedMm ?? 1.5} onValue={(v) => up({ bleedMm: v })} w={70} />
+        </div>
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
+          <span className="pe-label" style={{ flex: 1 }}>Nudge right<span className="pe-label-sm"> · shrinks C, grows A</span></span>
+          <NumRaw value={s.shiftXMm ?? 0} onValue={(v) => up({ shiftXMm: v })} w={70} />
+        </div>
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+          <span className="pe-label" style={{ flex: 1 }}>Nudge down<span className="pe-label-sm"> · shrinks the foot</span></span>
+          <NumRaw value={s.shiftYMm ?? 0} onValue={(v) => up({ shiftYMm: v })} w={70} />
+        </div>
+        <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>
+          <div>Left <b>A {FIT.marginXMm.toFixed(2)}</b> · right <b>C {(FIT.sheetWMm - FIT.marginXMm - 2 * 88.9 - (s.gutterXMm ?? 13)).toFixed(2)}</b> mm</div>
+          <div>Head <b>D {FIT.marginTopMm.toFixed(2)}</b> · foot <b>H {FIT.marginBottomMm.toFixed(2)}</b> mm</div>
         </div>
       </Section>
 
