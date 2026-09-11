@@ -2991,11 +2991,13 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         )}
       </Section>
 
-      <Section label="// BACKS" help="Give the tool a second page and it emits a sheet of backs that registers with the fronts.">
-        {pageCount > 1 ? (
+      <Section label="// BACKS" help="A second sheet of backs that registers with the fronts. Page 2 is the back art when the file has one; otherwise page 1 is used so you can still see and set up the sheet.">
+        {true ? (
           <>
-            <Check icon="flip" label="Print backs from page 2"
-              sub="A second sheet, so you can duplex fronts to backs"
+            <Check icon="flip" label={pageCount > 1 ? 'Print backs from page 2' : 'Print backs from page 1'}
+              sub={pageCount > 1
+                ? 'A second sheet, so you can duplex fronts to backs'
+                : 'No second page in this file, so page 1 is standing in as the back'}
               checked={s.backs !== false} onChange={(v) => up({ backs: v })} />
             {s.backs !== false && (
               <>
@@ -3006,8 +3008,8 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
                 </div>
                 <div style={{ marginTop: 10 }}>
                   <Check icon="rotate" label="Spin backs 180°"
-                    sub="Turn this off if the backs come out upside down against their fronts"
-                    checked={s.spinBacks !== false} onChange={(v) => up({ spinBacks: v })} />
+                    sub="Tick this if the backs come out upside down against their fronts"
+                    checked={!!s.spinBacks} onChange={(v) => up({ spinBacks: v })} />
                 </div>
                 <div className="pe-note" style={{ marginTop: 8 }}>
                   <b>Portrait</b> art gets a quarter turn to lie across the cell, and then
@@ -3019,21 +3021,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               </>
             )}
           </>
-        ) : (
-          <div className="pe-note">
-            Single-sided right now. Upload a <b>two-page</b> file — front on page 1, back on
-            page 2 — and you&apos;ll get a second sheet of backs. The setting below is saved
-            either way, so you can set it before you load the back.
-          </div>
-        )}
-        {/* ALWAYS shown, even on a one-page upload. It used to live inside the
-            two-page branch, which meant the control the operator most needs to
-            set was invisible exactly when they were setting the job up. */}
-        {pageCount <= 1 && (
-          <div style={{ marginTop: 10 }}>
-            <Check icon="rotate" label="Spin backs 180°"
-              sub="Turn this off if the backs come out upside down against their fronts"
-              checked={s.spinBacks !== false} onChange={(v) => up({ spinBacks: v })} />
+        ) : null}
+        {pageCount === 1 && s.backs !== false && (
+          <div className="pe-note" style={{ marginTop: 8 }}>
+            This file has <b>one page</b>, so the back sheet is showing page 1. Upload a
+            <b> two-page</b> file — front on page 1, back on page 2 — for the real back.
           </div>
         )}
         <div className="pe-note" style={{ marginTop: 8 }}>

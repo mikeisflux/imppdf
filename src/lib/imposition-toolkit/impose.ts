@@ -4639,11 +4639,11 @@ export interface DivinityCardOptions {
   /** How the press turns the sheet over. 'long' = flipped about the vertical
    *  axis (Fiery's "open to left"); 'short' = about the horizontal axis. */
   flip?: 'long' | 'short';
-  /** Spin the back artwork a further 180 within its cell. Default ON: a stack
-   *  turned over by hand lands the opposite way from a perfecting press, which
-   *  is what the shop's own cut sheets show. It is a property of the operator's
-   *  workflow, not something the file can derive — so it is a switch, set by
-   *  cutting one sheet and looking at it. */
+  /** Spin the back artwork a further 180 within its cell. Default OFF: the
+   *  unspun turn is the one the press convention gives, so that is what a fresh
+   *  job gets. Which way a hand-turned stack of heavy card actually lands is a
+   *  property of the operator's workflow, not something the file can derive —
+   *  so it is a switch, set by cutting one sheet and looking at it. */
   spinBacks?: boolean;
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
@@ -4670,9 +4670,15 @@ export async function imposeDivinityCards(
   const frontPage = srcPages[frontIdx];
   if (!frontPage) return out.save();
 
+  /* The back is page 2 when there is one. When there ISN'T — a single-card
+     upload, which is how this tool is normally set up — it falls back to the
+     front's own page rather than suppressing the sheet. Suppressing it meant
+     the backs controls, SPIN BACKS included, had nothing to act on and appeared
+     broken exactly when the operator was setting the job up. A one-page file
+     now previews a real back sheet, and the panel says it is page 1. */
   const backIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.backPage ?? 2))) - 1;
-  const wantBacks = opts.backs !== false && srcPages.length > 1 && backIdx !== frontIdx;
-  const backPage = wantBacks ? srcPages[backIdx] : null;
+  const wantBacks = opts.backs !== false;
+  const backPage = wantBacks ? (srcPages[backIdx] ?? frontPage) : null;
 
   const embeds = await out.embedPages(backPage ? [frontPage, backPage] : [frontPage]);
   const front = embeds[0];
@@ -4689,9 +4695,13 @@ export async function imposeDivinityCards(
   const cellPortrait = fit.cells[0] ? fit.cells[0].hMm >= fit.cells[0].wMm : true;
   const needsTurn = (c: { width: number; height: number }) =>
     (c.height >= c.width) !== cellPortrait;
+  /* All four right angles, not just the two quarter turns. 180 has to be a real
+     case: without it, "spin the backs" could only ever swap +90 for -90, so a
+     back whose art was ALREADY the cell's way round had nothing to swap and the
+     switch silently did nothing. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const drawSheet = (pg: any, card: any, quarter: 0 | 90 | -90) => {
-    const turn = quarter !== 0;
+  const drawSheet = (pg: any, card: any, deg: 0 | 90 | 180 | 270) => {
+    const turn = deg === 90 || deg === 270;
     const artW = turn ? card.height : card.width;
     const artH = turn ? card.width : card.height;
     for (const c of fit.cells) {
@@ -4705,27 +4715,30 @@ export async function imposeDivinityCards(
       const w = card.width * scale, h = card.height * scale;
       pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(mm(c.xMm), mm(c.yMm), cw, ch), PL.clip(), PL.endPath());
       /* Rotating sweeps the box away from the placement point, so the anchor is
-         the corner it sweeps FROM: bottom-right at +90, top-left at -90. */
-      if (quarter === 90) pg.drawPage(card, { x: x + dw, y, width: w, height: h, rotate: degrees(90) });
-      else if (quarter === -90) pg.drawPage(card, { x, y: y + dh, width: w, height: h, rotate: degrees(-90) });
+         the corner it sweeps FROM: bottom-right at 90, top-left at 270, and the
+         far corner at 180. */
+      if (deg === 90) pg.drawPage(card, { x: x + dw, y, width: w, height: h, rotate: degrees(90) });
+      else if (deg === 270) pg.drawPage(card, { x, y: y + dh, width: w, height: h, rotate: degrees(-90) });
+      else if (deg === 180) pg.drawPage(card, { x: x + dw, y: y + dh, width: w, height: h, rotate: degrees(180) });
       else pg.drawPage(card, { x, y, width: dw, height: dh });
       pg.pushOperators(PL.popGraphicsState());
     }
   };
 
-  const frontTurn: 0 | 90 | -90 = needsTurn(front) ? 90 : 0;
+  const frontTurn: 0 | 90 | 180 | 270 = needsTurn(front) ? 90 : 0;
   const pages = [out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)])];
   drawSheet(pages[0], front, frontTurn);
 
   if (back) {
-    /* The flip picks a base turn, and SPIN BACKS (default on) takes the other
-       of the two quarter turns, which is exactly half a turn away. Get it wrong
-       and every back is upside down against its front, which only shows after
-       cutting — hence a switch rather than a guess. */
-    const spun = opts.spinBacks !== false;
-    const baseBack: 0 | 90 | -90 = (opts.flip ?? 'long') === 'long' ? -90 : 90;
-    const backTurn: 0 | 90 | -90 = needsTurn(back)
-      ? (spun ? (baseBack === 90 ? -90 : 90) : baseBack) : 0;
+    /* The flip picks the base orientation; SPIN BACKS then adds a literal half
+       turn on top of it. Adding 180 rather than swapping +90 for -90 is the
+       whole point: a back already lying the cell's way round needs no quarter
+       turn at all, and the old swap left it at 0 either way — so the switch did
+       nothing for exactly the artwork most likely to need it. */
+    const spun = opts.spinBacks === true;
+    const baseBack: 0 | 90 | 270 = needsTurn(back)
+      ? ((opts.flip ?? 'long') === 'long' ? 270 : 90) : 0;
+    const backTurn = ((baseBack + (spun ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
     const bp = out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)]);
     drawSheet(bp, back, backTurn);
     pages.push(bp);

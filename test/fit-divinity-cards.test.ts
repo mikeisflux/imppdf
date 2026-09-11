@@ -136,13 +136,13 @@ async function cardPdf() {
 }
 
 test('the sheets come out at real A4 and A3 sizes', async () => {
-  const a3 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet: 'a3' }));
+  const a3 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet: 'a3', backs: false }));
   assert.equal(a3.getPageCount(), 1);
   let { width, height } = a3.getPage(0).getSize();
   assert.ok(Math.abs(width - 420 * PT_PER_MM) < 0.5, `420 mm wide, got ${(width / PT_PER_MM).toFixed(2)}`);
   assert.ok(Math.abs(height - 297 * PT_PER_MM) < 0.5);
 
-  const a4 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet: 'a4' }));
+  const a4 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet: 'a4', backs: false }));
   ({ width, height } = a4.getPage(0).getSize());
   assert.ok(Math.abs(width - 210 * PT_PER_MM) < 0.5);
   assert.ok(Math.abs(height - 297 * PT_PER_MM) < 0.5);
@@ -173,16 +173,18 @@ async function turnsOnPage(bytes: Uint8Array, index: number) {
     try { text += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
     catch { text += Buffer.from(raw).toString('latin1'); }
   }
-  let ccw = 0, cw = 0;
+  let ccw = 0, cw = 0, half = 0;
   const NUM = '(-?[\\d.]+(?:e-?\\d+)?)';
   const re = new RegExp(`${NUM} ${NUM} ${NUM} ${NUM} ${NUM} ${NUM} cm`, 'g');
   for (const m of text.matchAll(re)) {
-    const a = Number(m[1]), b = Number(m[2]), c = Number(m[3]);
+    const a = Number(m[1]), b = Number(m[2]), c = Number(m[3]), d = Number(m[4]);
+    // 180 has a = d = -1 with b = c = 0; the quarter turns have a = 0.
+    if (Math.abs(a + 1) < 1e-6 && Math.abs(d + 1) < 1e-6) { half++; continue; }
     if (Math.abs(a) > 1e-6) continue;
     if (Math.abs(b - 1) < 1e-6 && Math.abs(c + 1) < 1e-6) ccw++;
     else if (Math.abs(b + 1) < 1e-6 && Math.abs(c - 1) < 1e-6) cw++;
   }
-  return { ccw, cw };
+  return { ccw, cw, half };
 }
 
 test('a second page becomes a sheet of backs', async () => {
@@ -193,17 +195,46 @@ test('a second page becomes a sheet of backs', async () => {
 
 test('portrait art IS turned, and SPIN BACKS picks the other turn', async () => {
   /* The two quarter turns are 180 apart, so the switch simply picks the other
-     one. Default ON — what the shop's own cut sheets showed. */
-  const on = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'long' });
-  const f = await turnsOnPage(on, 0), b = await turnsOnPage(on, 1);
+     one. Default OFF — a fresh job gets the press convention, and the operator
+     ticks the box only if a cut sheet shows the backs upside down. */
+  const off = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'long' });
+  const f = await turnsOnPage(off, 0), b = await turnsOnPage(off, 1);
   assert.equal(f.ccw, 8, 'eight fronts, all turned one way');
   assert.equal(f.cw, 0);
-  assert.deepEqual(b, f, 'spun: the backs match the fronts');
+  assert.equal(b.cw, 8, 'default: the backs take the opposite turn');
+  assert.equal(b.ccw, 0);
 
-  const off = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'long', spinBacks: false });
+  const on = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'long', spinBacks: true });
+  const ob = await turnsOnPage(on, 1);
+  assert.deepEqual(ob, f, 'spun: a real 180 — the backs now match the fronts');
+});
+
+/** A LANDSCAPE back — already the cell's way round, so it takes no quarter turn
+ *  at all. This is the case the old swap-the-quarter-turn implementation could
+ *  not touch: there was no quarter turn to swap, so the switch did nothing. */
+async function landscapeBackPdf() {
+  const d = await PDFDocument.create();
+  const w = CARD_W_MM * PT_PER_MM, h = CARD_H_MM * PT_PER_MM;
+  const front = d.addPage([w, h]);
+  front.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(0.15, 0.2, 0.55) });
+  const back = d.addPage([h, w]);                     // landscape
+  back.drawRectangle({ x: 0, y: 0, width: h, height: w, color: rgb(0.6, 0.15, 0.2) });
+  return d.save();
+}
+
+test('SPIN BACKS works even when the back needs no quarter turn', async () => {
+  /* The bug this exists for: spinning used to mean "take the other quarter
+     turn", which is a no-op when the art is already lying the cell's way round
+     — exactly the artwork most likely to need spinning. It now adds a literal
+     180 on top of whatever the base orientation is. */
+  const off = await imposeDivinityCards(await landscapeBackPdf(), { sheet: 'a4' });
   const ob = await turnsOnPage(off, 1);
-  assert.equal(ob.cw, 8, 'unspun is the other way — a real 180');
-  assert.equal(ob.ccw, 0);
+  assert.deepEqual(ob, { ccw: 0, cw: 0, half: 0 }, 'unspun: landscape back sits as-is');
+
+  const on = await imposeDivinityCards(await landscapeBackPdf(), { sheet: 'a4', spinBacks: true });
+  const nb = await turnsOnPage(on, 1);
+  assert.equal(nb.half, 8, 'spun: eight real 180s — the cards face the other way');
+  assert.equal(nb.ccw + nb.cw, 0, 'and no quarter turns');
 });
 
 test('the flip still picks the base turn that spinning inverts', async () => {
@@ -213,9 +244,19 @@ test('the flip still picks the base turn that spinning inverts', async () => {
   assert.ok((lb.ccw > 0) !== (sb.ccw > 0), 'long and short land opposite ways');
 });
 
-test('backs can be turned off, and a one-page file makes one sheet', async () => {
+test('backs can be turned off; a one-page file still previews a back sheet', async () => {
+  /* Turning backs OFF is the only thing that suppresses the second sheet. A
+     one-page file used to suppress it too, which left the backs controls —
+     SPIN BACKS among them — with nothing to act on, so they looked broken
+     exactly when the job was being set up. Page 1 now stands in as the back. */
   const off = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', backs: false });
   assert.equal((await PDFDocument.load(off)).getPageCount(), 1, 'suppressed');
+
   const single = await imposeDivinityCards(await cardPdf(), { sheet: 'a4' });
-  assert.equal((await PDFDocument.load(single)).getPageCount(), 1, 'nothing to back with');
+  assert.equal((await PDFDocument.load(single)).getPageCount(), 2, 'front sheet + a stand-in back');
+
+  // And the stand-in back still answers to the spin, which is the whole point.
+  const spun = await imposeDivinityCards(await cardPdf(), { sheet: 'a4', spinBacks: true });
+  const b = await turnsOnPage(spun, 1), u = await turnsOnPage(single, 1);
+  assert.ok((b.ccw > 0) !== (u.ccw > 0), 'spinning a stand-in back really turns it');
 });
