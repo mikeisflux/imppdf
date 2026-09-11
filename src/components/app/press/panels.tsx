@@ -2893,6 +2893,8 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
  * The geometry is FIXED (fit/divinity-cards.ts), so this panel is mostly a
  * statement of what you are going to get rather than a set of dials. The one
  * real decision is which sheet. */
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
 const SHEET_LABEL: Record<string, string> = {
   letter: '215.9 × 279.4 mm (8.5 × 11")', tabloid: '431.8 × 279.4 mm (11 × 17")',
   a4: '210 × 297 mm (A4)', a3: '420 × 297 mm (A3)',
@@ -2939,17 +2941,27 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
             <NumRaw value={(s[key] as number) ?? def} onValue={(v) => up({ [key]: v })} w={70} />
           </div>
         ))}
+        {/* C and H are the other end of the same two spans, so setting one is
+            just setting the block's position from the far edge instead of the
+            near one. Written back through A and D so the arithmetic can never
+            disagree with itself. */}
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+          <span className="pe-label" style={{ flex: 1 }}>C<span className="pe-label-sm"> · card to right edge</span></span>
+          <NumRaw value={round2(FIT.marginRightMm)}
+            onValue={(v) => up({ marginXMm: round2(FIT.sheetWMm - FIT.blockWMm - v) })} w={70} />
+        </div>
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+          <span className="pe-label" style={{ flex: 1 }}>H<span className="pe-label-sm"> · row 4 to foot</span></span>
+          <NumRaw value={round2(FIT.marginBottomMm)}
+            onValue={(v) => up({ marginTopMm: round2(FIT.sheetHMm - FIT.blockHMm - v) })} w={70} />
+        </div>
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 14 }}>
           <span className="pe-label" style={{ flex: 1 }}>Bleed<span className="pe-label-sm"> · art past the cut</span></span>
           <NumRaw value={s.bleedMm ?? 1.5} onValue={(v) => up({ bleedMm: v })} w={70} />
         </div>
-        <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.8 }}>
-          <div>C · card to right edge <b>{FIT.marginRightMm.toFixed(2)} mm</b></div>
-          <div>H · row 4 to foot <b>{FIT.marginBottomMm.toFixed(2)} mm</b></div>
-          <div style={{ marginTop: 4 }}>
-            C and H are <b>what is left</b> — A, the two cards and C have to add up to the
-            sheet, so only one of them can be set. Change A or B and C moves.
-          </div>
+        <div className="pe-note" style={{ marginTop: 12 }}>
+          Set <b>C</b> or <b>H</b> and the block slides to suit — <b>A</b> and <b>D</b> take up
+          the difference, because A, the cards and C have to add up to the sheet.
         </div>
       </Section>
 

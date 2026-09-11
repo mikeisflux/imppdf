@@ -94,6 +94,9 @@ export interface DivinityCardFit {
   n: number;
   /** A and D as set; H (marginBottomMm) and C (marginRightMm) as they fall out. */
   marginXMm: number; marginTopMm: number; marginBottomMm: number; marginRightMm: number;
+  /** The block itself — the cards plus the gutters between them. Reported so a
+   *  caller can work back from C or H to A or D without restating the sums. */
+  blockWMm: number; blockHMm: number;
   /** Where an A3 is cut into two A4s, as an x DOWN the sheet. Empty for a plain
    *  A4. The blocks sit side by side, so the cut is vertical. */
   cutXMm: number[];
@@ -141,7 +144,7 @@ export function fitDivinityCards(
       : blockCells(0),
     n: (spec.doubled ? 2 : 1) * COLS * ROWS,
     marginXMm: mX, marginTopMm: mTop, marginBottomMm: mBot,
-    marginRightMm: spec.blockWMm - mX - blockW,
+    marginRightMm: spec.blockWMm - mX - blockW, blockWMm: blockW, blockHMm: blockH,
     cutXMm: spec.doubled ? [spec.blockWMm] : [],
   };
 }
