@@ -1,14 +1,14 @@
-/* Divinity trading card DECK — a whole deck out of one file, ganged on an A4
- * fed long edge first, backs as a SEPARATE PASS.
+/* Divinity trading card DECK — a whole deck out of one file, ganged on portrait
+ * A4 sheets, backs as a SEPARATE PASS.
  *
  *   card  63.5 x 88.9 mm (2.5 x 3.5"), 3 mm gutter
- *   sheet 297 x 210 — A4 the long way, and that does not change
+ *   sheet 210 x 297 — a plain PORTRAIT A4
  *
- *   UPRIGHT (default)  63.5 x 88.9   4 across x 2 down = 8   margins 17.00 / 14.60
- *   TURNED             88.9 x 63.5   3 across x 3 down = 9   margins 12.15 /  6.75
+ *   ACROSS (default)  88.9 x 63.5   2 across x 4 down = 8   margins 14.60 / 17.00
+ *   UPRIGHT           63.5 x 88.9   3 across x 3 down = 9   margins  6.75 / 12.15
  *
- * Turned fits one more, but hands the guillotine its cards a quarter turn from
- * how the shop cuts them, so upright is the default and the ninth card is not
+ * Upright fits one more, but hands the guillotine its cards a quarter turn from
+ * how the shop cuts them, so across is the default and the ninth card is not
  * taken. That trade is the point of the tool, so both layouts are asserted.
  *
  * The other thing a wrong build costs is a backs pass that does not land on its
@@ -35,76 +35,74 @@ test('standard 2.5 x 3.5in card, 3 mm gutter', () => {
   assert.equal(GUTTER_MM, 3, "the shop's cutting allowance");
 });
 
-test('the sheet is A4 fed LONG EDGE FIRST — 297 x 210, not 210 x 297', () => {
-  /* Not a cosmetic choice: heavy card stock run short-edge-first wears a band
-     across the fuser, and that band then shows on 11x17 work afterwards. It is
-     also NOT what the orientation option changes — that is the card, not the
-     paper. */
-  assert.equal(SHEET_W_MM, 297);
-  assert.equal(SHEET_H_MM, 210);
+test('the sheet is a plain PORTRAIT A4 — 210 x 297', () => {
+  /* The orientation option turns the CARD, never the paper. Which edge goes
+     into the tray first is a printer setting, not a page box. */
+  assert.equal(SHEET_W_MM, 210);
+  assert.equal(SHEET_H_MM, 297);
 });
 
-test('UPRIGHT is the default — the way round the cutter takes them', () => {
-  assert.equal(DEFAULT_ORIENT, 'upright');
+test('ACROSS is the default — the way round the cutter takes them', () => {
+  assert.equal(DEFAULT_ORIENT, 'turned');
   const L = deckLayout();
-  assert.equal(L.orient, 'upright');
-  assert.ok(close(L.placedWMm, CARD_W_MM), 'placed upright — no quarter turn');
-  assert.ok(close(L.placedHMm, CARD_H_MM));
-  assert.equal(L.cols, 4);
-  assert.equal(L.rows, 2);
+  assert.equal(L.orient, 'turned');
+  assert.ok(close(L.placedWMm, CARD_H_MM), 'placed across — long edge runs left to right');
+  assert.ok(close(L.placedHMm, CARD_W_MM));
+  assert.equal(L.cols, 2);
+  assert.equal(L.rows, 4);
   assert.equal(L.perSheet, 8);
   assert.equal(L.cells.length, 8);
 });
 
 test('the fit is worked, not hard-coded — all four ways round', () => {
   /* The project rule. Both sheet orientations, both card orientations. Note the
-     two nines are the SAME physical arrangement: a portrait A4 laid out 3 x 3
-     upright is this sheet rotated, and its cards come off lying down too. So
-     there is no 9-up-and-upright to be had — 8 is what upright costs. */
+     two eights are the SAME physical sheet: eight across on a portrait A4 is
+     eight upright on a landscape one, turned a quarter turn with the paper. We
+     describe it portrait because that is how the shop wants to see and cut it. */
   const fits = (sw: number, sh: number, w: number, h: number) =>
     Math.floor((sw + GUTTER_MM) / (w + GUTTER_MM)) * Math.floor((sh + GUTTER_MM) / (h + GUTTER_MM));
-  assert.equal(fits(210, 297, 63.5, 88.9), 9, 'portrait sheet, upright card');
-  assert.equal(fits(210, 297, 88.9, 63.5), 8, 'portrait sheet, turned card');
-  assert.equal(fits(297, 210, 63.5, 88.9), 8, 'landscape sheet, upright card — what we use');
-  assert.equal(fits(297, 210, 88.9, 63.5), 9, 'landscape sheet, turned card');
+  assert.equal(fits(210, 297, 88.9, 63.5), 8, 'portrait sheet, card across — what we use');
+  assert.equal(fits(210, 297, 63.5, 88.9), 9, 'portrait sheet, card upright');
+  assert.equal(fits(297, 210, 63.5, 88.9), 8, 'landscape sheet, card upright — the same sheet');
+  assert.equal(fits(297, 210, 88.9, 63.5), 9, 'landscape sheet, card across');
 
   // And the layout agrees with the arithmetic rather than restating a number.
-  assert.equal(deckLayout('upright').perSheet, fits(297, 210, 63.5, 88.9));
-  assert.equal(deckLayout('turned').perSheet, fits(297, 210, 88.9, 63.5));
+  assert.equal(deckLayout('turned').perSheet, fits(210, 297, 88.9, 63.5));
+  assert.equal(deckLayout('upright').perSheet, fits(210, 297, 63.5, 88.9));
 });
 
-test('turned is still available, at 9-up on the same sheet', () => {
-  const L = deckLayout('turned');
-  assert.ok(close(L.placedWMm, CARD_H_MM), 'turned: the long edge runs across');
-  assert.ok(close(L.placedHMm, CARD_W_MM));
+test('upright is still available, at 9-up on the same sheet', () => {
+  const L = deckLayout('upright');
+  assert.ok(close(L.placedWMm, CARD_W_MM), 'upright: the short edge runs across');
+  assert.ok(close(L.placedHMm, CARD_H_MM));
   assert.equal(L.cols, 3);
   assert.equal(L.rows, 3);
   assert.equal(L.perSheet, 9);
 });
 
-test('upright grid is centred 17.00 / 14.60, on a 66.5 x 91.9 pitch', () => {
-  const L = deckLayout('upright');
-  assert.ok(close(L.marginXMm, 17), `(297 - (4*63.5 + 3*3)) / 2, got ${L.marginXMm}`);
-  assert.ok(close(L.marginYMm, 14.6), `(210 - (2*88.9 + 3)) / 2, got ${L.marginYMm}`);
+test('across grid is centred 14.60 / 17.00, on a 91.9 x 66.5 pitch', () => {
+  const L = deckLayout('turned');
+  assert.ok(close(L.marginXMm, 14.6), `(210 - (2*88.9 + 3)) / 2, got ${L.marginXMm}`);
+  assert.ok(close(L.marginYMm, 17), `(297 - (4*63.5 + 3*3)) / 2, got ${L.marginYMm}`);
 
   const xs = [...new Set(L.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(L.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  assert.equal(xs.length, 4, 'four columns');
-  assert.equal(ys.length, 2, 'two rows');
-  for (let i = 1; i < xs.length; i++) {
-    assert.ok(close(xs[i]! - xs[i - 1]!, 66.5), `column pitch 63.5 + 3, got ${xs[i]! - xs[i - 1]!}`);
+  assert.equal(xs.length, 2, 'two columns');
+  assert.equal(ys.length, 4, 'four rows');
+  assert.ok(close(xs[1]! - xs[0]!, 91.9), `column pitch 88.9 + 3, got ${xs[1]! - xs[0]!}`);
+  for (let i = 1; i < ys.length; i++) {
+    assert.ok(close(ys[i - 1]! - ys[i]!, 66.5), `row pitch 63.5 + 3, got ${ys[i - 1]! - ys[i]!}`);
   }
-  assert.ok(close(ys[0]! - ys[1]!, 91.9), `row pitch 88.9 + 3, got ${ys[0]! - ys[1]!}`);
 });
 
-test('turned grid is centred 12.15 / 6.75, on a 91.9 x 66.5 pitch', () => {
-  const L = deckLayout('turned');
-  assert.ok(close(L.marginXMm, 12.15), `(297 - (3*88.9 + 2*3)) / 2, got ${L.marginXMm}`);
-  assert.ok(close(L.marginYMm, 6.75), `(210 - (3*63.5 + 2*3)) / 2, got ${L.marginYMm}`);
+test('upright grid is centred 6.75 / 12.15, on a 66.5 x 91.9 pitch', () => {
+  const L = deckLayout('upright');
+  assert.ok(close(L.marginXMm, 6.75), `(210 - (3*63.5 + 2*3)) / 2, got ${L.marginXMm}`);
+  assert.ok(close(L.marginYMm, 12.15), `(297 - (3*88.9 + 2*3)) / 2, got ${L.marginYMm}`);
   const xs = [...new Set(L.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(L.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  for (let i = 1; i < xs.length; i++) assert.ok(close(xs[i]! - xs[i - 1]!, 91.9));
-  for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66.5));
+  for (let i = 1; i < xs.length; i++) assert.ok(close(xs[i]! - xs[i - 1]!, 66.5));
+  for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 91.9));
 });
 
 test('every cell is inside the sheet and none overlaps another, either way', () => {
@@ -165,9 +163,9 @@ test('sheet arithmetic: 172 cards is 22 sheets with 4 cells spare', () => {
   assert.equal(cardsOnSheet(0, 172, perSheet), 8);
   assert.equal(cardsOnSheet(21, 172, perSheet), 4, '172 - 21*8');
   assert.equal(cardsOnSheet(22, 172, perSheet), 0, 'past the end');
-  // Turned would save two sheets. That is the whole cost of cutting the right
+  // Upright would save two sheets. That is the whole cost of cutting the right
   // way round, stated here so it can't quietly grow.
-  assert.equal(deckSheets(172, deckLayout('turned').perSheet), 20);
+  assert.equal(deckSheets(172, deckLayout('upright').perSheet), 20);
 });
 
 test('cards fall SEQUENTIALLY, not cut-and-stack', () => {
@@ -198,9 +196,9 @@ async function deckPdf(cards: number) {
 test('172 cards + a back: 22 front sheets then 22 back sheets', async () => {
   const { bytes, report } = await imposeDivinityDeck(await deckPdf(172));
   assert.equal(report.cards, 172);
-  assert.equal(report.orient, 'upright', 'the default');
-  assert.equal(report.cols, 4);
-  assert.equal(report.rows, 2);
+  assert.equal(report.orient, 'turned', 'the default — cards lying across');
+  assert.equal(report.cols, 2);
+  assert.equal(report.rows, 4);
   assert.equal(report.perSheet, 8);
   assert.equal(report.sheets, 22);
   assert.equal(report.blanksOnLastSheet, 4, '22*8 - 172');
@@ -209,9 +207,9 @@ test('172 cards + a back: 22 front sheets then 22 back sheets', async () => {
   assert.equal((await PDFDocument.load(bytes)).getPageCount(), 44);
 });
 
-test('turned still builds the 20-sheet job it always did', async () => {
-  const { report } = await imposeDivinityDeck(await deckPdf(172), { orient: 'turned' });
-  assert.equal(report.orient, 'turned');
+test('upright builds the tighter 20-sheet job when asked', async () => {
+  const { report } = await imposeDivinityDeck(await deckPdf(172), { orient: 'upright' });
+  assert.equal(report.orient, 'upright');
   assert.equal(report.perSheet, 9);
   assert.equal(report.sheets, 20);
   assert.equal(report.blanksOnLastSheet, 8);
@@ -219,16 +217,18 @@ test('turned still builds the 20-sheet job it always did', async () => {
   assert.equal(report.totalPages, 40);
 });
 
-test('every output page is an A4 lying down — 297 x 210 mm, both ways round', async () => {
+test('every output page is a portrait A4 — 210 x 297 mm, both ways round', async () => {
+  /* The card orientation must never leak into the PAGE size: whichever way the
+     cards lie, the paper is the same portrait A4. */
   for (const orient of ['upright', 'turned'] as const) {
     const { bytes } = await imposeDivinityDeck(await deckPdf(12), { orient });
     const doc = await PDFDocument.load(bytes);
     for (let i = 0; i < doc.getPageCount(); i++) {
       const { width, height } = doc.getPage(i).getSize();
-      assert.ok(Math.abs(width - 297 * PT_PER_MM) < 0.5,
-        `${orient} page ${i + 1}: 297 mm wide, got ${(width / PT_PER_MM).toFixed(2)}`);
-      assert.ok(Math.abs(height - 210 * PT_PER_MM) < 0.5,
-        `${orient} page ${i + 1}: 210 mm tall, got ${(height / PT_PER_MM).toFixed(2)}`);
+      assert.ok(Math.abs(width - 210 * PT_PER_MM) < 0.5,
+        `${orient} page ${i + 1}: 210 mm wide, got ${(width / PT_PER_MM).toFixed(2)}`);
+      assert.ok(Math.abs(height - 297 * PT_PER_MM) < 0.5,
+        `${orient} page ${i + 1}: 297 mm tall, got ${(height / PT_PER_MM).toFixed(2)}`);
     }
   }
 });
@@ -296,30 +296,27 @@ async function turnsOnPage(bytes: Uint8Array, index: number) {
   return { ccw, cw };
 }
 
+test('across: art is quartered, and the backs go the other way on a long flip', async () => {
+  /* A card lying across has its "up" along the axis a long-edge flip reverses,
+     so the back has to be turned the opposite way to come out upright against
+     its front. A short-edge flip leaves that axis alone. */
+  const long = await imposeDivinityDeck(await deckPdf(8), { flip: 'long' });
+  const lf = await turnsOnPage(long.bytes, 0), lb = await turnsOnPage(long.bytes, 1);
+  assert.equal(lf.ccw + lf.cw, 8, 'eight cards, each turned');
+  assert.equal(lb.ccw + lb.cw, 8, 'eight backs, each turned');
+  assert.ok((lf.ccw > 0) !== (lb.ccw > 0), 'and the backs turn the OTHER way');
+
+  const short = await imposeDivinityDeck(await deckPdf(8), { flip: 'short' });
+  const sf = await turnsOnPage(short.bytes, 0), sb = await turnsOnPage(short.bytes, 1);
+  assert.deepEqual(sf, sb, 'short-edge flip: fronts and backs turn the same way');
+});
+
 test('upright: portrait art is NOT turned, on fronts or backs, under either flip', async () => {
-  /* The quiet win of cutting the right way round. Upright art in an upright
-     cell needs no quarter turn, so there is nothing for the backs pass to get
-     wrong however the stack goes back in. */
   for (const flip of ['long', 'short'] as const) {
-    const { bytes } = await imposeDivinityDeck(await deckPdf(8), { flip });
+    const { bytes } = await imposeDivinityDeck(await deckPdf(9), { orient: 'upright', flip });
     assert.deepEqual(await turnsOnPage(bytes, 0), { ccw: 0, cw: 0 }, `${flip}: fronts untouched`);
     assert.deepEqual(await turnsOnPage(bytes, 1), { ccw: 0, cw: 0 }, `${flip}: backs untouched`);
   }
-});
-
-test('turned: art is quartered, and the backs go the other way on a long flip', async () => {
-  /* A card lying on its side has its "up" along the axis a long-edge flip
-     reverses, so the back has to be turned the opposite way to come out upright
-     against its front. A short-edge flip leaves that axis alone. */
-  const long = await imposeDivinityDeck(await deckPdf(9), { orient: 'turned', flip: 'long' });
-  const lf = await turnsOnPage(long.bytes, 0), lb = await turnsOnPage(long.bytes, 1);
-  assert.equal(lf.ccw + lf.cw, 9, 'nine cards, each turned');
-  assert.equal(lb.ccw + lb.cw, 9, 'nine backs, each turned');
-  assert.ok((lf.ccw > 0) !== (lb.ccw > 0), 'and the backs turn the OTHER way');
-
-  const short = await imposeDivinityDeck(await deckPdf(9), { orient: 'turned', flip: 'short' });
-  const sf = await turnsOnPage(short.bytes, 0), sb = await turnsOnPage(short.bytes, 1);
-  assert.deepEqual(sf, sb, 'short-edge flip: fronts and backs turn the same way');
 });
 
 test('the short last sheet gets no ink in its empty cells, front or back', async () => {

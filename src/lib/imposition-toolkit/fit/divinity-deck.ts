@@ -1,30 +1,21 @@
 /* Divinity trading card DECK — a whole deck from one multi-page PDF, ganged on
- * A4 sheets fed LONG EDGE FIRST.
+ * A4 sheets.
  *
- * WHY LANDSCAPE. The shop feeds A4 long-edge-first through the bypass tray, on
- * purpose: running heavy card stock short-edge-first wears a band across the
- * fuser, and that band then shows up on 11x17 work afterwards. So the PAGE is
- * described 297 x 210 — the same sheet of paper, fed the other way. That is not
- * negotiable and is not what the orientation option below changes.
+ * THE SHEET IS PORTRAIT and the card LIES ACROSS it. Owner requirement, both
+ * halves of it. On a portrait A4 that is the eight-up arrangement:
  *
- * HOW THE CARD SITS ON IT. Two ways, and the shop's guillotine has an opinion:
+ *   210 x 297 sheet, 3 mm gutter
+ *     ACROSS (default)  88.9 x 63.5   2 across x 4 down = 8   margins 14.60 / 17.00
+ *     UPRIGHT           63.5 x 88.9   3 across x 3 down = 9   margins  6.75 / 12.15
  *
- *   UPRIGHT  63.5 x 88.9   4 across x 2 down = 8    margins 17.00 / 14.60
- *   TURNED   88.9 x 63.5   3 across x 3 down = 9    margins 12.15 /  6.75
+ * Nine is available and is NOT taken: the shop's guillotine cuts eight off an
+ * A4, and it cuts them lying across. Eight is the requirement; the ninth card is
+ * the trap. Both counts are asserted so neither can quietly change.
  *
- * Turned fits one more per sheet — 20 sheets for a 172-card deck against 22 —
- * but it hands the cutter its cards the wrong way round, so UPRIGHT is the
- * default. The extra sheet every ninth card is the price of cutting the way the
- * shop actually cuts, and it is the cheaper of the two mistakes.
- *
- * There is no third option: 9-up with the card upright does not exist on a
- * landscape A4. A portrait A4 laid out 3 x 3 upright is the SAME physical sheet
- * rotated, so the cards come off it lying down again — the geometry does not
- * care which way the page happens to be described.
- *
- * Upright has a second, quieter advantage: portrait artwork in a portrait cell
- * needs no quarter turn at all, so there is nothing for the backs pass to get
- * wrong whichever way the stack is turned over.
+ * Note eight-across-on-portrait is the same physical sheet as eight-upright-on-
+ * landscape — turn one a quarter turn and you have the other. The page box is
+ * described the way the shop wants to see and cut it; which edge goes into the
+ * printer first is a tray setting, not something a page box decides.
  *
  * Counts are WORKED here, never hard-coded, so a size change can't leave a
  * stale number behind. Asserted in test/fit-divinity-deck.test.ts.          */
@@ -38,12 +29,13 @@ export const CARD_H_MM = 3.5 * MM_PER_IN;    // 88.9
 
 export const GUTTER_MM = 3;
 
-/** A4 fed long edge first. Same paper as 210 x 297, described the other way. */
-export const SHEET_W_MM = 297, SHEET_H_MM = 210;
+/** A4 PORTRAIT — the sheet as the shop wants to see and cut it. */
+export const SHEET_W_MM = 210, SHEET_H_MM = 297;
 
-/** How the card sits on the sheet. 'upright' is what the shop's cutter wants. */
+/** How the card sits on the sheet. 'turned' lies it ACROSS the portrait sheet,
+ *  which is the 8-up the cutter wants; 'upright' is the 9-up that is not. */
 export type DeckOrient = 'upright' | 'turned';
-export const DEFAULT_ORIENT: DeckOrient = 'upright';
+export const DEFAULT_ORIENT: DeckOrient = 'turned';
 
 export interface DeckCellMm { xMm: number; yMm: number; wMm: number; hMm: number; }
 

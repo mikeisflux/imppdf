@@ -4606,14 +4606,10 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
    ganged onto as many A4 sheets as the deck needs. 172 cards comes out at 20
    sheets, nine to a sheet.
 
-   FED LONG EDGE FIRST, so the page is 297 x 210. That is the shop's deliberate
-   choice: heavy card stock run short-edge-first wears a band across the fuser,
-   and the band then shows on 11x17 work afterwards. Geometry, and the fit
-   arithmetic, live in fit/divinity-deck.ts.
-
-   The card sits UPRIGHT by default — 4 across x 2 down = 8 — because that is
-   the way round the shop's guillotine cuts. Turning it fits nine, but hands the
-   cutter its cards sideways, so the ninth card costs a sheet and is opt-in.
+   The sheet is a PORTRAIT A4, 210 x 297, and the card LIES ACROSS it: 2 across
+   x 4 down = 8, which is what the shop's guillotine takes off one A4. Nine is
+   available (the card standing upright, 3 x 3) and is deliberately not taken.
+   Geometry and the fit arithmetic live in fit/divinity-deck.ts.
 
    NO DUPLEX. The printer will not turn stock this thick, so the backs are a
    SEPARATE PASS: all the fronts first, then all the backs, grouped rather than
@@ -4629,8 +4625,8 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
 import type { DeckCellMm, DeckOrient } from './fit/divinity-deck.ts';
 
 export interface DivinityDeckOptions {
-  /** How the card sits on the sheet. 'upright' (default) is 8-up and is the way
-   *  round the cutter wants; 'turned' is 9-up lying on its side. */
+  /** How the card sits on the sheet. 'turned' (default) lies it ACROSS the
+   *  portrait sheet for the 8-up the cutter wants; 'upright' is the 9-up. */
   orient?: DeckOrient;
   /** 1-based page holding the shared card back. Defaults to the LAST page. */
   backPage?: number;
@@ -4672,7 +4668,7 @@ export async function imposeDivinityDeck(
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();
   const pages = src.getPages();
-  const L = F.deckLayout(opts.orient === 'turned' ? 'turned' : F.DEFAULT_ORIENT);
+  const L = F.deckLayout(opts.orient === 'upright' ? 'upright' : F.DEFAULT_ORIENT);
   const empty: DivinityDeckReport = {
     cards: 0, sheets: 0, perSheet: L.perSheet, orient: L.orient, cols: L.cols, rows: L.rows,
     blanksOnLastSheet: 0, backsStartPage: null, totalPages: 0,
@@ -4693,8 +4689,8 @@ export async function imposeDivinityDeck(
 
   /* Judged by comparing the artwork's aspect with the CELL's rather than
      testing for portrait — a hard-coded orientation is what goes stale when a
-     size changes. With the card upright the cell is portrait like the art, so
-     nothing is turned and the flip has nothing left to get wrong. */
+     size changes. Portrait art in an across cell gets a quarter turn; in an
+     upright cell it gets none. */
   const cellPortrait = L.placedHMm >= L.placedWMm;
   const needsTurn = (c: { width: number; height: number }) =>
     (c.height >= c.width) !== cellPortrait;
@@ -4803,14 +4799,13 @@ export async function imposeDivinityDeck(
    A standard 2.5 x 3.5" trading card, nine to an A4, with the A4 block doubled
    onto an A3 so one sheet yields eighteen and cuts in half into two A4s.
 
-   EIGHT to an A4, not nine. The shop's guillotine cuts eight from an A4 and the
-   sheet feeds LONG EDGE FIRST, so the block is described 297 x 210 and holds
-   4 across x 2 down — the same arrangement Divinity Trading Card Deck uses, so
-   both tools come off the cutter identically. The A3 is that block STACKED
-   (297 x 420), cut across at 210 into two A4s that each stand on their own.
+   EIGHT to an A4, not nine. The sheet is a PORTRAIT A4 and the card LIES ACROSS
+   it, 2 across x 4 down — what the shop's guillotine takes off one A4, and the
+   same arrangement Divinity Trading Card Deck uses, so both tools cut
+   identically. The A3 is that block side by side (420 x 297), cut down at 210
+   into two A4s that each stand on their own.
 
-   The card stands UPRIGHT, so portrait artwork needs no turn at all. Geometry,
-   and the fit arithmetic, live in fit/divinity-cards.ts. */
+   Geometry and the fit arithmetic live in fit/divinity-cards.ts. */
 
 export interface DivinityCardOptions {
   /** 'a3' (default) is the doubled sheet; 'a4' is a single block of eight. */
@@ -4821,7 +4816,7 @@ export interface DivinityCardOptions {
      that registers with the fronts. Defaults to page 2 when the file has one.
 
      The card POSITIONS need nothing done to them: the grid is symmetric about
-     both sheet axes (17 / 17 across, 14.6 / 14.6 down), so every card has a
+     both sheet axes (14.6 / 14.6 across, 17 / 17 down), so every card has a
      partner at the mirrored position and the sheet backs up under either flip.
      Asserted in test/fit-divinity-cards.test.ts, because it is the property the
      whole duplex story rests on.
@@ -4873,8 +4868,8 @@ export async function imposeDivinityCards(
   const back = backPage ? embeds[1] : null;
 
   /* Turn the artwork a quarter turn only when its orientation DISAGREES with
-     the cell's. The cell is portrait now (a 2.5 x 3.5 card stands upright), so
-     portrait art needs nothing doing to it and landscape art gets turned.
+     the cell's. The cell lies across now, so PORTRAIT art gets the quarter turn
+     and landscape art (already the cell's way round) is left alone.
      Compared aspect-to-aspect rather than against a hard-coded orientation —
      hard-coding "turn if portrait" is exactly what went stale when the card
      size changed, and this cannot go stale the same way. A square-ish card is
@@ -4940,10 +4935,9 @@ export async function imposeDivinityCards(
     const sheetH = mm(fit.sheetHMm), sheetW = mm(fit.sheetWMm);
     for (const x of xs) { line(x, 0, x, len); line(x, sheetH, x, sheetH - len); }
     for (const y of ys) { line(0, y, len, y); line(sheetW, y, sheetW - len, y); }
-    /* The half-sheet cut on an A3, marked at both sides so it cannot be missed.
-       The two A4 blocks STACK, so this cut runs across the sheet, not down it. */
-    for (const cy of fit.cutYMm) {
-      line(0, mm(cy), len + off, mm(cy)); line(sheetW, mm(cy), sheetW - len - off, mm(cy));
+    // The half-sheet cut on an A3, marked top and bottom so it cannot be missed.
+    for (const cx of fit.cutXMm) {
+      line(mm(cx), 0, mm(cx), len + off); line(mm(cx), sheetH, mm(cx), sheetH - len - off);
     }
   }
 

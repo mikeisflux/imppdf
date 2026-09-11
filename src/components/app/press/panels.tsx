@@ -2934,10 +2934,11 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
  * computed here from the page count rather than waiting for the export. */
 function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
   const MM = 25.4 / 72;
-  /* Kept in step with fit/divinity-deck.ts: upright 4 x 2, turned 3 x 3 on the
-     same 297 x 210 sheet. Worked there, restated here only to label the chips. */
-  const turned = s.orient === 'turned';
-  const COLS = turned ? 3 : 4, ROWS = turned ? 3 : 2;
+  /* Kept in step with fit/divinity-deck.ts: on the 210 x 297 portrait sheet the
+     card lying across gives 2 x 4 and standing upright gives 3 x 3. Worked
+     there, restated here only to label the chips. */
+  const across = s.orient !== 'upright';
+  const COLS = across ? 2 : 3, ROWS = across ? 4 : 3;
   const PER_SHEET = COLS * ROWS;
   // Same rule as the engine: the named back page, or the last page.
   const backPg = s.backPage && s.backPage > 0
@@ -2960,28 +2961,27 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload the <b>whole deck</b> — one card per page, the <b>last page the shared
-        back</b>. Cards go {PER_SHEET} to an <b>A4 fed long edge first</b> (297 × 210 mm),
-        standard <b>2.5 × 3.5&quot;</b>, 3 mm gutters.
+        back</b>. Cards go {PER_SHEET} to a <b>portrait A4</b> (210 × 297 mm), standard
+        <b>2.5 × 3.5&quot;</b>, 3 mm gutters.
       </div>
 
       <Section label="// CARD DIRECTION" help="Which way round the cards sit on the sheet. Set this to match your cutter, not to save paper.">
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <button className="pe-chipbtn" style={pickStyle(!turned)} onClick={() => up({ orient: 'upright' })}>Upright · 8-up</button>
-          <button className="pe-chipbtn" style={pickStyle(turned)} onClick={() => up({ orient: 'turned' })}>On its side · 9-up</button>
+          <button className="pe-chipbtn" style={pickStyle(across)} onClick={() => up({ orient: 'turned' })}>Across · 8-up</button>
+          <button className="pe-chipbtn" style={pickStyle(!across)} onClick={() => up({ orient: 'upright' })}>Upright · 9-up</button>
         </div>
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
           <div>Grid <b>{COLS} across × {ROWS} down</b> = <b>{PER_SHEET} cards</b>, each 2.5 × 3.5&quot;</div>
-          {turned ? (
+          {across ? (
             <div style={{ marginTop: 4 }}>
-              One more per sheet, but the cards come off the guillotine turned a quarter
-              turn from upright. Only worth it if your cutter wants them that way.
+              The way the cutter takes them — <b>8 off one A4</b>. Standing them upright
+              would fit nine{cards ? <> ({Math.ceil(cards / 9)} sheets instead of {sheets})</> : null},
+              but that is not how this gets cut.
             </div>
           ) : (
             <div style={{ marginTop: 4 }}>
-              The way the shop&apos;s cutter takes them. One fewer per sheet than lying them
-              down{cards ? <> — {sheets} sheets instead of {Math.ceil(cards / 9)}</> : null}, and worth it.
-              Upright art in an upright cell is also <b>never turned</b>, so there is nothing
-              for the backs pass to get wrong.
+              One more per sheet, but the cards come off the guillotine a quarter turn from
+              the way the shop cuts them. Only use this if you are cutting them yourself.
             </div>
           )}
         </div>
@@ -3014,10 +3014,9 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
 
       <Section label="// FEED" help="The sheet is described 297 × 210 because that is how it goes into the tray.">
         <div className="pe-note" style={{ lineHeight: 1.7 }}>
-          The sheet is <b>A4 turned on its side</b> — same paper, fed <b>long edge first</b>
-          through the bypass so heavy stock never wears a band across the fuser that
-          would show on 11 × 17 afterwards. That part doesn&apos;t change; the card
-          direction above only decides how the cards sit on it.
+          The page is a plain <b>portrait A4</b>, 210 × 297 mm. Which edge goes into the
+          tray first is a printer setting, not something the file decides — feed it
+          <b> long edge first</b> through the bypass as usual for heavy stock.
         </div>
       </Section>
 
@@ -3050,13 +3049,13 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
             </div>
             <div className="pe-note" style={{ marginTop: 8 }}>
               How the stack goes back in. The grid is <b>symmetric</b>, so the positions land
-              on themselves either way.{turned ? (
-                <> A card <b>on its side</b> has its &ldquo;up&rdquo; along the axis a
+              on themselves either way.{across ? (
+                <> A card lying <b>across</b> has its &ldquo;up&rdquo; along the axis a
                   long-edge flip reverses, so the back art is turned the other way to come
                   out upright against its front.</>
               ) : (
                 <> With the cards <b>upright</b> nothing is turned at all, so this changes
-                  nothing — it only matters if you switch to 9-up.</>
+                  nothing.</>
               )}
             </div>
           </>
@@ -3086,23 +3085,23 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload <b>one card</b> and it fills the sheet. Standard <b>2.5 × 3.5&quot;</b>
-        (63.5 × 88.9 mm), standing upright, <b>8 to an A4</b> — 3 mm gutters, 17 mm
-        at the sides and 14.6 mm top and bottom.
+        (63.5 × 88.9 mm), lying across, <b>8 to an A4</b> — 3 mm gutters, 14.6 mm
+        at the sides and 17 mm top and bottom.
       </div>
 
-      <Section label="// SHEET" help="A3 is the A4 block printed twice, one above the other. Cut it in half and you have two identical A4s to run.">
+      <Section label="// SHEET" help="A3 is the A4 block printed twice, side by side. Cut it in half and you have two identical A4s to run.">
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
           <button className="pe-btn" style={pickStyle(a3)} onClick={() => up({ sheet: 'a3' })}>A3 · 16 cards</button>
           <button className="pe-btn" style={pickStyle(!a3)} onClick={() => up({ sheet: 'a4' })}>A4 · 8 cards</button>
         </div>
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
-          <div>Sheet <b>{a3 ? '297 × 420 mm (A3)' : '297 × 210 mm (A4)'}</b></div>
-          <div>Grid <b>{a3 ? '2 blocks of 4 × 2' : '4 × 2'}</b> — <b>{a3 ? 16 : 8} cards</b>, each 2.5 × 3.5&quot;</div>
-          {a3 && <div>Cut across at <b>210 mm</b> for two A4s, marked both sides</div>}
+          <div>Sheet <b>{a3 ? '420 × 297 mm (A3)' : '210 × 297 mm (A4)'}</b></div>
+          <div>Grid <b>{a3 ? '2 blocks of 2 × 4' : '2 × 4'}</b> — <b>{a3 ? 16 : 8} cards</b>, each 2.5 × 3.5&quot;</div>
+          {a3 && <div>Cut down at <b>210 mm</b> for two A4s, marked top and bottom</div>}
           <div style={{ marginTop: 4 }}>
-            The A4 is described <b>297 × 210</b> — fed <b>long edge first</b>, the way the
-            bypass tray takes heavy stock. Eight is what the cutter takes off one A4,
-            and it matches <b>Divinity Trading Card Deck</b> so both cut the same.
+            A plain <b>portrait A4</b> with the cards lying <b>across</b> it. Eight is what
+            the cutter takes off one A4, and it matches <b>Divinity Trading Card Deck</b>
+            so both cut the same.
           </div>
         </div>
       </Section>
@@ -3147,11 +3146,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
                   <button className="pe-chipbtn" style={pickStyle(s.flip === 'short')} onClick={() => up({ flip: 'short' })}>Short edge</button>
                 </div>
                 <div className="pe-note" style={{ marginTop: 8 }}>
-                  Only matters if your art is <b>landscape</b>, which has to be turned to fit
-                  the upright cell. <b>Long edge</b> (the Fiery&apos;s &ldquo;open to left&rdquo;) reverses
-                  the sheet&apos;s x-axis, so the backs are turned the other way to come out
-                  upright against their fronts; short edge leaves x alone. Portrait art is
-                  never turned, so this changes nothing for it.
+                  <b>Portrait</b> art gets a quarter turn to lie across the cell, and then
+                  this matters. <b>Long edge</b> (the Fiery&apos;s &ldquo;open to left&rdquo;)
+                  reverses the sheet&apos;s x-axis, so the backs are turned the other way to
+                  come out upright against their fronts; short edge leaves x alone.
+                  Landscape art is already the cell&apos;s way round and is never turned.
                 </div>
               </>
             )}
@@ -3163,10 +3162,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           </div>
         )}
         <div className="pe-note" style={{ marginTop: 8 }}>
-          Card positions are <b>absolute and symmetric</b> — 17 mm at both sides, 14.6 mm top
-          and bottom — so the grid backs up under either flip. And an upright card needs no
-          quarter turn at all, so with portrait artwork there is nothing left for the flip to
-          get wrong.
+          Card positions are <b>absolute and symmetric</b> — 14.6 mm at both sides, 17 mm top
+          and bottom — so the grid backs up under either flip; the positions never need
+          anything done to them.
         </div>
       </Section>
 
