@@ -1,20 +1,19 @@
 /* Divinity trading cards — one card artwork ganged 8-up on A4 and the block
  * duplicated onto A3, so one A3 cuts in half into two identical A4s to run.
  *
- * THE CARD SIZE IS THE INPUT. A trading card is 2.5 x 3.5 inches and nothing
- * else; that is the product. Placed sideways the cell is 88.9 x 63.5 exactly,
- * so the artwork needs no scaling and loses nothing.
+ * THE CELL IS ALWAYS A TRUE 2.5 x 3.5" CARD, laid sideways (88.9 x 63.5).
+ * That is never derived and never adjusted to make a margin come out: a cell
+ * that is not a card cuts cards that are the wrong size.
  *
- * The GUTTERS are measured off the shop's cut machine — 10 between the columns,
- * 3 between the rows — as is the 6.5 head margin. THE OUTER MARGINS ARE THE
- * REMAINDER: eight gaps and a card size cannot all be chosen at once, and the
- * margins are the right thing to give because they are WASTE.
+ * WHERE THE BLOCK SITS is the operator's to set — it is a property of the shop's
+ * cut machine, and twenty rounds of inferring it from measured gaps produced a
+ * template that printed off the top of the sheet. The gutters and margins are
+ * settings now, with `centre` on by default.
  *
- *   across  11.1 + 88.9 + 10 + 88.9 + 11.1  = 210
- *   down    6.5 + 4(63.5) + 3(3) + 27.5       = 297
- *
- * The block is PINNED TO THE HEAD, so the sheet backs up on a LONG-EDGE flip
- * but not end-for-end.
+ * CENTRED BY DEFAULT, for a printing reason: pinned 6.5 mm off the head, the top
+ * row lands inside the unprintable margin of most lasers — the PDF is correct,
+ * every page box says 210 x 297, and the press still clips the top row. Centred,
+ * the block sits 17 mm clear top and bottom and 11.05 clear either side.
  *
  *    A4 210 x 297  ->   8 cards, 2 across x 4 down, cell 88.9 x 63.5
  *    A3 420 x 297  ->  16 cards, the same block twice, cut down at 210
@@ -34,27 +33,40 @@ export const CARD_H_MM = CARD_H_IN * MM_PER_IN;   // 88.9
 export const A4_W_MM = 210, A4_H_MM = 297;
 export const A3_W_MM = 420, A3_H_MM = 297;
 
+/* ── The template, as the operator sets it. ────────────────────────────────
+   These are DEFAULTS. Every one is overridable from the panel, because the
+   position of the block on the sheet is a property of the shop's cut machine
+   and nobody but the operator, with a ruler and a test sheet, can know it. The
+   CELL is never one of them: it is always a true 2.5 x 3.5" card, because a
+   cell that is not a card cuts cards that are the wrong size.               */
+export const DEF_MARGIN_X_MM = 14;    // A and C — sheet edge to the first cut line
+export const DEF_GUTTER_X_MM = 10;    // B — between the columns
+/** D — head margin. Only used when `centre` is off. */
+export const DEF_MARGIN_TOP_MM = 6.5;
+export const DEF_GUTTER_Y_MM = 3;     // E/F/G — between the rows
+
 /** The cell IS the card, laid sideways. Never derived, never adjusted to make a
- *  margin come out — a card that is not 2.5 x 3.5 is not a trading card. */
+ *  margin come out. */
 export const PLACED_W_MM = CARD_H_MM;             // 88.9
 export const PLACED_H_MM = CARD_W_MM;             // 63.5
-
-/* ── Measured off the cut machine. Change these only with a ruler. ────────── */
-/** B — between the two columns. */
-export const GUTTER_X_MM = 10;
-/** D — sheet edge to the first cut line at the head. Not more, not less. */
-export const MARGIN_TOP_MM = 6.5;
-/** E, F and G — between the rows. NOT the same as the column gutter. */
-export const GUTTER_Y_MM = 3;
 
 export const COLS = 2;
 export const ROWS = 4;
 
-/* ── The waste. Worked, never stated. ─────────────────────────────────────── */
-export const MARGIN_X_MM =
-  (A4_W_MM - COLS * PLACED_W_MM - (COLS - 1) * GUTTER_X_MM) / 2;                        // 11.1
-export const MARGIN_BOTTOM_MM =
-  A4_H_MM - MARGIN_TOP_MM - ROWS * PLACED_H_MM - (ROWS - 1) * GUTTER_Y_MM;              // 27.5
+export interface DivinityCardTemplate {
+  /** A and C. */ marginXMm?: number;
+  /** B. */       gutterXMm?: number;
+  /** D. */       marginTopMm?: number;
+  /** E/F/G. */   gutterYMm?: number;
+  /** Centre the block on the sheet instead of pinning it by A and D. DEFAULT
+   *  ON, and it is the default for a printing reason, not a tidiness one: a
+   *  block pinned 6.5 mm off the head puts the top row inside the unprintable
+   *  margin of most lasers, so the sheet looks right on screen and comes off
+   *  the press with the top row clipped. Centred, the same eight cards sit
+   *  17 mm clear top and bottom. Untick it only to match a machine template
+   *  that genuinely wants the block off-centre. */
+  centre?: boolean;
+}
 
 export interface CardRectMm { xMm: number; yMm: number; wMm: number; hMm: number; }
 
@@ -73,35 +85,49 @@ export interface DivinityCardFit {
   cutXMm: number[];
 }
 
-/** The positions inside ONE A4 block, offset by `originXMm` on the sheet. */
-function blockCells(originXMm: number): CardRectMm[] {
-  const out: CardRectMm[] = [];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      out.push({
-        xMm: originXMm + MARGIN_X_MM + c * (PLACED_W_MM + GUTTER_X_MM),
-        /* Rows are numbered from the TOP of the sheet, the way a spec sheet
-           reads, but PDF y runs up — so row 0 is the highest y. */
-        yMm: A4_H_MM - MARGIN_TOP_MM - (r + 1) * PLACED_H_MM - r * GUTTER_Y_MM,
-        wMm: PLACED_W_MM, hMm: PLACED_H_MM,
-      });
-    }
-  }
-  return out;
-}
+export function fitDivinityCards(
+  sheet: 'a4' | 'a3' = 'a3', t: DivinityCardTemplate = {},
+): DivinityCardFit {
+  const gX = t.gutterXMm ?? DEF_GUTTER_X_MM;
+  const gY = t.gutterYMm ?? DEF_GUTTER_Y_MM;
 
-export function fitDivinityCards(sheet: 'a4' | 'a3' = 'a3'): DivinityCardFit {
+  /* The block's own size never moves — it is COLS cards plus the gutters. What
+     the settings decide is where on the sheet it sits. */
+  const blockW = COLS * PLACED_W_MM + (COLS - 1) * gX;
+  const blockH = ROWS * PLACED_H_MM + (ROWS - 1) * gY;
+
+  const centre = t.centre !== false;
+  const mX = centre ? (A4_W_MM - blockW) / 2 : (t.marginXMm ?? DEF_MARGIN_X_MM);
+  const mTop = centre ? (A4_H_MM - blockH) / 2 : (t.marginTopMm ?? DEF_MARGIN_TOP_MM);
+  const mBot = A4_H_MM - mTop - blockH;
+
+  /** One A4 block, offset by `originXMm` on the sheet. */
+  const blockCells = (originXMm: number): CardRectMm[] => {
+    const out: CardRectMm[] = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        out.push({
+          xMm: originXMm + mX + c * (PLACED_W_MM + gX),
+          /* Rows are numbered from the TOP of the sheet, the way a spec sheet
+             reads, but PDF y runs up — so row 0 is the highest y. */
+          yMm: A4_H_MM - mTop - (r + 1) * PLACED_H_MM - r * gY,
+          wMm: PLACED_W_MM, hMm: PLACED_H_MM,
+        });
+      }
+    }
+    return out;
+  };
+
   if (sheet === 'a4') {
     return {
       sheetWMm: A4_W_MM, sheetHMm: A4_H_MM, cells: blockCells(0),
-      n: COLS * ROWS, marginXMm: MARGIN_X_MM,
-      marginTopMm: MARGIN_TOP_MM, marginBottomMm: MARGIN_BOTTOM_MM, cutXMm: [],
+      n: COLS * ROWS, marginXMm: mX, marginTopMm: mTop, marginBottomMm: mBot, cutXMm: [],
     };
   }
   return {
     sheetWMm: A3_W_MM, sheetHMm: A3_H_MM,
     cells: [...blockCells(0), ...blockCells(A4_W_MM)],
-    n: 2 * COLS * ROWS, marginXMm: MARGIN_X_MM,
-    marginTopMm: MARGIN_TOP_MM, marginBottomMm: MARGIN_BOTTOM_MM, cutXMm: [A4_W_MM],
+    n: 2 * COLS * ROWS, marginXMm: mX, marginTopMm: mTop, marginBottomMm: mBot,
+    cutXMm: [A4_W_MM],
   };
 }

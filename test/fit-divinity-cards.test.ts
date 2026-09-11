@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import { PDFDocument, rgb } from 'pdf-lib';
 import {
   fitDivinityCards, PT_PER_MM, CARD_W_MM, CARD_H_MM, PLACED_W_MM, PLACED_H_MM,
-  GUTTER_X_MM, GUTTER_Y_MM, MARGIN_X_MM, MARGIN_TOP_MM, MARGIN_BOTTOM_MM, COLS, ROWS,
+  DEF_GUTTER_X_MM, DEF_GUTTER_Y_MM, DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, COLS, ROWS,
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
 import { imposeDivinityCards } from '../src/lib/imposition-toolkit/impose.ts';
 
@@ -31,22 +31,47 @@ test('THE CELL IS THE CARD — 2.5 x 3.5in laid sideways, exactly', () => {
   assert.ok(close(PLACED_H_MM, CARD_W_MM));
 });
 
-test('the measured gaps are what the file says they are', () => {
-  assert.equal(GUTTER_X_MM, 10, 'B — between the columns');
-  assert.equal(MARGIN_TOP_MM, 6.5, 'D — head. Not more, not less.');
-  assert.equal(GUTTER_Y_MM, 3, 'E/F/G — between the rows');
+test('the measured gaps are the DEFAULTS the panel starts from', () => {
+  assert.equal(DEF_GUTTER_X_MM, 10, 'B — between the columns');
+  assert.equal(DEF_GUTTER_Y_MM, 3, 'E/F/G — between the rows');
+  assert.equal(DEF_MARGIN_X_MM, 14, 'A/C, used only when the block is pinned');
+  assert.equal(DEF_MARGIN_TOP_MM, 6.5, 'D, used only when the block is pinned');
   assert.equal(COLS, 2);
   assert.equal(ROWS, 4);
 });
 
-test('the outer margins are the WASTE — derived, never stated', () => {
-  assert.ok(close(MARGIN_X_MM, 11.1));
-  assert.ok(close(MARGIN_BOTTOM_MM, 27.5));
+test('CENTRED by default — the block clears the press margin', () => {
+  /* The bug this exists for: pinned at 6.5 off the head, the top row landed
+     inside the unprintable margin of the shop's laser. Every page box measured
+     a correct 210 x 297 and the sheet still came off with the top row over the
+     edge. Centred, the same eight cards sit 17 mm clear top and bottom. */
+  const f = fitDivinityCards('a4');
+  assert.ok(close(f.marginTopMm, 17), `17 clear at the head, got ${f.marginTopMm}`);
+  assert.ok(close(f.marginBottomMm, 17), 'and the same at the foot');
+  assert.ok(close(f.marginXMm, 11.1), 'centred across too');
+  assert.ok(f.marginTopMm > 10, 'comfortably outside any press margin');
+});
+
+test('pinning is still available for a machine that wants it off-centre', () => {
+  const f = fitDivinityCards('a4', { centre: false });
+  assert.ok(close(f.marginXMm, 14), 'A/C as set');
+  assert.ok(close(f.marginTopMm, 6.5), 'D as set');
+  assert.ok(close(f.marginBottomMm, 27.5), 'and the slack lands at the foot');
+});
+
+test('the gutters are settings, and the cell never moves with them', () => {
+  const wide = fitDivinityCards('a4', { gutterXMm: 20, gutterYMm: 8 });
+  assert.ok(close(wide.cells[0]!.wMm, 88.9), 'still a true 3.5in across');
+  assert.ok(close(wide.cells[0]!.hMm, 63.5), 'still a true 2.5in down');
+  const xs = [...new Set(wide.cells.map((c) => c.xMm))].sort((a, b) => a - b);
+  assert.ok(close(xs[1]! - xs[0]!, 88.9 + 20), 'column pitch follows the gutter');
+  assert.equal(wide.n, 8, 'and it still fits eight');
 });
 
 test('both sums close on A4 exactly — the check the template is right', () => {
-  assert.ok(close(2 * MARGIN_X_MM + COLS * PLACED_W_MM + (COLS - 1) * GUTTER_X_MM, 210));
-  assert.ok(close(MARGIN_TOP_MM + ROWS * PLACED_H_MM + (ROWS - 1) * GUTTER_Y_MM + MARGIN_BOTTOM_MM, 297));
+  const f = fitDivinityCards('a4');
+  assert.ok(close(2 * f.marginXMm + COLS * PLACED_W_MM + (COLS - 1) * DEF_GUTTER_X_MM, 210));
+  assert.ok(close(f.marginTopMm + ROWS * PLACED_H_MM + (ROWS - 1) * DEF_GUTTER_Y_MM + f.marginBottomMm, 297));
 });
 
 test('the artwork loses NOTHING — the cell is the card, so cover-fit is 1:1', () => {
@@ -69,7 +94,7 @@ test('A4: eight cards, 2 across x 4 down, on a 98.9 x 66.5 pitch', () => {
   assert.equal(ys.length, 4, 'four rows');
   assert.ok(close(xs[1]! - xs[0]!, 98.9), 'column pitch 88.9 + 10');
   for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66.5), 'row pitch 63.5 + 3');
-  assert.ok(close(Math.min(...ys), 27.5), 'the last row sits exactly on the H margin');
+  assert.ok(close(Math.min(...ys), 17), 'the last row sits on the centred foot margin');
 });
 
 test('A4: every card is inside the sheet, and none overlaps another', () => {
@@ -105,13 +130,14 @@ test('A3: the A4 block duplicated — sixteen cards, cut down at 210', () => {
   // So each half, cut free, is a correct A4: 11.1 mm in from its own edges.
   assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 11.1));
   assert.ok(close(420 - Math.max(...right.map((c) => c.xMm + c.wMm)), 11.1));
+  // And centred, it now mirrors end-for-end as well as across.
+  assert.ok(close(f.marginTopMm, f.marginBottomMm), 'equal head and foot');
 });
 
-test('the grid is symmetric ACROSS, so a long-edge flip backs up', () => {
-  /* What the duplex story rests on. It holds because A and C come out equal —
-     the remainder is split evenly. Down it is NOT symmetric: the block is
-     pinned to the head at 6.5 with all the slack at the foot — so end-for-end does not register, and
-     that is asserted too rather than left to be discovered on press. */
+test('centred, the grid mirrors BOTH ways, so backs register under either flip', () => {
+  /* Pinned to the head this only mirrored across, so a stack turned end-for-end
+     landed the backs out. Centring it fixed the press-margin clipping AND gave
+     the sheet the second axis of symmetry for free. */
   for (const sheet of ['a4', 'a3'] as const) {
     const f = fitDivinityCards(sheet);
     const key = (x: number, y: number) => `${x.toFixed(4)},${y.toFixed(4)}`;
@@ -119,10 +145,24 @@ test('the grid is symmetric ACROSS, so a long-edge flip backs up', () => {
     for (const c of f.cells) {
       assert.ok(at.has(key(f.sheetWMm - (c.xMm + c.wMm), c.yMm)),
         `${sheet}: no partner across for the card at ${c.xMm},${c.yMm}`);
+      assert.ok(at.has(key(c.xMm, f.sheetHMm - (c.yMm + c.hMm))),
+        `${sheet}: no partner end-for-end for the card at ${c.xMm},${c.yMm}`);
     }
-    const down = f.cells.filter((c) => at.has(key(c.xMm, f.sheetHMm - (c.yMm + c.hMm))));
-    assert.equal(down.length, 0, `${sheet}: head-pinned, so nothing mirrors end-for-end`);
   }
+});
+
+test('pinned off-centre, it mirrors NEITHER way — the cost of pinning', () => {
+  /* Worth stating plainly, because it is the hidden price of an off-centre
+     template: pinned at A 14 the block ends 8.2 from the right edge, so the
+     sheet no longer backs up onto itself in either direction and the backs pass
+     has to be squared with the SPIN BACKS switch instead of by symmetry. */
+  const f = fitDivinityCards('a4', { centre: false });
+  const key = (x: number, y: number) => `${x.toFixed(4)},${y.toFixed(4)}`;
+  const at = new Set(f.cells.map((c) => key(c.xMm, c.yMm)));
+  const across = f.cells.filter((c) => at.has(key(f.sheetWMm - (c.xMm + c.wMm), c.yMm)));
+  const down = f.cells.filter((c) => at.has(key(c.xMm, f.sheetHMm - (c.yMm + c.hMm))));
+  assert.equal(across.length, 0, 'not across — 14 at the left, 8.2 at the right');
+  assert.equal(down.length, 0, 'not end-for-end either');
 });
 
 /** One portrait card, with a marker so its orientation is checkable. */

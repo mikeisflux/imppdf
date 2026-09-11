@@ -4645,6 +4645,16 @@ export interface DivinityCardOptions {
    *  property of the operator's workflow, not something the file can derive —
    *  so it is a switch, set by cutting one sheet and looking at it. */
   spinBacks?: boolean;
+  /* ── Where the block sits on the sheet. The CELL is always a true 2.5 x 3.5"
+     card; these only move it. Centred by default, because a block pinned close
+     to the head lands inside the press's unprintable margin — the PDF is
+     correct and the sheet still comes off with the top row clipped. ──────── */
+  /** Centre the block. Default ON; turn it off to pin it by the margins below. */
+  centre?: boolean;
+  /** A and C, when `centre` is off. */ marginXMm?: number;
+  /** D, when `centre` is off. */       marginTopMm?: number;
+  /** B — between the columns. */       gutterXMm?: number;
+  /** E/F/G — between the rows. */      gutterYMm?: number;
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
   markLenMm?: number;      // default 3
@@ -4659,7 +4669,10 @@ export async function imposeDivinityCards(
   const { PDFDocument, rgb, degrees } = PL;
   const { fitDivinityCards, PT_PER_MM } = await import('./fit/divinity-cards.ts');
 
-  const fit = fitDivinityCards(opts.sheet ?? 'a3');
+  const fit = fitDivinityCards(opts.sheet ?? 'a3', {
+    centre: opts.centre, marginXMm: opts.marginXMm, marginTopMm: opts.marginTopMm,
+    gutterXMm: opts.gutterXMm, gutterYMm: opts.gutterYMm,
+  });
   const mm = (v: number) => v * PT_PER_MM;
 
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });

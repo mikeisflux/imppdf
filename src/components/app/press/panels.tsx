@@ -2965,6 +2965,38 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         </div>
       </Section>
 
+      <Section label="// POSITION" help="Where the block of eight sits on the sheet. The cards themselves are always a true 2.5 x 3.5 inch; these only move them.">
+        <Check icon="grid" label="Centre on the sheet"
+          sub="17 mm clear top and bottom, 11.1 either side — clear of any press margin"
+          checked={s.centre !== false} onChange={(v) => up({ centre: v })} />
+        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
+          Keep this <b>on</b> unless your cutter needs the block off-centre. Pinned tight to
+          the head, the top row lands inside the <b>unprintable margin</b> most lasers have —
+          the PDF measures dead right and the sheet still comes off the press with the top
+          row over the edge.
+        </div>
+        {s.centre === false && (
+          <>
+            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
+              <span className="pe-label" style={{ flex: 1 }}>Side margin<span className="pe-label-sm"> · A / C, mm</span></span>
+              <NumRaw value={s.marginXMm ?? 14} onValue={(v) => up({ marginXMm: v })} w={70} />
+            </div>
+            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+              <span className="pe-label" style={{ flex: 1 }}>Head margin<span className="pe-label-sm"> · D, mm</span></span>
+              <NumRaw value={s.marginTopMm ?? 6.5} onValue={(v) => up({ marginTopMm: v })} w={70} />
+            </div>
+          </>
+        )}
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
+          <span className="pe-label" style={{ flex: 1 }}>Column gutter<span className="pe-label-sm"> · B, mm</span></span>
+          <NumRaw value={s.gutterXMm ?? 10} onValue={(v) => up({ gutterXMm: v })} w={70} />
+        </div>
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+          <span className="pe-label" style={{ flex: 1 }}>Row gutter<span className="pe-label-sm"> · E / F / G, mm</span></span>
+          <NumRaw value={s.gutterYMm ?? 3} onValue={(v) => up({ gutterYMm: v })} w={70} />
+        </div>
+      </Section>
+
       <Section label="// CARD" help="Which page of the uploaded file is the card. Portrait art is turned a quarter turn to lie in the cell.">
         {pageCount > 1 && (
           <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginBottom: 8 }}>
