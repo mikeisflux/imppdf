@@ -2908,6 +2908,17 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
     marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
     gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
   });
+  /* Spinning the backs mirrors the block across, so A and C trade places. The
+     panel shows the EFFECTIVE pair — what the sheet in front of you actually
+     has — rather than the stored one, because a switch whose numbers do not
+     move is a switch nobody can tell is working. Typing while spun writes back
+     through the mirror, so the field you edit is the gap you measured. */
+  const spun = !!s.spinBacks;
+  const effA = spun ? FIT.marginRightMm : FIT.marginXMm;
+  const effC = spun ? FIT.marginXMm : FIT.marginRightMm;
+  const flip = (v: number) => round2(FIT.sheetWMm - FIT.blockWMm - v);
+  const setA = (v: number) => up({ marginXMm: spun ? flip(v) : v });
+  const setC = (v: number) => up({ marginXMm: spun ? v : flip(v) });
   /* Live from the fit module so the panel can never quote a margin the engine
      is not actually using — that is how it came to advertise an 89 x 63 cell. */
 
@@ -2936,10 +2947,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           ['marginTopMm', 'D', 'Head to row 1', 5.5],
           ['gutterYMm', 'E / F / G', 'Between the rows', 3],
         ] as const).map(([key, tag, what, def], i) => (
-          <div key={key} className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: i ? 8 : 0 }}>
+          <div key={key} className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
             <span className="pe-label" style={{ flex: 1 }}>{tag}<span className="pe-label-sm"> · {what}</span></span>
-            <NumRaw value={key === 'marginXMm' ? round2(FIT.marginXMm) : ((s[key] as number) ?? def)}
-              onValue={(v) => up({ [key]: v })} w={70} />
+            <NumRaw value={(s[key] as number) ?? def} onValue={(v) => up({ [key]: v })} w={70} />
           </div>
         ))}
         {/* C and H are the other end of the same two spans, so setting one is
@@ -2948,8 +2958,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
             disagree with itself. */}
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
           <span className="pe-label" style={{ flex: 1 }}>C<span className="pe-label-sm"> · card to right edge</span></span>
-          <NumRaw value={round2(FIT.marginRightMm)}
-            onValue={(v) => up({ marginXMm: round2(FIT.sheetWMm - FIT.blockWMm - v) })} w={70} />
+          <NumRaw value={round2(effC)} onValue={setC} w={70} />
         </div>
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
           <span className="pe-label" style={{ flex: 1 }}>H<span className="pe-label-sm"> · row 4 to foot</span></span>
@@ -2961,6 +2970,12 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           <NumRaw value={s.bleedMm ?? 1.5} onValue={(v) => up({ bleedMm: v })} w={70} />
         </div>
         <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.7 }}>
+          {spun && (
+            <div style={{ marginBottom: 6 }}>
+              <b>Backs pass:</b> A and C are <b>swapped</b> — the block is mirrored so this
+              sheet lands behind its fronts. Untick to go back to 15.5 / 12.60.
+            </div>
+          )}
           <b>A 15.5 · B 10 · D 5.5 · E/F/G 3 · bleed 1.5</b> on Letter, measured off
           <b> production stock</b>. C and H fall out at 12.60 and 10.90. A is not equal to C
           on purpose — that is where the machine cuts on the heavy stock. A, the two cards,
