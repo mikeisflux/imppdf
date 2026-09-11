@@ -18,7 +18,7 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 
 | Tool | Piece | Default sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
-| `divinitycards` Divinity Trading Cards | 2.5 × 3.5" | A3 420 × 297 | [x] | [x] | [x] | [x] | 18-up, 2 blocks of 3×3 |
+| `divinitycards` Divinity Trading Cards | 2.5 × 3.5" | A3 297 × 420 | [x] | [x] | [x] | [x] | 16-up, 2 blocks of 4×2 |
 | `divinitydeck` Divinity Trading Card Deck | 2.5 × 3.5" | A4 297 × 210 | [x] | [x] | [x] | [x] | 8-up upright, N sheets, backs 2nd pass |
 | `indexcard` Index Cards | 3 × 5" | 17 × 11 | [x] | [x] | [x] | [x] | 10-up 5×2 |
 | `business` Business Cards | 3.5 × 2" | 8.5 × 11 | [x] | [x] | [x] | [x] |
@@ -291,22 +291,32 @@ Newest first. Every entry records a **measured** number, not a claim.
 
 ### `divinitycards` Divinity Trading Cards
 
-A standard 2.5 × 3.5" trading card ganged on A4 and doubled onto A3, so one
-sheet cuts in half into two identical A4s. Geometry in `fit/divinity-cards.ts`.
+A standard 2.5 × 3.5" trading card ganged on A4 and the block duplicated onto
+A3, so one sheet cuts in half into two identical A4s you can run. Geometry in
+`fit/divinity-cards.ts`.
 
     card  63.5 × 88.9 mm (2.5 × 3.5"), UPRIGHT, 3 mm gutter
-    A4  210 × 297   3 across × 3 down =  9, margins 6.75 / 12.15
-    A3  420 × 297   the A4 block twice = 18, cut at 210
+    A4  297 × 210   4 across × 2 down =  8, margins 17.00 / 14.60
+    A3  297 × 420   the A4 block twice = 16, cut across at 210
 
-Upright because it was worked both ways round rather than assumed: portrait
-gives 3 × 3 = 9, landscape only 2 × 4 = 8. That also means portrait artwork needs
-**no quarter turn**, which removes the one thing duplex could get wrong. The
-comparison itself is a test, so the choice can't silently stop being true.
+**Eight to an A4, not the nine a portrait A4 would take.** The shop's guillotine
+cuts eight off an A4 and the sheet feeds long edge first, so the block is
+described 297 × 210. Owner instruction — *"8 for a4 and then duplicate the
+layout for a3 so you can cut it in half and run two sheets"* — and it matches
+`divinitydeck`, so both tools come off the cutter the same way. The comparison
+(upright 4 × 2 = 8 against turned 3 × 3 = 9 on that sheet) is a test, not a
+comment, so the ninth card can't be "restored" by accident.
 
-Positions are symmetric about **both** sheet axes (6.75/6.75 across, 12.15/12.15
-down), so every card has a partner at the mirrored position and the sheet backs
-up whichever way the press turns it. That property is asserted, not assumed — it
-is what the whole duplex story rests on.
+The A3 is the block **stacked**, not set side by side: two 297 × 210 blocks make
+297 × 420, which is A3. Side by side would need 594 mm and there is no such
+sheet. The cut therefore runs **across** the sheet at 210 and is ticked at both
+sides. Each half, cut free, is a correct A4 with 17 / 14.6 mm of its own margin.
+
+Upright means portrait artwork needs **no quarter turn**, which removes the one
+thing duplex could get wrong. Positions are symmetric about **both** sheet axes
+(17/17 across, 14.6/14.6 down), so every card has a partner at the mirrored
+position and the sheet backs up whichever way the press turns it. That property
+is asserted, not assumed.
 
 A two-page upload becomes fronts on sheet 1 and backs on sheet 2. Landscape art
 does get turned, and then the flip matters: long-edge reverses the sheet's
@@ -314,14 +324,14 @@ x-axis so the backs turn the other way; short-edge leaves it alone.
 
 Cut marks are ruled off the sheet EDGES only, never into the gutters — every card
 edge is shared with its neighbour across 3 mm, so a mark long enough to be useful
-there would run onto the card beside it. The A3 half-sheet cut is ticked top and
-bottom.
+there would run onto the card beside it.
 
 Cover-fit and clipped, not contained: a card trims on all four sides, so a white
 sliver inside the trim reads as a printing fault.
 
-Counted from the RENDERED sheet, not the calculator: A4 → 9 cards measured at
-63.7 × 88.8 mm; A3 → 18. Thirteen assertions in `test/fit-divinity-cards.test.ts`.
+Counted from the RENDERED sheet, not the calculator: A4 → 8 cards measured at
+63.1 × 88.4 mm, taller than wide; A3 → 16 in two identical blocks. Thirteen
+assertions in `test/fit-divinity-cards.test.ts`.
 
 ### `divinitydeck` Divinity Trading Card Deck
 

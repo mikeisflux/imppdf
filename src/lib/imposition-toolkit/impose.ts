@@ -4803,12 +4803,17 @@ export async function imposeDivinityDeck(
    A standard 2.5 x 3.5" trading card, nine to an A4, with the A4 block doubled
    onto an A3 so one sheet yields eighteen and cuts in half into two A4s.
 
-   The card stands UPRIGHT: worked both ways round, portrait gives 3 x 3 = 9 and
-   landscape only 2 x 4 = 8, so upright wins — and portrait artwork then needs no
-   turn at all. Geometry, and that arithmetic, live in fit/divinity-cards.ts. */
+   EIGHT to an A4, not nine. The shop's guillotine cuts eight from an A4 and the
+   sheet feeds LONG EDGE FIRST, so the block is described 297 x 210 and holds
+   4 across x 2 down — the same arrangement Divinity Trading Card Deck uses, so
+   both tools come off the cutter identically. The A3 is that block STACKED
+   (297 x 420), cut across at 210 into two A4s that each stand on their own.
+
+   The card stands UPRIGHT, so portrait artwork needs no turn at all. Geometry,
+   and the fit arithmetic, live in fit/divinity-cards.ts. */
 
 export interface DivinityCardOptions {
-  /** 'a3' (default) is the doubled sheet; 'a4' is a single block of nine. */
+  /** 'a3' (default) is the doubled sheet; 'a4' is a single block of eight. */
   sheet?: 'a4' | 'a3';
   /** 1-based page of the uploaded file to use as the card FRONT. */
   page?: number;
@@ -4816,7 +4821,7 @@ export interface DivinityCardOptions {
      that registers with the fronts. Defaults to page 2 when the file has one.
 
      The card POSITIONS need nothing done to them: the grid is symmetric about
-     both sheet axes (13.5 / 13.5 across, 7.5 / 7.5 down), so every card has a
+     both sheet axes (17 / 17 across, 14.6 / 14.6 down), so every card has a
      partner at the mirrored position and the sheet backs up under either flip.
      Asserted in test/fit-divinity-cards.test.ts, because it is the property the
      whole duplex story rests on.
@@ -4935,9 +4940,10 @@ export async function imposeDivinityCards(
     const sheetH = mm(fit.sheetHMm), sheetW = mm(fit.sheetWMm);
     for (const x of xs) { line(x, 0, x, len); line(x, sheetH, x, sheetH - len); }
     for (const y of ys) { line(0, y, len, y); line(sheetW, y, sheetW - len, y); }
-    // The half-sheet cut on an A3, marked top and bottom so it cannot be missed.
-    for (const cx of fit.cutXMm) {
-      line(mm(cx), 0, mm(cx), len + off); line(mm(cx), sheetH, mm(cx), sheetH - len - off);
+    /* The half-sheet cut on an A3, marked at both sides so it cannot be missed.
+       The two A4 blocks STACK, so this cut runs across the sheet, not down it. */
+    for (const cy of fit.cutYMm) {
+      line(0, mm(cy), len + off, mm(cy)); line(sheetW, mm(cy), sheetW - len - off, mm(cy));
     }
   }
 

@@ -3086,19 +3086,24 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload <b>one card</b> and it fills the sheet. Standard <b>2.5 × 3.5&quot;</b>
-        (63.5 × 88.9 mm), standing upright, nine to an A4 — 3 mm gutters, 6.75 mm
-        at the sides and 12.15 mm top and bottom.
+        (63.5 × 88.9 mm), standing upright, <b>8 to an A4</b> — 3 mm gutters, 17 mm
+        at the sides and 14.6 mm top and bottom.
       </div>
 
-      <Section label="// SHEET" help="A3 is the A4 block printed twice, side by side. Cut it in half and you have two identical A4s.">
+      <Section label="// SHEET" help="A3 is the A4 block printed twice, one above the other. Cut it in half and you have two identical A4s to run.">
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <button className="pe-btn" style={pickStyle(a3)} onClick={() => up({ sheet: 'a3' })}>A3 · 18 cards</button>
-          <button className="pe-btn" style={pickStyle(!a3)} onClick={() => up({ sheet: 'a4' })}>A4 · 9 cards</button>
+          <button className="pe-btn" style={pickStyle(a3)} onClick={() => up({ sheet: 'a3' })}>A3 · 16 cards</button>
+          <button className="pe-btn" style={pickStyle(!a3)} onClick={() => up({ sheet: 'a4' })}>A4 · 8 cards</button>
         </div>
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
-          <div>Sheet <b>{a3 ? '420 × 297 mm (A3)' : '210 × 297 mm (A4)'}</b></div>
-          <div>Grid <b>{a3 ? '2 blocks of 3 × 3' : '3 × 3'}</b> — <b>{a3 ? 18 : 9} cards</b>, each 2.5 × 3.5&quot;</div>
-          {a3 && <div>Cut at <b>210 mm</b> for two A4s, marked top and bottom</div>}
+          <div>Sheet <b>{a3 ? '297 × 420 mm (A3)' : '297 × 210 mm (A4)'}</b></div>
+          <div>Grid <b>{a3 ? '2 blocks of 4 × 2' : '4 × 2'}</b> — <b>{a3 ? 16 : 8} cards</b>, each 2.5 × 3.5&quot;</div>
+          {a3 && <div>Cut across at <b>210 mm</b> for two A4s, marked both sides</div>}
+          <div style={{ marginTop: 4 }}>
+            The A4 is described <b>297 × 210</b> — fed <b>long edge first</b>, the way the
+            bypass tray takes heavy stock. Eight is what the cutter takes off one A4,
+            and it matches <b>Divinity Trading Card Deck</b> so both cut the same.
+          </div>
         </div>
       </Section>
 
@@ -3158,7 +3163,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           </div>
         )}
         <div className="pe-note" style={{ marginTop: 8 }}>
-          Card positions are <b>absolute and symmetric</b> — 6.75 mm at both sides, 12.15 mm top
+          Card positions are <b>absolute and symmetric</b> — 17 mm at both sides, 14.6 mm top
           and bottom — so the grid backs up under either flip. And an upright card needs no
           quarter turn at all, so with portrait artwork there is nothing left for the flip to
           get wrong.
