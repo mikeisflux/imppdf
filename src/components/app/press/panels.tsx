@@ -5,6 +5,8 @@ import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PA
 import {
   fitDivinityCards, type DivinityCardSheet,
   DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, DEF_GUTTER_X_MM,
+  DEF_GUTTER_E_MM, DEF_GUTTER_F_MM, DEF_GUTTER_G_MM,
+  PLACED_W_MM as CELL_W, PLACED_H_MM as CELL_H,
 } from '@/lib/imposition-toolkit/fit/divinity-cards';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
@@ -2910,6 +2912,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
   const FIT = fitDivinityCards((s.sheet ?? 'letter') as DivinityCardSheet, {
     marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
     gutterXMm: s.gutterXMm,
+    gutterEMm: s.gutterEMm, gutterFMm: s.gutterFMm, gutterGMm: s.gutterGMm,
   });
   /* Spinning the backs mirrors the block across, so A and C trade places. The
      panel shows the EFFECTIVE pair — what the sheet in front of you actually
@@ -2941,17 +2944,20 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Upload <b>one card</b> and it fills the sheet. Standard <b>2.5 × 3.5&quot;</b>
-        (63.5 × 88.9 mm), lying <b>sideways</b>, <b>8 to a sheet</b> in a cell that is the
-        card exactly — nothing scaled, nothing cropped. Pick the stock below to match what
-        is in the tray.
+        Upload <b>one card</b> and it fills the sheet. A standard <b>2.5 × 3.5&quot;</b> card
+        lying <b>sideways</b>, cut <b>1.5 mm over</b> on each dimension — so every one of the
+        <b>8</b> comes off the guillotine at <b>{round2(CELL_W)} × {round2(CELL_H)} mm</b>.
+        Pick the stock below to match what is in the tray.
       </div>
 
-      <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D places the rows; C and H are what is left over. There is no row gutter — the rows butt.">
+      <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E F G place the rows; C and H are what is left over. E F G default to 0, so the rows touch.">
         {([
           ['marginXMm', 'A', 'Left edge to card', DEF_MARGIN_X_MM],
           ['gutterXMm', 'B', 'Between the columns', DEF_GUTTER_X_MM],
           ['marginTopMm', 'D', 'Head to row 1', DEF_MARGIN_TOP_MM],
+          ['gutterEMm', 'E', 'Row 1 to row 2', DEF_GUTTER_E_MM],
+          ['gutterFMm', 'F', 'Row 2 to row 3', DEF_GUTTER_F_MM],
+          ['gutterGMm', 'G', 'Row 3 to row 4', DEF_GUTTER_G_MM],
         ] as const).map(([key, tag, what, def]) => (
           <div key={key} className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
             <span className="pe-label" style={{ flex: 1 }}>{tag}<span className="pe-label-sm"> · {what}</span></span>
@@ -2982,15 +2988,16 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               sheet lands behind its fronts.
             </div>
           )}
-          <b>A {DEF_MARGIN_X_MM} · B {DEF_GUTTER_X_MM} · D {DEF_MARGIN_TOP_MM}</b> on Letter.
-          C and H are the remainder — C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
-          <br />Every gap is <b>1.5 smaller than the ruler reads</b>, because these place the
-          <b> cut lines</b> and the art runs 1.5 past them on every side. The bleed is built
-          in now — no control, always there. <b>There is no row gutter</b>: the rows butt,
-          one cut serves both cards, and the bleed laps onto the next card, which is the
-          same artwork.
+          <b>A {DEF_MARGIN_X_MM} · B {DEF_GUTTER_X_MM} · D {DEF_MARGIN_TOP_MM} · E F G {DEF_GUTTER_E_MM}</b> on
+          Letter. C and H are the remainder — C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
+          <br />The cell is the <b>cut size</b>, {round2(CELL_W)} × {round2(CELL_H)} — a 2.5 × 3.5&quot; card
+          laid sideways with 1.5 added on each dimension. The bleed is built in on top of that,
+          1.5 past the cut on all four sides, no control. At <b>E F G 0</b> the rows touch: one
+          cut serves both cards and the bleed laps onto the next, which is the same artwork.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
-            onClick={() => up({ marginXMm: DEF_MARGIN_X_MM, marginTopMm: DEF_MARGIN_TOP_MM, gutterXMm: DEF_GUTTER_X_MM })}>
+            onClick={() => up({ marginXMm: DEF_MARGIN_X_MM, marginTopMm: DEF_MARGIN_TOP_MM,
+              gutterXMm: DEF_GUTTER_X_MM, gutterEMm: DEF_GUTTER_E_MM,
+              gutterFMm: DEF_GUTTER_F_MM, gutterGMm: DEF_GUTTER_G_MM })}>
             Reset to the proven template</button>
         </div>
       </Section>

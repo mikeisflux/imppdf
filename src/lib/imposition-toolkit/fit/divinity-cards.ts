@@ -7,8 +7,9 @@
  * derived and never nudged to make a margin come out: a cell that is not the
  * cut size cuts cards that are the wrong size.
  *
- * B IS 7 — a real gap down the middle, measured off the machine. The ROWS still
- * touch and share one cut line; the columns do not.
+ * B IS 7 — a real gap down the middle, measured off the machine. E, F and G are
+ * the three gaps between the rows and each defaults to 0, so the rows touch and
+ * share one cut line; the columns do not.
  *
  * EVERY GAP IS A SETTING, and C and H can be typed as readily as A and D — they
  * are the far end of the same two spans, so entering one just places the block
@@ -18,7 +19,7 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 14   B 7   D 8   sheet LETTER      (there is no row gutter)
+ *     A 14   B 7   D 8   E F G 0   sheet LETTER
  *     C and H then fall out at 14.10 and 11.40.
  *
  *     across  14 + 90.4 + 7 + 90.4 + 14.1 = 215.9
@@ -33,9 +34,10 @@
  * without it cuts white edges, which is the fault this template was rebuilt to
  * remove.
  *
- * THE ROWS BUTT — no gutter down the sheet at all. One cut line serves both
- * cards, and the 1.5 mm bleed laps onto the neighbour, which is the same
- * artwork.
+ * THE ROWS BUTT AT THE DEFAULT — E, F and G are 0, so one cut line serves both
+ * cards and the 1.5 mm bleed laps onto the neighbour, which is the same artwork.
+ * They are settings, though: type a number and that one gap opens, and H closes
+ * up by the same amount.
  *
  * A IS NOT EQUAL TO C, and that is not a mistake. An earlier set (A 14, D 6.5,
  * with 3 mm between the rows) was validated on TEST stock and did not hold when
@@ -93,7 +95,7 @@ const COLS_N = 2, ROWS_N = 4;
    a rule, or clever: the operator has a ruler and the machine, and inferring
    this instead of exposing it produced twenty rounds of wrong sheets.
 
-   A and B place the columns; D places the rows. C and H are then simply what is
+   A and B place the columns; D, E, F and G place the rows. C and H are then what is
    left over — there is one degree of freedom per axis, because A, the cards and
    C have to sum to the sheet. The panel shows C and H live so the operator can
    see what a change did.                                                     */
@@ -101,14 +103,22 @@ export const DEF_MARGIN_X_MM = 14;    // A — sheet edge to the first cut line
 export const DEF_MARGIN_TOP_MM = 8;   // D — head margin
 
 export const DEF_GUTTER_X_MM = 7;     // B — down the middle, between the columns
-/* THERE IS NO ROW GUTTER AT ALL. Not zero-by-default — gone, no setting. The
-   rows BUTT: one cut line serves both cards, and the 1.5 mm bleed laps onto the
-   neighbour, which is the same artwork, so the row pitch IS the cell height. B
-   is a real gap and stays a setting — the columns do NOT butt. */
 
-/* The vertical chain with the rows butted is four cells and nothing between:
+/* E, F and G: the three gaps BETWEEN THE ROWS, top to bottom. Each is its own
+   setting and each DEFAULTS TO 0 — the rows touch, one cut line serves both
+   cards, and the 1.5 mm bleed laps onto the neighbour, which is the same
+   artwork. They are separate rather than one shared figure because every crack
+   on the sheet has its own letter and its own box: the operator measures three
+   gaps with a ruler, not one gap three times, and a machine that drifts down
+   the sheet needs them to differ. */
+export const DEF_GUTTER_E_MM = 0;     // E — row 1 to row 2
+export const DEF_GUTTER_F_MM = 0;     // F — row 2 to row 3
+export const DEF_GUTTER_G_MM = 0;     // G — row 3 to row 4
 
-     D 8 + 4(65) + H  =  8 + 260 + H         on a 279.4 sheet  ->  H 11.4
+/* The vertical chain is four cells plus E, F and G:
+
+     D 8 + 4(65) + E + F + G + H             on a 279.4 sheet
+     at the default 0 0 0                ->  H 11.4
 
    The bleed is not a term in it. Bleed is drawn OUTSIDE each cell — it laps over
    the neighbouring card and over the margin — so it never moves a cut line and
@@ -132,6 +142,9 @@ export interface DivinityCardTemplate {
   /** A — sheet edge to the first cut line. */ marginXMm?: number;
   /** B — between the columns. */              gutterXMm?: number;
   /** D — head margin. */                      marginTopMm?: number;
+  /** E — row 1 to row 2. Default 0: they touch. */ gutterEMm?: number;
+  /** F — row 2 to row 3. Default 0: they touch. */ gutterFMm?: number;
+  /** G — row 3 to row 4. Default 0: they touch. */ gutterGMm?: number;
 }
 
 export interface CardRectMm { xMm: number; yMm: number; wMm: number; hMm: number; }
@@ -148,6 +161,9 @@ export interface DivinityCardFit {
   /** The block itself — the cards plus the gutters between them. Reported so a
    *  caller can work back from C or H to A or D without restating the sums. */
   blockWMm: number; blockHMm: number;
+  /** E, F and G as set, top to bottom. Reported so the panel can label the three
+   *  row gaps without recomputing which setting landed where. */
+  rowGapsMm: [number, number, number];
   /** Where an A3 is cut into two A4s, as an x DOWN the sheet. Empty for a plain
    *  A4. The blocks sit side by side, so the cut is vertical. */
   cutXMm: number[];
@@ -158,17 +174,32 @@ export function fitDivinityCards(
 ): DivinityCardFit {
   const spec = SHEETS[sheet] ?? SHEETS.letter;
   const gX = t.gutterXMm ?? DEF_GUTTER_X_MM;
+  /* E, F, G top to bottom — three separate gaps, not one repeated. */
+  const rowGaps: [number, number, number] = [
+    t.gutterEMm ?? DEF_GUTTER_E_MM,
+    t.gutterFMm ?? DEF_GUTTER_F_MM,
+    t.gutterGMm ?? DEF_GUTTER_G_MM,
+  ];
 
   /* The block's own size never moves — it is COLS cards plus the gutters. What
      the settings decide is where on the sheet it sits. */
   const blockW = COLS * PLACED_W_MM + (COLS - 1) * gX;
-  const blockH = ROWS * PLACED_H_MM;      // rows butt — no gutter term at all
+  const blockH = ROWS * PLACED_H_MM + rowGaps[0] + rowGaps[1] + rowGaps[2];
 
   const mX = t.marginXMm ?? DEF_MARGIN_X_MM;
   const mTop = t.marginTopMm ?? DEF_MARGIN_TOP_MM;
   /* C and H are the leftovers, not settings — they cannot be, because A, the
      cards and C must sum to the sheet. Reported so the panel can show them. */
   const mBot = spec.hMm - mTop - blockH;
+
+  /* How far row r's TOP sits below the head, counting the cells above it and
+     whichever of E, F, G lie between. Accumulated rather than multiplied,
+     because the three gaps can differ. */
+  const rowTop = (r: number) => {
+    let y = mTop;
+    for (let i = 0; i < r; i++) y += PLACED_H_MM + rowGaps[i]!;
+    return y;
+  };
 
   /** One block, offset by `originXMm` on the sheet. */
   const blockCells = (originXMm: number): CardRectMm[] => {
@@ -179,7 +210,7 @@ export function fitDivinityCards(
           xMm: originXMm + mX + c * (PLACED_W_MM + gX),
           /* Rows are numbered from the TOP of the sheet, the way a spec sheet
              reads, but PDF y runs up — so row 0 is the highest y. */
-          yMm: spec.hMm - mTop - (r + 1) * PLACED_H_MM,
+          yMm: spec.hMm - rowTop(r) - PLACED_H_MM,
           wMm: PLACED_W_MM, hMm: PLACED_H_MM,
         });
       }
@@ -195,6 +226,7 @@ export function fitDivinityCards(
     n: (spec.doubled ? 2 : 1) * COLS * ROWS,
     marginXMm: mX, marginTopMm: mTop, marginBottomMm: mBot,
     marginRightMm: spec.blockWMm - mX - blockW, blockWMm: blockW, blockHMm: blockH,
+    rowGapsMm: rowGaps,
     cutXMm: spec.doubled ? [spec.blockWMm] : [],
   };
 }

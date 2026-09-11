@@ -4655,6 +4655,9 @@ export interface DivinityCardOptions {
   /** A — sheet edge to the first cut line. */ marginXMm?: number;
   /** D — head margin. */                      marginTopMm?: number;
   /** B — between the columns. */       gutterXMm?: number;
+  /** E, F, G — the three gaps between the rows, top to bottom. Each defaults to
+   *  0, which butts the rows onto one shared cut line. */
+  gutterEMm?: number; gutterFMm?: number; gutterGMm?: number;
   /** How far the art runs PAST the trim on every side, mm. Default 1.5. The cell
    *  stays the true card size; this only decides how much ink is there for the
    *  blade to drift into. It is MEANT to spill into the gutters — 1.5 against
@@ -4679,6 +4682,7 @@ export async function imposeDivinityCards(
   const fit = fitDivinityCards(opts.sheet ?? 'letter', {
     marginXMm: opts.marginXMm, marginTopMm: opts.marginTopMm,
     gutterXMm: opts.gutterXMm,
+    gutterEMm: opts.gutterEMm, gutterFMm: opts.gutterFMm, gutterGMm: opts.gutterGMm,
   });
   const mm = (v: number) => v * PT_PER_MM;
 
