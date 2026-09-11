@@ -5,9 +5,15 @@
  * Never derived, never adjusted to make a margin come out: a cell that is not a
  * card cuts cards that are the wrong size.
  *
- * EVERY GAP IS A SETTING. A and B place the columns, D and E place the rows, and
- * C and H are whatever is left — there is one degree of freedom per axis. The
- * defaults are the shop's own measured numbers.
+ * EVERY GAP IS A SETTING, and C and H can be typed as readily as A and D — they
+ * are the far end of the same two spans, so entering one just places the block
+ * from that edge instead. There is still only ONE degree of freedom per axis:
+ * A + block + C must equal the sheet.
+ *
+ * LEFT ALONE, A IS WHATEVER MAKES C EQUAL IT. The shop cuts a fixed strip down
+ * the middle (B) and wants the two side margins identical, and those two
+ * together leave nothing to choose: A = (sheet - block) / 2. On Letter with B 10
+ * that is 14.05 each; on A4 it is 11.1 each.
  *
  * ART BLEEDS PAST THE TRIM and is meant to spill into the gutters; that is what
  * a bleed is for. At 1.5 against the 3 mm row gutter, one row's bleed lands
@@ -63,7 +69,13 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
    what is left over — there is one degree of freedom per axis, because A, the
    cards and C have to sum to the sheet. The panel shows C and H live so the
    operator can see what a change did.                                       */
-export const DEF_MARGIN_X_MM = 11;    // A — sheet edge to the first cut line
+/** A, when it is not set. UNDEFINED on purpose: left alone, A is whatever makes
+ *  C come out equal to it — the block sits centred across, which is the shop's
+ *  requirement ("C is supposed to be the exact same width as A"). Equality is a
+ *  CONSTRAINT, not a number: A + block + C = the sheet, so demanding A = C fixes
+ *  A at (sheet - block) / 2 and there is nothing left to type. Type A anyway and
+ *  it wins, with C taking the difference. */
+export const DEF_MARGIN_X_MM: number | undefined = undefined;
 export const DEF_GUTTER_X_MM = 10;    // B — between the columns
 export const DEF_MARGIN_TOP_MM = 6.5; // D — head margin
 export const DEF_GUTTER_Y_MM = 3;     // E/F/G — between the rows
@@ -114,7 +126,7 @@ export function fitDivinityCards(
   const blockW = COLS * PLACED_W_MM + (COLS - 1) * gX;
   const blockH = ROWS * PLACED_H_MM + (ROWS - 1) * gY;
 
-  const mX = t.marginXMm ?? DEF_MARGIN_X_MM;
+  const mX = t.marginXMm ?? (spec.blockWMm - blockW) / 2;
   const mTop = t.marginTopMm ?? DEF_MARGIN_TOP_MM;
   /* C and H are the leftovers, not settings — they cannot be, because A, the
      cards and C must sum to the sheet. Reported so the panel can show them. */

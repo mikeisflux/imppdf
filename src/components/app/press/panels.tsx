@@ -2931,14 +2931,15 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
 
       <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E place the rows; C and H are what is left over.">
         {([
-          ['marginXMm', 'A', 'Left edge to card', 11],
+          ['marginXMm', 'A', 'Left edge to card', 0],
           ['gutterXMm', 'B', 'Between the columns', 9],
           ['marginTopMm', 'D', 'Head to row 1', 6.5],
           ['gutterYMm', 'E / F / G', 'Between the rows', 3],
         ] as const).map(([key, tag, what, def], i) => (
           <div key={key} className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: i ? 8 : 0 }}>
             <span className="pe-label" style={{ flex: 1 }}>{tag}<span className="pe-label-sm"> · {what}</span></span>
-            <NumRaw value={(s[key] as number) ?? def} onValue={(v) => up({ [key]: v })} w={70} />
+            <NumRaw value={key === 'marginXMm' ? round2(FIT.marginXMm) : ((s[key] as number) ?? def)}
+              onValue={(v) => up({ [key]: v })} w={70} />
           </div>
         ))}
         {/* C and H are the other end of the same two spans, so setting one is
@@ -2959,9 +2960,12 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           <span className="pe-label" style={{ flex: 1 }}>Bleed<span className="pe-label-sm"> · art past the cut</span></span>
           <NumRaw value={s.bleedMm ?? 1.5} onValue={(v) => up({ bleedMm: v })} w={70} />
         </div>
-        <div className="pe-note" style={{ marginTop: 12 }}>
-          Set <b>C</b> or <b>H</b> and the block slides to suit — <b>A</b> and <b>D</b> take up
-          the difference, because A, the cards and C have to add up to the sheet.
+        <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.7 }}>
+          Left alone, <b>A</b> is whatever makes <b>C equal it</b> — A + the two cards + B + C
+          have to add up to the sheet, so asking for A = C fixes both. Type any of the four
+          and the others take up the difference.
+          {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
+            onClick={() => up({ marginXMm: undefined, marginTopMm: 6.5 })}>Reset A = C</button>
         </div>
       </Section>
 

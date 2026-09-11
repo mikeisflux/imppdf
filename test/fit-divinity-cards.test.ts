@@ -34,7 +34,7 @@ test('THE CELL IS THE CARD — 2.5 x 3.5in laid sideways, exactly', () => {
 test('the measured gaps are the DEFAULTS the panel starts from', () => {
   assert.equal(DEF_GUTTER_X_MM, 10, 'B — between the columns');
   assert.equal(DEF_GUTTER_Y_MM, 3, 'E/F/G — between the rows');
-  assert.equal(DEF_MARGIN_X_MM, 11, 'A — the shop\'s measured left margin');
+  assert.equal(DEF_MARGIN_X_MM, undefined, 'A is not a number — it is whatever makes C equal it');
   assert.equal(DEF_MARGIN_TOP_MM, 6.5, 'D — the shop\'s measured head margin');
   assert.equal(COLS, 2);
   assert.equal(ROWS, 4);
@@ -49,11 +49,12 @@ test('LETTER is the default sheet, and the measured template closes on it', () =
   const f = fitDivinityCards();
   assert.ok(close(f.sheetWMm, 215.9), '8.5in wide');
   assert.ok(close(f.sheetHMm, 279.4), '11in tall');
-  assert.ok(close(f.marginXMm, 11), `A as measured, got ${f.marginXMm}`);
+  assert.ok(close(f.marginXMm, 14.05), `A as centred, got ${f.marginXMm}`);
+  assert.ok(close(f.marginXMm, f.marginRightMm), 'A and C are equal, which is the point');
   assert.equal(f.n, 8);
   // And the sum the owner measured across the sheet.
   assert.ok(close(f.marginXMm + 2 * PLACED_W_MM + DEF_GUTTER_X_MM + f.marginRightMm, 215.9),
-    'A 11 + 88.9 + B 10 + 88.9 + C 17.1 = 215.9');
+    'A 14.05 + 88.9 + B 10 + 88.9 + C 14.05 = 215.9');
   // A4 is taller, which is the clipping.
   assert.ok(close(297 - 279.4, 17.6), 'A4 overhangs Letter by 17.6 mm');
 });
@@ -65,7 +66,7 @@ test('tabloid is two Letters side by side, cut at 215.9', () => {
   assert.equal(f.n, 16);
   assert.ok(close(f.cutXMm[0]!, 215.9), 'cut down the middle into two Letters');
   const right = f.cells.slice(8);
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 11),
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 14.05),
     'each half carries its own A margin');
 });
 
@@ -100,7 +101,7 @@ test('A4: eight cards, 2 across x 4 down, on a 98.9 x 66.5 pitch', () => {
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
   assert.equal(xs.length, 2, 'two columns');
-  assert.ok(close(xs[0]!, 11), `A at 11, got ${xs}`);
+  assert.ok(close(xs[0]!, 11.1), `A4 centres A at 11.1, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
   assert.ok(close(xs[1]! - xs[0]!, 98.9), 'column pitch 88.9 + 10');
   for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66.5), 'row pitch 63.5 + 3');
@@ -138,7 +139,7 @@ test('A3: the A4 block duplicated — sixteen cards, cut down at 210', () => {
     assert.ok(close(left[i]!.yMm, right[i]!.yMm), 'and at the same height');
   }
   // Each half, cut free, carries its own A margin.
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 11));
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 11.1));
 });
 
 /** One portrait card, with a marker so its orientation is checkable. */
@@ -355,4 +356,24 @@ test('SPIN BACKS turns a lone sheet — and still never adds a page', async () =
   const pf = await turnsOnPage(pair, 0), pb = await turnsOnPage(pair, 1);
   assert.deepEqual(pf, a, 'fronts untouched when a back page exists');
   assert.deepEqual(pb, pf, 'and the back is spun onto the front’s orientation');
+});
+
+test('A EQUALS C unless A is typed — the shop’s requirement, as a constraint', () => {
+  /* "Gutter C is supposed to be the exact same width as A." That is not a
+     number to store, it is a constraint: A + block + C = the sheet, so equality
+     fixes A at (sheet - block) / 2 and leaves nothing to choose. Asserted on
+     every sheet, and at a non-default gutter, so it cannot hold by luck. */
+  for (const sheet of ['letter', 'tabloid', 'a4', 'a3'] as const) {
+    for (const gutterXMm of [10, 16, 4]) {
+      const f = fitDivinityCards(sheet, { gutterXMm });
+      assert.ok(close(f.marginXMm, f.marginRightMm),
+        `${sheet} @ B ${gutterXMm}: A ${f.marginXMm} vs C ${f.marginRightMm}`);
+      assert.ok(close(f.marginXMm + f.blockWMm + f.marginRightMm,
+        sheet === 'tabloid' ? 215.9 : sheet === 'a3' ? 210 : f.sheetWMm), 'and it still sums');
+    }
+  }
+  // Typing A still wins, with C taking the difference.
+  const pinned = fitDivinityCards('letter', { marginXMm: 11 });
+  assert.ok(close(pinned.marginXMm, 11));
+  assert.ok(close(pinned.marginRightMm, 17.1), 'C absorbs it');
 });
