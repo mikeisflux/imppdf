@@ -288,53 +288,57 @@ Newest first. Every entry records a **measured** number, not a claim.
 - **`prooflabel`** — fixed 3 × 10 die, never computed; art stretched to the cell.
   `fit/proof-labels.ts` + test.
 
-### `divinitycards` Divinity Trading Cards — the cut-machine template
+### `divinitycards` Divinity Trading Cards
 
-One card artwork ganged 8-up on A4, the block duplicated onto A3 so one sheet
-cuts in half into two identical A4s to run. Geometry in `fit/divinity-cards.ts`.
+One card artwork ganged 8-up, the block duplicated onto the double sheet so it
+cuts in half into two identical sheets to run. Geometry in
+`fit/divinity-cards.ts`.
 
-    sheet   210 × 297 (A4) · 420 × 297 (A3, the A4 block twice, cut down at 210)
-    cell    88.9 × 63.5 — a 2.5 × 3.5" card laid SIDEWAYS, exactly
-    grid    2 across × 4 down = 8 per A4, 16 per A3
+**THE PROVEN TEMPLATE** — the shop cut a stack from this and confirmed it:
 
-    across  A 11.1 + 88.9 + B 10 + 88.9 + C 11.1   = 210
-    down    D 6.5 + 4(63.5) + E/F/G 3(3) + H 27.5  = 297
+    sheet   LETTER 215.9 × 279.4 (8.5 × 11)
+    cell    88.9 × 63.5 — a true 2.5 × 3.5" card, laid SIDEWAYS
+    grid    2 across × 4 down = 8
 
-**The card size is the INPUT; the outer margins are the remainder.** This took
-several wrong turns to land, so the reasoning is worth keeping: eight gaps and a
-card size cannot all be dictated at once, because they have to sum to the sheet.
-An earlier build made the margins the input and let the cell fall out, which
-produced an 86 × 67.6 cell — and cut cards that measured wrong. The margins are
-the right thing to give, because they are **waste**: a millimetre there gets
-trimmed off and binned, a millimetre on the card is a card that is the wrong
-size. A test asserts cover-fit comes out at scale 1.0, so if anyone makes a
-margin an input again the artwork starts scaling and the test says so.
+    A 14      left edge to card        C 14.10   falls out
+    B 10      between the columns      H  9.90   falls out
+    D 6.5     head to row 1
+    E/F/G 3   between the rows
+    bleed 1.5 art past the cut
 
-The gutters (10 between the columns, 3 between the rows) and the 6.5 head margin
-are measured off the machine with a ruler. The column gutter and the row gutter
-are genuinely different numbers and stay separate constants.
+Both sums close on the sheet, and a test pins the whole set together rather than
+as scattered constants: what was proven on paper is the *combination*, and any
+one figure drifting breaks a template that is known to work.
 
-**The block is pinned to the head** — 6.5 at the top, all the slack (27.5) at
-the foot — so the sheet is symmetric across (11.1 / 11.1) but not down. It backs
-up on a **long-edge** flip and *not* end-for-end.
+**The cell is always the card.** Never derived, never nudged to make a margin
+come out — a cell that is not 2.5 × 3.5 cuts cards that are the wrong size, and
+an earlier build that let the margins drive the cell produced an 86 × 67.6 cell
+and a stack of wrong-sized cards. A test asserts cover-fit scales at exactly 1.0.
 
-**Spin backs 180° — a checkbox, default ON, and ALWAYS VISIBLE.** Portrait art
-takes a quarter turn into the sideways cell, and the back needs one of the two
-quarter turns, which are exactly 180° apart. Which one is right depends on how
-the operator turns the stack over by hand, and a hand-turned stack of heavy card
-does not land the way a perfecting press would. That is a property of the
-workflow, not something the file can derive, so it is a switch: if the backs
-come out upside down against their fronts, untick it. It used to be nested
-inside the two-page branch, which hid the control exactly when the operator was
-setting the job up with a single card loaded — it now renders either way and
-both states are asserted.
+**One degree of freedom per axis.** A + card + B + card + C must equal the sheet,
+so only one of A and C can be typed; the other moves. All four (A, B, D, E) plus
+C and H are editable, with C and H writing back through A and D so the
+arithmetic can never disagree with itself.
 
-A two-page upload becomes fronts on sheet 1 and backs on sheet 2. Cut marks are
-ruled off the sheet edges only, never into the gutters; the A3 half-sheet cut is
-ticked top and bottom. Cover-fit and clipped: a card trims on all four sides, so
-a white sliver inside the trim reads as a printing fault.
+**Bleed 1.5 and uncapped.** It is meant to spill into the gutters — that is what
+a bleed is for. Against B 10 it leaves 7 mm of paper down the middle; against the
+3 mm row gutter it leaves none, so rows bleed edge to edge. Every card on the
+sheet is the same artwork, so overlapping bleeds overlap with themselves and the
+blade takes it away. Fitting art to the bare trim is what left white slivers on
+the first cut stack.
 
-Sixteen assertions in `test/fit-divinity-cards.test.ts`.
+**Sheet is a real choice** — letter (default), tabloid (two Letters side by side,
+cut at 215.9), a4, a3 — and it must match the paper in the tray. A4 is 17.6 mm
+taller than Letter, and an A4 file on Letter stock ran the top row off the sheet
+with every page box measuring a correct A4 the whole way through.
 
-**Divinity Trading Card Deck was removed** at the owner's instruction — one card
-tool, not two.
+**Spin backs 180°** — one checkbox, unticked by default. The back needs one of
+two quarter turns, exactly 180° apart, and which one is right depends on how the
+stack is turned over by hand. With a two-page file it turns the back sheet; with
+a one-page file — the shop runs fronts and backs as separate files — it turns
+that sheet, since that sheet *is* the backs pass. It never changes the page
+count: one page in, one sheet out, asserted alongside the behaviour because this
+tool's page count has moved by accident twice.
+
+Cut marks are ruled off the sheet edges, never into the gutters. Cover-fit and
+clipped. Eighteen assertions in `test/fit-divinity-cards.test.ts`.

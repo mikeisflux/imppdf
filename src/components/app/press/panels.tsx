@@ -2931,7 +2931,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
 
       <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E place the rows; C and H are what is left over.">
         {([
-          ['marginXMm', 'A', 'Left edge to card', 0],
+          ['marginXMm', 'A', 'Left edge to card', 14],
           ['gutterXMm', 'B', 'Between the columns', 9],
           ['marginTopMm', 'D', 'Head to row 1', 6.5],
           ['gutterYMm', 'E / F / G', 'Between the rows', 3],
@@ -2961,11 +2961,13 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           <NumRaw value={s.bleedMm ?? 1.5} onValue={(v) => up({ bleedMm: v })} w={70} />
         </div>
         <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.7 }}>
-          Left alone, <b>A</b> is whatever makes <b>C equal it</b> — A + the two cards + B + C
-          have to add up to the sheet, so asking for A = C fixes both. Type any of the four
-          and the others take up the difference.
+          <b>A 14 · B 10 · D 6.5 · E/F/G 3 · bleed 1.5</b> on Letter is the template the shop
+          cut a stack from and confirmed. C and H fall out at 14.10 and 9.90 — A, the two
+          cards, B and C have to add up to the sheet, so typing any of the four moves the
+          others.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
-            onClick={() => up({ marginXMm: undefined, marginTopMm: 6.5 })}>Reset A = C</button>
+            onClick={() => up({ marginXMm: 14, marginTopMm: 6.5, gutterXMm: 10, gutterYMm: 3, bleedMm: 1.5 })}>
+            Reset to the proven template</button>
         </div>
       </Section>
 

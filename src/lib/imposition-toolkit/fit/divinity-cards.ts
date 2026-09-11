@@ -10,10 +10,14 @@
  * from that edge instead. There is still only ONE degree of freedom per axis:
  * A + block + C must equal the sheet.
  *
- * LEFT ALONE, A IS WHATEVER MAKES C EQUAL IT. The shop cuts a fixed strip down
- * the middle (B) and wants the two side margins identical, and those two
- * together leave nothing to choose: A = (sheet - block) / 2. On Letter with B 10
- * that is 14.05 each; on A4 it is 11.1 each.
+ * THE VALIDATED TEMPLATE, confirmed by the shop against a cut stack:
+ *
+ *     A 14    B 10    D 6.5    E/F/G 3    bleed 1.5    sheet LETTER
+ *     C and H then fall out at 14.10 and 9.90.
+ *
+ * A and C are equal to within a tenth of a millimetre, which is closer than the
+ * blade holds. Clearing A makes them exactly equal at 14.05 — the difference is
+ * not worth having, and 14 is the number that was actually proven on paper.
  *
  * ART BLEEDS PAST THE TRIM and is meant to spill into the gutters; that is what
  * a bleed is for. At 1.5 against the 3 mm row gutter, one row's bleed lands
@@ -69,13 +73,12 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
    what is left over — there is one degree of freedom per axis, because A, the
    cards and C have to sum to the sheet. The panel shows C and H live so the
    operator can see what a change did.                                       */
-/** A, when it is not set. UNDEFINED on purpose: left alone, A is whatever makes
- *  C come out equal to it — the block sits centred across, which is the shop's
- *  requirement ("C is supposed to be the exact same width as A"). Equality is a
- *  CONSTRAINT, not a number: A + block + C = the sheet, so demanding A = C fixes
- *  A at (sheet - block) / 2 and there is nothing left to type. Type A anyway and
- *  it wins, with C taking the difference. */
-export const DEF_MARGIN_X_MM: number | undefined = undefined;
+/** A — sheet edge to the first cut line. 14 is the shop's own validated number:
+ *  it cut a stack off this template and confirmed it. On Letter it leaves C at
+ *  14.10, which is the same margin to within a tenth of a millimetre — closer
+ *  than the blade can hold anyway. Clear it and A falls back to whatever makes
+ *  C exactly equal, which is 14.05. */
+export const DEF_MARGIN_X_MM = 14;
 export const DEF_GUTTER_X_MM = 10;    // B — between the columns
 export const DEF_MARGIN_TOP_MM = 6.5; // D — head margin
 export const DEF_GUTTER_Y_MM = 3;     // E/F/G — between the rows
@@ -126,7 +129,7 @@ export function fitDivinityCards(
   const blockW = COLS * PLACED_W_MM + (COLS - 1) * gX;
   const blockH = ROWS * PLACED_H_MM + (ROWS - 1) * gY;
 
-  const mX = t.marginXMm ?? (spec.blockWMm - blockW) / 2;
+  const mX = t.marginXMm ?? DEF_MARGIN_X_MM ?? (spec.blockWMm - blockW) / 2;
   const mTop = t.marginTopMm ?? DEF_MARGIN_TOP_MM;
   /* C and H are the leftovers, not settings — they cannot be, because A, the
      cards and C must sum to the sheet. Reported so the panel can show them. */
