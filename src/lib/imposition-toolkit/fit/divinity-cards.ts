@@ -8,8 +8,7 @@
  * cut size cuts cards that are the wrong size.
  *
  * B IS 7 — a real gap down the middle, measured off the machine. E, F and G are
- * the three gaps between the rows and each defaults to 0, so the rows touch and
- * share one cut line; the columns do not.
+ * the three gaps between the rows, 0.5 each.
  *
  * EVERY GAP IS A SETTING, and C and H can be typed as readily as A and D — they
  * are the far end of the same two spans, so entering one just places the block
@@ -19,11 +18,11 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 14   B 7   D 8   E F G 0   sheet LETTER
- *     C and H then fall out at 14.10 and 11.40.
+ *     A 14   B 7   D 8   E F G 0.5   sheet LETTER
+ *     C and H then fall out at 14.10 and 9.90.
  *
- *     across  14 + 90.4 + 7 + 90.4 + 14.1 = 215.9
- *     down    8 + 4(65)                   + 11.4 = 279.4
+ *     across  14 + 90.4 + 7 + 90.4 + 14.1     = 215.9
+ *     down    8 + 4(65) + 3(0.5) + 9.9        = 279.4
  *
  * EVERY GAP IS 1.5 SMALLER THAN THE RULER READING, because the ruler reads the
  * paper between the ART and the art runs 1.5 past the cut. The CUT LINES are
@@ -34,10 +33,10 @@
  * without it cuts white edges, which is the fault this template was rebuilt to
  * remove.
  *
- * THE ROWS BUTT AT THE DEFAULT — E, F and G are 0, so one cut line serves both
- * cards and the 1.5 mm bleed laps onto the neighbour, which is the same artwork.
- * They are settings, though: type a number and that one gap opens, and H closes
- * up by the same amount.
+ * THE ROW GAPS ARE 0.5 — E, F and G, each its own setting. The 1.5 mm bleed
+ * laps three times that distance onto the neighbour, which is the same artwork,
+ * so there is no white between the rows. Change one and H closes up by the same
+ * amount.
  *
  * A IS NOT EQUAL TO C, and that is not a mistake. An earlier set (A 14, D 6.5,
  * with 3 mm between the rows) was validated on TEST stock and did not hold when
@@ -111,14 +110,14 @@ export const DEF_GUTTER_X_MM = 7;     // B — down the middle, between the colu
    on the sheet has its own letter and its own box: the operator measures three
    gaps with a ruler, not one gap three times, and a machine that drifts down
    the sheet needs them to differ. */
-export const DEF_GUTTER_E_MM = 0;     // E — row 1 to row 2
-export const DEF_GUTTER_F_MM = 0;     // F — row 2 to row 3
-export const DEF_GUTTER_G_MM = 0;     // G — row 3 to row 4
+export const DEF_GUTTER_E_MM = 0.5;   // E — row 1 to row 2
+export const DEF_GUTTER_F_MM = 0.5;   // F — row 2 to row 3
+export const DEF_GUTTER_G_MM = 0.5;   // G — row 3 to row 4
 
 /* The vertical chain is four cells plus E, F and G:
 
      D 8 + 4(65) + E + F + G + H             on a 279.4 sheet
-     at the default 0 0 0                ->  H 11.4
+     at the default 0.5 0.5 0.5          ->  H 9.9
 
    The bleed is not a term in it. Bleed is drawn OUTSIDE each cell — it laps over
    the neighbouring card and over the margin — so it never moves a cut line and

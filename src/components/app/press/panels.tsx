@@ -2950,7 +2950,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         Pick the stock below to match what is in the tray.
       </div>
 
-      <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E F G place the rows; C and H are what is left over. E F G default to 0, so the rows touch.">
+      <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E F G place the rows; C and H are what is left over.">
         {([
           ['marginXMm', 'A', 'Left edge to card', DEF_MARGIN_X_MM],
           ['gutterXMm', 'B', 'Between the columns', DEF_GUTTER_X_MM],
@@ -2992,8 +2992,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           Letter. C and H are the remainder — C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
           <br />The cell is the <b>cut size</b>, {round2(CELL_W)} × {round2(CELL_H)} — a 2.5 × 3.5&quot; card
           laid sideways with 1.5 added on each dimension. The bleed is built in on top of that,
-          1.5 past the cut on all four sides, no control. At <b>E F G 0</b> the rows touch: one
-          cut serves both cards and the bleed laps onto the next, which is the same artwork.
+          1.5 past the cut on all four sides, no control — so at <b>E F G 0.5</b> the art laps
+          three times the gap onto the next card, which is the same artwork, and no white
+          shows between the rows.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
             onClick={() => up({ marginXMm: DEF_MARGIN_X_MM, marginTopMm: DEF_MARGIN_TOP_MM,
               gutterXMm: DEF_GUTTER_X_MM, gutterEMm: DEF_GUTTER_E_MM,
