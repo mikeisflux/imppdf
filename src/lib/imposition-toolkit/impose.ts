@@ -4656,10 +4656,12 @@ export interface DivinityCardOptions {
   /** D — head margin. */                      marginTopMm?: number;
   /** B — between the columns. */       gutterXMm?: number;
   /** E/F/G — between the rows. */      gutterYMm?: number;
-  /** How far the art runs PAST the trim on every side, mm. Default 2. The cell
+  /** How far the art runs PAST the trim on every side, mm. Default 1.5. The cell
    *  stays the true card size; this only decides how much ink is there for the
-   *  blade to drift into. It is MEANT to spill into the gutters. 0 fits the art
-   *  to the bare trim, which is what left white slivers on the first cut. */
+   *  blade to drift into. It is MEANT to spill into the gutters — 1.5 against
+   *  the shop's 3 mm row gutter puts one row's bleed exactly against the next,
+   *  which is what a shared-edge bleed looks like. 0 fits the art to the bare
+   *  trim, which is what left white slivers on the first cut. */
   bleedMm?: number;
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
@@ -4684,7 +4686,7 @@ export async function imposeDivinityCards(
   /* NOT capped. Bleed is supposed to spill into the gutters — that is the whole
      point of it — and every card on the sheet is the same artwork, so where two
      bleeds overlap they overlap with themselves and the blade takes it away. */
-  const bleedMm = Math.max(0, opts.bleedMm ?? 2);
+  const bleedMm = Math.max(0, opts.bleedMm ?? 1.5);
 
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();

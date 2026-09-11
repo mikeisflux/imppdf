@@ -10,8 +10,10 @@
  * defaults are the shop's own measured numbers.
  *
  * ART BLEEDS PAST THE TRIM and is meant to spill into the gutters; that is what
- * a bleed is for. Neighbouring bleeds may overlap and that is fine — every card
- * on the sheet is the same artwork, and the blade takes the overlap away.
+ * a bleed is for. At 1.5 against the 3 mm row gutter, one row's bleed lands
+ * exactly against the next one's — a shared edge, with no paper between them.
+ * Overlap is allowed too: every card on the sheet is the same artwork, so two
+ * bleeds that cross cross with themselves and the blade takes it away.
  */
 
 export const MM_PER_IN = 25.4;
@@ -30,7 +32,7 @@ export const CARD_H_MM = CARD_H_IN * MM_PER_IN;   // 88.9
    measured a correct A4 all the way through and the paper was never A4.
 
    It is also the sheet on which the owner's measured template closes:
-     across  12.55 + 88.9 + 13 + 88.9 + 12.55 = 215.9  (Letter, exactly)
+     across  A 12 + 88.9 + B 10 + 88.9 + C 16.1 = 215.9  (Letter, exactly)
      down    6.5 + 4(63.5) + 3(3) + 11  = 280.5  (Letter is 279.4)
    Those same margins need 215.8 mm of a 210 mm A4, which is why they could
    never be honoured there.                                                 */
@@ -61,8 +63,8 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
    what is left over — there is one degree of freedom per axis, because A, the
    cards and C have to sum to the sheet. The panel shows C and H live so the
    operator can see what a change did.                                       */
-export const DEF_MARGIN_X_MM = 12;    // A — sheet edge to the first cut line
-export const DEF_GUTTER_X_MM = 9;     // B — between the columns
+export const DEF_MARGIN_X_MM = 11;    // A — sheet edge to the first cut line
+export const DEF_GUTTER_X_MM = 10;    // B — between the columns
 export const DEF_MARGIN_TOP_MM = 6.5; // D — head margin
 export const DEF_GUTTER_Y_MM = 3;     // E/F/G — between the rows
 

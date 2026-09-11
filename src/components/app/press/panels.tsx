@@ -2929,7 +2929,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
 
       <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E place the rows; C and H are what is left over.">
         {([
-          ['marginXMm', 'A', 'Left edge to card', 12],
+          ['marginXMm', 'A', 'Left edge to card', 11],
           ['gutterXMm', 'B', 'Between the columns', 9],
           ['marginTopMm', 'D', 'Head to row 1', 6.5],
           ['gutterYMm', 'E / F / G', 'Between the rows', 3],
@@ -2941,7 +2941,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         ))}
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 14 }}>
           <span className="pe-label" style={{ flex: 1 }}>Bleed<span className="pe-label-sm"> · art past the cut</span></span>
-          <NumRaw value={s.bleedMm ?? 2} onValue={(v) => up({ bleedMm: v })} w={70} />
+          <NumRaw value={s.bleedMm ?? 1.5} onValue={(v) => up({ bleedMm: v })} w={70} />
         </div>
         <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.8 }}>
           <div>C · card to right edge <b>{FIT.marginRightMm.toFixed(2)} mm</b></div>

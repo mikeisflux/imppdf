@@ -32,9 +32,9 @@ test('THE CELL IS THE CARD — 2.5 x 3.5in laid sideways, exactly', () => {
 });
 
 test('the measured gaps are the DEFAULTS the panel starts from', () => {
-  assert.equal(DEF_GUTTER_X_MM, 9, 'B — between the columns');
+  assert.equal(DEF_GUTTER_X_MM, 10, 'B — between the columns');
   assert.equal(DEF_GUTTER_Y_MM, 3, 'E/F/G — between the rows');
-  assert.equal(DEF_MARGIN_X_MM, 12, 'A — the shop\'s measured left margin');
+  assert.equal(DEF_MARGIN_X_MM, 11, 'A — the shop\'s measured left margin');
   assert.equal(DEF_MARGIN_TOP_MM, 6.5, 'D — the shop\'s measured head margin');
   assert.equal(COLS, 2);
   assert.equal(ROWS, 4);
@@ -49,11 +49,11 @@ test('LETTER is the default sheet, and the measured template closes on it', () =
   const f = fitDivinityCards();
   assert.ok(close(f.sheetWMm, 215.9), '8.5in wide');
   assert.ok(close(f.sheetHMm, 279.4), '11in tall');
-  assert.ok(close(f.marginXMm, 12), `A as measured, got ${f.marginXMm}`);
+  assert.ok(close(f.marginXMm, 11), `A as measured, got ${f.marginXMm}`);
   assert.equal(f.n, 8);
   // And the sum the owner measured across the sheet.
   assert.ok(close(f.marginXMm + 2 * PLACED_W_MM + DEF_GUTTER_X_MM + f.marginRightMm, 215.9),
-    'A 12 + 88.9 + B 9 + 88.9 + C 17.1 = 215.9');
+    'A 11 + 88.9 + B 10 + 88.9 + C 17.1 = 215.9');
   // A4 is taller, which is the clipping.
   assert.ok(close(297 - 279.4, 17.6), 'A4 overhangs Letter by 17.6 mm');
 });
@@ -65,7 +65,7 @@ test('tabloid is two Letters side by side, cut at 215.9', () => {
   assert.equal(f.n, 16);
   assert.ok(close(f.cutXMm[0]!, 215.9), 'cut down the middle into two Letters');
   const right = f.cells.slice(8);
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 12),
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 11),
     'each half carries its own A margin');
 });
 
@@ -91,7 +91,7 @@ test('the artwork loses NOTHING — the cell is the card, so cover-fit is 1:1', 
   assert.ok(close(CARD_W_MM * scale - PLACED_H_MM, 0), 'nothing off the height');
 });
 
-test('A4: eight cards, 2 across x 4 down, on a 97.9 x 66.5 pitch', () => {
+test('A4: eight cards, 2 across x 4 down, on a 98.9 x 66.5 pitch', () => {
   const f = fitDivinityCards('a4');
   assert.equal(f.sheetWMm, 210);
   assert.equal(f.sheetHMm, 297);
@@ -100,9 +100,9 @@ test('A4: eight cards, 2 across x 4 down, on a 97.9 x 66.5 pitch', () => {
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
   assert.equal(xs.length, 2, 'two columns');
-  assert.ok(close(xs[0]!, 12), `A at 12, got ${xs}`);
+  assert.ok(close(xs[0]!, 11), `A at 11, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
-  assert.ok(close(xs[1]! - xs[0]!, 97.9), 'column pitch 88.9 + 9');
+  assert.ok(close(xs[1]! - xs[0]!, 98.9), 'column pitch 88.9 + 10');
   for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66.5), 'row pitch 63.5 + 3');
   assert.ok(close(Math.min(...ys), 297 - 6.5 - 254 - 9), 'the last row sits on H');
 });
@@ -138,7 +138,7 @@ test('A3: the A4 block duplicated — sixteen cards, cut down at 210', () => {
     assert.ok(close(left[i]!.yMm, right[i]!.yMm), 'and at the same height');
   }
   // Each half, cut free, carries its own A margin.
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 12));
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 11));
 });
 
 /** One portrait card, with a marker so its orientation is checkable. */
@@ -319,4 +319,21 @@ test('bleed is NOT capped — it is meant to spill into the gutters', async () =
   const { width, height } = doc.getPage(0).getSize();
   assert.ok(Math.abs(width - 215.9 * PT_PER_MM) < 0.5, 'and the sheet is untouched');
   assert.ok(Math.abs(height - 279.4 * PT_PER_MM) < 0.5);
+});
+
+test('the bleed leaves the paper the operator expects in each gutter', () => {
+  /* The arithmetic the owner did out loud, kept so it cannot drift: bleed eats
+     into the gutter from BOTH sides, so what is left between two bled cards is
+     the gutter minus twice the bleed. B 10 leaves 7 mm of paper; E/F/G 3 leaves
+     nothing at all, which is a shared edge and exactly right. */
+  const BLEED = 1.5;
+  const f = fitDivinityCards('letter');
+  const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
+  const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
+  const gapX = xs[1]! - xs[0]! - PLACED_W_MM;
+  const gapY = ys[0]! - ys[1]! - PLACED_H_MM;
+  assert.ok(close(gapX, 10), 'B is 10 between the trims');
+  assert.ok(close(gapY, 3), 'E/F/G is 3 between the trims');
+  assert.ok(close(gapX - 2 * BLEED, 7), '7 mm of paper left between the columns');
+  assert.ok(close(gapY - 2 * BLEED, 0), 'and the rows bleed edge to edge');
 });
