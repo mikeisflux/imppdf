@@ -54,15 +54,16 @@ test('B is a setting, and the cell never moves with it', () => {
   assert.equal(wide.n, 8, 'and it still fits eight');
 });
 
-test('B 9 down the middle, E F G 0.5 between the rows', () => {
+test('B 9 down the middle, E 0.5 F 1.2 G 1.2 between the rows', () => {
   const f = fitDivinityCards('letter');
   assert.ok(close(DEF_GUTTER_X_MM, 9), 'B defaults to 9');
-  assert.deepEqual(f.rowGapsMm, [0.5, 0.5, 0.5], 'E F G default to half a millimetre each');
+  assert.deepEqual(f.rowGapsMm, [0.5, 1.2, 1.2], 'E F G are the measured 0.5 / 1.2 / 1.2');
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
   assert.ok(close(xs[1]! - xs[0]!, PLACED_W_MM + 9), 'column pitch = cell + B');
+  /* Pitch differs row to row, which is the point of three settings. */
   for (let i = 1; i < ys.length; i++)
-    assert.ok(close(ys[i - 1]! - ys[i]!, PLACED_H_MM + 0.5), 'row pitch = cell + its gap');
+    assert.ok(close(ys[i - 1]! - ys[i]!, PLACED_H_MM + f.rowGapsMm[i - 1]!), 'row pitch = cell + its own gap');
 });
 
 test('E F G are set INDEPENDENTLY, and H takes up whatever they leave', () => {
@@ -75,7 +76,8 @@ test('E F G are set INDEPENDENTLY, and H takes up whatever they leave', () => {
   assert.ok(close(ys[1]! - ys[2]!, PLACED_H_MM + 2), 'F between rows 2 and 3');
   assert.ok(close(ys[2]! - ys[3]!, PLACED_H_MM + 1), 'G between rows 3 and 4');
   const plain = fitDivinityCards('letter');
-  assert.ok(close(plain.marginBottomMm - f.marginBottomMm, 6 - 1.5),
+  const opened = 6 - (plain.rowGapsMm[0] + plain.rowGapsMm[1] + plain.rowGapsMm[2]);
+  assert.ok(close(plain.marginBottomMm - f.marginBottomMm, opened),
     'H closes up by exactly what the three gaps opened');
 });
 
@@ -129,10 +131,11 @@ test('EVERY GAP IS REAL PAPER — no bleed is laid over any of them', async () =
   assert.ok(close(rects[1]![0] - (rects[0]![0] + rects[0]![2]), 9, 0.02), 'B is 9 of paper');
   assert.ok(close(215.9 - (rects[1]![0] + rects[1]![2]), 9.6, 0.02), 'C is 9.60 of paper');
   assert.ok(close(279.4 - (rects[0]![1] + rects[0]![3]), 5, 0.02), 'D is 5 of paper');
+  const rowGaps = fitDivinityCards('letter').rowGapsMm;
   for (let i = 1; i < left.length; i++)
-    assert.ok(close(left[i - 1]![1] - (left[i]![1] + left[i]![3]), 0.5, 0.02),
-      'E, F and G are half a millimetre of WHITE, not ink');
-  assert.ok(close(left[3]![1], 12.9, 0.02), 'H is 12.90 of paper');
+    assert.ok(close(left[i - 1]![1] - (left[i]![1] + left[i]![3]), rowGaps[i - 1]!, 0.02),
+      `E, F and G are ${rowGaps.join(' / ')} of WHITE, not ink`);
+  assert.ok(close(left[3]![1], 11.5, 0.02), 'H is 11.50 of paper');
 });
 
 test('A4: eight cards, 2 across x 4 down', () => {
@@ -147,8 +150,9 @@ test('A4: eight cards, 2 across x 4 down', () => {
   assert.ok(close(xs[0]!, DEF_MARGIN_X_MM), `A at ${DEF_MARGIN_X_MM}, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
   assert.ok(close(xs[1]! - xs[0]!, 99.4), 'column pitch = the cell + B 9');
-  for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 65.5), 'row pitch = cell + 0.5');
-  assert.ok(close(Math.min(...ys), 297 - 5 - 260 - 1.5), 'the last row sits on H');
+  for (let i = 1; i < ys.length; i++)
+    assert.ok(close(ys[i - 1]! - ys[i]!, 65 + f.rowGapsMm[i - 1]!), 'row pitch = cell + its own gap');
+  assert.ok(close(Math.min(...ys), 297 - 5 - 260 - 2.9), 'the last row sits on H');
 });
 
 test('A4: every card is inside the sheet, and none overlaps another', () => {
@@ -390,6 +394,10 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
   };
   assert.equal(await leftEdge(off), 16.5, 'unticked: A 16.5');
   assert.equal(await leftEdge(on), 9.6, 'ticked: A becomes C 9.60');
+  /* A 16.5 against C 9.60 is a 6.9 mm move — if the mirror ever silently stopped
+     working this is the assertion that screams, which the near-identical pairs
+     of earlier templates could not do. */
+  assert.ok(Math.abs(16.5 - 9.6) > 5, 'and the two are far enough apart to see');
   /* Run it again on a deliberately lopsided A, so the claim does not rest on one
      pair of numbers that happen to differ — the block really is flipped end for
      end, whatever A is set to. */

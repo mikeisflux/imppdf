@@ -155,10 +155,10 @@ export function defaultSettings(type: StepType): StepSettings {
       /* The shop's card template, measured off its own cut machine: a 90.4 x 65
          cell (a 2.5 x 3.5" card laid sideways, 1.5 over on each dimension),
          eight to a Letter, the block doubled onto 11 x 17 that cuts into two
-         Letters. E, F and G are 0.5 each. */
+         Letters. E, F and G are 0.5, 1.2, 1.2 — the machine's own feed. */
       return { sheet: 'letter', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false,
         marginXMm: 16.5, marginTopMm: 5, gutterXMm: 9,
-        gutterEMm: 0.5, gutterFMm: 0.5, gutterGMm: 0.5,
+        gutterEMm: 0.5, gutterFMm: 1.2, gutterGMm: 1.2,
         addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is

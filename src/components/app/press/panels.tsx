@@ -2988,8 +2988,10 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               sheet lands behind its fronts.
             </div>
           )}
-          <b>A {DEF_MARGIN_X_MM} · B {DEF_GUTTER_X_MM} · D {DEF_MARGIN_TOP_MM} · E F G {DEF_GUTTER_E_MM}</b> on
-          Letter. C and H are the remainder — C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
+          <b>A {DEF_MARGIN_X_MM} · B {DEF_GUTTER_X_MM} · D {DEF_MARGIN_TOP_MM} · E {DEF_GUTTER_E_MM} ·
+          F {DEF_GUTTER_F_MM} · G {DEF_GUTTER_G_MM}</b> on Letter — the three row gaps are NOT
+          equal, because the machine's feed is not. C and H are the remainder —
+          C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
           <br /><b>There is no bleed.</b> The art is laid at the cell exactly, so every number
           here is the <b>white paper you can measure</b> on the sheet — E F G at 0.5 is half a
           millimetre of white between the rows, not a cut line buried under ink.

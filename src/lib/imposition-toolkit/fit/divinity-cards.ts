@@ -18,11 +18,11 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 16.5   B 9   D 5   E F G 0.5   sheet LETTER
- *     C and H then fall out at 9.60 and 12.90.
+ *     A 16.5   B 9   D 5   E 0.5   F 1.2   G 1.2   sheet LETTER
+ *     C and H then fall out at 9.60 and 11.50.
  *
- *     across  16.5 + 90.4 + 9 + 90.4 + 9.6    = 215.9
- *     down    5 + 4(65) + 3(0.5) + 12.9       = 279.4
+ *     across  16.5 + 90.4 + 9 + 90.4 + 9.6         = 215.9
+ *     down    5 + 4(65) + 0.5 + 1.2 + 1.2 + 11.5   = 279.4
  *
  * THERE IS NO BLEED. The card is a set size and the art is laid at exactly that
  * size, so EVERY GAP HERE IS WHAT THE RULER READS on the sheet — the paper you
@@ -30,9 +30,10 @@
  * each cell by 1.5 mm on all four sides put 3 mm of ink into a 0.5 mm row gap,
  * overlapped the rows, and made those settings do nothing visible.
  *
- * THE ROW GAPS ARE 0.5 — E, F and G, each its own setting, and each is half a
- * millimetre of actual paper between two cards. Change one and H closes up by
- * exactly that much: D stays where it is and the block grows downward.
+ * THE ROW GAPS ARE 0.5, 1.2, 1.2 — E, F and G, each its own setting and each
+ * real paper between two cards. They differ because the machine's feed does.
+ * Change one and H closes up by exactly that much: D stays where it is and the
+ * block grows downward.
  *
  * A IS NOT EQUAL TO C — 16.5 against 9.6, so the block sits well right of
  * centre. That is not a mistake and not something to tidy up: these numbers
@@ -106,13 +107,13 @@ export const DEF_GUTTER_X_MM = 9;     // B — down the middle, between the colu
    gaps with a ruler, not one gap three times, and a machine that drifts down
    the sheet needs them to differ. */
 export const DEF_GUTTER_E_MM = 0.5;   // E — row 1 to row 2
-export const DEF_GUTTER_F_MM = 0.5;   // F — row 2 to row 3
-export const DEF_GUTTER_G_MM = 0.5;   // G — row 3 to row 4
+export const DEF_GUTTER_F_MM = 1.2;   // F — row 2 to row 3
+export const DEF_GUTTER_G_MM = 1.2;   // G — row 3 to row 4
 
 /* The vertical chain is four cells plus E, F and G:
 
      D 5 + 4(65) + E + F + G + H             on a 279.4 sheet
-     at the default 0.5 0.5 0.5          ->  H 12.9
+     at the default 0.5 1.2 1.2          ->  H 11.5
 
    Nothing is drawn outside a cell, so that sum is the sheet exactly. */
 
