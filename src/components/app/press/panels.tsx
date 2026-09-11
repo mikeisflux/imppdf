@@ -2941,11 +2941,15 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         )}
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
           <span className="pe-label" style={{ flex: 1 }}>Column gutter<span className="pe-label-sm"> · B, mm</span></span>
-          <NumRaw value={s.gutterXMm ?? 10} onValue={(v) => up({ gutterXMm: v })} w={70} />
+          <NumRaw value={s.gutterXMm ?? 9} onValue={(v) => up({ gutterXMm: v })} w={70} />
         </div>
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
           <span className="pe-label" style={{ flex: 1 }}>Row gutter<span className="pe-label-sm"> · E / F / G, mm</span></span>
           <NumRaw value={s.gutterYMm ?? 3} onValue={(v) => up({ gutterYMm: v })} w={70} />
+        </div>
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+          <span className="pe-label" style={{ flex: 1 }}>Bleed<span className="pe-label-sm"> · past the cut, mm</span></span>
+          <NumRaw value={s.bleedMm ?? 1.5} onValue={(v) => up({ bleedMm: v })} w={70} />
         </div>
       </Section>
 

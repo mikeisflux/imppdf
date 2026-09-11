@@ -4658,6 +4658,11 @@ export interface DivinityCardOptions {
   /** D, when `centre` is off. */       marginTopMm?: number;
   /** B — between the columns. */       gutterXMm?: number;
   /** E/F/G — between the rows. */      gutterYMm?: number;
+  /** How far the art runs PAST the trim on every side, mm. Default 1.5. The
+   *  cell stays the true card size; this only decides how much ink is there for
+   *  the blade to drift into. 0 fits the art to the bare trim, which is what
+   *  left white slivers on the shop's first cut stack. */
+  bleedMm?: number;
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
   markLenMm?: number;      // default 3
@@ -4677,6 +4682,12 @@ export async function imposeDivinityCards(
     gutterXMm: opts.gutterXMm, gutterYMm: opts.gutterYMm,
   });
   const mm = (v: number) => v * PT_PER_MM;
+
+  /* Capped at half the tighter gutter so neighbouring bleeds meet but never
+     overlap — a card's own bleed in the gutter is invisible after cutting, a
+     neighbour's is somebody else's artwork on your card. */
+  const gapMm = Math.min(opts.gutterXMm ?? 9, opts.gutterYMm ?? 3);
+  const bleedMm = Math.max(0, Math.min(opts.bleedMm ?? 1.5, gapMm / 2));
 
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();
@@ -4721,15 +4732,24 @@ export async function imposeDivinityCards(
     const artW = turn ? card.height : card.width;
     const artH = turn ? card.width : card.height;
     for (const c of fit.cells) {
-      const cw = mm(c.wMm), ch = mm(c.hMm);
+      /* BLEED. The cell is the TRIM — where the blade is aimed. The art is laid
+         into that cell grown by `bleed` on all four sides, so it runs out into
+         the gutter and a cut that drifts still lands in ink instead of leaving a
+         white sliver down one edge. The owner's artwork already carries about
+         1.6 mm of bleed; fitting it to the bare trim threw that away, which is
+         exactly what the slivers on the first cut stack were.
+         The CUT MARKS are drawn from fit.cells and so still mark the trim. */
+      const bl = mm(bleedMm);
+      const bx = mm(c.xMm) - bl, by = mm(c.yMm) - bl;
+      const cw = mm(c.wMm) + 2 * bl, ch = mm(c.hMm) + 2 * bl;
       /* COVER-fit and clip: a card is trimmed on all four sides, so the art must
-         reach every edge of the cell. Contain would leave white slivers inside
-         the trim, which on a card reads as a printing fault. */
+         reach every edge. Contain would leave white inside the trim, which on a
+         card reads as a printing fault. */
       const scale = Math.max(cw / artW, ch / artH);
       const dw = artW * scale, dh = artH * scale;
-      const x = mm(c.xMm) + (cw - dw) / 2, y = mm(c.yMm) + (ch - dh) / 2;
+      const x = bx + (cw - dw) / 2, y = by + (ch - dh) / 2;
       const w = card.width * scale, h = card.height * scale;
-      pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(mm(c.xMm), mm(c.yMm), cw, ch), PL.clip(), PL.endPath());
+      pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(bx, by, cw, ch), PL.clip(), PL.endPath());
       /* Rotating sweeps the box away from the placement point, so the anchor is
          the corner it sweeps FROM: bottom-right at 90, top-left at 270, and the
          far corner at 180. */

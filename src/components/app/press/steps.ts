@@ -155,7 +155,8 @@ export function defaultSettings(type: StepType): StepSettings {
       // The shop's card template, to the printer's spec sheet: 54 x 90 mm card,
       // ten to an A4, the A4 block doubled onto an A3 that cuts into two A4s.
       return { sheet: 'letter', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false,
-        centre: true, marginXMm: 14, marginTopMm: 6.5, gutterXMm: 10, gutterYMm: 3,
+        centre: true, marginXMm: 14, marginTopMm: 6.5, gutterXMm: 9, gutterYMm: 3,
+        bleedMm: 1.5,
         addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
@@ -631,6 +632,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           centre: s.centre !== false,
           marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
           gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
+          bleedMm: s.bleedMm ?? 1.5,
           addMarks: s.addMarks !== false,
         });
         break;

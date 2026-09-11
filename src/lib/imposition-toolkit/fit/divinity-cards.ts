@@ -35,7 +35,7 @@ export const CARD_H_MM = CARD_H_IN * MM_PER_IN;   // 88.9
    measured a correct A4 all the way through and the paper was never A4.
 
    It is also the sheet on which the owner's measured template closes:
-     across  14 + 88.9 + 10 + 88.9 + 14 = 215.8  (Letter is 215.9)
+     across  14.55 + 88.9 + 9 + 88.9 + 14.55 = 215.9  (Letter, exactly)
      down    6.5 + 4(63.5) + 3(3) + 11  = 280.5  (Letter is 279.4)
    Those same margins need 215.8 mm of a 210 mm A4, which is why they could
    never be honoured there.                                                 */
@@ -64,7 +64,7 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
    CELL is never one of them: it is always a true 2.5 x 3.5" card, because a
    cell that is not a card cuts cards that are the wrong size.               */
 export const DEF_MARGIN_X_MM = 14;    // A and C — sheet edge to the first cut line
-export const DEF_GUTTER_X_MM = 10;    // B — between the columns
+export const DEF_GUTTER_X_MM = 9;     // B — between the columns
 /** D — head margin. Only used when `centre` is off. */
 export const DEF_MARGIN_TOP_MM = 6.5;
 export const DEF_GUTTER_Y_MM = 3;     // E/F/G — between the rows

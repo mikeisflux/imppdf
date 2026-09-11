@@ -32,7 +32,7 @@ test('THE CELL IS THE CARD — 2.5 x 3.5in laid sideways, exactly', () => {
 });
 
 test('the measured gaps are the DEFAULTS the panel starts from', () => {
-  assert.equal(DEF_GUTTER_X_MM, 10, 'B — between the columns');
+  assert.equal(DEF_GUTTER_X_MM, 9, 'B — between the columns');
   assert.equal(DEF_GUTTER_Y_MM, 3, 'E/F/G — between the rows');
   assert.equal(DEF_MARGIN_X_MM, 14, 'A/C, used only when the block is pinned');
   assert.equal(DEF_MARGIN_TOP_MM, 6.5, 'D, used only when the block is pinned');
@@ -49,11 +49,11 @@ test('LETTER is the default sheet, and the measured template closes on it', () =
   const f = fitDivinityCards();
   assert.ok(close(f.sheetWMm, 215.9), '8.5in wide');
   assert.ok(close(f.sheetHMm, 279.4), '11in tall');
-  assert.ok(close(f.marginXMm, 14.05), `the measured 14 mm, got ${f.marginXMm}`);
+  assert.ok(close(f.marginXMm, 14.55), `centred on Letter, got ${f.marginXMm}`);
   assert.equal(f.n, 8);
   // And the sum the owner measured across the sheet.
   assert.ok(close(2 * f.marginXMm + 2 * PLACED_W_MM + DEF_GUTTER_X_MM, 215.9),
-    '14.05 + 88.9 + 10 + 88.9 + 14.05');
+    '14.55 + 88.9 + 9 + 88.9 + 14.55');
   // A4 is taller, which is the clipping.
   assert.ok(close(297 - 279.4, 17.6), 'A4 overhangs Letter by 17.6 mm');
 });
@@ -65,8 +65,8 @@ test('tabloid is two Letters side by side, cut at 215.9', () => {
   assert.equal(f.n, 16);
   assert.ok(close(f.cutXMm[0]!, 215.9), 'cut down the middle into two Letters');
   const right = f.cells.slice(8);
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 14.05),
-    'each half carries its own 14 mm margin');
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 14.55),
+    'each half carries its own side margin');
 });
 
 test('CENTRED by default — the block clears the press margin', () => {
@@ -77,7 +77,7 @@ test('CENTRED by default — the block clears the press margin', () => {
   const f = fitDivinityCards();
   assert.ok(close(f.marginTopMm, 8.2), `8.2 clear at the head, got ${f.marginTopMm}`);
   assert.ok(close(f.marginBottomMm, 8.2), 'and the same at the foot');
-  assert.ok(close(f.marginXMm, 14.05), 'centred across too');
+  assert.ok(close(f.marginXMm, 14.55), 'centred across too');
   const a4 = fitDivinityCards('a4');
   assert.ok(close(a4.marginTopMm, 17), 'A4 centres at 17 head and foot');
   assert.ok(close(a4.marginBottomMm, 17));
@@ -112,7 +112,7 @@ test('the artwork loses NOTHING — the cell is the card, so cover-fit is 1:1', 
   assert.ok(close(CARD_W_MM * scale - PLACED_H_MM, 0), 'nothing off the height');
 });
 
-test('A4: eight cards, 2 across x 4 down, on a 98.9 x 66.5 pitch', () => {
+test('A4: eight cards, 2 across x 4 down, on a 97.9 x 66.5 pitch', () => {
   const f = fitDivinityCards('a4');
   assert.equal(f.sheetWMm, 210);
   assert.equal(f.sheetHMm, 297);
@@ -121,9 +121,9 @@ test('A4: eight cards, 2 across x 4 down, on a 98.9 x 66.5 pitch', () => {
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
   assert.equal(xs.length, 2, 'two columns');
-  assert.ok(close(xs[0]!, 11.1) && close(xs[1]!, 110), `at 11.1 and 110, got ${xs}`);
+  assert.ok(close(xs[0]!, 11.6), `at 11.6, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
-  assert.ok(close(xs[1]! - xs[0]!, 98.9), 'column pitch 88.9 + 10');
+  assert.ok(close(xs[1]! - xs[0]!, 97.9), 'column pitch 88.9 + 9');
   for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66.5), 'row pitch 63.5 + 3');
   assert.ok(close(Math.min(...ys), 17), 'the last row sits on the centred foot margin');
 });
@@ -158,9 +158,9 @@ test('A3: the A4 block duplicated — sixteen cards, cut down at 210', () => {
     assert.ok(close(right[i]!.xMm, a4.cells[i]!.xMm + 210), `right card ${i} is the same, +210`);
     assert.ok(close(left[i]!.yMm, right[i]!.yMm), 'and at the same height');
   }
-  // So each half, cut free, is a correct A4: 11.1 mm in from its own edges.
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 11.1));
-  assert.ok(close(420 - Math.max(...right.map((c) => c.xMm + c.wMm)), 11.1));
+  // So each half, cut free, is a correct A4: 11.6 mm in from its own edges.
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 11.6));
+  assert.ok(close(420 - Math.max(...right.map((c) => c.xMm + c.wMm)), 11.6));
   // And centred, it now mirrors end-for-end as well as across.
   assert.ok(close(f.marginTopMm, f.marginBottomMm), 'equal head and foot');
 });
@@ -330,4 +330,47 @@ test('backs can be turned off; a one-page file still previews a back sheet', asy
   const spun = await imposeDivinityCards(await cardPdf(), { sheet: 'a4', spinBacks: true });
   const b = await turnsOnPage(spun, 1), u = await turnsOnPage(single, 1);
   assert.ok((b.ccw > 0) !== (u.ccw > 0), 'spinning a stand-in back really turns it');
+});
+
+test('BLEED runs the art past the trim without moving the cut', async () => {
+  /* The white slivers on the shop's first cut stack: the art was fitted to the
+     bare trim, so any drift in the blade left paper showing down one edge. The
+     art now overflows into the gutter. The CELL is untouched — bleed must move
+     ink, never the cut line, or every card comes out a different size. */
+  const a = fitDivinityCards('letter');
+  for (const c of a.cells) {
+    assert.ok(close(c.wMm, PLACED_W_MM), 'trim unchanged by bleed');
+    assert.ok(close(c.hMm, PLACED_H_MM));
+  }
+
+  const zero = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', bleedMm: 0 });
+  const bled = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', bleedMm: 1.5 });
+  // More ink on the sheet means a bigger scale factor in the placement matrix.
+  const scaleOf = async (b: Uint8Array) => {
+    const zlib = await import('node:zlib');
+    const { PDFStream } = await import('pdf-lib');
+    const d = await PDFDocument.load(b);
+    const st = d.getPage(0).node.normalizedEntries().Contents;
+    let text = '';
+    for (let i = 0; st && i < st.size(); i++) {
+      const raw = (d.context.lookup(st.get(i), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+      try { text += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+      catch { text += Buffer.from(raw).toString('latin1'); }
+    }
+    const m = [...text.matchAll(/(-?[\d.]+) 0 0 (-?[\d.]+) [-\d.]+ [-\d.]+ cm/g)];
+    return Math.max(...m.map((x) => Math.abs(Number(x[1]))));
+  };
+  assert.ok(await scaleOf(bled) > await scaleOf(zero), 'bleed really enlarges the art');
+});
+
+test('bleed is capped at half the tighter gutter, so bleeds never overlap', async () => {
+  /* A card's own bleed in the gutter vanishes when it is cut. A NEIGHBOUR's
+     bleed on your card is somebody else's artwork, so the cap is not optional.
+     The row gutter is 3, so 1.5 is the ceiling however big a number is typed. */
+  const huge = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', bleedMm: 50 });
+  const doc = await PDFDocument.load(huge);
+  assert.equal(doc.getPageCount(), 2, 'still builds');
+  const { width, height } = doc.getPage(0).getSize();
+  assert.ok(Math.abs(width - 215.9 * PT_PER_MM) < 0.5, 'and the sheet is untouched');
+  assert.ok(Math.abs(height - 279.4 * PT_PER_MM) < 0.5);
 });
