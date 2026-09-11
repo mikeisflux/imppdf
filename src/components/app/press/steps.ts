@@ -157,13 +157,12 @@ export function defaultSettings(type: StepType): StepSettings {
       return { sheet: 'a3', page: 1, backPage: 2, backs: true, flip: 'long', addMarks: true };
     case 'divinitydeck':
       /* A whole deck out of one file — a card per page, the LAST page the shared
-         back — ganged on a PORTRAIT A4 with the card lying ACROSS it.
-         'turned' is that 8-up, which is what the shop's guillotine takes off one
-         A4. 'upright' would fit nine and is deliberately not the default.
+         back — ganged 8-up on a PORTRAIT A4, to the cut machine's own measured
+         template (14 mm sides, 6.5 top/bottom, 10 mm gutters).
          'grouped' because the printer will not duplex stock this thick: every
          front prints, the stack comes out and goes back in, then every back.
          backPage 0 means "the last page", so it tracks a deck that grows. */
-      return { orient: 'turned', backPage: 0, backs: true, order: 'grouped', flip: 'long', addMarks: true };
+      return { backPage: 0, backs: true, order: 'grouped', flip: 'long', addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
@@ -636,7 +635,6 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       case 'divinitydeck': {
         const { imposeDivinityDeck } = await import('@/lib/imposition-toolkit/impose');
         b = (await imposeDivinityDeck(b, {
-          orient: s.orient === 'upright' ? 'upright' : 'turned',
           // 0/absent = the last page, which is where the shared back lives in
           // the shop's export. A real page number overrides it.
           backPage: s.backPage && s.backPage > 0 ? s.backPage : undefined,

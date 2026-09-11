@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import '@/lib/polyfills';
 import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, RAISED_METAL_DEFAULTS as RM, type ZineFormat } from '@/lib/imposition-toolkit/impose';
+import { deckLayout } from '@/lib/imposition-toolkit/fit/divinity-deck';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
 import { ImageFitModal } from './image-fit-modal';
@@ -2934,12 +2935,10 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
  * computed here from the page count rather than waiting for the export. */
 function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
   const MM = 25.4 / 72;
-  /* Kept in step with fit/divinity-deck.ts: on the 210 x 297 portrait sheet the
-     card lying across gives 2 x 4 and standing upright gives 3 x 3. Worked
-     there, restated here only to label the chips. */
-  const across = s.orient !== 'upright';
-  const COLS = across ? 2 : 3, ROWS = across ? 4 : 3;
-  const PER_SHEET = COLS * ROWS;
+  /* Read straight from the fit module rather than restated here — the counts
+     move with the gutter, and a second copy of them is exactly what goes stale. */
+  const LAY = deckLayout();
+  const { cols: COLS, rows: ROWS, perSheet: PER_SHEET } = LAY;
   // Same rule as the engine: the named back page, or the last page.
   const backPg = s.backPage && s.backPage > 0
     ? Math.max(1, Math.min(pageCount, Math.round(s.backPage)))
@@ -2961,31 +2960,10 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload the <b>whole deck</b> — one card per page, the <b>last page the shared
-        back</b>. Cards go {PER_SHEET} to a <b>portrait A4</b> (210 × 297 mm), standard
-        <b>2.5 × 3.5&quot;</b>, 3 mm gutters.
+        back</b>. {PER_SHEET} to a <b>portrait A4</b>, {COLS} across × {ROWS} down, cards
+        <b>lying sideways</b> in an <b>89 × 63 mm</b> cell — the cut machine&apos;s own
+        template.
       </div>
-
-      <Section label="// CARD DIRECTION" help="Which way round the cards sit on the sheet. Set this to match your cutter, not to save paper.">
-        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <button className="pe-chipbtn" style={pickStyle(across)} onClick={() => up({ orient: 'turned' })}>Across · 8-up</button>
-          <button className="pe-chipbtn" style={pickStyle(!across)} onClick={() => up({ orient: 'upright' })}>Upright · 9-up</button>
-        </div>
-        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
-          <div>Grid <b>{COLS} across × {ROWS} down</b> = <b>{PER_SHEET} cards</b>, each 2.5 × 3.5&quot;</div>
-          {across ? (
-            <div style={{ marginTop: 4 }}>
-              The way the cutter takes them — <b>8 off one A4</b>. Standing them upright
-              would fit nine{cards ? <> ({Math.ceil(cards / 9)} sheets instead of {sheets})</> : null},
-              but that is not how this gets cut.
-            </div>
-          ) : (
-            <div style={{ marginTop: 4 }}>
-              One more per sheet, but the cards come off the guillotine a quarter turn from
-              the way the shop cuts them. Only use this if you are cutting them yourself.
-            </div>
-          )}
-        </div>
-      </Section>
 
       <Section label="// DECK" help="Read straight off the file: every page except the back is a card.">
         {pageCount > 1 ? (
@@ -3016,7 +2994,8 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
         <div className="pe-note" style={{ lineHeight: 1.7 }}>
           The page is a plain <b>portrait A4</b>, 210 × 297 mm. Which edge goes into the
           tray first is a printer setting, not something the file decides — feed it
-          <b> long edge first</b> through the bypass as usual for heavy stock.
+          <b> long edge first</b> through the bypass as usual for heavy stock.<br />
+          Across <b>11 + 89 + 10 + 89 + 11 = 210</b>. Down <b>18 + 4×63 + 3×3 + 18 = 297</b>.
         </div>
       </Section>
 
@@ -3049,20 +3028,15 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
             </div>
             <div className="pe-note" style={{ marginTop: 8 }}>
               How the stack goes back in. The grid is <b>symmetric</b>, so the positions land
-              on themselves either way.{across ? (
-                <> A card lying <b>across</b> has its &ldquo;up&rdquo; along the axis a
-                  long-edge flip reverses, so the back art is turned the other way to come
-                  out upright against its front.</>
-              ) : (
-                <> With the cards <b>upright</b> nothing is turned at all, so this changes
-                  nothing.</>
-              )}
+              on themselves either way. A card lying <b>sideways</b> has its
+              &ldquo;up&rdquo; along the axis a long-edge flip reverses, so the back art is
+              turned the other way to come out upright against its front.
             </div>
           </>
         )}
       </Section>
 
-      <Section label="// MARKS" help="Cut marks are ruled off the sheet edges, never into the gutters — a mark long enough to be useful in a 3 mm gutter would run onto the next card.">
+      <Section label="// MARKS" help="Cut marks are ruled off the sheet edges rather than into the gutters, so nothing can print on a neighbouring card.">
         <Check icon="crop" label="Cut marks" sub="At every card edge, in the sheet margins"
           checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />
       </Section>
@@ -3085,8 +3059,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload <b>one card</b> and it fills the sheet. Standard <b>2.5 × 3.5&quot;</b>
-        (63.5 × 88.9 mm), lying across, <b>8 to an A4</b> — 3 mm gutters, 14.6 mm
-        at the sides and 17 mm top and bottom.
+        (63.5 × 88.9 mm), lying <b>sideways</b>, <b>8 to an A4</b> in an <b>89 × 63 mm</b>
+        cell — the cut machine&apos;s template: 10 mm between the columns, 3 mm between the
+        rows, 11 mm at the sides and 18 mm top and bottom.
       </div>
 
       <Section label="// SHEET" help="A3 is the A4 block printed twice, side by side. Cut it in half and you have two identical A4s to run.">
@@ -3097,6 +3072,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
           <div>Sheet <b>{a3 ? '420 × 297 mm (A3)' : '210 × 297 mm (A4)'}</b></div>
           <div>Grid <b>{a3 ? '2 blocks of 2 × 4' : '2 × 4'}</b> — <b>{a3 ? 16 : 8} cards</b>, each 2.5 × 3.5&quot;</div>
+          <div>Gutters <b>10</b> across, <b>3</b> down; margins <b>11</b> sides, <b>18</b> top and bottom</div>
           {a3 && <div>Cut down at <b>210 mm</b> for two A4s, marked top and bottom</div>}
           <div style={{ marginTop: 4 }}>
             A plain <b>portrait A4</b> with the cards lying <b>across</b> it. Eight is what
@@ -3162,13 +3138,13 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           </div>
         )}
         <div className="pe-note" style={{ marginTop: 8 }}>
-          Card positions are <b>absolute and symmetric</b> — 14.6 mm at both sides, 17 mm top
+          Card positions are <b>absolute and symmetric</b> — 11 mm at both sides, 18 mm top
           and bottom — so the grid backs up under either flip; the positions never need
           anything done to them.
         </div>
       </Section>
 
-      <Section label="// MARKS" help="Cut marks are ruled off the sheet edges, never into the gutters — a mark long enough to be useful in a 3 mm gutter would run onto the next card.">
+      <Section label="// MARKS" help="Cut marks are ruled off the sheet edges rather than into the gutters, so nothing can print on a neighbouring card.">
         <Check icon="crop" label="Cut marks" sub="At every card edge, in the sheet margins, plus the half-sheet cut on A3"
           checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />
       </Section>

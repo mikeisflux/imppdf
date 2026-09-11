@@ -4606,10 +4606,11 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
    ganged onto as many A4 sheets as the deck needs. 172 cards comes out at 20
    sheets, nine to a sheet.
 
-   The sheet is a PORTRAIT A4, 210 x 297, and the card LIES ACROSS it: 2 across
-   x 4 down = 8, which is what the shop's guillotine takes off one A4. Nine is
-   available (the card standing upright, 3 x 3) and is deliberately not taken.
-   Geometry and the fit arithmetic live in fit/divinity-deck.ts.
+   The sheet is a PORTRAIT A4, 210 x 297, laid out to the CUT MACHINE'S OWN
+   template: 14 mm side margins, 6.5 top and bottom, 10 mm gutters, 2 across x
+   4 down = 8. Those numbers were measured off the machine; the 86 x 63.5 cell
+   is the remainder. See fit/divinity-deck.ts — including why the cell is not
+   88.9 wide and must not be "corrected" to it.
 
    NO DUPLEX. The printer will not turn stock this thick, so the backs are a
    SEPARATE PASS: all the fronts first, then all the backs, grouped rather than
@@ -4622,12 +4623,9 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
    ART is turned the opposite way for a long-edge flip because a card lying on
    its side has its "up" along the axis the flip reverses.                    */
 
-import type { DeckCellMm, DeckOrient } from './fit/divinity-deck.ts';
+import type { DeckCellMm } from './fit/divinity-deck.ts';
 
 export interface DivinityDeckOptions {
-  /** How the card sits on the sheet. 'turned' (default) lies it ACROSS the
-   *  portrait sheet for the 8-up the cutter wants; 'upright' is the 9-up. */
-  orient?: DeckOrient;
   /** 1-based page holding the shared card back. Defaults to the LAST page. */
   backPage?: number;
   /** Emit the back sheets at all. Default true. */
@@ -4646,8 +4644,7 @@ export interface DivinityDeckReport {
   cards: number;
   sheets: number;
   perSheet: number;
-  /** How the card was laid down, and the grid that followed from it. */
-  orient: DeckOrient;
+  /** The grid, echoed so callers never restate it. */
   cols: number;
   rows: number;
   /** Empty cells on the final sheet. */
@@ -4668,9 +4665,9 @@ export async function imposeDivinityDeck(
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();
   const pages = src.getPages();
-  const L = F.deckLayout(opts.orient === 'upright' ? 'upright' : F.DEFAULT_ORIENT);
+  const L = F.deckLayout();
   const empty: DivinityDeckReport = {
-    cards: 0, sheets: 0, perSheet: L.perSheet, orient: L.orient, cols: L.cols, rows: L.rows,
+    cards: 0, sheets: 0, perSheet: L.perSheet, cols: L.cols, rows: L.rows,
     blanksOnLastSheet: 0, backsStartPage: null, totalPages: 0,
   };
   if (pages.length < 2) return { bytes: await out.save(), report: empty };
@@ -4681,7 +4678,7 @@ export async function imposeDivinityDeck(
   const backIdx = Math.min(pages.length, Math.max(1, Math.round(opts.backPage ?? pages.length))) - 1;
   const cardIdx = pages.map((_, i) => i).filter((i) => i !== backIdx);
   const cardCount = cardIdx.length;
-  const sheets = F.deckSheets(cardCount, L.perSheet);
+  const sheets = F.deckSheets(cardCount);
   const cells = L.cells;
 
   const cardEmbeds = await out.embedPages(cardIdx.map((i) => pages[i]!));
@@ -4748,7 +4745,7 @@ export async function imposeDivinityDeck(
     const pg = out.addPage([mm(F.SHEET_W_MM), mm(F.SHEET_H_MM)]);
     const used: DeckCellMm[] = [];
     cells.forEach((cell, ci) => {
-      const ci2 = F.deckCardAt(si, ci, cardCount, L.perSheet);
+      const ci2 = F.deckCardAt(si, ci, cardCount);
       if (ci2 < 0) return;
       const art = cardEmbeds[ci2];
       if (!art) return;
@@ -4765,7 +4762,7 @@ export async function imposeDivinityDeck(
     cells.forEach((cell, ci) => {
       // Only where the front actually carries a card — no point laying ink on
       // the blank cells of a short last sheet.
-      if (F.deckCardAt(si, ci, cardCount, L.perSheet) < 0) return;
+      if (F.deckCardAt(si, ci, cardCount) < 0) return;
       if (backEmb) drawInto(pg, backEmb, cell, backTurn);
       used.push(cell);
     });
@@ -4785,9 +4782,8 @@ export async function imposeDivinityDeck(
 
   await carryColorContext(src, out);
   const report: DivinityDeckReport = {
-    cards: cardCount, sheets, perSheet: L.perSheet,
-    orient: L.orient, cols: L.cols, rows: L.rows,
-    blanksOnLastSheet: sheets ? L.perSheet - F.cardsOnSheet(sheets - 1, cardCount, L.perSheet) : 0,
+    cards: cardCount, sheets, perSheet: L.perSheet, cols: L.cols, rows: L.rows,
+    blanksOnLastSheet: sheets ? L.perSheet - F.cardsOnSheet(sheets - 1, cardCount) : 0,
     backsStartPage: wantBacks && (opts.order ?? 'grouped') === 'grouped' && sheets ? sheets + 1 : null,
     totalPages: out.getPageCount(),
   };
@@ -4799,13 +4795,14 @@ export async function imposeDivinityDeck(
    A standard 2.5 x 3.5" trading card, nine to an A4, with the A4 block doubled
    onto an A3 so one sheet yields eighteen and cuts in half into two A4s.
 
-   EIGHT to an A4, not nine. The sheet is a PORTRAIT A4 and the card LIES ACROSS
-   it, 2 across x 4 down — what the shop's guillotine takes off one A4, and the
-   same arrangement Divinity Trading Card Deck uses, so both tools cut
-   identically. The A3 is that block side by side (420 x 297), cut down at 210
-   into two A4s that each stand on their own.
+   EIGHT to an A4, on the CUT MACHINE'S OWN template: 14 mm side margins, 6.5
+   top and bottom, 10 mm gutters, 2 across x 4 down, giving an 86 x 63.5 cell.
+   Same template as Divinity Trading Card Deck, so both tools cut identically.
+   The A3 is that block side by side (420 x 297), cut down at 210 into two A4s
+   that each stand on their own.
 
-   Geometry and the fit arithmetic live in fit/divinity-cards.ts. */
+   Geometry, and why the cell is 86 and not 88.9, live in
+   fit/divinity-cards.ts. */
 
 export interface DivinityCardOptions {
   /** 'a3' (default) is the doubled sheet; 'a4' is a single block of eight. */
@@ -4816,7 +4813,7 @@ export interface DivinityCardOptions {
      that registers with the fronts. Defaults to page 2 when the file has one.
 
      The card POSITIONS need nothing done to them: the grid is symmetric about
-     both sheet axes (14.6 / 14.6 across, 17 / 17 down), so every card has a
+     both sheet axes (14 / 14 across, 6.5 / 6.5 down), so every card has a
      partner at the mirrored position and the sheet backs up under either flip.
      Asserted in test/fit-divinity-cards.test.ts, because it is the property the
      whole duplex story rests on.
