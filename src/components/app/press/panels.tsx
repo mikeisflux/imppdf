@@ -2952,35 +2952,35 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
 
       <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E F G place the rows; C and H are what is left over.">
         {([
-          ['marginXMm', 'A', 'Left edge to card', DEF_MARGIN_X_MM],
-          ['gutterXMm', 'B', 'Between the columns', DEF_GUTTER_X_MM],
-          ['marginTopMm', 'D', 'Head to row 1', DEF_MARGIN_TOP_MM],
-          ['gutterEMm', 'E', 'Row 1 to row 2', DEF_GUTTER_E_MM],
-          ['gutterFMm', 'F', 'Row 2 to row 3', DEF_GUTTER_F_MM],
-          ['gutterGMm', 'G', 'Row 3 to row 4', DEF_GUTTER_G_MM],
-        ] as const).map(([key, tag, what, def]) => (
-          <div key={key} className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+          /* IN LETTER ORDER, A to H — the order the sheet is lettered and the
+             order the operator reads a ruler across it, then down it. C and H
+             are the remainders and used to be tacked on the end for that
+             reason, but a lettered sheet whose boxes run A B D E F G C H is a
+             sheet nobody can check against the drawing. They are written back
+             through A and D, so the arithmetic still cannot disagree with
+             itself; only the reading order changed.
+             A (and C with it) is shown and written THROUGH the mirror when the
+             backs are spun, so each field always names the gap you can measure
+             on the sheet that comes out. */
+          ['A', 'Left edge to card', round2(effA), setA],
+          ['B', 'Between the columns', (s.gutterXMm as number) ?? DEF_GUTTER_X_MM,
+            (v: number) => up({ gutterXMm: v })],
+          ['C', 'Card to right edge', round2(effC), setEffC],
+          ['D', 'Head to row 1', (s.marginTopMm as number) ?? DEF_MARGIN_TOP_MM,
+            (v: number) => up({ marginTopMm: v })],
+          ['E', 'Row 1 to row 2', (s.gutterEMm as number) ?? DEF_GUTTER_E_MM,
+            (v: number) => up({ gutterEMm: v })],
+          ['F', 'Row 2 to row 3', (s.gutterFMm as number) ?? DEF_GUTTER_F_MM,
+            (v: number) => up({ gutterFMm: v })],
+          ['G', 'Row 3 to row 4', (s.gutterGMm as number) ?? DEF_GUTTER_G_MM,
+            (v: number) => up({ gutterGMm: v })],
+          ['H', 'Row 4 to foot', round2(FIT.marginBottomMm), setH],
+        ] as const).map(([tag, what, value, set]) => (
+          <div key={tag} className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
             <span className="pe-label" style={{ flex: 1 }}>{tag}<span className="pe-label-sm"> · {what}</span></span>
-            {/* A is shown and written THROUGH the mirror when the backs are
-                spun, so the field always names the gap you can measure on the
-                sheet that comes out. */}
-            <NumRaw
-              value={key === 'marginXMm' ? round2(effA) : ((s[key] as number) ?? def)}
-              onValue={key === 'marginXMm' ? setA : (v) => up({ [key]: v })} w={70} />
+            <NumRaw value={value} onValue={set} w={70} />
           </div>
         ))}
-        {/* C and H are the other end of the same two spans, so setting one is
-            just setting the block's position from the far edge instead of the
-            near one. Written back through A and D so the arithmetic can never
-            disagree with itself. */}
-        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
-          <span className="pe-label" style={{ flex: 1 }}>C<span className="pe-label-sm"> · card to right edge</span></span>
-          <NumRaw value={round2(effC)} onValue={setEffC} w={70} />
-        </div>
-        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
-          <span className="pe-label" style={{ flex: 1 }}>H<span className="pe-label-sm"> · row 4 to foot</span></span>
-          <NumRaw value={round2(FIT.marginBottomMm)} onValue={setH} w={70} />
-        </div>
         <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.7 }}>
           {spun && (
             <div style={{ marginBottom: 6 }}>
