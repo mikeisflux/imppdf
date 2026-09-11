@@ -5,16 +5,20 @@
  *   cell    89 x 63     the cut card, lying sideways
  *   gutters 10 between the columns, 3 between the rows
  *
- *   across  11 + 89 + 10 + 89 + 11                  = 210
- *   down    18 + 63 + 3 + 63 + 3 + 63 + 3 + 63 + 18 = 297
+ *   head    6.5 from the sheet edge to the first cut line
+ *
+ *   across  11 + 89 + 10 + 89 + 11                     = 210
+ *   down    6.5 + 63 + 3 + 63 + 3 + 63 + 3 + 63 + 29.5 = 297
  *
  * The cell and the gutters were MEASURED off the shop's cut machine and are the
  * input; the margins are the remainder. Both sums closing exactly on A4 is the
  * check that the template is right, so both are asserted directly — get either
  * wrong and the file stops meeting the blade.
  *
- * The other thing a wrong build costs is a backs pass that does not land on its
- * fronts, so the grid is checked to be symmetric about both axes.            */
+ * The block is PINNED TO THE HEAD, so it is symmetric across but not down. That
+ * is what decides the flip: long-edge registers, end-for-end does not. Both
+ * halves of that are asserted, because a backs pass that misses its fronts is
+ * the other thing a wrong build costs.                                       */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,20 +26,26 @@ import { PDFDocument, rgb } from 'pdf-lib';
 import {
   PT_PER_MM, CARD_W_MM, CARD_H_MM, SHEET_W_MM, SHEET_H_MM,
   CELL_W_MM, CELL_H_MM, GUTTER_X_MM, GUTTER_Y_MM, COLS, ROWS, PER_SHEET,
-  MARGIN_X_MM, MARGIN_Y_MM, deckLayout, deckSheets, deckCardAt, cardsOnSheet,
+  MARGIN_X_MM, MARGIN_TOP_MM, MARGIN_BOTTOM_MM, deckLayout, deckSheets, deckCardAt, cardsOnSheet,
 } from '../src/lib/imposition-toolkit/fit/divinity-deck.ts';
 import { imposeDivinityDeck } from '../src/lib/imposition-toolkit/impose.ts';
 
 const close = (a: number, b: number, tol = 1e-6) => Math.abs(a - b) <= tol;
 
-test('the measured numbers are what the file says they are', () => {
-  assert.equal(CELL_W_MM, 89, 'the cut card, long edge');
-  assert.equal(CELL_H_MM, 63, 'the cut card, short edge');
-  assert.equal(GUTTER_X_MM, 10, 'between the columns');
-  assert.equal(GUTTER_Y_MM, 3, 'between the rows — NOT the same as the column gutter');
+test('the measured gaps are what the file says they are', () => {
+  assert.equal(MARGIN_X_MM, 14, 'A and C — both sides');
+  assert.equal(GUTTER_X_MM, 10, 'B — between the columns');
+  assert.equal(MARGIN_TOP_MM, 6.5, 'D — head. Not more, not less.');
+  assert.equal(GUTTER_Y_MM, 3, 'E/F/G — between the rows, NOT the column gutter');
+  assert.equal(MARGIN_BOTTOM_MM, 11, 'H — foot');
   assert.equal(COLS, 2);
   assert.equal(ROWS, 4);
   assert.equal(PER_SHEET, 8);
+});
+
+test('the cell is DERIVED from those gaps, never stated', () => {
+  assert.equal(CELL_W_MM, 86, '(210 - 14 - 14 - 10) / 2');
+  assert.equal(CELL_H_MM, 67.625, '(297 - 6.5 - 11 - 3*3) / 4');
 });
 
 test('the sheet is a plain PORTRAIT A4 — 210 x 297', () => {
@@ -45,36 +55,37 @@ test('the sheet is a plain PORTRAIT A4 — 210 x 297', () => {
 
 test('both sums close on A4 exactly — the check the template is right', () => {
   assert.equal(2 * MARGIN_X_MM + COLS * CELL_W_MM + (COLS - 1) * GUTTER_X_MM, 210,
-    '11 + 89 + 10 + 89 + 11');
-  assert.equal(2 * MARGIN_Y_MM + ROWS * CELL_H_MM + (ROWS - 1) * GUTTER_Y_MM, 297,
-    '18 + 4(63) + 3(3) + 18');
-  assert.equal(MARGIN_X_MM, 11, 'the remainder across, not a choice');
-  assert.equal(MARGIN_Y_MM, 18, 'the remainder down, not a choice');
+    '14 + 86 + 10 + 86 + 14');
+  assert.equal(MARGIN_TOP_MM + ROWS * CELL_H_MM + (ROWS - 1) * GUTTER_Y_MM + MARGIN_BOTTOM_MM, 297,
+    '6.5 + 4(67.625) + 3(3) + 11');
 });
 
-test('the cell is close enough to a 2.5 x 3.5in card to cost only bleed', () => {
-  /* The artwork is 88.9 x 63.5 placed sideways; the cell is 89 x 63. Cover-fit
-     scales by the larger ratio and clips the rest, so the loss is what the
-     blade was taking anyway. Guard the magnitude, not the exact figure. */
+test('what the cell costs a 2.5 x 3.5in card, stated so it cannot creep', () => {
+  /* The artwork is 88.9 x 63.5 placed sideways — WIDER and SHORTER than the
+     86 x 67.625 cell. Cover-fit scales by the larger ratio and clips the rest,
+     so the loss is off the WIDTH and it is not small. Pinned here rather than
+     left as a comment: if these gaps are ever re-measured, this figure moving
+     is the thing that tells you the artwork's framing changed with them. */
   const scale = Math.max(CELL_W_MM / CARD_H_MM, CELL_H_MM / CARD_W_MM);
   const lostW = CARD_H_MM * scale - CELL_W_MM;
   const lostH = CARD_W_MM * scale - CELL_H_MM;
-  assert.ok(lostW < 1, `under a millimetre off the width, got ${lostW.toFixed(2)}`);
-  assert.ok(lostH < 1, `under a millimetre off the height, got ${lostH.toFixed(2)}`);
+  assert.ok(Math.abs(lostW - 8.68) < 0.05, `~8.7mm off the width, got ${lostW.toFixed(2)}`);
+  assert.ok(Math.abs(lostH) < 1e-6, 'and nothing off the height — the cell is taller');
 });
 
-test('eight cells, 2 across x 4 down, on a 99 x 66 pitch', () => {
+test('eight cells, 2 across x 4 down, on a 96 x 70.625 pitch', () => {
   const L = deckLayout();
   assert.equal(L.cells.length, 8);
   assert.equal(L.perSheet, 8);
   const xs = [...new Set(L.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(L.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  assert.deepEqual(xs, [11, 110], 'two columns at 11 and 110');
+  assert.deepEqual(xs, [14, 110], 'two columns at 14 and 110');
   assert.equal(ys.length, 4, 'four rows');
-  assert.equal(xs[1]! - xs[0]!, 99, 'column pitch 89 + 10');
+  assert.equal(xs[1]! - xs[0]!, 96, 'column pitch 86 + 10');
   for (let i = 1; i < ys.length; i++) {
-    assert.equal(ys[i - 1]! - ys[i]!, 66, 'row pitch 63 + 3');
+    assert.equal(ys[i - 1]! - ys[i]!, 70.625, 'row pitch 67.625 + 3');
   }
+  assert.equal(Math.min(...ys), 11, 'the last row sits exactly on the H margin');
 });
 
 test('every cell is inside the sheet and none overlaps another', () => {
@@ -93,20 +104,31 @@ test('every cell is inside the sheet and none overlaps another', () => {
   }
 });
 
-test('the grid is symmetric about both axes, so the backs pass registers', () => {
+test('the grid IS symmetric across — so a long-edge flip registers', () => {
   /* THE property the two-pass workflow rests on. The stack comes out of the
-     tray, gets turned over and goes back in; if every cell has a partner at the
-     mirrored position the backs land on their fronts however it was turned. It
-     holds because the margins came out equal on each axis. */
+     tray, gets turned over about the VERTICAL axis and goes back in; every cell
+     has a partner at the mirrored x, so the backs land on their fronts. It
+     holds because A and C were both measured at 14. */
   const { cells } = deckLayout();
   const key = (x: number, y: number) => `${x.toFixed(4)},${y.toFixed(4)}`;
   const at = new Set(cells.map((c) => key(c.xMm, c.yMm)));
   for (const c of cells) {
     assert.ok(at.has(key(SHEET_W_MM - (c.xMm + c.wMm), c.yMm)),
       `no partner across for the cell at ${c.xMm},${c.yMm}`);
-    assert.ok(at.has(key(c.xMm, SHEET_H_MM - (c.yMm + c.hMm))),
-      `no partner down for the cell at ${c.xMm},${c.yMm}`);
   }
+});
+
+test('the grid is NOT symmetric down — so end-for-end does NOT register', () => {
+  /* The block is pinned to the head at 6.5 against 11 at the foot, because that
+     is where the machine cuts. Turning the stack end-for-end therefore lands
+     the backs 4.5 mm out. Asserted rather than left as a comment, so nobody
+     "fixes" the layout by centring it and quietly breaks the cut. */
+  const { cells } = deckLayout();
+  const key = (x: number, y: number) => `${x.toFixed(4)},${y.toFixed(4)}`;
+  const at = new Set(cells.map((c) => key(c.xMm, c.yMm)));
+  const mirrored = cells.filter((c) => at.has(key(c.xMm, SHEET_H_MM - (c.yMm + c.hMm))));
+  assert.equal(mirrored.length, 0, 'no cell has a partner end-for-end');
+  assert.equal(MARGIN_BOTTOM_MM - MARGIN_TOP_MM, 4.5, 'and that is how far out it would land');
 });
 
 test('cells read the way a person reads — left to right, top row first', () => {

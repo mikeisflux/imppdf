@@ -1,27 +1,29 @@
-/* Divinity trading card DECK — a whole deck from one multi-page PDF, ganged on
- * portrait A4 sheets, eight up, cards LYING SIDEWAYS.
+/* Divinity trading card DECK — a whole deck from one multi-page PDF, ganged
+ * 8-up on portrait A4, cards LYING SIDEWAYS.
  *
- * THIS IS THE CUT MACHINE'S TEMPLATE. It is built from the two things the owner
- * measured with a ruler on the machine's own output:
+ * THIS IS THE CUT MACHINE'S TEMPLATE. Every gap below was measured off the
+ * machine with a ruler, and every gap is the INPUT. The CELL is the remainder.
+ * That inverts how the rest of the toolkit works — everywhere else the piece
+ * size is fixed and the margins fall out — and it is deliberate: the machine
+ * cuts where it cuts, and the file has to meet it.
  *
- *   the CUT CARD   89 x 63 mm   (a 2.5 x 3.5" card after the blade)
- *   the GUTTERS    10 mm between the columns, 3 mm between the rows
- *
- * Those are the INPUT. The margins are the remainder — they are not a choice,
- * and they cannot be set independently: once the sheet, the cell and the
- * gutters are fixed, what is left over is what is left over.
- *
- *   across   11 + 89 + 10 + 89 + 11              = 210
- *   down     18 + 63 + 3 + 63 + 3 + 63 + 3 + 63 + 18 = 297
+ *   across  A 14 + 86 + B 10 + 86 + C 14                    = 210
+ *   down    D 6.5 + 67.625 + E 3 + 67.625 + F 3 + 67.625
+ *                 + G 3 + 67.625 + H 11                     = 297
  *
  * Both close on A4 exactly, which is the check that the template is right.
+ * The letters are the ones on the cut map the owner marked up.
  *
- * The cell is 89 x 63; the artwork is a 2.5 x 3.5" card, 88.9 x 63.5 placed
- * sideways. Cover-fit, that loses about 0.5 mm off the height and nothing off
- * the width — the little bit of bleed the blade was taking anyway.
+ * So the cell is 86 x 67.625 mm. The artwork is a 2.5 x 3.5" card (88.9 x 63.5)
+ * placed sideways, which is a WIDER, SHORTER shape than the cell: cover-fit
+ * scales it up about 6% and clips roughly 4 mm off each long edge. That is real
+ * artwork lost, and it is what these gaps require — if it is too much, the
+ * number to re-measure is E/F/G, since the four rows have to fill whatever the
+ * head and foot margins leave.
  *
- * There is no card-orientation option. The template is the machine's, not a
- * layout choice, and an upright card does not fit this grid at all.
+ * THE BLOCK IS PINNED TO THE HEAD, not centred: 6.5 at the top against 11 at
+ * the foot. So the sheet backs up on a LONG-EDGE flip (it is centred across)
+ * but NOT end-for-end. Both halves of that are asserted.
  *
  * Asserted in test/fit-divinity-deck.test.ts.                                */
 
@@ -36,29 +38,37 @@ export const CARD_H_MM = 3.5 * MM_PER_IN;    // 88.9
 /** Portrait A4 — the sheet as the shop sees and cuts it. */
 export const SHEET_W_MM = 210, SHEET_H_MM = 297;
 
-/* ── Measured off the cut machine. Change these only with a ruler. ────────── */
-/** The cell as the blade leaves it: sideways, long edge across the sheet. */
-export const CELL_W_MM = 89;
-export const CELL_H_MM = 63;
-/** Between the two columns. */
+/* ── Measured off the cut machine. Change these only with a ruler. ──────────
+   Named for the letters on the cut map: A/C sides, B between the columns,
+   D head, E/F/G between the rows, H foot.                                   */
+/** A and C — sheet edge to the first cut line, both sides. */
+export const MARGIN_X_MM = 14;
+/** B — between the two columns. */
 export const GUTTER_X_MM = 10;
-/** Between the rows. Not the same as the column gutter — measured separately. */
+/** D — sheet edge to the first cut line at the head. Not more, not less. */
+export const MARGIN_TOP_MM = 6.5;
+/** E, F and G — between the rows. NOT the same as the column gutter. */
 export const GUTTER_Y_MM = 3;
+/** H — last cut line to the foot of the sheet. */
+export const MARGIN_BOTTOM_MM = 11;
+
 export const COLS = 2;
 export const ROWS = 4;
 export const PER_SHEET = COLS * ROWS;        // 8
 
-/** The remainder, worked rather than restated, so the measured numbers above
- *  stay the single source of truth. */
-export const MARGIN_X_MM = (SHEET_W_MM - COLS * CELL_W_MM - (COLS - 1) * GUTTER_X_MM) / 2;  // 11
-export const MARGIN_Y_MM = (SHEET_H_MM - ROWS * CELL_H_MM - (ROWS - 1) * GUTTER_Y_MM) / 2;  // 18
+/* The cell is the REMAINDER — worked, never restated, so the measured gaps
+   above stay the single source of truth. */
+export const CELL_W_MM =
+  (SHEET_W_MM - 2 * MARGIN_X_MM - (COLS - 1) * GUTTER_X_MM) / COLS;                      // 86
+export const CELL_H_MM =
+  (SHEET_H_MM - MARGIN_TOP_MM - MARGIN_BOTTOM_MM - (ROWS - 1) * GUTTER_Y_MM) / ROWS;     // 67.625
 
 export interface DeckCellMm { xMm: number; yMm: number; wMm: number; hMm: number; }
 
 export interface DeckLayout {
   placedWMm: number; placedHMm: number;
   cols: number; rows: number; perSheet: number;
-  marginXMm: number; marginYMm: number;
+  marginXMm: number; marginTopMm: number; marginBottomMm: number;
   cells: DeckCellMm[];
 }
 
@@ -70,7 +80,7 @@ export function deckLayout(): DeckLayout {
     for (let c = 0; c < COLS; c++) {
       cells.push({
         xMm: MARGIN_X_MM + c * (CELL_W_MM + GUTTER_X_MM),
-        yMm: SHEET_H_MM - MARGIN_Y_MM - (r + 1) * CELL_H_MM - r * GUTTER_Y_MM,
+        yMm: SHEET_H_MM - MARGIN_TOP_MM - (r + 1) * CELL_H_MM - r * GUTTER_Y_MM,
         wMm: CELL_W_MM, hMm: CELL_H_MM,
       });
     }
@@ -78,7 +88,7 @@ export function deckLayout(): DeckLayout {
   return {
     placedWMm: CELL_W_MM, placedHMm: CELL_H_MM,
     cols: COLS, rows: ROWS, perSheet: PER_SHEET,
-    marginXMm: MARGIN_X_MM, marginYMm: MARGIN_Y_MM, cells,
+    marginXMm: MARGIN_X_MM, marginTopMm: MARGIN_TOP_MM, marginBottomMm: MARGIN_BOTTOM_MM, cells,
   };
 }
 

@@ -2995,7 +2995,8 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
           The page is a plain <b>portrait A4</b>, 210 × 297 mm. Which edge goes into the
           tray first is a printer setting, not something the file decides — feed it
           <b> long edge first</b> through the bypass as usual for heavy stock.<br />
-          Across <b>11 + 89 + 10 + 89 + 11 = 210</b>. Down <b>18 + 4×63 + 3×3 + 18 = 297</b>.
+          Across <b>11 + 89 + 10 + 89 + 11 = 210</b>. Down <b>6.5 + 4×63 + 3×3 + 29.5 = 297</b>
+          — the block is pinned <b>6.5 mm off the head</b>, so flip the stack <b>long edge</b>.
         </div>
       </Section>
 
@@ -3061,7 +3062,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         Upload <b>one card</b> and it fills the sheet. Standard <b>2.5 × 3.5&quot;</b>
         (63.5 × 88.9 mm), lying <b>sideways</b>, <b>8 to an A4</b> in an <b>89 × 63 mm</b>
         cell — the cut machine&apos;s template: 10 mm between the columns, 3 mm between the
-        rows, 11 mm at the sides and 18 mm top and bottom.
+        rows, 11 mm at the sides and <b>6.5 mm off the head</b>.
       </div>
 
       <Section label="// SHEET" help="A3 is the A4 block printed twice, side by side. Cut it in half and you have two identical A4s to run.">
@@ -3072,7 +3073,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
           <div>Sheet <b>{a3 ? '420 × 297 mm (A3)' : '210 × 297 mm (A4)'}</b></div>
           <div>Grid <b>{a3 ? '2 blocks of 2 × 4' : '2 × 4'}</b> — <b>{a3 ? 16 : 8} cards</b>, each 2.5 × 3.5&quot;</div>
-          <div>Gutters <b>10</b> across, <b>3</b> down; margins <b>11</b> sides, <b>18</b> top and bottom</div>
+          <div>Gutters <b>10</b> across, <b>3</b> down; margins <b>11</b> sides, <b>6.5</b> head, <b>29.5</b> foot</div>
           {a3 && <div>Cut down at <b>210 mm</b> for two A4s, marked top and bottom</div>}
           <div style={{ marginTop: 4 }}>
             A plain <b>portrait A4</b> with the cards lying <b>across</b> it. Eight is what
@@ -3138,9 +3139,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           </div>
         )}
         <div className="pe-note" style={{ marginTop: 8 }}>
-          Card positions are <b>absolute and symmetric</b> — 11 mm at both sides, 18 mm top
-          and bottom — so the grid backs up under either flip; the positions never need
-          anything done to them.
+          Card positions are <b>absolute</b>, and symmetric across (11 mm both sides) so the
+          grid backs up on a <b>long-edge</b> flip. The block sits <b>6.5 mm off the head</b>
+          with the remainder at the foot, so it does <b>not</b> back up end-for-end.
         </div>
       </Section>
 
