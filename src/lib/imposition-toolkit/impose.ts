@@ -4652,19 +4652,14 @@ export interface DivinityCardOptions {
      card; these only move it. Centred by default, because a block pinned close
      to the head lands inside the press's unprintable margin — the PDF is
      correct and the sheet still comes off with the top row clipped. ──────── */
-  /** Centre the block. Default ON; turn it off to pin it by the margins below. */
-  centre?: boolean;
-  /** A and C, when `centre` is off. */ marginXMm?: number;
-  /** Nudge the block: +x right (C shrinks, A grows), +y down. */
-  shiftXMm?: number;
-  shiftYMm?: number;
-  /** D, when `centre` is off. */       marginTopMm?: number;
+  /** A — sheet edge to the first cut line. */ marginXMm?: number;
+  /** D — head margin. */                      marginTopMm?: number;
   /** B — between the columns. */       gutterXMm?: number;
   /** E/F/G — between the rows. */      gutterYMm?: number;
-  /** How far the art runs PAST the trim on every side, mm. Default 1.5. The
-   *  cell stays the true card size; this only decides how much ink is there for
-   *  the blade to drift into. 0 fits the art to the bare trim, which is what
-   *  left white slivers on the shop's first cut stack. */
+  /** How far the art runs PAST the trim on every side, mm. Default 2. The cell
+   *  stays the true card size; this only decides how much ink is there for the
+   *  blade to drift into. It is MEANT to spill into the gutters. 0 fits the art
+   *  to the bare trim, which is what left white slivers on the first cut. */
   bleedMm?: number;
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
@@ -4681,17 +4676,15 @@ export async function imposeDivinityCards(
   const { fitDivinityCards, PT_PER_MM } = await import('./fit/divinity-cards.ts');
 
   const fit = fitDivinityCards(opts.sheet ?? 'letter', {
-    centre: opts.centre, marginXMm: opts.marginXMm, marginTopMm: opts.marginTopMm,
+    marginXMm: opts.marginXMm, marginTopMm: opts.marginTopMm,
     gutterXMm: opts.gutterXMm, gutterYMm: opts.gutterYMm,
-    shiftXMm: opts.shiftXMm, shiftYMm: opts.shiftYMm,
   });
   const mm = (v: number) => v * PT_PER_MM;
 
-  /* Capped at half the tighter gutter so neighbouring bleeds meet but never
-     overlap — a card's own bleed in the gutter is invisible after cutting, a
-     neighbour's is somebody else's artwork on your card. */
-  const gapMm = Math.min(opts.gutterXMm ?? 9, opts.gutterYMm ?? 3);
-  const bleedMm = Math.max(0, Math.min(opts.bleedMm ?? 1.5, gapMm / 2));
+  /* NOT capped. Bleed is supposed to spill into the gutters — that is the whole
+     point of it — and every card on the sheet is the same artwork, so where two
+     bleeds overlap they overlap with themselves and the blade takes it away. */
+  const bleedMm = Math.max(0, opts.bleedMm ?? 2);
 
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();

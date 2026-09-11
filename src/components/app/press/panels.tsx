@@ -2901,12 +2901,14 @@ const DOUBLED = new Set(['tabloid', 'a3']);
 
 function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
   /* Live from the fit module so the panel can never quote a margin the engine
-     is not actually using — that is how it came to advertise an 89 x 63 cell. */
+     is not using — that is how it came to advertise an 89 x 63 cell. */
   const FIT = fitDivinityCards((s.sheet ?? 'letter') as DivinityCardSheet, {
-    centre: s.centre !== false, marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
+    marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
     gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
-    shiftXMm: s.shiftXMm, shiftYMm: s.shiftYMm,
   });
+  /* Live from the fit module so the panel can never quote a margin the engine
+     is not actually using — that is how it came to advertise an 89 x 63 cell. */
+
   const MM = 25.4 / 72;
   const src = pageSizes[Math.max(0, Math.min(pageSizes.length - 1, (s.page ?? 1) - 1))];
   const wMm = src ? src.wPt * MM : 0, hMm = src ? src.hPt * MM : 0;
@@ -2925,51 +2927,29 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         is in the tray.
       </div>
 
-      <Section label="// POSITION" help="Where the block of eight sits on the sheet. The cards themselves are always a true 2.5 x 3.5 inch; these only move them.">
-        <Check icon="grid" label="Centre on the sheet"
-          sub="17 mm clear top and bottom, 11.1 either side — clear of any press margin"
-          checked={s.centre !== false} onChange={(v) => up({ centre: v })} />
-        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
-          Keep this <b>on</b> unless your cutter needs the block off-centre. Pinned tight to
-          the head, the top row lands inside the <b>unprintable margin</b> most lasers have —
-          the PDF measures dead right and the sheet still comes off the press with the top
-          row over the edge.
+      <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E place the rows; C and H are what is left over.">
+        {([
+          ['marginXMm', 'A', 'Left edge to card', 12],
+          ['gutterXMm', 'B', 'Between the columns', 9],
+          ['marginTopMm', 'D', 'Head to row 1', 6.5],
+          ['gutterYMm', 'E / F / G', 'Between the rows', 3],
+        ] as const).map(([key, tag, what, def], i) => (
+          <div key={key} className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: i ? 8 : 0 }}>
+            <span className="pe-label" style={{ flex: 1 }}>{tag}<span className="pe-label-sm"> · {what}</span></span>
+            <NumRaw value={(s[key] as number) ?? def} onValue={(v) => up({ [key]: v })} w={70} />
+          </div>
+        ))}
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 14 }}>
+          <span className="pe-label" style={{ flex: 1 }}>Bleed<span className="pe-label-sm"> · art past the cut</span></span>
+          <NumRaw value={s.bleedMm ?? 2} onValue={(v) => up({ bleedMm: v })} w={70} />
         </div>
-        {s.centre === false && (
-          <>
-            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
-              <span className="pe-label" style={{ flex: 1 }}>Side margin<span className="pe-label-sm"> · A / C, mm</span></span>
-              <NumRaw value={s.marginXMm ?? 14} onValue={(v) => up({ marginXMm: v })} w={70} />
-            </div>
-            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
-              <span className="pe-label" style={{ flex: 1 }}>Head margin<span className="pe-label-sm"> · D, mm</span></span>
-              <NumRaw value={s.marginTopMm ?? 6.5} onValue={(v) => up({ marginTopMm: v })} w={70} />
-            </div>
-          </>
-        )}
-        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
-          <span className="pe-label" style={{ flex: 1 }}>Column gutter<span className="pe-label-sm"> · B, mm</span></span>
-          <NumRaw value={s.gutterXMm ?? 13} onValue={(v) => up({ gutterXMm: v })} w={70} />
-        </div>
-        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
-          <span className="pe-label" style={{ flex: 1 }}>Row gutter<span className="pe-label-sm"> · E / F / G, mm</span></span>
-          <NumRaw value={s.gutterYMm ?? 3} onValue={(v) => up({ gutterYMm: v })} w={70} />
-        </div>
-        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
-          <span className="pe-label" style={{ flex: 1 }}>Bleed<span className="pe-label-sm"> · past the cut, mm</span></span>
-          <NumRaw value={s.bleedMm ?? 1.5} onValue={(v) => up({ bleedMm: v })} w={70} />
-        </div>
-        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
-          <span className="pe-label" style={{ flex: 1 }}>Nudge right<span className="pe-label-sm"> · shrinks C, grows A</span></span>
-          <NumRaw value={s.shiftXMm ?? 0} onValue={(v) => up({ shiftXMm: v })} w={70} />
-        </div>
-        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
-          <span className="pe-label" style={{ flex: 1 }}>Nudge down<span className="pe-label-sm"> · shrinks the foot</span></span>
-          <NumRaw value={s.shiftYMm ?? 0} onValue={(v) => up({ shiftYMm: v })} w={70} />
-        </div>
-        <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>
-          <div>Left <b>A {FIT.marginXMm.toFixed(2)}</b> · right <b>C {(FIT.sheetWMm - FIT.marginXMm - 2 * 88.9 - (s.gutterXMm ?? 13)).toFixed(2)}</b> mm</div>
-          <div>Head <b>D {FIT.marginTopMm.toFixed(2)}</b> · foot <b>H {FIT.marginBottomMm.toFixed(2)}</b> mm</div>
+        <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.8 }}>
+          <div>C · card to right edge <b>{FIT.marginRightMm.toFixed(2)} mm</b></div>
+          <div>H · row 4 to foot <b>{FIT.marginBottomMm.toFixed(2)} mm</b></div>
+          <div style={{ marginTop: 4 }}>
+            C and H are <b>what is left</b> — A, the two cards and C have to add up to the
+            sheet, so only one of them can be set. Change A or B and C moves.
+          </div>
         </div>
       </Section>
 
