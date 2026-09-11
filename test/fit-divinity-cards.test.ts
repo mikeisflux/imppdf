@@ -333,3 +333,26 @@ test('the bleed leaves the paper the operator expects in each gutter', () => {
   assert.ok(close(gapX - 2 * BLEED, 7), '7 mm of paper left between the columns');
   assert.ok(close(gapY - 2 * BLEED, 0), 'and the rows bleed edge to edge');
 });
+
+test('SPIN BACKS turns a lone sheet — and still never adds a page', async () => {
+  /* The shop runs fronts from one file and backs from another. A single upload
+     of the back artwork IS the backs pass, so the switch has to turn THAT sheet;
+     with no second sheet to act on it would otherwise do nothing at all. The
+     page count is asserted in the same test because the last two fixes to this
+     tool both moved it by accident. */
+  const plain = await imposeDivinityCards(await cardPdf(), { sheet: 'letter' });
+  const spun = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', spinBacks: true });
+  assert.equal((await PDFDocument.load(plain)).getPageCount(), 1, 'one sheet');
+  assert.equal((await PDFDocument.load(spun)).getPageCount(), 1, 'still one sheet when spun');
+
+  const a = await turnsOnPage(plain, 0), b = await turnsOnPage(spun, 0);
+  assert.ok((a.ccw > 0) !== (b.ccw > 0), 'and the art really turned a half turn');
+
+  /* With a real back page the switch goes back to acting on the BACK sheet only,
+     leaving the fronts alone — otherwise ticking it would flip both and the
+     backs would land the same way round they started. */
+  const pair = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', spinBacks: true });
+  const pf = await turnsOnPage(pair, 0), pb = await turnsOnPage(pair, 1);
+  assert.deepEqual(pf, a, 'fronts untouched when a back page exists');
+  assert.deepEqual(pb, pf, 'and the back is spun onto the front’s orientation');
+});

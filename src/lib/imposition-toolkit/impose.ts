@@ -4759,7 +4759,13 @@ export async function imposeDivinityCards(
     }
   };
 
-  const frontTurn: 0 | 90 | 180 | 270 = needsTurn(front) ? 90 : 0;
+  /* SPIN BACKS with no back sheet: the single sheet IS the backs pass. The shop
+     prints fronts from one file, then the backs from another, so a lone upload
+     of the back artwork is the thing that needs turning — and with no second
+     sheet to act on the switch would otherwise sit there doing nothing. It
+     still never adds a page: one page in, one sheet out. */
+  const spinFront = opts.spinBacks === true && !backPage;
+  const frontTurn = (((needsTurn(front) ? 90 : 0) + (spinFront ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
   const pages = [out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)])];
   drawSheet(pages[0], front, frontTurn);
 
