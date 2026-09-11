@@ -2,7 +2,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import '@/lib/polyfills';
 import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, RAISED_METAL_DEFAULTS as RM, type ZineFormat } from '@/lib/imposition-toolkit/impose';
-import { fitDivinityCards, type DivinityCardSheet } from '@/lib/imposition-toolkit/fit/divinity-cards';
+import {
+  fitDivinityCards, type DivinityCardSheet,
+  DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, DEF_GUTTER_X_MM,
+} from '@/lib/imposition-toolkit/fit/divinity-cards';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
 import { ImageFitModal } from './image-fit-modal';
@@ -2906,22 +2909,15 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
      is not using — that is how it came to advertise an 89 x 63 cell. */
   const FIT = fitDivinityCards((s.sheet ?? 'letter') as DivinityCardSheet, {
     marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
-    gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
+    gutterXMm: s.gutterXMm,
   });
   /* Spinning the backs mirrors the block across, so A and C trade places. The
      panel shows the EFFECTIVE pair — what the sheet in front of you actually
      has — rather than the stored one, because a switch whose numbers do not
      move is a switch nobody can tell is working. Typing while spun writes back
      through the mirror, so the field you edit is the gap you measured. */
-  /* The four MARGINS are the measurements; the two GUTTERS are the remainder.
-     A gutter between two cards cannot be laid against a ruler from a sheet edge,
-     so typing C moves B and typing H moves E/F/G, rather than the margin
-     silently absorbing it and the sum going 2.6 mm over the sheet. */
-  const CW = 88.9, CH = 63.5;
-  const gX = round2(FIT.blockWMm - 2 * CW);
-  const gY = round2((FIT.blockHMm - 4 * CH) / 3);
   /* Typing C moves A, and typing H moves D — the block slides, the cards and
-     gutters never change size. B and E/F/G stay exactly what they are set to. */
+     the one gutter never change size. B stays exactly what it is set to. */
   const setC = (v: number) => up({ marginXMm: round2(FIT.sheetWMm - FIT.blockWMm - v) });
   const setH = (v: number) => up({ marginTopMm: round2(FIT.sheetHMm - FIT.blockHMm - v) });
 
@@ -2951,16 +2947,20 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         is in the tray.
       </div>
 
-      <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E place the rows; C and H are what is left over.">
+      <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D places the rows; C and H are what is left over. There is no row gutter — the rows butt.">
         {([
-          ['marginXMm', 'A', 'Left edge to card', 15.5],
-          ['gutterXMm', 'B', 'Between the columns', 9],
-          ['marginTopMm', 'D', 'Head to row 1', 5.5],
-          ['gutterYMm', 'E / F / G', 'Between the rows', 3],
-        ] as const).map(([key, tag, what, def], i) => (
+          ['marginXMm', 'A', 'Left edge to card', DEF_MARGIN_X_MM],
+          ['gutterXMm', 'B', 'Between the columns', DEF_GUTTER_X_MM],
+          ['marginTopMm', 'D', 'Head to row 1', DEF_MARGIN_TOP_MM],
+        ] as const).map(([key, tag, what, def]) => (
           <div key={key} className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
             <span className="pe-label" style={{ flex: 1 }}>{tag}<span className="pe-label-sm"> · {what}</span></span>
-            <NumRaw value={(s[key] as number) ?? def} onValue={(v) => up({ [key]: v })} w={70} />
+            {/* A is shown and written THROUGH the mirror when the backs are
+                spun, so the field always names the gap you can measure on the
+                sheet that comes out. */}
+            <NumRaw
+              value={key === 'marginXMm' ? round2(effA) : ((s[key] as number) ?? def)}
+              onValue={key === 'marginXMm' ? setA : (v) => up({ [key]: v })} w={70} />
           </div>
         ))}
         {/* C and H are the other end of the same two spans, so setting one is
@@ -2979,16 +2979,18 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           {spun && (
             <div style={{ marginBottom: 6 }}>
               <b>Backs pass:</b> A and C are <b>swapped</b> — the block is mirrored so this
-              sheet lands behind its fronts. Untick to go back to 15.5 / 12.60.
+              sheet lands behind its fronts.
             </div>
           )}
-          <b>A 14 · B 8.5 · D 6.5 · E/F/G 0</b> on Letter. C and H are the remainder —
-          C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
+          <b>A {DEF_MARGIN_X_MM} · B {DEF_GUTTER_X_MM} · D {DEF_MARGIN_TOP_MM}</b> on Letter.
+          C and H are the remainder — C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
           <br />Every gap is <b>1.5 smaller than the ruler reads</b>, because these place the
           <b> cut lines</b> and the art runs 1.5 past them on every side. The bleed is built
-          in now — no control, always there. Rows <b>butt</b>: one cut serves both cards.
+          in now — no control, always there. <b>There is no row gutter</b>: the rows butt,
+          one cut serves both cards, and the bleed laps onto the next card, which is the
+          same artwork.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
-            onClick={() => up({ marginXMm: 15.5, marginTopMm: 5.5, gutterXMm: 10, gutterYMm: 3, bleedMm: 1.5 })}>
+            onClick={() => up({ marginXMm: DEF_MARGIN_X_MM, marginTopMm: DEF_MARGIN_TOP_MM, gutterXMm: DEF_GUTTER_X_MM })}>
             Reset to the proven template</button>
         </div>
       </Section>

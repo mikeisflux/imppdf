@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import { PDFDocument, rgb } from 'pdf-lib';
 import {
   fitDivinityCards, PT_PER_MM, CARD_W_MM, CARD_H_MM, PLACED_W_MM, PLACED_H_MM,
-  DEF_GUTTER_X_MM, DEF_GUTTER_Y_MM, DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, COLS, ROWS,
+  DEF_GUTTER_X_MM, DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, COLS, ROWS,
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
 import { imposeDivinityCards } from '../src/lib/imposition-toolkit/impose.ts';
 
@@ -43,7 +43,7 @@ test('tabloid is two Letters side by side, cut at 215.9', () => {
 });
 
 test('the gutters are settings, and the cell never moves with them', () => {
-  const wide = fitDivinityCards('letter', { gutterXMm: 20, gutterYMm: 8 });
+  const wide = fitDivinityCards('letter', { gutterXMm: 20 });
   assert.ok(close(wide.cells[0]!.wMm, 88.9), 'still a true 3.5in across');
   assert.ok(close(wide.cells[0]!.hMm, 63.5), 'still a true 2.5in down');
   const xs = [...new Set(wide.cells.map((c) => c.xMm))].sort((a, b) => a - b);
@@ -54,7 +54,8 @@ test('the gutters are settings, and the cell never moves with them', () => {
 test('both sums close on A4 exactly — the check the template is right', () => {
   const f = fitDivinityCards('a4');
   assert.ok(close(f.marginXMm + COLS * PLACED_W_MM + (COLS - 1) * DEF_GUTTER_X_MM + f.marginRightMm, 210));
-  assert.ok(close(f.marginTopMm + ROWS * PLACED_H_MM + (ROWS - 1) * DEF_GUTTER_Y_MM + f.marginBottomMm, 297));
+  /* No row-gutter term: the rows BUTT, so the vertical chain is D + 4 cards + H. */
+  assert.ok(close(f.marginTopMm + ROWS * PLACED_H_MM + f.marginBottomMm, 297));
 });
 
 test('the artwork loses NOTHING — the cell is the card, so cover-fit is 1:1', () => {
@@ -75,9 +76,9 @@ test('A4: eight cards, 2 across x 4 down, rows butting', () => {
   assert.equal(xs.length, 2, 'two columns');
   assert.ok(close(xs[0]!, 14), `A at 14, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
-  assert.ok(close(xs[1]! - xs[0]!, 97.4), 'column pitch 88.9 + 8.5');
+  assert.ok(close(xs[1]! - xs[0]!, 98.9), 'column pitch 88.9 + B 10');
   for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 63.5), 'row pitch = the card, butting');
-  assert.ok(close(Math.min(...ys), 297 - 6.5 - 254), 'the last row sits on H');
+  assert.ok(close(Math.min(...ys), 297 - 8 - 254), 'the last row sits on H');
 });
 
 test('A4: every card is inside the sheet, and none overlaps another', () => {
@@ -270,7 +271,7 @@ test('SPIN BACKS turns a lone sheet — and still never adds a page', async () =
 });
 
 test('the BACK sheet mirrors across — A and C trade places', async () => {
-  /* The template is NOT symmetric: A 15.5 against C 12.6, because that is where
+  /* The template is NOT symmetric: A 14 against C 14.10, because that is where
      the machine cuts on production stock. A sheet turned over about its long
      edge therefore only lands on its front if the block is mirrored. Nothing
      about a symmetric template would need this, and nothing would catch it
@@ -290,8 +291,8 @@ test('the BACK sheet mirrors across — A and C trade places', async () => {
     return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10))].sort((a, b) => a - b);
   };
-  assert.deepEqual(await colsOf(0), [12.5, 109.9], 'unticked, nothing mirrors');
-  assert.deepEqual(await colsOf(1), [12.5, 109.9], 'including the back sheet');
+  assert.deepEqual(await colsOf(0), [12.5, 111.4], 'unticked, nothing mirrors');
+  assert.deepEqual(await colsOf(1), [12.5, 111.4], 'including the back sheet');
 });
 
 test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
@@ -318,7 +319,15 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10));
   };
   assert.equal(await leftEdge(off), 12.5, 'unticked: A 14, less the 1.5 bleed');
-  assert.equal(await leftEdge(on), 14.1, 'ticked: A becomes C 15.6, less the bleed');
+  assert.equal(await leftEdge(on), 12.6, 'ticked: A becomes C 14.10, less the bleed');
+  /* A 14 and C 14.10 are only 0.1 apart, so the pair above would still pass if
+     the mirror were a rounding wobble. Run it again on a deliberately lopsided
+     A to prove the block is genuinely being flipped end for end. */
+  const lop = { sheet: 'letter' as const, addMarks: false, marginXMm: 20 };
+  assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), lop)), 18.5,
+    'lopsided, unticked: A 20 less the bleed');
+  assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), { ...lop, spinBacks: true })),
+    6.6, 'lopsided, ticked: C 8.10 comes to the left, less the bleed');
 });
 
 test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
@@ -338,7 +347,7 @@ test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10));
   };
   assert.equal(await leftOf(0), 12.5, 'fronts untouched');
-  assert.equal(await leftOf(1), 14.1, 'backs swapped');
+  assert.equal(await leftOf(1), 12.6, 'backs swapped');
 });
 
 test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {

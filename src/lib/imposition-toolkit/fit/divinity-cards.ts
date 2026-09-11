@@ -13,11 +13,11 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 14   B 8.5   D 6.5   E/F/G 0   sheet LETTER
- *     C and H then fall out at 15.60 and 18.90.
+ *     A 14   B 10   D 8   sheet LETTER    (there is no row gutter)
+ *     C and H then fall out at 14.10 and 17.40.
  *
- *     across  14 + 88.9 + 8.5 + 88.9 + 15.6 = 215.9
- *     down    6.5 + 4(63.5) + 18.9          = 279.4
+ *     across  14 + 88.9 + 10 + 88.9 + 14.1 = 215.9
+ *     down    8 + 4(63.5) + 17.4           = 279.4
  *
  * EVERY GAP IS 1.5 SMALLER THAN THE RULER READING, because the ruler reads the
  * paper between the ART and the art runs 1.5 past the cut. The CUT LINES are
@@ -31,18 +31,17 @@
  * THE ROWS BUTT — no gutter at all. One cut line serves both cards, and the
  * 1.5 mm bleed laps onto the neighbour, which is the same artwork.
  *
- * A IS NOT EQUAL TO C, and that is not a mistake. An earlier set (A 14, D 6.5)
- * was validated on TEST stock and did not hold when the real card stock went in
- * — heavier stock registers differently through the machine, so the block lands
- * 1.45 mm right of centre. These numbers describe where the machine actually
- * cuts; they are not derived from any rule, and re-centring them breaks the
- * template.
+ * A IS NOT EQUAL TO C, and that is not a mistake. An earlier set (A 14, D 6.5,
+ * with 3 mm between the rows) was validated on TEST stock and did not hold when
+ * the real card stock went in — heavier stock registers differently through the
+ * machine. These numbers describe where the machine actually cuts; they are not
+ * derived from any rule, and re-centring them breaks the template.
  *
  * ART BLEEDS PAST THE TRIM and is meant to spill into the gutters; that is what
- * a bleed is for. At 1.5 against the 3 mm row gutter, one row's bleed lands
- * exactly against the next one's — a shared edge, with no paper between them.
- * Overlap is allowed too: every card on the sheet is the same artwork, so two
- * bleeds that cross cross with themselves and the blade takes it away.
+ * a bleed is for. Bleed is drawn OUTSIDE the cell, so it never enters the sum
+ * and never moves a cut line. Where two bleeds cross they cross with the same
+ * artwork — every card on the sheet is the same card — and the blade takes it
+ * away.
  */
 
 export const MM_PER_IN = 25.4;
@@ -61,8 +60,8 @@ export const CARD_H_MM = CARD_H_IN * MM_PER_IN;   // 88.9
    measured a correct A4 all the way through and the paper was never A4.
 
    It is also the sheet the production template closes on, to the millimetre:
-     across  A 15.5 + 88.9 + B 10 + 88.9 + C 12.6 = 215.9
-     down    D 5.5 + 4(63.5) + 3(3) + H 10.9      = 279.4                   */
+     across  A 14 + 88.9 + B 10 + 88.9 + C 14.1 = 215.9
+     down    D 8  + 4(63.5)      + H 17.4       = 279.4                     */
 export const LETTER_W_MM = 8.5 * MM_PER_IN;    // 215.9
 export const LETTER_H_MM = 11 * MM_PER_IN;     // 279.4
 export const TABLOID_W_MM = 17 * MM_PER_IN;    // 431.8 — two Letters side by side
@@ -88,27 +87,19 @@ const COLS_N = 2, ROWS_N = 4;
    a rule, or clever: the operator has a ruler and the machine, and inferring
    this instead of exposing it produced twenty rounds of wrong sheets.
 
-   A and B place the columns; D and E place the rows. C and H are then simply
-   what is left over — there is one degree of freedom per axis, because A, the
-   cards and C have to sum to the sheet. The panel shows C and H live so the
-   operator can see what a change did.                                       */
-/* Measured on PRODUCTION stock. The first validated set (A 14, D 6.5) came off
-   test stock and did not hold when the real card stock went in — heavier stock
-   registers differently through the machine, so the block lands a little over.
-   These are the production numbers. A is NOT equal to C any more (15.5 against
-   12.6): the block sits 1.45 mm right of centre because that is where the
-   machine puts it, not because anything is being centred. */
-export const DEF_MARGIN_X_MM = 14;    // A — sheet edge to the first cut line (15.5 - 1.5)
-export const DEF_MARGIN_TOP_MM = 6.5; // D — head margin (8 - 1.5)
+   A and B place the columns; D places the rows. C and H are then simply what is
+   left over — there is one degree of freedom per axis, because A, the cards and
+   C have to sum to the sheet. The panel shows C and H live so the operator can
+   see what a change did.                                                     */
+export const DEF_MARGIN_X_MM = 14;    // A — sheet edge to the first cut line
+export const DEF_MARGIN_TOP_MM = 8;   // D — head margin
 
-export const DEF_GUTTER_X_MM = 8.5;   // B — between the columns (10 - 1.5)
-/* E/F/G — ZERO. The rows BUTT: no strip between them, one cut line serving both
-   cards. With 1.5 mm of bleed on each side the art already met edge to edge
-   across a 3 mm gutter, so the gutter was doing nothing but consuming sheet —
-   and it was the term that made D 8 and H 11 impossible to have together. The
-   bleed now laps 1.5 mm onto the neighbour, which is the same artwork, and the
-   blade takes it away. */
-export const DEF_GUTTER_Y_MM = 0;
+export const DEF_GUTTER_X_MM = 10;    // B — between the columns
+/* THERE IS NO ROW GUTTER. Not zero-by-default — gone. The rows BUTT: one cut
+   line serves both cards, and the 1.5 mm bleed laps onto the neighbour, which is
+   the same artwork. A strip between the rows consumed sheet and bought nothing
+   once the art already met edge to edge, so the setting is deleted rather than
+   defaulted, and the row pitch IS the card height. */
 
 /* The vertical chain with the rows butted is four cards and nothing between:
 
@@ -131,7 +122,6 @@ export interface DivinityCardTemplate {
   /** A — sheet edge to the first cut line. */ marginXMm?: number;
   /** B — between the columns. */              gutterXMm?: number;
   /** D — head margin. */                      marginTopMm?: number;
-  /** E, F and G — between the rows. */        gutterYMm?: number;
 }
 
 export interface CardRectMm { xMm: number; yMm: number; wMm: number; hMm: number; }
@@ -158,12 +148,11 @@ export function fitDivinityCards(
 ): DivinityCardFit {
   const spec = SHEETS[sheet] ?? SHEETS.letter;
   const gX = t.gutterXMm ?? DEF_GUTTER_X_MM;
-  const gY = t.gutterYMm ?? DEF_GUTTER_Y_MM;
 
   /* The block's own size never moves — it is COLS cards plus the gutters. What
      the settings decide is where on the sheet it sits. */
   const blockW = COLS * PLACED_W_MM + (COLS - 1) * gX;
-  const blockH = ROWS * PLACED_H_MM + (ROWS - 1) * gY;
+  const blockH = ROWS * PLACED_H_MM;      // rows butt — no gutter term at all
 
   const mX = t.marginXMm ?? DEF_MARGIN_X_MM;
   const mTop = t.marginTopMm ?? DEF_MARGIN_TOP_MM;
@@ -180,7 +169,7 @@ export function fitDivinityCards(
           xMm: originXMm + mX + c * (PLACED_W_MM + gX),
           /* Rows are numbered from the TOP of the sheet, the way a spec sheet
              reads, but PDF y runs up — so row 0 is the highest y. */
-          yMm: spec.hMm - mTop - (r + 1) * PLACED_H_MM - r * gY,
+          yMm: spec.hMm - mTop - (r + 1) * PLACED_H_MM,
           wMm: PLACED_W_MM, hMm: PLACED_H_MM,
         });
       }
