@@ -300,11 +300,30 @@ cuts in half into two identical sheets to run. Geometry in
     cell    88.9 × 63.5 — a true 2.5 × 3.5" card, laid SIDEWAYS
     grid    2 across × 4 down = 8
 
-    A 14      left edge to card        C 14.10   falls out
-    B 10      between the columns      H  9.90   falls out
-    D 6.5     head to row 1
+    A 15.5    left edge to card        C 12.60   falls out
+    B 10      between the columns      H 10.90   falls out
+    D 5.5     head to row 1
     E/F/G 3   between the rows
     bleed 1.5 art past the cut
+
+**Measured on PRODUCTION stock.** An earlier set (A 14, D 6.5) was validated on
+test stock and did not survive the switch to real card stock — heavier stock
+registers differently through the machine. **A is not equal to C**, and that is
+not a mistake to tidy up: the block lands 1.45 mm right of centre because that
+is where the blade goes.
+
+**The back sheet mirrors across.** Because the template is asymmetric, a sheet
+turned over about its long edge only lands on its front if the block is
+mirrored — 15.5 goes to C and 12.6 to A. Cut marks are ruled from the mirrored
+cells so the lines follow. A lone sheet with SPIN BACKS ticked mirrors too,
+since the shop runs fronts and backs as separate files and that sheet *is* the
+backs pass. On a symmetric template this would be a no-op and nothing would
+catch it breaking, so it is asserted from the rendered content stream.
+
+**11 × 17 doubles the job up** (`tabloid`): two Letter blocks side by side, cut
+at 215.9. Each half is a whole Letter template carrying its own A 15.5 and C
+12.60, so the halves are interchangeable — asserted, since a double-up whose
+halves differ is worthless.
 
 Both sums close on the sheet, and a test pins the whole set together rather than
 as scattered constants: what was proven on paper is the *combination*, and any

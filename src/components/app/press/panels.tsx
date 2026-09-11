@@ -2931,9 +2931,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
 
       <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E place the rows; C and H are what is left over.">
         {([
-          ['marginXMm', 'A', 'Left edge to card', 14],
+          ['marginXMm', 'A', 'Left edge to card', 15.5],
           ['gutterXMm', 'B', 'Between the columns', 9],
-          ['marginTopMm', 'D', 'Head to row 1', 6.5],
+          ['marginTopMm', 'D', 'Head to row 1', 5.5],
           ['gutterYMm', 'E / F / G', 'Between the rows', 3],
         ] as const).map(([key, tag, what, def], i) => (
           <div key={key} className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: i ? 8 : 0 }}>
@@ -2961,12 +2961,12 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           <NumRaw value={s.bleedMm ?? 1.5} onValue={(v) => up({ bleedMm: v })} w={70} />
         </div>
         <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.7 }}>
-          <b>A 14 · B 10 · D 6.5 · E/F/G 3 · bleed 1.5</b> on Letter is the template the shop
-          cut a stack from and confirmed. C and H fall out at 14.10 and 9.90 — A, the two
-          cards, B and C have to add up to the sheet, so typing any of the four moves the
-          others.
+          <b>A 15.5 · B 10 · D 5.5 · E/F/G 3 · bleed 1.5</b> on Letter, measured off
+          <b> production stock</b>. C and H fall out at 12.60 and 10.90. A is not equal to C
+          on purpose — that is where the machine cuts on the heavy stock. A, the two cards,
+          B and C have to add up to the sheet, so typing any of the four moves the others.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
-            onClick={() => up({ marginXMm: 14, marginTopMm: 6.5, gutterXMm: 10, gutterYMm: 3, bleedMm: 1.5 })}>
+            onClick={() => up({ marginXMm: 15.5, marginTopMm: 5.5, gutterXMm: 10, gutterYMm: 3, bleedMm: 1.5 })}>
             Reset to the proven template</button>
         </div>
       </Section>

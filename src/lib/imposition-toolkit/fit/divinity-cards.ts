@@ -10,14 +10,21 @@
  * from that edge instead. There is still only ONE degree of freedom per axis:
  * A + block + C must equal the sheet.
  *
- * THE VALIDATED TEMPLATE, confirmed by the shop against a cut stack:
+ * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
+ * stack:
  *
- *     A 14    B 10    D 6.5    E/F/G 3    bleed 1.5    sheet LETTER
- *     C and H then fall out at 14.10 and 9.90.
+ *     A 15.5   B 10   D 5.5   E/F/G 3   bleed 1.5   sheet LETTER
+ *     C and H then fall out at 12.60 and 10.90.
  *
- * A and C are equal to within a tenth of a millimetre, which is closer than the
- * blade holds. Clearing A makes them exactly equal at 14.05 — the difference is
- * not worth having, and 14 is the number that was actually proven on paper.
+ *     across  15.5 + 88.9 + 10 + 88.9 + 12.6 = 215.9
+ *     down    5.5 + 4(63.5) + 3(3) + 10.9    = 279.4
+ *
+ * A IS NOT EQUAL TO C, and that is not a mistake. An earlier set (A 14, D 6.5)
+ * was validated on TEST stock and did not hold when the real card stock went in
+ * — heavier stock registers differently through the machine, so the block lands
+ * 1.45 mm right of centre. These numbers describe where the machine actually
+ * cuts; they are not derived from any rule, and re-centring them breaks the
+ * template.
  *
  * ART BLEEDS PAST THE TRIM and is meant to spill into the gutters; that is what
  * a bleed is for. At 1.5 against the 3 mm row gutter, one row's bleed lands
@@ -41,11 +48,9 @@ export const CARD_H_MM = CARD_H_IN * MM_PER_IN;   // 88.9
    Sending A4 to a Letter tray is what put the top row off the sheet — the file
    measured a correct A4 all the way through and the paper was never A4.
 
-   It is also the sheet on which the owner's measured template closes:
-     across  A 12 + 88.9 + B 10 + 88.9 + C 16.1 = 215.9  (Letter, exactly)
-     down    6.5 + 4(63.5) + 3(3) + 11  = 280.5  (Letter is 279.4)
-   Those same margins need 215.8 mm of a 210 mm A4, which is why they could
-   never be honoured there.                                                 */
+   It is also the sheet the production template closes on, to the millimetre:
+     across  A 15.5 + 88.9 + B 10 + 88.9 + C 12.6 = 215.9
+     down    D 5.5 + 4(63.5) + 3(3) + H 10.9      = 279.4                   */
 export const LETTER_W_MM = 8.5 * MM_PER_IN;    // 215.9
 export const LETTER_H_MM = 11 * MM_PER_IN;     // 279.4
 export const TABLOID_W_MM = 17 * MM_PER_IN;    // 431.8 — two Letters side by side
@@ -73,14 +78,15 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
    what is left over — there is one degree of freedom per axis, because A, the
    cards and C have to sum to the sheet. The panel shows C and H live so the
    operator can see what a change did.                                       */
-/** A — sheet edge to the first cut line. 14 is the shop's own validated number:
- *  it cut a stack off this template and confirmed it. On Letter it leaves C at
- *  14.10, which is the same margin to within a tenth of a millimetre — closer
- *  than the blade can hold anyway. Clear it and A falls back to whatever makes
- *  C exactly equal, which is 14.05. */
-export const DEF_MARGIN_X_MM = 14;
+/* Measured on PRODUCTION stock. The first validated set (A 14, D 6.5) came off
+   test stock and did not hold when the real card stock went in — heavier stock
+   registers differently through the machine, so the block lands a little over.
+   These are the production numbers. A is NOT equal to C any more (15.5 against
+   12.6): the block sits 1.45 mm right of centre because that is where the
+   machine puts it, not because anything is being centred. */
+export const DEF_MARGIN_X_MM = 15.5;  // A — sheet edge to the first cut line
 export const DEF_GUTTER_X_MM = 10;    // B — between the columns
-export const DEF_MARGIN_TOP_MM = 6.5; // D — head margin
+export const DEF_MARGIN_TOP_MM = 5.5; // D — head margin
 export const DEF_GUTTER_Y_MM = 3;     // E/F/G — between the rows
 
 /** The cell IS the card, laid sideways. Never derived, never adjusted to make a
@@ -129,7 +135,7 @@ export function fitDivinityCards(
   const blockW = COLS * PLACED_W_MM + (COLS - 1) * gX;
   const blockH = ROWS * PLACED_H_MM + (ROWS - 1) * gY;
 
-  const mX = t.marginXMm ?? DEF_MARGIN_X_MM ?? (spec.blockWMm - blockW) / 2;
+  const mX = t.marginXMm ?? DEF_MARGIN_X_MM;
   const mTop = t.marginTopMm ?? DEF_MARGIN_TOP_MM;
   /* C and H are the leftovers, not settings — they cannot be, because A, the
      cards and C must sum to the sheet. Reported so the panel can show them. */

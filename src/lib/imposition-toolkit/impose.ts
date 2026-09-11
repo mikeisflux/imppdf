@@ -4725,11 +4725,12 @@ export async function imposeDivinityCards(
      back whose art was ALREADY the cell's way round had nothing to swap and the
      switch silently did nothing. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const drawSheet = (pg: any, card: any, deg: 0 | 90 | 180 | 270) => {
+  const drawSheet = (pg: any, card: any, deg: 0 | 90 | 180 | 270,
+                     cells: typeof fit.cells = fit.cells) => {
     const turn = deg === 90 || deg === 270;
     const artW = turn ? card.height : card.width;
     const artH = turn ? card.width : card.height;
-    for (const c of fit.cells) {
+    for (const c of cells) {
       /* BLEED. The cell is the TRIM — where the blade is aimed. The art is laid
          into that cell grown by `bleed` on all four sides, so it runs out into
          the gutter and a cut that drifts still lands in ink instead of leaving a
@@ -4766,8 +4767,24 @@ export async function imposeDivinityCards(
      still never adds a page: one page in, one sheet out. */
   const spinFront = opts.spinBacks === true && !backPage;
   const frontTurn = (((needsTurn(front) ? 90 : 0) + (spinFront ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
+
+  /* THE BACK SHEET IS MIRRORED ACROSS. The template is not symmetric — A is
+     15.5 and C is 12.6, because that is where the machine cuts on production
+     stock — so a sheet turned over about its long edge only lands on its front
+     if the block is mirrored to match. In the shop's terms: on the backs, 15.5
+     goes to C and 12.6 goes to A. Mirroring the cells does that exactly, and it
+     keeps working on the doubled sheet, where the two blocks mirror into each
+     other. Marks are ruled from the same mirrored cells so the cut lines follow.
+     A symmetric template would make this a no-op; this one is not symmetric. */
+  const mirrored = fit.cells.map((c) => ({ ...c, xMm: fit.sheetWMm - (c.xMm + c.wMm) }));
+
   const pages = [out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)])];
-  drawSheet(pages[0], front, frontTurn);
+  /* A lone sheet marked as the backs pass (SPIN BACKS, no page 2) is a back
+     sheet in every sense, so it mirrors too — otherwise the separate backs run
+     would not register with the fronts run. */
+  const frontCells = spinFront ? mirrored : fit.cells;
+  drawSheet(pages[0], front, frontTurn, frontCells);
+  const cellsFor = [frontCells];
 
   if (back) {
     /* The flip picks the base orientation; SPIN BACKS then adds a literal half
@@ -4780,11 +4797,12 @@ export async function imposeDivinityCards(
       ? ((opts.flip ?? 'long') === 'long' ? 270 : 90) : 0;
     const backTurn = ((baseBack + (spun ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
     const bp = out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)]);
-    drawSheet(bp, back, backTurn);
+    drawSheet(bp, back, backTurn, mirrored);
     pages.push(bp);
+    cellsFor.push(mirrored);
   }
 
-  for (const pg of pages) if (opts.addMarks !== false) {
+  pages.forEach((pg, pi) => { if (opts.addMarks !== false) {
     const len = mm(opts.markLenMm ?? 3), off = mm(opts.markOffMm ?? 1.5);
     const w0 = opts.markWeightPt ?? 0.25;
     const line = (x1: number, y1: number, x2: number, y2: number) =>
@@ -4794,7 +4812,7 @@ export async function imposeDivinityCards(
        to be useful in the gutter would run onto the card next to it. Ruling the
        lines off the sheet edges instead gives the guillotine the same cut. */
     const xs = new Set<number>(), ys = new Set<number>();
-    for (const c of fit.cells) {
+    for (const c of cellsFor[pi]!) {
       xs.add(mm(c.xMm)); xs.add(mm(c.xMm + c.wMm));
       ys.add(mm(c.yMm)); ys.add(mm(c.yMm + c.hMm));
     }
@@ -4805,7 +4823,7 @@ export async function imposeDivinityCards(
     for (const cx of fit.cutXMm) {
       line(mm(cx), 0, mm(cx), len + off); line(mm(cx), sheetH, mm(cx), sheetH - len - off);
     }
-  }
+  } });
 
   await carryColorContext(src, out);
   return out.save();

@@ -34,8 +34,8 @@ test('THE CELL IS THE CARD — 2.5 x 3.5in laid sideways, exactly', () => {
 test('the measured gaps are the DEFAULTS the panel starts from', () => {
   assert.equal(DEF_GUTTER_X_MM, 10, 'B — between the columns');
   assert.equal(DEF_GUTTER_Y_MM, 3, 'E/F/G — between the rows');
-  assert.equal(DEF_MARGIN_X_MM, 14, 'A — validated against a cut stack');
-  assert.equal(DEF_MARGIN_TOP_MM, 6.5, 'D — the shop\'s measured head margin');
+  assert.equal(DEF_MARGIN_X_MM, 15.5, 'A — measured on production stock');
+  assert.equal(DEF_MARGIN_TOP_MM, 5.5, 'D — measured on production stock');
   assert.equal(COLS, 2);
   assert.equal(ROWS, 4);
 });
@@ -49,13 +49,12 @@ test('LETTER is the default sheet, and the measured template closes on it', () =
   const f = fitDivinityCards();
   assert.ok(close(f.sheetWMm, 215.9), '8.5in wide');
   assert.ok(close(f.sheetHMm, 279.4), '11in tall');
-  assert.ok(close(f.marginXMm, 14), `A as validated, got ${f.marginXMm}`);
-  assert.ok(close(f.marginRightMm, 14.1), `C falls out at 14.10, got ${f.marginRightMm}`);
-  assert.ok(Math.abs(f.marginXMm - f.marginRightMm) < 0.2, 'A and C match within the blade');
+  assert.ok(close(f.marginXMm, 15.5), `A as validated, got ${f.marginXMm}`);
+  assert.ok(close(f.marginRightMm, 12.6), `C falls out at 12.60, got ${f.marginRightMm}`);
   assert.equal(f.n, 8);
   // And the sum the owner measured across the sheet.
   assert.ok(close(f.marginXMm + 2 * PLACED_W_MM + DEF_GUTTER_X_MM + f.marginRightMm, 215.9),
-    'A 14 + 88.9 + B 10 + 88.9 + C 14.1 = 215.9');
+    'A 15.5 + 88.9 + B 10 + 88.9 + C 12.6 = 215.9');
   // A4 is taller, which is the clipping.
   assert.ok(close(297 - 279.4, 17.6), 'A4 overhangs Letter by 17.6 mm');
 });
@@ -67,7 +66,7 @@ test('tabloid is two Letters side by side, cut at 215.9', () => {
   assert.equal(f.n, 16);
   assert.ok(close(f.cutXMm[0]!, 215.9), 'cut down the middle into two Letters');
   const right = f.cells.slice(8);
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 14),
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 15.5),
     'each half carries its own A margin');
 });
 
@@ -102,11 +101,11 @@ test('A4: eight cards, 2 across x 4 down, on a 98.9 x 66.5 pitch', () => {
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
   assert.equal(xs.length, 2, 'two columns');
-  assert.ok(close(xs[0]!, 14), `A at 14, got ${xs}`);
+  assert.ok(close(xs[0]!, 15.5), `A at 15.5, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
   assert.ok(close(xs[1]! - xs[0]!, 98.9), 'column pitch 88.9 + 10');
   for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66.5), 'row pitch 63.5 + 3');
-  assert.ok(close(Math.min(...ys), 297 - 6.5 - 254 - 9), 'the last row sits on H');
+  assert.ok(close(Math.min(...ys), 297 - 5.5 - 254 - 9), 'the last row sits on H');
 });
 
 test('A4: every card is inside the sheet, and none overlaps another', () => {
@@ -140,7 +139,7 @@ test('A3: the A4 block duplicated — sixteen cards, cut down at 210', () => {
     assert.ok(close(left[i]!.yMm, right[i]!.yMm), 'and at the same height');
   }
   // Each half, cut free, carries its own A margin.
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 14));
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 15.5));
 });
 
 /** One portrait card, with a marker so its orientation is checkable. */
@@ -359,18 +358,23 @@ test('SPIN BACKS turns a lone sheet — and still never adds a page', async () =
   assert.deepEqual(pb, pf, 'and the back is spun onto the front’s orientation');
 });
 
-test('the validated template: A 14, B 10, D 6.5, E/F/G 3, bleed 1.5, Letter', () => {
-  /* The set the shop cut a stack from and confirmed: "made one with that and
-     they came out perfect." Pinned here as a whole rather than as scattered
-     constants, because what was proven on paper is the COMBINATION — the sheet,
-     the four gaps and the bleed together — and any one of them drifting breaks
-     a template that is known to work. */
+test('the production template: A 15.5, B 10, D 5.5, E/F/G 3, bleed 1.5, Letter', () => {
+  /* Measured off PRODUCTION stock and confirmed on a cut stack. Pinned as a
+     whole rather than as scattered constants, because what was proven is the
+     COMBINATION — sheet, four gaps, bleed, cell — and any one drifting breaks a
+     template that is known to work.
+
+     A (15.5) is NOT equal to C (12.6). An earlier set validated on TEST stock
+     had them within a tenth of each other, and it did not survive the switch to
+     real card stock: heavier stock registers differently and the block lands
+     1.45 mm right of centre. Do not "fix" this by centring it. */
   const f = fitDivinityCards('letter');
   assert.ok(close(f.sheetWMm, 215.9) && close(f.sheetHMm, 279.4), 'Letter');
-  assert.ok(close(f.marginXMm, 14), 'A 14');
-  assert.ok(close(f.marginTopMm, 6.5), 'D 6.5');
-  assert.ok(close(f.marginRightMm, 14.1), 'C falls out at 14.10');
-  assert.ok(close(f.marginBottomMm, 9.9), 'H falls out at 9.90');
+  assert.ok(close(f.marginXMm, 15.5), 'A 15.5');
+  assert.ok(close(f.marginTopMm, 5.5), 'D 5.5');
+  assert.ok(close(f.marginRightMm, 12.6), 'C falls out at 12.60');
+  assert.ok(close(f.marginBottomMm, 10.9), 'H falls out at 10.90');
+  assert.ok(!close(f.marginXMm, f.marginRightMm), 'and A is deliberately NOT C');
   assert.equal(DEF_GUTTER_X_MM, 10, 'B 10');
   assert.equal(DEF_GUTTER_Y_MM, 3, 'E/F/G 3');
   assert.equal(f.n, 8, 'eight cards');
@@ -380,4 +384,48 @@ test('the validated template: A 14, B 10, D 6.5, E/F/G 3, bleed 1.5, Letter', ()
   // Both sums close on the sheet, which is the check the whole template is sane.
   assert.ok(close(f.marginXMm + f.blockWMm + f.marginRightMm, 215.9));
   assert.ok(close(f.marginTopMm + f.blockHMm + f.marginBottomMm, 279.4));
+});
+
+test('the BACK sheet mirrors across — 15.5 goes to C, 12.6 to A', async () => {
+  /* The template is NOT symmetric: A 15.5 against C 12.6, because that is where
+     the machine cuts on production stock. A sheet turned over about its long
+     edge therefore only lands on its front if the block is mirrored. Nothing
+     about a symmetric template would need this, and nothing would catch it
+     breaking either — hence the test. */
+  const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', addMarks: false, bleedMm: 0 });
+  const zlib = await import('node:zlib');
+  const { PDFStream } = await import('pdf-lib');
+  const doc = await PDFDocument.load(out);
+  const colsOf = async (i: number) => {
+    const st = doc.getPage(i).node.normalizedEntries().Contents;
+    let t = '';
+    for (let k = 0; st && k < st.size(); k++) {
+      const raw = (doc.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+      try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+      catch { t += Buffer.from(raw).toString('latin1'); }
+    }
+    return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
+      .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10))].sort((a, b) => a - b);
+  };
+  assert.deepEqual(await colsOf(0), [15.5, 114.4], 'fronts start at A 15.5');
+  assert.deepEqual(await colsOf(1), [12.6, 111.5], 'backs start at A 12.6 — the swap');
+});
+
+test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {
+  /* Run the job two-up on tabloid and guillotine down the middle. Each half has
+     to be a whole Letter template in its own right, carrying its own A and C —
+     otherwise the halves are not interchangeable and the double-up is worthless. */
+  const f = fitDivinityCards('tabloid');
+  assert.ok(close(f.sheetWMm, 431.8) && close(f.sheetHMm, 279.4), '11 x 17');
+  assert.equal(f.n, 16, 'sixteen cards');
+  assert.ok(close(f.cutXMm[0]!, 215.9), 'cut down the middle at one Letter width');
+
+  const one = fitDivinityCards('letter');
+  const right = f.cells.filter((c) => c.xMm > 215.9);
+  assert.equal(right.length, 8, 'eight on the right half');
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, one.marginXMm), 'its own A 15.5');
+  assert.ok(close(431.8 - Math.max(...right.map((c) => c.xMm + c.wMm)), one.marginRightMm), 'its own C 12.6');
+  // And the left half is the plain Letter layout untouched.
+  const left = f.cells.filter((c) => c.xMm < 215.9);
+  assert.deepEqual(left.map((c) => Math.round(c.xMm * 100)), one.cells.map((c) => Math.round(c.xMm * 100)));
 });
