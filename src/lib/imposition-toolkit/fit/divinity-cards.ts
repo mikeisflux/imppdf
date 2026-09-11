@@ -7,8 +7,8 @@
  * derived and never nudged to make a margin come out: a cell that is not the
  * cut size cuts cards that are the wrong size.
  *
- * THE COLUMNS TOUCH. B is 0 — one cut line down the middle serves both columns,
- * the same way the rows already share theirs.
+ * B IS 7 — a real gap down the middle, measured off the machine. The ROWS still
+ * touch and share one cut line; the columns do not.
  *
  * EVERY GAP IS A SETTING, and C and H can be typed as readily as A and D — they
  * are the far end of the same two spans, so entering one just places the block
@@ -18,10 +18,10 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 14   B 0   D 8   sheet LETTER   (no column gutter, no row gutter)
- *     C and H then fall out at 21.10 and 11.40.
+ *     A 14   B 7   D 8   sheet LETTER      (there is no row gutter)
+ *     C and H then fall out at 14.10 and 11.40.
  *
- *     across  14 + 90.4 + 0 + 90.4 + 21.1 = 215.9
+ *     across  14 + 90.4 + 7 + 90.4 + 14.1 = 215.9
  *     down    8 + 4(65)                   + 11.4 = 279.4
  *
  * EVERY GAP IS 1.5 SMALLER THAN THE RULER READING, because the ruler reads the
@@ -33,9 +33,9 @@
  * without it cuts white edges, which is the fault this template was rebuilt to
  * remove.
  *
- * THE ROWS AND THE COLUMNS BOTH BUTT — no gutter either way. One cut line
- * serves both cards, and the 1.5 mm bleed laps onto the neighbour, which is the
- * same artwork.
+ * THE ROWS BUTT — no gutter down the sheet at all. One cut line serves both
+ * cards, and the 1.5 mm bleed laps onto the neighbour, which is the same
+ * artwork.
  *
  * A IS NOT EQUAL TO C, and that is not a mistake. An earlier set (A 14, D 6.5,
  * with 3 mm between the rows) was validated on TEST stock and did not hold when
@@ -66,7 +66,7 @@ export const CARD_H_MM = CARD_H_IN * MM_PER_IN;   // 88.9
    measured a correct A4 all the way through and the paper was never A4.
 
    It is also the sheet the production template closes on, to the millimetre:
-     across  A 14 + 90.4 + B 0 + 90.4 + C 21.1 = 215.9
+     across  A 14 + 90.4 + B 7 + 90.4 + C 14.1 = 215.9
      down    D 8  + 4(65)              + H 11.4 = 279.4                     */
 export const LETTER_W_MM = 8.5 * MM_PER_IN;    // 215.9
 export const LETTER_H_MM = 11 * MM_PER_IN;     // 279.4
@@ -100,11 +100,11 @@ const COLS_N = 2, ROWS_N = 4;
 export const DEF_MARGIN_X_MM = 14;    // A — sheet edge to the first cut line
 export const DEF_MARGIN_TOP_MM = 8;   // D — head margin
 
-export const DEF_GUTTER_X_MM = 0;     // B — the columns TOUCH
+export const DEF_GUTTER_X_MM = 7;     // B — down the middle, between the columns
 /* THERE IS NO ROW GUTTER AT ALL. Not zero-by-default — gone, no setting. The
    rows BUTT: one cut line serves both cards, and the 1.5 mm bleed laps onto the
-   neighbour, which is the same artwork. B survives as a setting and defaults to
-   0, so the columns butt the same way; the row pitch IS the cell height. */
+   neighbour, which is the same artwork, so the row pitch IS the cell height. B
+   is a real gap and stays a setting — the columns do NOT butt. */
 
 /* The vertical chain with the rows butted is four cells and nothing between:
 

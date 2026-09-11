@@ -54,12 +54,12 @@ test('B is a setting, and the cell never moves with it', () => {
   assert.equal(wide.n, 8, 'and it still fits eight');
 });
 
-test('BOTH ways, the cards TOUCH by default — B 0 and no row gutter at all', () => {
+test('the ROWS touch and the COLUMNS do not — B 7 down the middle', () => {
   const f = fitDivinityCards('letter');
-  assert.ok(close(DEF_GUTTER_X_MM, 0), 'B defaults to 0: the columns butt');
+  assert.ok(close(DEF_GUTTER_X_MM, 7), 'B defaults to 7');
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  assert.ok(close(xs[1]! - xs[0]!, PLACED_W_MM), 'column pitch IS the cell — no gap');
+  assert.ok(close(xs[1]! - xs[0]!, PLACED_W_MM + 7), 'column pitch = cell + B');
   for (let i = 1; i < ys.length; i++)
     assert.ok(close(ys[i - 1]! - ys[i]!, PLACED_H_MM), 'row pitch IS the cell — no gap');
 });
@@ -95,7 +95,7 @@ test('A4: eight cards, 2 across x 4 down, rows butting', () => {
   assert.equal(xs.length, 2, 'two columns');
   assert.ok(close(xs[0]!, 14), `A at 14, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
-  assert.ok(close(xs[1]! - xs[0]!, 90.4), 'column pitch = the cell, butting');
+  assert.ok(close(xs[1]! - xs[0]!, 97.4), 'column pitch = the cell + B 7');
   for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 65), 'row pitch = the cell, butting');
   assert.ok(close(Math.min(...ys), 297 - 8 - 260), 'the last row sits on H');
 });
@@ -290,7 +290,7 @@ test('SPIN BACKS turns a lone sheet — and still never adds a page', async () =
 });
 
 test('the BACK sheet mirrors across — A and C trade places', async () => {
-  /* The template is NOT symmetric: A 14 against C 21.10, because that is where
+  /* The template is NOT symmetric: A 14 against C 14.10, because that is where
      the machine cuts on production stock. A sheet turned over about its long
      edge therefore only lands on its front if the block is mirrored. Nothing
      about a symmetric template would need this, and nothing would catch it
@@ -310,8 +310,8 @@ test('the BACK sheet mirrors across — A and C trade places', async () => {
     return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10))].sort((a, b) => a - b);
   };
-  assert.deepEqual(await colsOf(0), [12.5, 102.9], 'unticked, nothing mirrors');
-  assert.deepEqual(await colsOf(1), [12.5, 102.9], 'including the back sheet');
+  assert.deepEqual(await colsOf(0), [12.5, 109.9], 'unticked, nothing mirrors');
+  assert.deepEqual(await colsOf(1), [12.5, 109.9], 'including the back sheet');
 });
 
 test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
@@ -338,7 +338,7 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10));
   };
   assert.equal(await leftEdge(off), 12.5, 'unticked: A 14, less the 1.5 bleed');
-  assert.equal(await leftEdge(on), 19.6, 'ticked: A becomes C 21.10, less the bleed');
+  assert.equal(await leftEdge(on), 12.6, 'ticked: A becomes C 14.10, less the bleed');
   /* Run it again on a deliberately lopsided A, so the claim does not rest on one
      pair of numbers that happen to differ — the block really is flipped end for
      end, whatever A is set to. */
@@ -346,7 +346,7 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
   assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), lop)), 18.5,
     'lopsided, unticked: A 20 less the bleed');
   assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), { ...lop, spinBacks: true })),
-    13.6, 'lopsided, ticked: C 15.10 comes to the left, less the bleed');
+    6.6, 'lopsided, ticked: C 8.10 comes to the left, less the bleed');
 });
 
 test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
@@ -366,7 +366,7 @@ test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10));
   };
   assert.equal(await leftOf(0), 12.5, 'fronts untouched');
-  assert.equal(await leftOf(1), 19.6, 'backs swapped');
+  assert.equal(await leftOf(1), 12.6, 'backs swapped');
 });
 
 test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {
