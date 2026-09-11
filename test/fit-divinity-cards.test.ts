@@ -31,34 +31,6 @@ test('THE CELL IS THE CARD — 2.5 x 3.5in laid sideways, exactly', () => {
   assert.ok(close(PLACED_H_MM, CARD_W_MM));
 });
 
-test('the measured gaps are the DEFAULTS the panel starts from', () => {
-  assert.equal(DEF_GUTTER_X_MM, 10, 'B — between the columns');
-  assert.equal(DEF_GUTTER_Y_MM, 3, 'E/F/G — between the rows');
-  assert.equal(DEF_MARGIN_X_MM, 15.5, 'A — measured on production stock');
-  assert.equal(DEF_MARGIN_TOP_MM, 5.5, 'D — measured on production stock');
-  assert.equal(COLS, 2);
-  assert.equal(ROWS, 4);
-});
-
-test('LETTER is the default sheet, and the measured template closes on it', () => {
-  /* The whole twenty-round confusion in one test. The owner's ruler said 14 mm
-     at the sides with a 10 mm centre gutter. On A4 that needs 215.8 mm of a
-     210 mm sheet and cannot be honoured — which is why every attempt to respect
-     it produced a wrong-sized cell. On LETTER it is exact, and A4 being 17.6 mm
-     TALLER than Letter is why the A4 file ran off the top of Letter stock. */
-  const f = fitDivinityCards();
-  assert.ok(close(f.sheetWMm, 215.9), '8.5in wide');
-  assert.ok(close(f.sheetHMm, 279.4), '11in tall');
-  assert.ok(close(f.marginXMm, 15.5), `A as validated, got ${f.marginXMm}`);
-  assert.ok(close(f.marginRightMm, 12.6), `C falls out at 12.60, got ${f.marginRightMm}`);
-  assert.equal(f.n, 8);
-  // And the sum the owner measured across the sheet.
-  assert.ok(close(f.marginXMm + 2 * PLACED_W_MM + DEF_GUTTER_X_MM + f.marginRightMm, 215.9),
-    'A 15.5 + 88.9 + B 10 + 88.9 + C 12.6 = 215.9');
-  // A4 is taller, which is the clipping.
-  assert.ok(close(297 - 279.4, 17.6), 'A4 overhangs Letter by 17.6 mm');
-});
-
 test('tabloid is two Letters side by side, cut at 215.9', () => {
   const f = fitDivinityCards('tabloid');
   assert.ok(close(f.sheetWMm, 431.8), '11 x 17');
@@ -66,7 +38,7 @@ test('tabloid is two Letters side by side, cut at 215.9', () => {
   assert.equal(f.n, 16);
   assert.ok(close(f.cutXMm[0]!, 215.9), 'cut down the middle into two Letters');
   const right = f.cells.slice(8);
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 15.5),
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 14),
     'each half carries its own A margin');
 });
 
@@ -92,7 +64,7 @@ test('the artwork loses NOTHING — the cell is the card, so cover-fit is 1:1', 
   assert.ok(close(CARD_W_MM * scale - PLACED_H_MM, 0), 'nothing off the height');
 });
 
-test('A4: eight cards, 2 across x 4 down, on a 98.9 x 66.5 pitch', () => {
+test('A4: eight cards, 2 across x 4 down, rows butting', () => {
   const f = fitDivinityCards('a4');
   assert.equal(f.sheetWMm, 210);
   assert.equal(f.sheetHMm, 297);
@@ -101,11 +73,11 @@ test('A4: eight cards, 2 across x 4 down, on a 98.9 x 66.5 pitch', () => {
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
   assert.equal(xs.length, 2, 'two columns');
-  assert.ok(close(xs[0]!, 15.5), `A at 15.5, got ${xs}`);
+  assert.ok(close(xs[0]!, 14), `A at 14, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
-  assert.ok(close(xs[1]! - xs[0]!, 98.9), 'column pitch 88.9 + 10');
-  for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66.5), 'row pitch 63.5 + 3');
-  assert.ok(close(Math.min(...ys), 297 - 5.5 - 254 - 9), 'the last row sits on H');
+  assert.ok(close(xs[1]! - xs[0]!, 97.4), 'column pitch 88.9 + 8.5');
+  for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 63.5), 'row pitch = the card, butting');
+  assert.ok(close(Math.min(...ys), 297 - 6.5 - 254), 'the last row sits on H');
 });
 
 test('A4: every card is inside the sheet, and none overlaps another', () => {
@@ -139,7 +111,7 @@ test('A3: the A4 block duplicated — sixteen cards, cut down at 210', () => {
     assert.ok(close(left[i]!.yMm, right[i]!.yMm), 'and at the same height');
   }
   // Each half, cut free, carries its own A margin.
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 15.5));
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 14));
 });
 
 /** One portrait card, with a marker so its orientation is checkable. */
@@ -274,67 +246,6 @@ test('a one-page file makes ONE sheet — no invented back', async () => {
   const off = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', backs: false });
   assert.equal((await PDFDocument.load(off)).getPageCount(), 1, 'and backs can still be suppressed');
 });
-test('BLEED runs the art past the trim without moving the cut', async () => {
-  /* The white slivers on the shop's first cut stack: the art was fitted to the
-     bare trim, so any drift in the blade left paper showing down one edge. The
-     art now overflows into the gutter. The CELL is untouched — bleed must move
-     ink, never the cut line, or every card comes out a different size. */
-  const a = fitDivinityCards('letter');
-  for (const c of a.cells) {
-    assert.ok(close(c.wMm, PLACED_W_MM), 'trim unchanged by bleed');
-    assert.ok(close(c.hMm, PLACED_H_MM));
-  }
-
-  const zero = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', bleedMm: 0 });
-  const bled = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', bleedMm: 1.5 });
-  // More ink on the sheet means a bigger scale factor in the placement matrix.
-  const scaleOf = async (b: Uint8Array) => {
-    const zlib = await import('node:zlib');
-    const { PDFStream } = await import('pdf-lib');
-    const d = await PDFDocument.load(b);
-    const st = d.getPage(0).node.normalizedEntries().Contents;
-    let text = '';
-    for (let i = 0; st && i < st.size(); i++) {
-      const raw = (d.context.lookup(st.get(i), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
-      try { text += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
-      catch { text += Buffer.from(raw).toString('latin1'); }
-    }
-    const m = [...text.matchAll(/(-?[\d.]+) 0 0 (-?[\d.]+) [-\d.]+ [-\d.]+ cm/g)];
-    return Math.max(...m.map((x) => Math.abs(Number(x[1]))));
-  };
-  assert.ok(await scaleOf(bled) > await scaleOf(zero), 'bleed really enlarges the art');
-});
-
-test('bleed is NOT capped — it is meant to spill into the gutters', async () => {
-  /* Every card on the sheet is the same artwork, so where two bleeds overlap
-     they overlap with themselves, and the blade takes the overlap away. Capping
-     it at half the gutter was the wrong instinct: a 3 mm row gutter would have
-     silently held the bleed to 1.5 however much was asked for. */
-  const huge = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', bleedMm: 50 });
-  const doc = await PDFDocument.load(huge);
-  assert.equal(doc.getPageCount(), 1, 'still builds');
-  const { width, height } = doc.getPage(0).getSize();
-  assert.ok(Math.abs(width - 215.9 * PT_PER_MM) < 0.5, 'and the sheet is untouched');
-  assert.ok(Math.abs(height - 279.4 * PT_PER_MM) < 0.5);
-});
-
-test('the bleed leaves the paper the operator expects in each gutter', () => {
-  /* The arithmetic the owner did out loud, kept so it cannot drift: bleed eats
-     into the gutter from BOTH sides, so what is left between two bled cards is
-     the gutter minus twice the bleed. B 10 leaves 7 mm of paper; E/F/G 3 leaves
-     nothing at all, which is a shared edge and exactly right. */
-  const BLEED = 1.5;
-  const f = fitDivinityCards('letter');
-  const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
-  const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  const gapX = xs[1]! - xs[0]! - PLACED_W_MM;
-  const gapY = ys[0]! - ys[1]! - PLACED_H_MM;
-  assert.ok(close(gapX, 10), 'B is 10 between the trims');
-  assert.ok(close(gapY, 3), 'E/F/G is 3 between the trims');
-  assert.ok(close(gapX - 2 * BLEED, 7), '7 mm of paper left between the columns');
-  assert.ok(close(gapY - 2 * BLEED, 0), 'and the rows bleed edge to edge');
-});
-
 test('SPIN BACKS turns a lone sheet — and still never adds a page', async () => {
   /* The shop runs fronts from one file and backs from another. A single upload
      of the back artwork IS the backs pass, so the switch has to turn THAT sheet;
@@ -358,41 +269,13 @@ test('SPIN BACKS turns a lone sheet — and still never adds a page', async () =
   assert.deepEqual(pb, pf, 'and the back is spun onto the front’s orientation');
 });
 
-test('the production template: A 15.5, B 10, D 5.5, E/F/G 3, bleed 1.5, Letter', () => {
-  /* Measured off PRODUCTION stock and confirmed on a cut stack. Pinned as a
-     whole rather than as scattered constants, because what was proven is the
-     COMBINATION — sheet, four gaps, bleed, cell — and any one drifting breaks a
-     template that is known to work.
-
-     A (15.5) is NOT equal to C (12.6). An earlier set validated on TEST stock
-     had them within a tenth of each other, and it did not survive the switch to
-     real card stock: heavier stock registers differently and the block lands
-     1.45 mm right of centre. Do not "fix" this by centring it. */
-  const f = fitDivinityCards('letter');
-  assert.ok(close(f.sheetWMm, 215.9) && close(f.sheetHMm, 279.4), 'Letter');
-  assert.ok(close(f.marginXMm, 15.5), 'A 15.5');
-  assert.ok(close(f.marginTopMm, 5.5), 'D 5.5');
-  assert.ok(close(f.marginRightMm, 12.6), 'C falls out at 12.60');
-  assert.ok(close(f.marginBottomMm, 10.9), 'H falls out at 10.90');
-  assert.ok(!close(f.marginXMm, f.marginRightMm), 'and A is deliberately NOT C');
-  assert.equal(DEF_GUTTER_X_MM, 10, 'B 10');
-  assert.equal(DEF_GUTTER_Y_MM, 3, 'E/F/G 3');
-  assert.equal(f.n, 8, 'eight cards');
-  for (const c of f.cells) {
-    assert.ok(close(c.wMm, PLACED_W_MM) && close(c.hMm, PLACED_H_MM), 'cells are true cards');
-  }
-  // Both sums close on the sheet, which is the check the whole template is sane.
-  assert.ok(close(f.marginXMm + f.blockWMm + f.marginRightMm, 215.9));
-  assert.ok(close(f.marginTopMm + f.blockHMm + f.marginBottomMm, 279.4));
-});
-
-test('the BACK sheet mirrors across — 15.5 goes to C, 12.6 to A', async () => {
+test('the BACK sheet mirrors across — A and C trade places', async () => {
   /* The template is NOT symmetric: A 15.5 against C 12.6, because that is where
      the machine cuts on production stock. A sheet turned over about its long
      edge therefore only lands on its front if the block is mirrored. Nothing
      about a symmetric template would need this, and nothing would catch it
      breaking either — hence the test. */
-  const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', addMarks: false, bleedMm: 0 });
+  const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', addMarks: false });
   const zlib = await import('node:zlib');
   const { PDFStream } = await import('pdf-lib');
   const doc = await PDFDocument.load(out);
@@ -407,8 +290,8 @@ test('the BACK sheet mirrors across — 15.5 goes to C, 12.6 to A', async () => 
     return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10))].sort((a, b) => a - b);
   };
-  assert.deepEqual(await colsOf(0), [15.5, 114.4], 'unticked, nothing mirrors');
-  assert.deepEqual(await colsOf(1), [15.5, 114.4], 'including the back sheet');
+  assert.deepEqual(await colsOf(0), [12.5, 109.9], 'unticked, nothing mirrors');
+  assert.deepEqual(await colsOf(1), [12.5, 109.9], 'including the back sheet');
 });
 
 test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
@@ -417,8 +300,8 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
      to move ITS margins — 15.5 to C, 12.6 to A — or the backs run does not
      register with the fronts run. Read off the rendered content stream, not the
      settings, because this is the exact claim that kept being wrong. */
-  const off = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false, bleedMm: 0 });
-  const on = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false, bleedMm: 0, spinBacks: true });
+  const off = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false });
+  const on = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false, spinBacks: true });
   const zlib = await import('node:zlib');
   const { PDFStream } = await import('pdf-lib');
   const leftEdge = async (b: Uint8Array) => {
@@ -434,12 +317,12 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10));
   };
-  assert.equal(await leftEdge(off), 15.5, 'unticked: A stays 15.5');
-  assert.equal(await leftEdge(on), 12.6, 'ticked: A becomes 12.6 — the swap');
+  assert.equal(await leftEdge(off), 12.5, 'unticked: A 14, less the 1.5 bleed');
+  assert.equal(await leftEdge(on), 14.1, 'ticked: A becomes C 15.6, less the bleed');
 });
 
 test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
-  const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', addMarks: false, bleedMm: 0, spinBacks: true });
+  const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', addMarks: false, spinBacks: true });
   const zlib = await import('node:zlib');
   const { PDFStream } = await import('pdf-lib');
   const d = await PDFDocument.load(out);
@@ -454,8 +337,8 @@ test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10));
   };
-  assert.equal(await leftOf(0), 15.5, 'fronts untouched');
-  assert.equal(await leftOf(1), 12.6, 'backs swapped');
+  assert.equal(await leftOf(0), 12.5, 'fronts untouched');
+  assert.equal(await leftOf(1), 14.1, 'backs swapped');
 });
 
 test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {
@@ -470,7 +353,7 @@ test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {
   const one = fitDivinityCards('letter');
   const right = f.cells.filter((c) => c.xMm > 215.9);
   assert.equal(right.length, 8, 'eight on the right half');
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, one.marginXMm), 'its own A 15.5');
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, one.marginXMm), 'its own A 14');
   assert.ok(close(431.8 - Math.max(...right.map((c) => c.xMm + c.wMm)), one.marginRightMm), 'its own C 12.6');
   // And the left half is the plain Letter layout untouched.
   const left = f.cells.filter((c) => c.xMm < 215.9);

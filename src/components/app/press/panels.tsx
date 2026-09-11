@@ -2913,12 +2913,23 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
      has — rather than the stored one, because a switch whose numbers do not
      move is a switch nobody can tell is working. Typing while spun writes back
      through the mirror, so the field you edit is the gap you measured. */
+  /* The four MARGINS are the measurements; the two GUTTERS are the remainder.
+     A gutter between two cards cannot be laid against a ruler from a sheet edge,
+     so typing C moves B and typing H moves E/F/G, rather than the margin
+     silently absorbing it and the sum going 2.6 mm over the sheet. */
+  const CW = 88.9, CH = 63.5;
+  const gX = round2(FIT.blockWMm - 2 * CW);
+  const gY = round2((FIT.blockHMm - 4 * CH) / 3);
+  /* Typing C moves A, and typing H moves D — the block slides, the cards and
+     gutters never change size. B and E/F/G stay exactly what they are set to. */
+  const setC = (v: number) => up({ marginXMm: round2(FIT.sheetWMm - FIT.blockWMm - v) });
+  const setH = (v: number) => up({ marginTopMm: round2(FIT.sheetHMm - FIT.blockHMm - v) });
+
   const spun = !!s.spinBacks;
   const effA = spun ? FIT.marginRightMm : FIT.marginXMm;
   const effC = spun ? FIT.marginXMm : FIT.marginRightMm;
-  const flip = (v: number) => round2(FIT.sheetWMm - FIT.blockWMm - v);
-  const setA = (v: number) => up({ marginXMm: spun ? flip(v) : v });
-  const setC = (v: number) => up({ marginXMm: spun ? v : flip(v) });
+  const setA = (v: number) => (spun ? setC(v) : up({ marginXMm: v }));
+  const setEffC = (v: number) => (spun ? up({ marginXMm: v }) : setC(v));
   /* Live from the fit module so the panel can never quote a margin the engine
      is not actually using — that is how it came to advertise an 89 x 63 cell. */
 
@@ -2958,16 +2969,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
             disagree with itself. */}
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
           <span className="pe-label" style={{ flex: 1 }}>C<span className="pe-label-sm"> · card to right edge</span></span>
-          <NumRaw value={round2(effC)} onValue={setC} w={70} />
+          <NumRaw value={round2(effC)} onValue={setEffC} w={70} />
         </div>
         <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
           <span className="pe-label" style={{ flex: 1 }}>H<span className="pe-label-sm"> · row 4 to foot</span></span>
-          <NumRaw value={round2(FIT.marginBottomMm)}
-            onValue={(v) => up({ marginTopMm: round2(FIT.sheetHMm - FIT.blockHMm - v) })} w={70} />
-        </div>
-        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 14 }}>
-          <span className="pe-label" style={{ flex: 1 }}>Bleed<span className="pe-label-sm"> · art past the cut</span></span>
-          <NumRaw value={s.bleedMm ?? 1.5} onValue={(v) => up({ bleedMm: v })} w={70} />
+          <NumRaw value={round2(FIT.marginBottomMm)} onValue={setH} w={70} />
         </div>
         <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.7 }}>
           {spun && (
@@ -2976,10 +2982,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               sheet lands behind its fronts. Untick to go back to 15.5 / 12.60.
             </div>
           )}
-          <b>A 15.5 · B 10 · D 5.5 · E/F/G 3 · bleed 1.5</b> on Letter, measured off
-          <b> production stock</b>. C and H fall out at 12.60 and 10.90. A is not equal to C
-          on purpose — that is where the machine cuts on the heavy stock. A, the two cards,
-          B and C have to add up to the sheet, so typing any of the four moves the others.
+          <b>A 14 · B 8.5 · D 6.5 · E/F/G 0</b> on Letter. C and H are the remainder —
+          C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
+          <br />Every gap is <b>1.5 smaller than the ruler reads</b>, because these place the
+          <b> cut lines</b> and the art runs 1.5 past them on every side. The bleed is built
+          in now — no control, always there. Rows <b>butt</b>: one cut serves both cards.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
             onClick={() => up({ marginXMm: 15.5, marginTopMm: 5.5, gutterXMm: 10, gutterYMm: 3, bleedMm: 1.5 })}>
             Reset to the proven template</button>

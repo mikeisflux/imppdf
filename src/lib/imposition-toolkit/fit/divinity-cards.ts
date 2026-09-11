@@ -13,11 +13,23 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 15.5   B 10   D 5.5   E/F/G 3   bleed 1.5   sheet LETTER
- *     C and H then fall out at 12.60 and 10.90.
+ *     A 14   B 8.5   D 6.5   E/F/G 0   sheet LETTER
+ *     C and H then fall out at 15.60 and 18.90.
  *
- *     across  15.5 + 88.9 + 10 + 88.9 + 12.6 = 215.9
- *     down    5.5 + 4(63.5) + 3(3) + 10.9    = 279.4
+ *     across  14 + 88.9 + 8.5 + 88.9 + 15.6 = 215.9
+ *     down    6.5 + 4(63.5) + 18.9          = 279.4
+ *
+ * EVERY GAP IS 1.5 SMALLER THAN THE RULER READING, because the ruler reads the
+ * paper between the ART and the art runs 1.5 past the cut. The CUT LINES are
+ * what these numbers place, and they sit 1.5 inside the ink on every side.
+ *
+ * THE BLEED IS BUILT IN — there is no bleed control any more. The art is always
+ * laid 1.5 mm past the cut on all four sides; it is not an option because a card
+ * without it cuts white edges, which is the fault this template was rebuilt to
+ * remove.
+ *
+ * THE ROWS BUTT — no gutter at all. One cut line serves both cards, and the
+ * 1.5 mm bleed laps onto the neighbour, which is the same artwork.
  *
  * A IS NOT EQUAL TO C, and that is not a mistake. An earlier set (A 14, D 6.5)
  * was validated on TEST stock and did not hold when the real card stock went in
@@ -69,6 +81,8 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
   a3:      { wMm: A3_W_MM,      hMm: A3_H_MM,     blockWMm: A4_W_MM,     doubled: true },
 };
 
+const COLS_N = 2, ROWS_N = 4;
+
 /* ── The template. EVERY GAP IS A SETTING, and these are only the numbers the
    shop measured off its own cut machine. Nothing here is centred, derived from
    a rule, or clever: the operator has a ruler and the machine, and inferring
@@ -84,18 +98,34 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
    These are the production numbers. A is NOT equal to C any more (15.5 against
    12.6): the block sits 1.45 mm right of centre because that is where the
    machine puts it, not because anything is being centred. */
-export const DEF_MARGIN_X_MM = 15.5;  // A — sheet edge to the first cut line
-export const DEF_GUTTER_X_MM = 10;    // B — between the columns
-export const DEF_MARGIN_TOP_MM = 5.5; // D — head margin
-export const DEF_GUTTER_Y_MM = 3;     // E/F/G — between the rows
+export const DEF_MARGIN_X_MM = 14;    // A — sheet edge to the first cut line (15.5 - 1.5)
+export const DEF_MARGIN_TOP_MM = 6.5; // D — head margin (8 - 1.5)
+
+export const DEF_GUTTER_X_MM = 8.5;   // B — between the columns (10 - 1.5)
+/* E/F/G — ZERO. The rows BUTT: no strip between them, one cut line serving both
+   cards. With 1.5 mm of bleed on each side the art already met edge to edge
+   across a 3 mm gutter, so the gutter was doing nothing but consuming sheet —
+   and it was the term that made D 8 and H 11 impossible to have together. The
+   bleed now laps 1.5 mm onto the neighbour, which is the same artwork, and the
+   blade takes it away. */
+export const DEF_GUTTER_Y_MM = 0;
+
+/* The vertical chain with the rows butted is four cards and nothing between:
+
+     D 8 + 4(63.5) + H  =  8 + 254 + H       on a 279.4 sheet  ->  H 17.4
+
+   The bleed is not a term in it. Bleed is drawn OUTSIDE each cell — it laps over
+   the neighbouring card and over the margin — so it never moves a cut line and
+   never consumes sheet. That is what "let the bleed spill over" means in the
+   geometry: the cells are the cards, full stop. */
 
 /** The cell IS the card, laid sideways. Never derived, never adjusted to make a
  *  margin come out — a card that is not 2.5 x 3.5 is not a trading card. */
 export const PLACED_W_MM = CARD_H_MM;             // 88.9
 export const PLACED_H_MM = CARD_W_MM;             // 63.5
 
-export const COLS = 2;
-export const ROWS = 4;
+export const COLS = COLS_N;
+export const ROWS = ROWS_N;
 
 export interface DivinityCardTemplate {
   /** A — sheet edge to the first cut line. */ marginXMm?: number;

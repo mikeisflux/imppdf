@@ -4683,10 +4683,12 @@ export async function imposeDivinityCards(
   });
   const mm = (v: number) => v * PT_PER_MM;
 
-  /* NOT capped. Bleed is supposed to spill into the gutters — that is the whole
-     point of it — and every card on the sheet is the same artwork, so where two
-     bleeds overlap they overlap with themselves and the blade takes it away. */
-  const bleedMm = Math.max(0, opts.bleedMm ?? 1.5);
+  /* BUILT IN, not a setting. The art always runs 1.5 mm past the cut on all four
+     sides — into the gutters, over the neighbour, over the margin. It is not
+     optional because a card fitted to the bare trim cuts white edges, which is
+     the fault this template was rebuilt to remove, and every gap on the sheet is
+     already stated 1.5 smaller to account for it. */
+  const bleedMm = 1.5;
 
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();
