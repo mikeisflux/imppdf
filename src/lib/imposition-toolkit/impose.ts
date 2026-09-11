@@ -4635,6 +4635,11 @@ export interface DivinityDeckOptions {
   order?: 'grouped' | 'interleaved';
   /** How the stack is turned over between passes. Long edge is the usual. */
   flip?: 'long' | 'short';
+  /** Spin the back artwork a further 180 within its cell. Default ON: a stack
+   *  turned over by hand lands the opposite way from a perfecting press, which
+   *  is what the shop's own cut sheets show. Turn it off if the backs come out
+   *  upside down against their fronts. */
+  spinBacks?: boolean;
   addMarks?: boolean;
   markLenMm?: number;      // default 3
   markWeightPt?: number;   // default 0.25
@@ -4734,11 +4739,20 @@ export async function imposeDivinityDeck(
   };
 
   const frontTurn: 0 | 90 | -90 = cardEmbeds[0] && needsTurn(cardEmbeds[0]) ? 90 : 0;
-  /* A long-edge flip reverses the axis a turned card's "up" points along, so
-     the back is turned the other way to come out upright against its front. A
-     short-edge flip leaves that axis alone, so the turn is unchanged. */
+  /* A long-edge flip reverses the axis a turned card's "up" points along, so on
+     a perfecting press the back turns the other way to come out upright against
+     its front. A short-edge flip leaves that axis alone.
+
+     SPIN BACKS adds half a turn on top of that. The two quarter turns differ by
+     exactly 180, so spinning is simply picking the other one. It exists because
+     a hand-turned stack of card stock does not always land the way a press
+     sheet would, and which way it lands is a property of the operator's
+     workflow, not something the file can work out — so it is a switch, set by
+     cutting one sheet and looking at it. */
+  const spun = opts.spinBacks !== false;
+  const baseBack: 0 | 90 | -90 = (opts.flip ?? 'long') === 'long' ? -90 : 90;
   const backTurn: 0 | 90 | -90 = backEmb && needsTurn(backEmb)
-    ? ((opts.flip ?? 'long') === 'long' ? -90 : 90) : 0;
+    ? (spun ? (baseBack === 90 ? -90 : 90) : baseBack) : 0;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const frontSheet = (si: number): any => {
@@ -4830,6 +4844,9 @@ export interface DivinityCardOptions {
   /** How the press turns the sheet over. 'long' = flipped about the vertical
    *  axis (Fiery's "open to left"); 'short' = about the horizontal axis. */
   flip?: 'long' | 'short';
+  /** Spin the back artwork a further 180 within its cell. Default ON — see
+   *  imposeDivinityDeck for why this is a switch and not a calculation. */
+  spinBacks?: boolean;
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
   markLenMm?: number;      // default 3
@@ -4903,13 +4920,15 @@ export async function imposeDivinityCards(
   drawSheet(pages[0], front, frontTurn);
 
   if (back) {
-    /* A long-edge flip reverses the sheet's x-axis, and a turned card's "up"
-       points along x — so the back has to be turned the OTHER way to come out
-       upright against its front. A short-edge flip leaves x alone, so the back
-       keeps the same turn. Get this wrong and the backs are upside down on
-       every card, which is only visible after cutting. */
+    /* Same rule as imposeDivinityDeck, kept in step with it deliberately: the
+       flip picks a base turn, and SPIN BACKS (default on) takes the other of the
+       two quarter turns, which is exactly half a turn away. Get it wrong and
+       every back is upside down against its front, which only shows after
+       cutting — hence a switch rather than a guess. */
+    const spun = opts.spinBacks !== false;
+    const baseBack: 0 | 90 | -90 = (opts.flip ?? 'long') === 'long' ? -90 : 90;
     const backTurn: 0 | 90 | -90 = needsTurn(back)
-      ? ((opts.flip ?? 'long') === 'long' ? -90 : 90) : 0;
+      ? (spun ? (baseBack === 90 ? -90 : 90) : baseBack) : 0;
     const bp = out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)]);
     drawSheet(bp, back, backTurn);
     pages.push(bp);

@@ -154,15 +154,19 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'divinitycards':
       // The shop's card template, to the printer's spec sheet: 54 x 90 mm card,
       // ten to an A4, the A4 block doubled onto an A3 that cuts into two A4s.
-      return { sheet: 'a3', page: 1, backPage: 2, backs: true, flip: 'long', addMarks: true };
+      return { sheet: 'a3', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: true, addMarks: true };
     case 'divinitydeck':
       /* A whole deck out of one file — a card per page, the LAST page the shared
-         back — ganged 8-up on a PORTRAIT A4, to the cut machine's own measured
-         template (14 mm sides, 6.5 top/bottom, 10 mm gutters).
+         back — ganged 8-up on a PORTRAIT A4. The cell IS a 2.5 x 3.5" card laid
+         sideways; the 10/3 gutters and 6.5 head margin are measured off the cut
+         machine and the outer margins are the waste left over.
          'grouped' because the printer will not duplex stock this thick: every
          front prints, the stack comes out and goes back in, then every back.
+         'spinBacks' because a hand-turned stack lands the opposite way from a
+         perfecting press — proven on the shop's own cut sheets.
          backPage 0 means "the last page", so it tracks a deck that grows. */
-      return { backPage: 0, backs: true, order: 'grouped', flip: 'long', addMarks: true };
+      return { backPage: 0, backs: true, order: 'grouped', flip: 'long',
+        spinBacks: true, addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
@@ -628,6 +632,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           sheet: s.sheet === 'a4' ? 'a4' : 'a3', page: s.page ?? 1,
           backPage: s.backPage ?? 2, backs: s.backs !== false,
           flip: s.flip === 'short' ? 'short' : 'long',
+          spinBacks: s.spinBacks !== false,
           addMarks: s.addMarks !== false,
         });
         break;
@@ -641,6 +646,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           backs: s.backs !== false,
           order: s.order === 'interleaved' ? 'interleaved' : 'grouped',
           flip: s.flip === 'short' ? 'short' : 'long',
+          spinBacks: s.spinBacks !== false,
           addMarks: s.addMarks !== false,
         })).bytes;
         break;

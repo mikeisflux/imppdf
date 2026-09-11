@@ -32,20 +32,29 @@ import { imposeDivinityDeck } from '../src/lib/imposition-toolkit/impose.ts';
 
 const close = (a: number, b: number, tol = 1e-6) => Math.abs(a - b) <= tol;
 
+test('THE CELL IS THE CARD — 2.5 x 3.5in laid sideways, exactly', () => {
+  /* The one number that is never negotiable. Everything else on the sheet is
+     waste and can move; a cell that is not a 2.5 x 3.5" card cuts cards that
+     are the wrong size, which is the whole failure this template exists to
+     avoid. */
+  assert.ok(close(CELL_W_MM, 88.9), `3.5in across, got ${CELL_W_MM}`);
+  assert.ok(close(CELL_H_MM, 63.5), `2.5in down, got ${CELL_H_MM}`);
+  assert.ok(close(CELL_W_MM, CARD_H_MM), 'and it IS the card, not a copy of its figures');
+  assert.ok(close(CELL_H_MM, CARD_W_MM));
+});
+
 test('the measured gaps are what the file says they are', () => {
-  assert.equal(MARGIN_X_MM, 14, 'A and C — both sides');
   assert.equal(GUTTER_X_MM, 10, 'B — between the columns');
   assert.equal(MARGIN_TOP_MM, 6.5, 'D — head. Not more, not less.');
   assert.equal(GUTTER_Y_MM, 3, 'E/F/G — between the rows, NOT the column gutter');
-  assert.equal(MARGIN_BOTTOM_MM, 11, 'H — foot');
   assert.equal(COLS, 2);
   assert.equal(ROWS, 4);
   assert.equal(PER_SHEET, 8);
 });
 
-test('the cell is DERIVED from those gaps, never stated', () => {
-  assert.equal(CELL_W_MM, 86, '(210 - 14 - 14 - 10) / 2');
-  assert.equal(CELL_H_MM, 67.625, '(297 - 6.5 - 11 - 3*3) / 4');
+test('the outer margins are the WASTE — derived, never stated', () => {
+  assert.ok(close(MARGIN_X_MM, 11.1), `(210 - 2(88.9) - 10) / 2, got ${MARGIN_X_MM}`);
+  assert.ok(close(MARGIN_BOTTOM_MM, 27.5), `297 - 6.5 - 4(63.5) - 3(3), got ${MARGIN_BOTTOM_MM}`);
 });
 
 test('the sheet is a plain PORTRAIT A4 — 210 x 297', () => {
@@ -54,38 +63,37 @@ test('the sheet is a plain PORTRAIT A4 — 210 x 297', () => {
 });
 
 test('both sums close on A4 exactly — the check the template is right', () => {
-  assert.equal(2 * MARGIN_X_MM + COLS * CELL_W_MM + (COLS - 1) * GUTTER_X_MM, 210,
-    '14 + 86 + 10 + 86 + 14');
-  assert.equal(MARGIN_TOP_MM + ROWS * CELL_H_MM + (ROWS - 1) * GUTTER_Y_MM + MARGIN_BOTTOM_MM, 297,
-    '6.5 + 4(67.625) + 3(3) + 11');
+  assert.ok(close(2 * MARGIN_X_MM + COLS * CELL_W_MM + (COLS - 1) * GUTTER_X_MM, 210),
+    '11.1 + 88.9 + 10 + 88.9 + 11.1');
+  assert.ok(close(MARGIN_TOP_MM + ROWS * CELL_H_MM + (ROWS - 1) * GUTTER_Y_MM + MARGIN_BOTTOM_MM, 297),
+    '6.5 + 4(63.5) + 3(3) + 27.5');
 });
 
-test('what the cell costs a 2.5 x 3.5in card, stated so it cannot creep', () => {
-  /* The artwork is 88.9 x 63.5 placed sideways — WIDER and SHORTER than the
-     86 x 67.625 cell. Cover-fit scales by the larger ratio and clips the rest,
-     so the loss is off the WIDTH and it is not small. Pinned here rather than
-     left as a comment: if these gaps are ever re-measured, this figure moving
-     is the thing that tells you the artwork's framing changed with them. */
+test('the artwork loses NOTHING — the cell is the card, so cover-fit is 1:1', () => {
+  /* The point of pinning the cell to the card. Cover-fit scales by the larger
+     ratio; when cell and card are the same shape that ratio is 1 and nothing is
+     scaled or clipped. If this ever fails, somebody made a margin an input
+     again and the cards are coming off the guillotine the wrong size. */
   const scale = Math.max(CELL_W_MM / CARD_H_MM, CELL_H_MM / CARD_W_MM);
-  const lostW = CARD_H_MM * scale - CELL_W_MM;
-  const lostH = CARD_W_MM * scale - CELL_H_MM;
-  assert.ok(Math.abs(lostW - 8.68) < 0.05, `~8.7mm off the width, got ${lostW.toFixed(2)}`);
-  assert.ok(Math.abs(lostH) < 1e-6, 'and nothing off the height — the cell is taller');
+  assert.ok(close(scale, 1), `no scaling, got ${scale}`);
+  assert.ok(close(CARD_H_MM * scale - CELL_W_MM, 0), 'nothing off the width');
+  assert.ok(close(CARD_W_MM * scale - CELL_H_MM, 0), 'nothing off the height');
 });
 
-test('eight cells, 2 across x 4 down, on a 96 x 70.625 pitch', () => {
+test('eight cells, 2 across x 4 down, on a 98.9 x 66.5 pitch', () => {
   const L = deckLayout();
   assert.equal(L.cells.length, 8);
   assert.equal(L.perSheet, 8);
   const xs = [...new Set(L.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(L.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  assert.deepEqual(xs, [14, 110], 'two columns at 14 and 110');
+  assert.equal(xs.length, 2, 'two columns');
+  assert.ok(close(xs[0]!, 11.1) && close(xs[1]!, 110), `at 11.1 and 110, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
-  assert.equal(xs[1]! - xs[0]!, 96, 'column pitch 86 + 10');
+  assert.ok(close(xs[1]! - xs[0]!, 98.9), 'column pitch 88.9 + 10');
   for (let i = 1; i < ys.length; i++) {
-    assert.equal(ys[i - 1]! - ys[i]!, 70.625, 'row pitch 67.625 + 3');
+    assert.ok(close(ys[i - 1]! - ys[i]!, 66.5), 'row pitch 63.5 + 3');
   }
-  assert.equal(Math.min(...ys), 11, 'the last row sits exactly on the H margin');
+  assert.ok(close(Math.min(...ys), 27.5), 'the last row sits exactly on the H margin');
 });
 
 test('every cell is inside the sheet and none overlaps another', () => {
@@ -108,7 +116,7 @@ test('the grid IS symmetric across — so a long-edge flip registers', () => {
   /* THE property the two-pass workflow rests on. The stack comes out of the
      tray, gets turned over about the VERTICAL axis and goes back in; every cell
      has a partner at the mirrored x, so the backs land on their fronts. It
-     holds because A and C were both measured at 14. */
+     holds because A and C come out equal — the remainder is split evenly. */
   const { cells } = deckLayout();
   const key = (x: number, y: number) => `${x.toFixed(4)},${y.toFixed(4)}`;
   const at = new Set(cells.map((c) => key(c.xMm, c.yMm)));
@@ -119,16 +127,16 @@ test('the grid IS symmetric across — so a long-edge flip registers', () => {
 });
 
 test('the grid is NOT symmetric down — so end-for-end does NOT register', () => {
-  /* The block is pinned to the head at 6.5 against 11 at the foot, because that
-     is where the machine cuts. Turning the stack end-for-end therefore lands
-     the backs 4.5 mm out. Asserted rather than left as a comment, so nobody
-     "fixes" the layout by centring it and quietly breaks the cut. */
+  /* The block is pinned to the head at 6.5, with all the slack at the foot,
+     because that is where the machine cuts. Turning the stack end-for-end
+     therefore lands the backs 21 mm out. Asserted rather than left as a
+     comment, so nobody "fixes" it by centring and quietly breaks the cut. */
   const { cells } = deckLayout();
   const key = (x: number, y: number) => `${x.toFixed(4)},${y.toFixed(4)}`;
   const at = new Set(cells.map((c) => key(c.xMm, c.yMm)));
   const mirrored = cells.filter((c) => at.has(key(c.xMm, SHEET_H_MM - (c.yMm + c.hMm))));
   assert.equal(mirrored.length, 0, 'no cell has a partner end-for-end');
-  assert.equal(MARGIN_BOTTOM_MM - MARGIN_TOP_MM, 4.5, 'and that is how far out it would land');
+  assert.ok(close(MARGIN_BOTTOM_MM - MARGIN_TOP_MM, 21), 'and that is how far out it would land');
 });
 
 test('cells read the way a person reads — left to right, top row first', () => {
@@ -259,19 +267,29 @@ async function turnsOnPage(bytes: Uint8Array, index: number) {
   return { ccw, cw };
 }
 
-test('portrait art is turned sideways, backs the other way on a long flip', async () => {
-  /* A card lying sideways has its "up" along the axis a long-edge flip
-     reverses, so the back has to turn the opposite way to come out upright
-     against its front. A short-edge flip leaves that axis alone. */
-  const long = await imposeDivinityDeck(await deckPdf(8), { flip: 'long' });
-  const lf = await turnsOnPage(long.bytes, 0), lb = await turnsOnPage(long.bytes, 1);
-  assert.equal(lf.ccw + lf.cw, 8, 'eight cards, each turned');
-  assert.equal(lb.ccw + lb.cw, 8, 'eight backs, each turned');
-  assert.ok((lf.ccw > 0) !== (lb.ccw > 0), 'and the backs turn the OTHER way');
+test('portrait art is turned sideways, and SPIN BACKS picks the other turn', async () => {
+  /* The two quarter turns differ by exactly 180, so spinning is simply taking
+     the other one. Default ON, because a hand-turned stack of card stock lands
+     the opposite way from a perfecting press — which is what the shop's own cut
+     sheets showed. Both states are asserted so the switch can't quietly stop
+     doing anything. */
+  const on = await imposeDivinityDeck(await deckPdf(8), { flip: 'long' });
+  const onF = await turnsOnPage(on.bytes, 0), onB = await turnsOnPage(on.bytes, 1);
+  assert.equal(onF.ccw + onF.cw, 8, 'eight cards, each turned');
+  assert.equal(onB.ccw + onB.cw, 8, 'eight backs, each turned');
+  assert.deepEqual(onF, onB, 'spun: the backs take the SAME turn as the fronts');
 
+  const off = await imposeDivinityDeck(await deckPdf(8), { flip: 'long', spinBacks: false });
+  const offB = await turnsOnPage(off.bytes, 1);
+  assert.ok((onB.ccw > 0) !== (offB.ccw > 0), 'unspun is the other way — a real 180');
+  assert.equal(offB.ccw + offB.cw, 8, 'and still eight of them');
+});
+
+test('the flip still picks the base turn that spinning inverts', async () => {
+  const long = await imposeDivinityDeck(await deckPdf(8), { flip: 'long' });
   const short = await imposeDivinityDeck(await deckPdf(8), { flip: 'short' });
-  const sf = await turnsOnPage(short.bytes, 0), sb = await turnsOnPage(short.bytes, 1);
-  assert.deepEqual(sf, sb, 'short-edge flip: fronts and backs turn the same way');
+  const lb = await turnsOnPage(long.bytes, 1), sb = await turnsOnPage(short.bytes, 1);
+  assert.ok((lb.ccw > 0) !== (sb.ccw > 0), 'long and short land opposite ways');
 });
 
 test('the short last sheet gets no ink in its empty cells, front or back', async () => {

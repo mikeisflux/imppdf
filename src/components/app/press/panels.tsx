@@ -3027,6 +3027,11 @@ function DivinityDeckPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps)
               <button className="pe-chipbtn" style={pickStyle((s.flip ?? 'long') === 'long')} onClick={() => up({ flip: 'long' })}>Long edge</button>
               <button className="pe-chipbtn" style={pickStyle(s.flip === 'short')} onClick={() => up({ flip: 'short' })}>Short edge</button>
             </div>
+            <div style={{ marginTop: 10 }}>
+              <Check icon="rotate" label="Spin backs 180°"
+                sub="Turn this off if the backs come out upside down against their fronts"
+                checked={s.spinBacks !== false} onChange={(v) => up({ spinBacks: v })} />
+            </div>
             <div className="pe-note" style={{ marginTop: 8 }}>
               How the stack goes back in. The grid is <b>symmetric</b>, so the positions land
               on themselves either way. A card lying <b>sideways</b> has its
@@ -3121,6 +3126,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
                   <span className="pe-label" style={{ width: 76 }}>Flip</span>
                   <button className="pe-chipbtn" style={pickStyle((s.flip ?? 'long') === 'long')} onClick={() => up({ flip: 'long' })}>Long edge</button>
                   <button className="pe-chipbtn" style={pickStyle(s.flip === 'short')} onClick={() => up({ flip: 'short' })}>Short edge</button>
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <Check icon="rotate" label="Spin backs 180°"
+                    sub="Turn this off if the backs come out upside down against their fronts"
+                    checked={s.spinBacks !== false} onChange={(v) => up({ spinBacks: v })} />
                 </div>
                 <div className="pe-note" style={{ marginTop: 8 }}>
                   <b>Portrait</b> art gets a quarter turn to lie across the cell, and then

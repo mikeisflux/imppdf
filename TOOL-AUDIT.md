@@ -18,8 +18,8 @@ sheet (rotate, crop, watermark…) have no fit calculation; they get Smoke + Sho
 
 | Tool | Piece | Default sheet | Calc | Fit | Smoke | Shot |
 |---|---|---|---|---|---|---|
-| `divinitycards` Divinity Trading Cards | 86 × 67.6 cell | A3 420 × 297 | [x] | [x] | [x] | [x] | 16-up, 2 blocks of 2×4 |
-| `divinitydeck` Divinity Trading Card Deck | 86 × 67.6 cell | A4 210 × 297 | [x] | [x] | [x] | [x] | 8-up sideways, N sheets, backs 2nd pass |
+| `divinitycards` Divinity Trading Cards | 88.9 × 63.5 cell | A3 420 × 297 | [x] | [x] | [x] | [x] | 16-up, 2 blocks of 2×4 |
+| `divinitydeck` Divinity Trading Card Deck | 88.9 × 63.5 cell | A4 210 × 297 | [x] | [x] | [x] | [x] | 8-up sideways, N sheets, backs 2nd pass |
 | `indexcard` Index Cards | 3 × 5" | 17 × 11 | [x] | [x] | [x] | [x] | 10-up 5×2 |
 | `business` Business Cards | 3.5 × 2" | 8.5 × 11 | [x] | [x] | [x] | [x] |
 | `postcard` Postcards | 6 × 4" | 8.5 × 11 | [x] | [x] | [x] | [x] |
@@ -296,44 +296,48 @@ machine. `fit/divinity-cards.ts` and `fit/divinity-deck.ts` hold it, and a test
 asserts the two files agree so neither can be re-tuned without the other.
 
     sheet   210 × 297 (A4) · 420 × 297 (A3, the A4 block twice, cut down at 210)
-    grid    2 across × 4 down = 8 per A4, 16 per A3, cards lying SIDEWAYS
+    cell    88.9 × 63.5 — a 2.5 × 3.5" card laid SIDEWAYS, exactly
+    grid    2 across × 4 down = 8 per A4, 16 per A3
 
-    across  A 14 + 86 + B 10 + 86 + C 14              = 210
-    down    D 6.5 + 4(67.625) + E/F/G 3(3) + H 11     = 297
+    across  A 11.1 + 88.9 + B 10 + 88.9 + C 11.1   = 210
+    down    D 6.5 + 4(63.5) + E/F/G 3(3) + H 27.5  = 297
 
-**Every gap is MEASURED; the cell is the remainder.** The letters are the ones
-on the cut map the owner marked up with a ruler against the machine's own
-output. This inverts how the rest of the toolkit works — everywhere else the
-piece size is fixed and the margins fall out — and it is deliberate: the machine
-cuts where it cuts and the file has to meet it. Both sums closing exactly on A4
-is the check that the template is right, and both are asserted. The column
-gutter (10) and the row gutter (3) are different numbers and are separate
-constants; a single shared gutter could not express this template at all.
+**The card size is the INPUT; the outer margins are the remainder.** This took
+several wrong turns to land, so the reasoning is worth keeping: eight gaps and a
+card size cannot all be dictated at once, because they have to sum to the sheet.
+Earlier builds made the margins the input and let the cell fall out, which
+produced an 86 × 67.6 cell — and cut cards that measured wrong. The margins are
+the right thing to give, because they are **waste**: a millimetre there gets
+trimmed off and binned, a millimetre on the card is a card that is the wrong
+size. A test asserts cover-fit comes out at scale 1.0, so if anyone makes a
+margin an input again the artwork starts scaling and the test says so.
 
-**What it costs the artwork.** A 2.5 × 3.5" card is 88.9 × 63.5; placed sideways
-that is a wider, shorter shape than the 86 × 67.625 cell. Cover-fit scales it up
-~6.5% and clips about **8.7 mm off the width**, nothing off the height. That
-figure is pinned in both tests, so if the gaps are ever re-measured the changed
-number tells you the framing moved with them. The gap to revisit if it is too
-much is **E/F/G**: the four rows have to fill whatever D and H leave.
+The gutters (10 between the columns, 3 between the rows) and the 6.5 head margin
+are measured off the machine with a ruler. The column gutter and the row gutter
+are genuinely different numbers and stay separate constants.
 
-**The block is pinned to the head** — 6.5 at the top against 11 at the foot — so
-the sheet is symmetric across (14 / 14) but not down. It backs up on a
-**long-edge** flip and *not* end-for-end; both halves of that are asserted, so
-nobody can "fix" the layout by centring it and quietly break the cut.
+**The block is pinned to the head** — 6.5 at the top, all the slack (27.5) at
+the foot — so the sheet is symmetric across (11.1 / 11.1) but not down. It backs
+up on a **long-edge** flip and *not* end-for-end; both halves are asserted so
+nobody re-centres it and quietly breaks the cut.
 
-Portrait art takes a quarter turn into the sideways cell, and then the flip
-decides the back's turn: long-edge reverses the sheet's x-axis so the backs turn
-the other way; short-edge leaves it alone. Cut marks are ruled off the sheet
-edges only, never into the gutters; the A3 half-sheet cut is ticked top and
-bottom.
+**Spin backs 180° — a checkbox, default ON.** Portrait art takes a quarter turn
+into the sideways cell, and the back needs one of the two quarter turns, which
+are exactly 180° apart. Which one is right depends on how the operator turns the
+stack over by hand, and a hand-turned stack of heavy card does not land the way
+a perfecting press would — proven on the shop's own cut sheets. That is a
+property of the workflow, not something the file can derive, so it is a switch:
+if the backs come out upside down against their fronts, untick it. Both states
+are asserted.
+
+Cut marks are ruled off the sheet edges only, never into the gutters; the A3
+half-sheet cut is ticked top and bottom.
 
 #### `divinitycards` — one card, filled across the sheet
 
-A3 (default) gives 16 and cuts into two A4s that each stand on their own with
-their own 14 mm side margins. A4 gives 8. A two-page upload becomes fronts on
-sheet 1 and backs on sheet 2. Fifteen assertions in
-`test/fit-divinity-cards.test.ts`.
+A3 (default) gives 16 and cuts into two A4s that each stand on their own. A4
+gives 8. A two-page upload becomes fronts on sheet 1 and backs on sheet 2.
+Sixteen assertions in `test/fit-divinity-cards.test.ts`.
 
 #### `divinitydeck` — a whole deck out of one file
 
@@ -350,5 +354,5 @@ Cards fall **sequentially**, not cut-and-stack: a deck is collated by hand off
 the guillotine, so sheet 1 holding cards 1–8 is what makes the stack checkable.
 The short last sheet gets no ink in its empty cells, front **or** back.
 
-172 cards → 22 front + 22 back pages, second pass at page 23. Twenty assertions
-in `test/fit-divinity-deck.test.ts`.
+172 cards → 22 front + 22 back pages, second pass at page 23. Twenty-one
+assertions in `test/fit-divinity-deck.test.ts`.

@@ -1,67 +1,65 @@
 /* Divinity trading card DECK — a whole deck from one multi-page PDF, ganged
  * 8-up on portrait A4, cards LYING SIDEWAYS.
  *
- * THIS IS THE CUT MACHINE'S TEMPLATE. Every gap below was measured off the
- * machine with a ruler, and every gap is the INPUT. The CELL is the remainder.
- * That inverts how the rest of the toolkit works — everywhere else the piece
- * size is fixed and the margins fall out — and it is deliberate: the machine
- * cuts where it cuts, and the file has to meet it.
+ * THE CARD SIZE IS THE INPUT. A trading card is 2.5 x 3.5 inches and nothing
+ * else; that is the product. Placed sideways the cell is 88.9 x 63.5, exactly,
+ * and the artwork therefore needs no scaling and loses nothing.
  *
- *   across  A 14 + 86 + B 10 + 86 + C 14                    = 210
- *   down    D 6.5 + 67.625 + E 3 + 67.625 + F 3 + 67.625
- *                 + G 3 + 67.625 + H 11                     = 297
+ * The GUTTERS are measured off the shop's cut machine — 10 mm between the
+ * columns, 3 mm between the rows — as is the 6.5 mm head margin.
  *
- * Both close on A4 exactly, which is the check that the template is right.
- * The letters are the ones on the cut map the owner marked up.
+ * THE OUTER MARGINS ARE THE REMAINDER. They cannot also be dictated: eight gaps
+ * and a card size cannot all be chosen at once, because they have to sum to the
+ * sheet. The margins are the right thing to give, because they are WASTE — they
+ * get trimmed off and binned, so a millimetre either way costs nothing, whereas
+ * a millimetre on the card is a card that is the wrong size.
  *
- * So the cell is 86 x 67.625 mm. The artwork is a 2.5 x 3.5" card (88.9 x 63.5)
- * placed sideways, which is a WIDER, SHORTER shape than the cell: cover-fit
- * scales it up about 6% and clips roughly 4 mm off each long edge. That is real
- * artwork lost, and it is what these gaps require — if it is too much, the
- * number to re-measure is E/F/G, since the four rows have to fill whatever the
- * head and foot margins leave.
+ *   across  11.1 + 88.9 + 10 + 88.9 + 11.1          = 210
+ *   down    6.5 + 4(63.5) + 3(3) + 27.5               = 297
  *
- * THE BLOCK IS PINNED TO THE HEAD, not centred: 6.5 at the top against 11 at
- * the foot. So the sheet backs up on a LONG-EDGE flip (it is centred across)
- * but NOT end-for-end. Both halves of that are asserted.
+ * Both close on A4 exactly. The block is PINNED TO THE HEAD (6.5 at the top,
+ * the slack at the foot), so the sheet is symmetric across but not down: it
+ * backs up on a LONG-EDGE flip and not end-for-end. Both are asserted.
  *
  * Asserted in test/fit-divinity-deck.test.ts.                                */
 
 export const MM_PER_IN = 25.4;
 export const PT_PER_MM = 72 / MM_PER_IN;
 
-/** The artwork's nominal size — a standard 2.5 x 3.5" card. Stated for
- *  comparison only; the CELL below is what actually gets used. */
+/** A standard 2.5 x 3.5" trading card. THE input — the cell is this, exactly. */
 export const CARD_W_MM = 2.5 * MM_PER_IN;    // 63.5
 export const CARD_H_MM = 3.5 * MM_PER_IN;    // 88.9
 
 /** Portrait A4 — the sheet as the shop sees and cuts it. */
 export const SHEET_W_MM = 210, SHEET_H_MM = 297;
 
+/** The cell IS the card, laid sideways. Never derived, never adjusted to make a
+ *  margin come out — a card that is not 2.5 x 3.5 is not a trading card. */
+export const CELL_W_MM = CARD_H_MM;          // 88.9
+export const CELL_H_MM = CARD_W_MM;          // 63.5
+
 /* ── Measured off the cut machine. Change these only with a ruler. ──────────
-   Named for the letters on the cut map: A/C sides, B between the columns,
-   D head, E/F/G between the rows, H foot.                                   */
-/** A and C — sheet edge to the first cut line, both sides. */
-export const MARGIN_X_MM = 14;
+   Letters are the ones on the cut map: B between the columns, D head,
+   E/F/G between the rows.                                                   */
 /** B — between the two columns. */
 export const GUTTER_X_MM = 10;
 /** D — sheet edge to the first cut line at the head. Not more, not less. */
 export const MARGIN_TOP_MM = 6.5;
 /** E, F and G — between the rows. NOT the same as the column gutter. */
 export const GUTTER_Y_MM = 3;
-/** H — last cut line to the foot of the sheet. */
-export const MARGIN_BOTTOM_MM = 11;
 
 export const COLS = 2;
 export const ROWS = 4;
 export const PER_SHEET = COLS * ROWS;        // 8
 
-/* The cell is the REMAINDER — worked, never restated, so the measured gaps
-   above stay the single source of truth. */
-export const CELL_W_MM =
-  (SHEET_W_MM - 2 * MARGIN_X_MM - (COLS - 1) * GUTTER_X_MM) / COLS;                      // 86
-export const CELL_H_MM =
-  (SHEET_H_MM - MARGIN_TOP_MM - MARGIN_BOTTOM_MM - (ROWS - 1) * GUTTER_Y_MM) / ROWS;     // 67.625
+/* ── The waste. Worked, never stated: whatever the card and the gutters leave
+   is what gets trimmed off and binned. ──────────────────────────────────── */
+/** A and C — equal, which is what lets a long-edge flip register. */
+export const MARGIN_X_MM =
+  (SHEET_W_MM - COLS * CELL_W_MM - (COLS - 1) * GUTTER_X_MM) / 2;                        // 11.1
+/** H — the slack, all of it at the foot, since the head margin is fixed. */
+export const MARGIN_BOTTOM_MM =
+  SHEET_H_MM - MARGIN_TOP_MM - ROWS * CELL_H_MM - (ROWS - 1) * GUTTER_Y_MM;              // 27.5
 
 export interface DeckCellMm { xMm: number; yMm: number; wMm: number; hMm: number; }
 

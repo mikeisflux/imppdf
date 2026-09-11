@@ -26,19 +26,24 @@ import { imposeDivinityCards } from '../src/lib/imposition-toolkit/impose.ts';
 
 const close = (a: number, b: number, tol = 1e-6) => Math.abs(a - b) <= tol;
 
+test('THE CELL IS THE CARD — 2.5 x 3.5in laid sideways, exactly', () => {
+  assert.ok(close(PLACED_W_MM, 88.9), `3.5in across, got ${PLACED_W_MM}`);
+  assert.ok(close(PLACED_H_MM, 63.5), `2.5in down, got ${PLACED_H_MM}`);
+  assert.ok(close(PLACED_W_MM, CARD_H_MM), 'and it IS the card, not a copy of its figures');
+  assert.ok(close(PLACED_H_MM, CARD_W_MM));
+});
+
 test('the measured gaps are what the file says they are', () => {
-  assert.equal(MARGIN_X_MM, 14, 'A and C — both sides');
   assert.equal(GUTTER_X_MM, 10, 'B — between the columns');
   assert.equal(MARGIN_TOP_MM, 6.5, 'D — head. Not more, not less.');
   assert.equal(GUTTER_Y_MM, 3, 'E/F/G — between the rows');
-  assert.equal(MARGIN_BOTTOM_MM, 11, 'H — foot');
   assert.equal(COLS, 2);
   assert.equal(ROWS, 4);
 });
 
-test('the cell is DERIVED from those gaps, never stated', () => {
-  assert.equal(PLACED_W_MM, 86, '(210 - 14 - 14 - 10) / 2');
-  assert.equal(PLACED_H_MM, 67.625, '(297 - 6.5 - 11 - 3*3) / 4');
+test('the outer margins are the WASTE — derived, never stated', () => {
+  assert.ok(close(MARGIN_X_MM, 11.1));
+  assert.ok(close(MARGIN_BOTTOM_MM, 27.5));
 });
 
 test('it is the SAME template as the deck tool, so both cut alike', () => {
@@ -56,19 +61,18 @@ test('it is the SAME template as the deck tool, so both cut alike', () => {
 });
 
 test('both sums close on A4 exactly — the check the template is right', () => {
-  assert.equal(2 * MARGIN_X_MM + COLS * PLACED_W_MM + (COLS - 1) * GUTTER_X_MM, 210);
-  assert.equal(MARGIN_TOP_MM + ROWS * PLACED_H_MM + (ROWS - 1) * GUTTER_Y_MM + MARGIN_BOTTOM_MM, 297);
+  assert.ok(close(2 * MARGIN_X_MM + COLS * PLACED_W_MM + (COLS - 1) * GUTTER_X_MM, 210));
+  assert.ok(close(MARGIN_TOP_MM + ROWS * PLACED_H_MM + (ROWS - 1) * GUTTER_Y_MM + MARGIN_BOTTOM_MM, 297));
 });
 
-test('what the cell costs a 2.5 x 3.5in card, stated so it cannot creep', () => {
-  // 88.9 x 63.5 sideways into an 86 x 67.625 cell: wider and shorter, so the
-  // loss is off the width. Pinned so a re-measure shows up as a changed figure.
+test('the artwork loses NOTHING — the cell is the card, so cover-fit is 1:1', () => {
   const scale = Math.max(PLACED_W_MM / CARD_H_MM, PLACED_H_MM / CARD_W_MM);
-  assert.ok(Math.abs(CARD_H_MM * scale - PLACED_W_MM - 8.68) < 0.05, '~8.7mm off the width');
-  assert.ok(Math.abs(CARD_W_MM * scale - PLACED_H_MM) < 1e-6, 'nothing off the height');
+  assert.ok(close(scale, 1), `no scaling, got ${scale}`);
+  assert.ok(close(CARD_H_MM * scale - PLACED_W_MM, 0), 'nothing off the width');
+  assert.ok(close(CARD_W_MM * scale - PLACED_H_MM, 0), 'nothing off the height');
 });
 
-test('A4: eight cards, 2 across x 4 down, on a 96 x 70.625 pitch', () => {
+test('A4: eight cards, 2 across x 4 down, on a 98.9 x 66.5 pitch', () => {
   const f = fitDivinityCards('a4');
   assert.equal(f.sheetWMm, 210);
   assert.equal(f.sheetHMm, 297);
@@ -76,11 +80,12 @@ test('A4: eight cards, 2 across x 4 down, on a 96 x 70.625 pitch', () => {
   assert.equal(f.cells.length, 8);
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  assert.deepEqual(xs, [14, 110], 'two columns at 14 and 110');
+  assert.equal(xs.length, 2, 'two columns');
+  assert.ok(close(xs[0]!, 11.1) && close(xs[1]!, 110), `at 11.1 and 110, got ${xs}`);
   assert.equal(ys.length, 4, 'four rows');
-  assert.equal(xs[1]! - xs[0]!, 96, 'column pitch 86 + 10');
-  for (let i = 1; i < ys.length; i++) assert.equal(ys[i - 1]! - ys[i]!, 70.625, 'row pitch 67.625 + 3');
-  assert.equal(Math.min(...ys), 11, 'the last row sits exactly on the H margin');
+  assert.ok(close(xs[1]! - xs[0]!, 98.9), 'column pitch 88.9 + 10');
+  for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66.5), 'row pitch 63.5 + 3');
+  assert.ok(close(Math.min(...ys), 27.5), 'the last row sits exactly on the H margin');
 });
 
 test('A4: every card is inside the sheet, and none overlaps another', () => {
@@ -113,15 +118,15 @@ test('A3: the A4 block duplicated — sixteen cards, cut down at 210', () => {
     assert.ok(close(right[i]!.xMm, a4.cells[i]!.xMm + 210), `right card ${i} is the same, +210`);
     assert.ok(close(left[i]!.yMm, right[i]!.yMm), 'and at the same height');
   }
-  // So each half, cut free, is a correct A4: 14 mm in from its own edges.
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 14));
-  assert.ok(close(420 - Math.max(...right.map((c) => c.xMm + c.wMm)), 14));
+  // So each half, cut free, is a correct A4: 11.1 mm in from its own edges.
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 210, 11.1));
+  assert.ok(close(420 - Math.max(...right.map((c) => c.xMm + c.wMm)), 11.1));
 });
 
 test('the grid is symmetric ACROSS, so a long-edge flip backs up', () => {
-  /* What the duplex story rests on. It holds because A and C were both measured
-     at 14. Down it is NOT symmetric — the block is pinned to the head at 6.5
-     against 11 at the foot — so end-for-end does not register, and
+  /* What the duplex story rests on. It holds because A and C come out equal —
+     the remainder is split evenly. Down it is NOT symmetric: the block is
+     pinned to the head at 6.5 with all the slack at the foot — so end-for-end does not register, and
      that is asserted too rather than left to be discovered on press. */
   for (const sheet of ['a4', 'a3'] as const) {
     const f = fitDivinityCards(sheet);
@@ -202,25 +207,25 @@ test('a second page becomes a sheet of backs', async () => {
   assert.equal(doc.getPageCount(), 2, 'fronts and backs');
 });
 
-test('portrait art IS turned, and the backs turn the other way on a long flip', async () => {
-  /* The cell lies sideways, so portrait art gets a quarter turn. A long-edge
-     flip reverses the sheet's x-axis, and a turned card's "up" points along x —
-     so printing the back with the same turn puts every back upside down, which
-     only shows up after cutting. */
-  const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'long' });
-  const front = await turnsOnPage(out, 0), back = await turnsOnPage(out, 1);
-  assert.equal(front.ccw, 8, 'eight fronts, all turned one way');
-  assert.equal(front.cw, 0);
-  assert.equal(back.cw, 8, 'eight backs, turned the other way');
-  assert.equal(back.ccw, 0);
+test('portrait art IS turned, and SPIN BACKS picks the other turn', async () => {
+  /* Same switch as imposeDivinityDeck, kept in step deliberately. Default ON. */
+  const on = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'long' });
+  const f = await turnsOnPage(on, 0), b = await turnsOnPage(on, 1);
+  assert.equal(f.ccw, 8, 'eight fronts, all turned one way');
+  assert.equal(f.cw, 0);
+  assert.deepEqual(b, f, 'spun: the backs match the fronts');
+
+  const off = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'long', spinBacks: false });
+  const ob = await turnsOnPage(off, 1);
+  assert.equal(ob.cw, 8, 'unspun is the other way — a real 180');
+  assert.equal(ob.ccw, 0);
 });
 
-test('portrait art: backs keep the SAME turn on a short flip', async () => {
-  const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'short' });
-  const front = await turnsOnPage(out, 0), back = await turnsOnPage(out, 1);
-  assert.equal(front.ccw, 8);
-  assert.equal(back.ccw, 8, 'same turn as the front');
-  assert.equal(back.cw, 0);
+test('the flip still picks the base turn that spinning inverts', async () => {
+  const long = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'long' });
+  const short = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', flip: 'short' });
+  const lb = await turnsOnPage(long, 1), sb = await turnsOnPage(short, 1);
+  assert.ok((lb.ccw > 0) !== (sb.ccw > 0), 'long and short land opposite ways');
 });
 
 test('backs can be turned off, and a one-page file makes one sheet', async () => {
