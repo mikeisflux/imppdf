@@ -24,19 +24,15 @@
  *     across  14 + 90.4 + 7 + 90.4 + 14.1     = 215.9
  *     down    8 + 4(65) + 3(0.5) + 9.9        = 279.4
  *
- * EVERY GAP IS 1.5 SMALLER THAN THE RULER READING, because the ruler reads the
- * paper between the ART and the art runs 1.5 past the cut. The CUT LINES are
- * what these numbers place, and they sit 1.5 inside the ink on every side.
+ * THERE IS NO BLEED. The card is a set size and the art is laid at exactly that
+ * size, so EVERY GAP HERE IS WHAT THE RULER READS on the sheet — the paper you
+ * can see between two cards, not a cut line hidden under ink. A build that grew
+ * each cell by 1.5 mm on all four sides put 3 mm of ink into a 0.5 mm row gap,
+ * overlapped the rows, and made those settings do nothing visible.
  *
- * THE BLEED IS BUILT IN — there is no bleed control any more. The art is always
- * laid 1.5 mm past the cut on all four sides; it is not an option because a card
- * without it cuts white edges, which is the fault this template was rebuilt to
- * remove.
- *
- * THE ROW GAPS ARE 0.5 — E, F and G, each its own setting. The 1.5 mm bleed
- * laps three times that distance onto the neighbour, which is the same artwork,
- * so there is no white between the rows. Change one and H closes up by the same
- * amount.
+ * THE ROW GAPS ARE 0.5 — E, F and G, each its own setting, and each is half a
+ * millimetre of actual paper between two cards. Change one and H closes up by
+ * exactly that much: D stays where it is and the block grows downward.
  *
  * A IS NOT EQUAL TO C, and that is not a mistake. An earlier set (A 14, D 6.5,
  * with 3 mm between the rows) was validated on TEST stock and did not hold when
@@ -44,11 +40,9 @@
  * machine. These numbers describe where the machine actually cuts; they are not
  * derived from any rule, and re-centring them breaks the template.
  *
- * ART BLEEDS PAST THE TRIM and is meant to spill into the gutters; that is what
- * a bleed is for. Bleed is drawn OUTSIDE the cell, so it never enters the sum
- * and never moves a cut line. Where two bleeds cross they cross with the same
- * artwork — every card on the sheet is the same card — and the blade takes it
- * away.
+ * THE CHAINS ARE THE WHOLE TRUTH. Nothing is drawn outside a cell, so A + the
+ * cards + the gutters + C is the sheet width exactly, and D + the cards + E F G
+ * + H is the sheet height exactly. What you type is what the ruler finds.
  */
 
 export const MM_PER_IN = 25.4;
@@ -119,14 +113,10 @@ export const DEF_GUTTER_G_MM = 0.5;   // G — row 3 to row 4
      D 8 + 4(65) + E + F + G + H             on a 279.4 sheet
      at the default 0.5 0.5 0.5          ->  H 9.9
 
-   The bleed is not a term in it. Bleed is drawn OUTSIDE each cell — it laps over
-   the neighbouring card and over the margin — so it never moves a cut line and
-   never consumes sheet. That is what "let the bleed spill over" means in the
-   geometry: the cells are the cards, full stop. */
+   Nothing is drawn outside a cell, so that sum is the sheet exactly. */
 
-/** How much bigger the CUT is than the nominal card, on each dimension. The
- *  shop's machine cuts 1.5 over, so that is the cell — not a bleed allowance and
- *  not a fudge: it is the size the finished card comes off the guillotine. */
+/** How much bigger the finished card is than the nominal 2.5 x 3.5". Not a bleed
+ *  allowance: the shop's card is simply this size, and the art is laid at it. */
 export const CELL_OVERSIZE_MM = 1.5;
 
 /** The cell: the card laid sideways, 1.5 over on both dimensions. Never derived,

@@ -2945,9 +2945,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload <b>one card</b> and it fills the sheet. A standard <b>2.5 × 3.5&quot;</b> card
-        lying <b>sideways</b>, cut <b>1.5 mm over</b> on each dimension — so every one of the
-        <b>8</b> comes off the guillotine at <b>{round2(CELL_W)} × {round2(CELL_H)} mm</b>.
-        Pick the stock below to match what is in the tray.
+        lying <b>sideways</b>, <b>1.5 mm over</b> on each dimension — every one of the <b>8</b>
+        is <b>{round2(CELL_W)} × {round2(CELL_H)} mm</b>, with the art <b>stretched</b> to fill
+        it. Pick the stock below to match what is in the tray.
       </div>
 
       <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E F G place the rows; C and H are what is left over.">
@@ -2990,11 +2990,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           )}
           <b>A {DEF_MARGIN_X_MM} · B {DEF_GUTTER_X_MM} · D {DEF_MARGIN_TOP_MM} · E F G {DEF_GUTTER_E_MM}</b> on
           Letter. C and H are the remainder — C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
-          <br />The cell is the <b>cut size</b>, {round2(CELL_W)} × {round2(CELL_H)} — a 2.5 × 3.5&quot; card
-          laid sideways with 1.5 added on each dimension. The bleed is built in on top of that,
-          1.5 past the cut on all four sides, no control — so at <b>E F G 0.5</b> the art laps
-          three times the gap onto the next card, which is the same artwork, and no white
-          shows between the rows.
+          <br /><b>There is no bleed.</b> The art is laid at the cell exactly, so every number
+          here is the <b>white paper you can measure</b> on the sheet — E F G at 0.5 is half a
+          millimetre of white between the rows, not a cut line buried under ink.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
             onClick={() => up({ marginXMm: DEF_MARGIN_X_MM, marginTopMm: DEF_MARGIN_TOP_MM,
               gutterXMm: DEF_GUTTER_X_MM, gutterEMm: DEF_GUTTER_E_MM,

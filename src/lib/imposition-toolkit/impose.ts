@@ -4658,13 +4658,12 @@ export interface DivinityCardOptions {
   /** E, F, G — the three gaps between the rows, top to bottom. Each defaults to
    *  0, which butts the rows onto one shared cut line. */
   gutterEMm?: number; gutterFMm?: number; gutterGMm?: number;
-  /** How far the art runs PAST the trim on every side, mm. Default 1.5. The cell
-   *  stays the true card size; this only decides how much ink is there for the
-   *  blade to drift into. It is MEANT to spill into the gutters — 1.5 against
-   *  the shop's 3 mm row gutter puts one row's bleed exactly against the next,
-   *  which is what a shared-edge bleed looks like. 0 fits the art to the bare
-   *  trim, which is what left white slivers on the first cut. */
-  bleedMm?: number;
+  /* THERE IS NO BLEED. Deleted, not defaulted to zero: the card is a SET SIZE
+     and the art is laid at exactly that size, so every gutter on the sheet is
+     real paper you can see and measure. An earlier build grew each cell by
+     1.5 mm on all four sides; on a template whose row gaps are half a
+     millimetre that put 3 mm of ink into a 0.5 mm slot, the rows overlapped,
+     and a gutter you typed did nothing you could see. */
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
   markLenMm?: number;      // default 3
@@ -4686,12 +4685,7 @@ export async function imposeDivinityCards(
   });
   const mm = (v: number) => v * PT_PER_MM;
 
-  /* BUILT IN, not a setting. The art always runs 1.5 mm past the cut on all four
-     sides — into the gutters, over the neighbour, over the margin. It is not
-     optional because a card fitted to the bare trim cuts white edges, which is
-     the fault this template was rebuilt to remove, and every gap on the sheet is
-     already stated 1.5 smaller to account for it. */
-  const bleedMm = 1.5;
+  /* No bleed term anywhere below: the art rect IS the cell rect. */
 
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();
@@ -4736,23 +4730,24 @@ export async function imposeDivinityCards(
     const artW = turn ? card.height : card.width;
     const artH = turn ? card.width : card.height;
     for (const c of cells) {
-      /* BLEED. The cell is the TRIM — where the blade is aimed. The art is laid
-         into that cell grown by `bleed` on all four sides, so it runs out into
-         the gutter and a cut that drifts still lands in ink instead of leaving a
-         white sliver down one edge. The owner's artwork already carries about
-         1.6 mm of bleed; fitting it to the bare trim threw that away, which is
-         exactly what the slivers on the first cut stack were.
-         The CUT MARKS are drawn from fit.cells and so still mark the trim. */
-      const bl = mm(bleedMm);
-      const bx = mm(c.xMm) - bl, by = mm(c.yMm) - bl;
-      const cw = mm(c.wMm) + 2 * bl, ch = mm(c.hMm) + 2 * bl;
-      /* COVER-fit and clip: a card is trimmed on all four sides, so the art must
-         reach every edge. Contain would leave white inside the trim, which on a
-         card reads as a printing fault. */
-      const scale = Math.max(cw / artW, ch / artH);
-      const dw = artW * scale, dh = artH * scale;
-      const x = bx + (cw - dw) / 2, y = by + (ch - dh) / 2;
-      const w = card.width * scale, h = card.height * scale;
+      /* The art box IS the cell — nothing added on any side. The cell is the
+         card's set size, so what lands on the sheet is the card, and the gutters
+         around it stay paper. */
+      const bx = mm(c.xMm), by = mm(c.yMm);
+      const cw = mm(c.wMm), ch = mm(c.hMm);
+      /* STRETCH — the owner's instruction, and an exception to the house rule
+         that art is fitted CONTAIN and never distorted. The cell is the card's
+         set size, 1.5 mm over a 2.5 x 3.5" on each dimension, and the art is
+         pulled to it exactly. Cover-fit would keep the aspect and shave the
+         difference off one axis, which crops the card; contain would leave white
+         inside it, which reads as a printing fault. Neither is wanted: the cell
+         IS the card, so the art becomes the cell.
+         The two axes scale independently, so a quarter turn swaps which of them
+         drives the card's own width and height. */
+      const sx = cw / artW, sy = ch / artH;
+      const dw = cw, dh = ch;
+      const x = bx, y = by;
+      const w = card.width * (turn ? sy : sx), h = card.height * (turn ? sx : sy);
       pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(bx, by, cw, ch), PL.clip(), PL.endPath());
       /* Rotating sweeps the box away from the placement point, so the anchor is
          the corner it sweeps FROM: bottom-right at 90, top-left at 270, and the

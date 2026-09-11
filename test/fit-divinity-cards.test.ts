@@ -87,17 +87,52 @@ test('both sums close on A4 exactly — the check the template is right', () => 
   assert.ok(close(f.marginTopMm + ROWS * PLACED_H_MM + rowSum + f.marginBottomMm, 297));
 });
 
-test('cover-fit into the oversized cell loses well under a millimetre', () => {
-  /* The cell is 1.5 over on BOTH dimensions, so it is very slightly squarer than
-     the card; covering it means scaling to the tighter axis and letting the other
-     run off. Worth pinning: if it ever grows past a millimetre the art is being
-     cropped, not bled. */
-  const scale = Math.max(PLACED_W_MM / CARD_H_MM, PLACED_H_MM / CARD_W_MM);
-  assert.ok(scale >= 1, `never scaled DOWN, got ${scale}`);
-  const offW = CARD_H_MM * scale - PLACED_W_MM;
-  const offH = CARD_W_MM * scale - PLACED_H_MM;
-  assert.ok(offW >= -1e-9 && offH >= -1e-9, 'the cell is always covered');
-  assert.ok(Math.max(offW, offH) < 1, `under a millimetre lost, got ${Math.max(offW, offH)}`);
+test('the art is STRETCHED to the cell — nothing cropped, no white inside', () => {
+  /* Owner's instruction, and an exception to the house contain-never-stretch
+     rule: the cell IS the card's set size, so the art becomes the cell. The two
+     axes therefore scale by DIFFERENT amounts, which is the whole point — a
+     single shared scale would be cover (crops) or contain (leaves white). */
+  const sx = PLACED_W_MM / CARD_H_MM, sy = PLACED_H_MM / CARD_W_MM;
+  assert.ok(!close(sx, sy), 'the two axes scale apart, or it is not a stretch');
+  assert.ok(close(CARD_H_MM * sx, PLACED_W_MM), 'fills the cell across');
+  assert.ok(close(CARD_W_MM * sy, PLACED_H_MM), 'fills the cell down');
+});
+
+test('EVERY GAP IS REAL PAPER — no bleed is laid over any of them', async () => {
+  /* The fault this replaced: each cell was grown 1.5 mm on all four sides, so
+     3 mm of ink landed in the 0.5 mm row gaps, the rows overlapped, and E F G
+     did nothing anyone could see on the sheet. Read the drawn rectangles back
+     out of the page and check each gutter against what was typed. */
+  const zlib = await import('node:zlib');
+  const { PDFStream } = await import('pdf-lib');
+  const out = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false });
+  const doc = await PDFDocument.load(out);
+  const st = doc.getPage(0).node.normalizedEntries().Contents;
+  let t = '';
+  for (let k = 0; st && k < st.size(); k++) {
+    const raw = (doc.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+    try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+    catch { t += Buffer.from(raw).toString('latin1'); }
+  }
+  const mm2 = (v: string) => Math.round((Number(v) / PT_PER_MM) * 100) / 100;
+  const rects = [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
+    .map((m) => [mm2(m[1]!), mm2(m[2]!), mm2(m[3]!), mm2(m[4]!)].join(',')))]
+    .map((r) => r.split(',').map(Number) as [number, number, number, number])
+    .sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  assert.equal(rects.length, 8, 'eight cards drawn');
+  for (const r of rects) {
+    assert.ok(close(r[2], PLACED_W_MM, 0.02), `art is the cell across, got ${r[2]}`);
+    assert.ok(close(r[3], PLACED_H_MM, 0.02), `art is the cell down, got ${r[3]}`);
+  }
+  const left = rects.filter((r) => r[0] < 60);
+  assert.ok(close(rects[0]![0], 14, 0.02), 'A is 14 of paper');
+  assert.ok(close(rects[1]![0] - (rects[0]![0] + rects[0]![2]), 7, 0.02), 'B is 7 of paper');
+  assert.ok(close(215.9 - (rects[1]![0] + rects[1]![2]), 14.1, 0.02), 'C is 14.10 of paper');
+  assert.ok(close(279.4 - (rects[0]![1] + rects[0]![3]), 8, 0.02), 'D is 8 of paper');
+  for (let i = 1; i < left.length; i++)
+    assert.ok(close(left[i - 1]![1] - (left[i]![1] + left[i]![3]), 0.5, 0.02),
+      'E, F and G are half a millimetre of WHITE, not ink');
+  assert.ok(close(left[3]![1], 9.9, 0.02), 'H is 9.90 of paper');
 });
 
 test('A4: eight cards, 2 across x 4 down', () => {
@@ -326,8 +361,8 @@ test('the BACK sheet mirrors across — A and C trade places', async () => {
     return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10))].sort((a, b) => a - b);
   };
-  assert.deepEqual(await colsOf(0), [12.5, 109.9], 'unticked, nothing mirrors');
-  assert.deepEqual(await colsOf(1), [12.5, 109.9], 'including the back sheet');
+  assert.deepEqual(await colsOf(0), [14, 111.4], 'unticked, nothing mirrors');
+  assert.deepEqual(await colsOf(1), [14, 111.4], 'including the back sheet');
 });
 
 test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
@@ -353,16 +388,16 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10));
   };
-  assert.equal(await leftEdge(off), 12.5, 'unticked: A 14, less the 1.5 bleed');
-  assert.equal(await leftEdge(on), 12.6, 'ticked: A becomes C 14.10, less the bleed');
+  assert.equal(await leftEdge(off), 14, 'unticked: A 14');
+  assert.equal(await leftEdge(on), 14.1, 'ticked: A becomes C 14.10');
   /* Run it again on a deliberately lopsided A, so the claim does not rest on one
      pair of numbers that happen to differ — the block really is flipped end for
      end, whatever A is set to. */
   const lop = { sheet: 'letter' as const, addMarks: false, marginXMm: 20 };
-  assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), lop)), 18.5,
-    'lopsided, unticked: A 20 less the bleed');
+  assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), lop)), 20,
+    'lopsided, unticked: A 20');
   assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), { ...lop, spinBacks: true })),
-    6.6, 'lopsided, ticked: C 8.10 comes to the left, less the bleed');
+    8.1, 'lopsided, ticked: C 8.10 comes to the left');
 });
 
 test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
@@ -381,8 +416,8 @@ test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10));
   };
-  assert.equal(await leftOf(0), 12.5, 'fronts untouched');
-  assert.equal(await leftOf(1), 12.6, 'backs swapped');
+  assert.equal(await leftOf(0), 14, 'fronts untouched');
+  assert.equal(await leftOf(1), 14.1, 'backs swapped');
 });
 
 test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {
