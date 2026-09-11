@@ -1664,66 +1664,30 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
     case 'gangsheet':
       return (
         <>
-          <Section label="// SHEET" help="Nest target media.">
-            <div className="pe-grid2">
-              <div className="pe-field-col"><span className="pe-label-sm">Width</span><NumIn valueIn={s.sheetWIn} unit={unit} onIn={(v) => up({ sheetWIn: v })} /></div>
-              <div className="pe-field-col"><span className="pe-label-sm">Height</span><NumIn valueIn={s.sheetHIn} unit={unit} onIn={(v) => up({ sheetHIn: v })} /></div>
-            </div>
-            <div className="pe-row" style={{ marginTop: 10 }}><span className="pe-label pe-w96">Margin</span><NumIn valueIn={s.marginIn} unit={unit} onIn={(v) => up({ marginIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
-            <div className="pe-row"><span className="pe-label pe-w96">Spacing</span><NumIn valueIn={s.paddingIn} unit={unit} onIn={(v) => up({ paddingIn: v })} /></div>
-            <Check icon="rotate" label="Allow 90° rotation" checked={!!s.allowRotate} onChange={(v) => up({ allowRotate: v })} />
-            <Check icon="split" label="Roll media (variable length)" checked={!!s.roll} onChange={(v) => up({ roll: v })} />
-            <Check icon="gangsheet" label="True-shape nesting" checked={!!s.trueShape} onChange={(v) => up({ trueShape: v })} />
-            <Check icon="duplicate" label="Fill sheet with copies" checked={!!s.fillSheet} onChange={(v) => up({ fillSheet: v })} />
-          </Section>
-        </>
-      );
-    case 'stickers':
-      return (
-        <>
-          <Section label="// MEDIA FORMAT" help="Stacked sheets or continuous roll.">
-            <div className="pe-cards2">
-              <SelCard on={!s.roll} off={!!s.roll} cap="STACKED SHEETS" onClick={() => up({ roll: false })}><Ic name="stickers" size={20} /></SelCard>
-              <SelCard on={!!s.roll} off={!s.roll} cap="ROLL OF STICKERS" onClick={() => up({ roll: true })}><Ic name="split" size={20} /></SelCard>
-            </div>
-          </Section>
-          <PaperSize {...{ s, up, unit, onUnit }} />
-          <Section label="// REPEAT" help="Fill each sheet, or produce an exact copy count.">
-            <Radio label="Fill sheet" on={!!s.fillSheet} onSelect={() => up({ fillSheet: true })} />
-            <div className="pe-row">
-              <Radio label="Copies" on={!s.fillSheet} onSelect={() => up({ fillSheet: false })} />
-              <NumRaw value={s.copies} onValue={(v) => up({ copies: Math.max(1, Math.round(v)), fillSheet: false })} w={70} min={1} />
-            </div>
-          </Section>
-          <Section label="// WHITESPACE" help="Padding between stickers and margins around the block.">
-            <div className="pe-row"><span className="pe-label pe-w96">Padding</span><NumIn valueIn={s.paddingIn} unit={unit} onIn={(v) => up({ paddingIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
-            <div className="pe-row"><span className="pe-label pe-w96">Margin</span><NumIn valueIn={s.marginTopIn} unit={unit} onIn={(v) => up({ marginTopIn: v, marginLeftIn: v, marginRightIn: v, marginBottomIn: v })} /></div>
-          </Section>
-          <Section label="// NESTING" help="Allow 90° rotation for tighter packing.">
-            <Check icon="rotate" label="Allow rotations (0°, 90°)" checked={!!s.allowRotate} onChange={(v) => up({ allowRotate: v })} />
-          </Section>
-        </>
-      );
-    case 'calendar':
-      return (
-        <>
-          <Section label="// PAGE LAYOUT" help="Wall calendars flip the back page so the hung spread reads upright.">
-            <Radio label="Full Sheet" on={!s.halfSheet} onSelect={() => up({ halfSheet: false })} />
-            <Radio label="Half Sheet" on={!!s.halfSheet} onSelect={() => up({ halfSheet: true })} />
-            <Check icon="rotate" label="Rotate back page 180°" sub="Wall-calendar back flip" checked={!!s.rotateBack} onChange={(v) => up({ rotateBack: v })} />
-          </Section>
-          <MarksSection {...{ s, up, unit, onUnit }} />
-        </>
-      );
-    case 'insertpages':
-      return (
-        <>
-          <Section label="// SOURCE FILE" help="The PDF whose pages get inserted.">
-            <button className="pe-chipbtn" onClick={() => pickPdf((bytes, name) => up({ file: bytes, fileName: name }))}>
-              <Ic name="upload" size={14} /> {s.fileName || 'Choose file'}
-            </button>
-          </Section>
-          <Section label="// POSITION" help="Where the inserted pages land.">
+          <Section label="// SHEET" help="The stock in the tray. Letter is 8.5 x 11; A4 is 17.6 mm TALLER, which is why an A4 file run on Letter paper loses the top row.">
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {([['letter', 'Letter', '8 cards'], ['tabloid', '11 × 17', '16 cards'],
+             ['a4', 'A4', '8 cards'], ['a3', 'A3', '16 cards']] as const).map(([id, label, sub]) => (
+            <button key={id} className="pe-btn" style={pickStyle((s.sheet ?? 'letter') === id)}
+              onClick={() => up({ sheet: id })}>{label} · {sub}</button>
+          ))}
+        </div>
+        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
+          <div>Sheet <b>{SHEET_LABEL[s.sheet ?? 'letter']}</b></div>
+          <div>Grid <b>{DOUBLED.has(s.sheet ?? 'letter') ? '2 blocks of 2 × 4' : '2 × 4'}</b> —
+            {' '}<b>{DOUBLED.has(s.sheet ?? 'letter') ? 16 : 8} cards</b>, each a true 2.5 × 3.5&quot;</div>
+          {DOUBLED.has(s.sheet ?? 'letter') && (
+            <div>Cut down at <b>{(s.sheet === 'a3' ? 210 : 215.9)} mm</b> for two sheets, marked top and bottom</div>
+          )}
+          <div style={{ marginTop: 4 }}>
+            Set this to the paper that is actually <b>in the tray</b>. An A4 file on Letter
+            stock is 17.6 mm too tall and the top row runs off the sheet — the PDF measures
+            correct and the press still clips it.
+          </div>
+        </div>
+      </Section>
+
+      <Section label="// POSITION" help="Where the inserted pages land.">
             <div className="pe-row"><span className="pe-label pe-w96">Insert before page</span><NumRaw value={s.position} onValue={(v) => up({ position: Math.max(1, Math.round(v)), mode: 'at' })} w={70} min={1} /></div>
             <Check label={<span>and after every <b>{s.everyN}</b> pages</span>} checked={s.mode === 'everyN'} onChange={(v) => up({ mode: v ? 'everyN' : 'at' })} />
             {s.mode === 'everyN' && <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Every</span><NumRaw value={s.everyN} onValue={(v) => up({ everyN: Math.max(1, Math.round(v)) })} w={70} min={1} /><span className="pe-label-sm">pages</span></div>}
@@ -2928,8 +2892,13 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
  * The geometry is FIXED (fit/divinity-cards.ts), so this panel is mostly a
  * statement of what you are going to get rather than a set of dials. The one
  * real decision is which sheet. */
+const SHEET_LABEL: Record<string, string> = {
+  letter: '215.9 × 279.4 mm (8.5 × 11")', tabloid: '431.8 × 279.4 mm (11 × 17")',
+  a4: '210 × 297 mm (A4)', a3: '420 × 297 mm (A3)',
+};
+const DOUBLED = new Set(['tabloid', 'a3']);
+
 function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
-  const a3 = s.sheet !== 'a4';
   const MM = 25.4 / 72;
   const src = pageSizes[Math.max(0, Math.min(pageSizes.length - 1, (s.page ?? 1) - 1))];
   const wMm = src ? src.wPt * MM : 0, hMm = src ? src.hPt * MM : 0;
@@ -2943,27 +2912,10 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload <b>one card</b> and it fills the sheet. Standard <b>2.5 × 3.5&quot;</b>
-        (63.5 × 88.9 mm), lying <b>sideways</b>, <b>8 to an A4</b> in an <b>89 × 63 mm</b>
-        cell — the cut machine&apos;s template: 10 mm between the columns, 3 mm between the
-        rows, 11 mm at the sides and <b>6.5 mm off the head</b>.
+        (63.5 × 88.9 mm), lying <b>sideways</b>, <b>8 to a sheet</b> in a cell that is the
+        card exactly — nothing scaled, nothing cropped. Pick the stock below to match what
+        is in the tray.
       </div>
-
-      <Section label="// SHEET" help="A3 is the A4 block printed twice, side by side. Cut it in half and you have two identical A4s to run.">
-        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <button className="pe-btn" style={pickStyle(a3)} onClick={() => up({ sheet: 'a3' })}>A3 · 16 cards</button>
-          <button className="pe-btn" style={pickStyle(!a3)} onClick={() => up({ sheet: 'a4' })}>A4 · 8 cards</button>
-        </div>
-        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
-          <div>Sheet <b>{a3 ? '420 × 297 mm (A3)' : '210 × 297 mm (A4)'}</b></div>
-          <div>Grid <b>{a3 ? '2 blocks of 2 × 4' : '2 × 4'}</b> — <b>{a3 ? 16 : 8} cards</b>, each 2.5 × 3.5&quot;</div>
-          <div>Gutters <b>10</b> across, <b>3</b> down; margins <b>11</b> sides, <b>6.5</b> head, <b>29.5</b> foot</div>
-          {a3 && <div>Cut down at <b>210 mm</b> for two A4s, marked top and bottom</div>}
-          <div style={{ marginTop: 4 }}>
-            A plain <b>portrait A4</b> with the cards lying <b>across</b> it. Eight is what
-            the cutter takes off one A4.
-          </div>
-        </div>
-      </Section>
 
       <Section label="// POSITION" help="Where the block of eight sits on the sheet. The cards themselves are always a true 2.5 x 3.5 inch; these only move them.">
         <Check icon="grid" label="Centre on the sheet"

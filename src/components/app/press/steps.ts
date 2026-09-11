@@ -154,7 +154,7 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'divinitycards':
       // The shop's card template, to the printer's spec sheet: 54 x 90 mm card,
       // ten to an A4, the A4 block doubled onto an A3 that cuts into two A4s.
-      return { sheet: 'a3', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false,
+      return { sheet: 'letter', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false,
         centre: true, marginXMm: 14, marginTopMm: 6.5, gutterXMm: 10, gutterYMm: 3,
         addMarks: true };
     case 'mediafix':
@@ -619,7 +619,8 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       case 'divinitycards': {
         const { imposeDivinityCards } = await import('@/lib/imposition-toolkit/impose');
         b = await imposeDivinityCards(b, {
-          sheet: s.sheet === 'a4' ? 'a4' : 'a3', page: s.page ?? 1,
+          sheet: ['letter', 'tabloid', 'a4', 'a3'].includes(s.sheet) ? s.sheet : 'letter',
+          page: s.page ?? 1,
           backPage: s.backPage ?? 2, backs: s.backs !== false,
           flip: s.flip === 'short' ? 'short' : 'long',
           spinBacks: !!s.spinBacks,

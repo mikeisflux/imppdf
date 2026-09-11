@@ -4614,8 +4614,11 @@ export async function imposePerfectCover(src: Uint8Array, opts: PerfectCoverOpti
    fit/divinity-cards.ts. */
 
 export interface DivinityCardOptions {
-  /** 'a3' (default) is the doubled sheet; 'a4' is a single block of eight. */
-  sheet?: 'a4' | 'a3';
+  /** Which stock. 'letter' (default) is 8.5 x 11 — what the shop actually runs;
+   *  'tabloid' is two Letters side by side, cut down the middle. A4/A3 are
+   *  there for metric stock. Sending A4 to a Letter tray is what put the top
+   *  row off the sheet: A4 is 17.6 mm taller than Letter. */
+  sheet?: import('./fit/divinity-cards.ts').DivinityCardSheet;
   /** 1-based page of the uploaded file to use as the card FRONT. */
   page?: number;
   /* BACKS. Give the tool a second page and it emits a second sheet of backs
@@ -4669,7 +4672,7 @@ export async function imposeDivinityCards(
   const { PDFDocument, rgb, degrees } = PL;
   const { fitDivinityCards, PT_PER_MM } = await import('./fit/divinity-cards.ts');
 
-  const fit = fitDivinityCards(opts.sheet ?? 'a3', {
+  const fit = fitDivinityCards(opts.sheet ?? 'letter', {
     centre: opts.centre, marginXMm: opts.marginXMm, marginTopMm: opts.marginTopMm,
     gutterXMm: opts.gutterXMm, gutterYMm: opts.gutterYMm,
   });

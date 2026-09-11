@@ -40,27 +40,58 @@ test('the measured gaps are the DEFAULTS the panel starts from', () => {
   assert.equal(ROWS, 4);
 });
 
+test('LETTER is the default sheet, and the measured template closes on it', () => {
+  /* The whole twenty-round confusion in one test. The owner's ruler said 14 mm
+     at the sides with a 10 mm centre gutter. On A4 that needs 215.8 mm of a
+     210 mm sheet and cannot be honoured — which is why every attempt to respect
+     it produced a wrong-sized cell. On LETTER it is exact, and A4 being 17.6 mm
+     TALLER than Letter is why the A4 file ran off the top of Letter stock. */
+  const f = fitDivinityCards();
+  assert.ok(close(f.sheetWMm, 215.9), '8.5in wide');
+  assert.ok(close(f.sheetHMm, 279.4), '11in tall');
+  assert.ok(close(f.marginXMm, 14.05), `the measured 14 mm, got ${f.marginXMm}`);
+  assert.equal(f.n, 8);
+  // And the sum the owner measured across the sheet.
+  assert.ok(close(2 * f.marginXMm + 2 * PLACED_W_MM + DEF_GUTTER_X_MM, 215.9),
+    '14.05 + 88.9 + 10 + 88.9 + 14.05');
+  // A4 is taller, which is the clipping.
+  assert.ok(close(297 - 279.4, 17.6), 'A4 overhangs Letter by 17.6 mm');
+});
+
+test('tabloid is two Letters side by side, cut at 215.9', () => {
+  const f = fitDivinityCards('tabloid');
+  assert.ok(close(f.sheetWMm, 431.8), '11 x 17');
+  assert.ok(close(f.sheetHMm, 279.4));
+  assert.equal(f.n, 16);
+  assert.ok(close(f.cutXMm[0]!, 215.9), 'cut down the middle into two Letters');
+  const right = f.cells.slice(8);
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, 14.05),
+    'each half carries its own 14 mm margin');
+});
+
 test('CENTRED by default — the block clears the press margin', () => {
   /* The bug this exists for: pinned at 6.5 off the head, the top row landed
      inside the unprintable margin of the shop's laser. Every page box measured
      a correct 210 x 297 and the sheet still came off with the top row over the
      edge. Centred, the same eight cards sit 17 mm clear top and bottom. */
-  const f = fitDivinityCards('a4');
-  assert.ok(close(f.marginTopMm, 17), `17 clear at the head, got ${f.marginTopMm}`);
-  assert.ok(close(f.marginBottomMm, 17), 'and the same at the foot');
-  assert.ok(close(f.marginXMm, 11.1), 'centred across too');
-  assert.ok(f.marginTopMm > 10, 'comfortably outside any press margin');
+  const f = fitDivinityCards();
+  assert.ok(close(f.marginTopMm, 8.2), `8.2 clear at the head, got ${f.marginTopMm}`);
+  assert.ok(close(f.marginBottomMm, 8.2), 'and the same at the foot');
+  assert.ok(close(f.marginXMm, 14.05), 'centred across too');
+  const a4 = fitDivinityCards('a4');
+  assert.ok(close(a4.marginTopMm, 17), 'A4 centres at 17 head and foot');
+  assert.ok(close(a4.marginBottomMm, 17));
 });
 
 test('pinning is still available for a machine that wants it off-centre', () => {
-  const f = fitDivinityCards('a4', { centre: false });
+  const f = fitDivinityCards('letter', { centre: false });
   assert.ok(close(f.marginXMm, 14), 'A/C as set');
   assert.ok(close(f.marginTopMm, 6.5), 'D as set');
-  assert.ok(close(f.marginBottomMm, 27.5), 'and the slack lands at the foot');
+  assert.ok(close(f.marginBottomMm, 279.4 - 6.5 - 263), 'and the slack lands at the foot');
 });
 
 test('the gutters are settings, and the cell never moves with them', () => {
-  const wide = fitDivinityCards('a4', { gutterXMm: 20, gutterYMm: 8 });
+  const wide = fitDivinityCards('letter', { gutterXMm: 20, gutterYMm: 8 });
   assert.ok(close(wide.cells[0]!.wMm, 88.9), 'still a true 3.5in across');
   assert.ok(close(wide.cells[0]!.hMm, 63.5), 'still a true 2.5in down');
   const xs = [...new Set(wide.cells.map((c) => c.xMm))].sort((a, b) => a - b);

@@ -29,9 +29,33 @@ export const CARD_H_IN = 3.5;
 export const CARD_W_MM = CARD_W_IN * MM_PER_IN;   // 63.5
 export const CARD_H_MM = CARD_H_IN * MM_PER_IN;   // 88.9
 
-/** A4 PORTRAIT, and A3 as two of those side by side. */
+/* ── The sheets. LETTER is the default because it is what is in the shop's
+   tray: 8.5 x 11 is 215.9 x 279.4, and an A4 page is 17.6 mm TALLER than that.
+   Sending A4 to a Letter tray is what put the top row off the sheet — the file
+   measured a correct A4 all the way through and the paper was never A4.
+
+   It is also the sheet on which the owner's measured template closes:
+     across  14 + 88.9 + 10 + 88.9 + 14 = 215.8  (Letter is 215.9)
+     down    6.5 + 4(63.5) + 3(3) + 11  = 280.5  (Letter is 279.4)
+   Those same margins need 215.8 mm of a 210 mm A4, which is why they could
+   never be honoured there.                                                 */
+export const LETTER_W_MM = 8.5 * MM_PER_IN;    // 215.9
+export const LETTER_H_MM = 11 * MM_PER_IN;     // 279.4
+export const TABLOID_W_MM = 17 * MM_PER_IN;    // 431.8 — two Letters side by side
 export const A4_W_MM = 210, A4_H_MM = 297;
 export const A3_W_MM = 420, A3_H_MM = 297;
+
+/** 'letter' / 'a4' hold one block; 'tabloid' / 'a3' hold two side by side and
+ *  cut down the middle into two of the smaller sheet. */
+export type DivinityCardSheet = 'letter' | 'tabloid' | 'a4' | 'a3';
+
+interface SheetSpec { wMm: number; hMm: number; blockWMm: number; doubled: boolean; }
+const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
+  letter:  { wMm: LETTER_W_MM,  hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false },
+  tabloid: { wMm: TABLOID_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: true },
+  a4:      { wMm: A4_W_MM,      hMm: A4_H_MM,     blockWMm: A4_W_MM,     doubled: false },
+  a3:      { wMm: A3_W_MM,      hMm: A3_H_MM,     blockWMm: A4_W_MM,     doubled: true },
+};
 
 /* ── The template, as the operator sets it. ────────────────────────────────
    These are DEFAULTS. Every one is overridable from the panel, because the
@@ -86,8 +110,9 @@ export interface DivinityCardFit {
 }
 
 export function fitDivinityCards(
-  sheet: 'a4' | 'a3' = 'a3', t: DivinityCardTemplate = {},
+  sheet: DivinityCardSheet = 'letter', t: DivinityCardTemplate = {},
 ): DivinityCardFit {
+  const spec = SHEETS[sheet] ?? SHEETS.letter;
   const gX = t.gutterXMm ?? DEF_GUTTER_X_MM;
   const gY = t.gutterYMm ?? DEF_GUTTER_Y_MM;
 
@@ -97,11 +122,11 @@ export function fitDivinityCards(
   const blockH = ROWS * PLACED_H_MM + (ROWS - 1) * gY;
 
   const centre = t.centre !== false;
-  const mX = centre ? (A4_W_MM - blockW) / 2 : (t.marginXMm ?? DEF_MARGIN_X_MM);
-  const mTop = centre ? (A4_H_MM - blockH) / 2 : (t.marginTopMm ?? DEF_MARGIN_TOP_MM);
-  const mBot = A4_H_MM - mTop - blockH;
+  const mX = centre ? (spec.blockWMm - blockW) / 2 : (t.marginXMm ?? DEF_MARGIN_X_MM);
+  const mTop = centre ? (spec.hMm - blockH) / 2 : (t.marginTopMm ?? DEF_MARGIN_TOP_MM);
+  const mBot = spec.hMm - mTop - blockH;
 
-  /** One A4 block, offset by `originXMm` on the sheet. */
+  /** One block, offset by `originXMm` on the sheet. */
   const blockCells = (originXMm: number): CardRectMm[] => {
     const out: CardRectMm[] = [];
     for (let r = 0; r < ROWS; r++) {
@@ -110,7 +135,7 @@ export function fitDivinityCards(
           xMm: originXMm + mX + c * (PLACED_W_MM + gX),
           /* Rows are numbered from the TOP of the sheet, the way a spec sheet
              reads, but PDF y runs up — so row 0 is the highest y. */
-          yMm: A4_H_MM - mTop - (r + 1) * PLACED_H_MM - r * gY,
+          yMm: spec.hMm - mTop - (r + 1) * PLACED_H_MM - r * gY,
           wMm: PLACED_W_MM, hMm: PLACED_H_MM,
         });
       }
@@ -118,16 +143,13 @@ export function fitDivinityCards(
     return out;
   };
 
-  if (sheet === 'a4') {
-    return {
-      sheetWMm: A4_W_MM, sheetHMm: A4_H_MM, cells: blockCells(0),
-      n: COLS * ROWS, marginXMm: mX, marginTopMm: mTop, marginBottomMm: mBot, cutXMm: [],
-    };
-  }
   return {
-    sheetWMm: A3_W_MM, sheetHMm: A3_H_MM,
-    cells: [...blockCells(0), ...blockCells(A4_W_MM)],
-    n: 2 * COLS * ROWS, marginXMm: mX, marginTopMm: mTop, marginBottomMm: mBot,
-    cutXMm: [A4_W_MM],
+    sheetWMm: spec.wMm, sheetHMm: spec.hMm,
+    cells: spec.doubled
+      ? [...blockCells(0), ...blockCells(spec.blockWMm)]
+      : blockCells(0),
+    n: (spec.doubled ? 2 : 1) * COLS * ROWS,
+    marginXMm: mX, marginTopMm: mTop, marginBottomMm: mBot,
+    cutXMm: spec.doubled ? [spec.blockWMm] : [],
   };
 }
