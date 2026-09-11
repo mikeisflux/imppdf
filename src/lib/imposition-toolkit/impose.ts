@@ -4696,15 +4696,14 @@ export async function imposeDivinityCards(
   const frontPage = srcPages[frontIdx];
   if (!frontPage) return out.save();
 
-  /* The back is page 2 when there is one. When there ISN'T — a single-card
-     upload, which is how this tool is normally set up — it falls back to the
-     front's own page rather than suppressing the sheet. Suppressing it meant
-     the backs controls, SPIN BACKS included, had nothing to act on and appeared
-     broken exactly when the operator was setting the job up. A one-page file
-     now previews a real back sheet, and the panel says it is page 1. */
+  /* ONE PAGE IN, ONE SHEET OUT. The back comes from page 2 and only page 2 —
+     no standing in, no duplicating the front. A previous build faked a back
+     sheet from page 1 so the SPIN BACKS switch would have something to act on
+     with a single card loaded; that traded a visible control for an invisible
+     extra page in every export, which is a far worse bargain. */
   const backIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.backPage ?? 2))) - 1;
-  const wantBacks = opts.backs !== false;
-  const backPage = wantBacks ? (srcPages[backIdx] ?? frontPage) : null;
+  const wantBacks = opts.backs !== false && srcPages.length > 1 && backIdx !== frontIdx;
+  const backPage = wantBacks ? srcPages[backIdx]! : null;
 
   const embeds = await out.embedPages(backPage ? [frontPage, backPage] : [frontPage]);
   const front = embeds[0];

@@ -260,23 +260,19 @@ test('the flip still picks the base turn that spinning inverts', async () => {
   assert.ok((lb.ccw > 0) !== (sb.ccw > 0), 'long and short land opposite ways');
 });
 
-test('backs can be turned off; a one-page file still previews a back sheet', async () => {
-  /* Turning backs OFF is the only thing that suppresses the second sheet. A
-     one-page file used to suppress it too, which left the backs controls —
-     SPIN BACKS among them — with nothing to act on, so they looked broken
-     exactly when the job was being set up. Page 1 now stands in as the back. */
-  const off = await imposeDivinityCards(await frontBackPdf(), { sheet: 'a4', backs: false });
-  assert.equal((await PDFDocument.load(off)).getPageCount(), 1, 'suppressed');
+test('a one-page file makes ONE sheet — no invented back', async () => {
+  /* Regression. A build that faked a back sheet from page 1 so the spin switch
+     had something to act on doubled the page count of every single-card export.
+     The back comes from page 2 or it does not exist. */
+  const single = await imposeDivinityCards(await cardPdf(), { sheet: 'letter' });
+  assert.equal((await PDFDocument.load(single)).getPageCount(), 1, 'one page in, one sheet out');
 
-  const single = await imposeDivinityCards(await cardPdf(), { sheet: 'a4' });
-  assert.equal((await PDFDocument.load(single)).getPageCount(), 2, 'front sheet + a stand-in back');
+  const pair = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter' });
+  assert.equal((await PDFDocument.load(pair)).getPageCount(), 2, 'two pages in, fronts + backs');
 
-  // And the stand-in back still answers to the spin, which is the whole point.
-  const spun = await imposeDivinityCards(await cardPdf(), { sheet: 'a4', spinBacks: true });
-  const b = await turnsOnPage(spun, 1), u = await turnsOnPage(single, 1);
-  assert.ok((b.ccw > 0) !== (u.ccw > 0), 'spinning a stand-in back really turns it');
+  const off = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', backs: false });
+  assert.equal((await PDFDocument.load(off)).getPageCount(), 1, 'and backs can still be suppressed');
 });
-
 test('BLEED runs the art past the trim without moving the cut', async () => {
   /* The white slivers on the shop's first cut stack: the art was fitted to the
      bare trim, so any drift in the blade left paper showing down one edge. The
@@ -315,7 +311,7 @@ test('bleed is NOT capped — it is meant to spill into the gutters', async () =
      silently held the bleed to 1.5 however much was asked for. */
   const huge = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', bleedMm: 50 });
   const doc = await PDFDocument.load(huge);
-  assert.equal(doc.getPageCount(), 2, 'still builds');
+  assert.equal(doc.getPageCount(), 1, 'still builds');
   const { width, height } = doc.getPage(0).getSize();
   assert.ok(Math.abs(width - 215.9 * PT_PER_MM) < 0.5, 'and the sheet is untouched');
   assert.ok(Math.abs(height - 279.4 * PT_PER_MM) < 0.5);
