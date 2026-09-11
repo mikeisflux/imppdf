@@ -407,8 +407,55 @@ test('the BACK sheet mirrors across — 15.5 goes to C, 12.6 to A', async () => 
     return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10))].sort((a, b) => a - b);
   };
-  assert.deepEqual(await colsOf(0), [15.5, 114.4], 'fronts start at A 15.5');
-  assert.deepEqual(await colsOf(1), [12.6, 111.5], 'backs start at A 12.6 — the swap');
+  assert.deepEqual(await colsOf(0), [15.5, 114.4], 'unticked, nothing mirrors');
+  assert.deepEqual(await colsOf(1), [15.5, 114.4], 'including the back sheet');
+});
+
+test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
+  /* The shop's actual workflow: the backs are their own one-page file, printed
+     as a separate pass. That single sheet IS the backs, so ticking the box has
+     to move ITS margins — 15.5 to C, 12.6 to A — or the backs run does not
+     register with the fronts run. Read off the rendered content stream, not the
+     settings, because this is the exact claim that kept being wrong. */
+  const off = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false, bleedMm: 0 });
+  const on = await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false, bleedMm: 0, spinBacks: true });
+  const zlib = await import('node:zlib');
+  const { PDFStream } = await import('pdf-lib');
+  const leftEdge = async (b: Uint8Array) => {
+    const d = await PDFDocument.load(b);
+    assert.equal(d.getPageCount(), 1, 'and it is still ONE sheet');
+    const st = d.getPage(0).node.normalizedEntries().Contents;
+    let t = '';
+    for (let k = 0; st && k < st.size(); k++) {
+      const raw = (d.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+      try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+      catch { t += Buffer.from(raw).toString('latin1'); }
+    }
+    return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
+      .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10));
+  };
+  assert.equal(await leftEdge(off), 15.5, 'unticked: A stays 15.5');
+  assert.equal(await leftEdge(on), 12.6, 'ticked: A becomes 12.6 — the swap');
+});
+
+test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
+  const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', addMarks: false, bleedMm: 0, spinBacks: true });
+  const zlib = await import('node:zlib');
+  const { PDFStream } = await import('pdf-lib');
+  const d = await PDFDocument.load(out);
+  const leftOf = async (i: number) => {
+    const st = d.getPage(i).node.normalizedEntries().Contents;
+    let t = '';
+    for (let k = 0; st && k < st.size(); k++) {
+      const raw = (d.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+      try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+      catch { t += Buffer.from(raw).toString('latin1'); }
+    }
+    return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
+      .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 10) / 10));
+  };
+  assert.equal(await leftOf(0), 15.5, 'fronts untouched');
+  assert.equal(await leftOf(1), 12.6, 'backs swapped');
 });
 
 test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {

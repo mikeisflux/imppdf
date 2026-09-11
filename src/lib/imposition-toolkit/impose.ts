@@ -4765,17 +4765,27 @@ export async function imposeDivinityCards(
      of the back artwork is the thing that needs turning — and with no second
      sheet to act on the switch would otherwise sit there doing nothing. It
      still never adds a page: one page in, one sheet out. */
-  const spinFront = opts.spinBacks === true && !backPage;
+  const spun = opts.spinBacks === true;
+  /* With no back page the single sheet IS the backs pass — the shop runs fronts
+     and backs as separate files — so the switch acts on it directly. */
+  const spinFront = spun && !backPage;
   const frontTurn = (((needsTurn(front) ? 90 : 0) + (spinFront ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
 
-  /* THE BACK SHEET IS MIRRORED ACROSS. The template is not symmetric — A is
+  /* SPIN BACKS MIRRORS THE MARGINS ACROSS. The template is not symmetric — A is
      15.5 and C is 12.6, because that is where the machine cuts on production
      stock — so a sheet turned over about its long edge only lands on its front
-     if the block is mirrored to match. In the shop's terms: on the backs, 15.5
-     goes to C and 12.6 goes to A. Mirroring the cells does that exactly, and it
-     keeps working on the doubled sheet, where the two blocks mirror into each
-     other. Marks are ruled from the same mirrored cells so the cut lines follow.
-     A symmetric template would make this a no-op; this one is not symmetric. */
+     if the block is mirrored. In the shop's terms: on the backs, 15.5 goes to C
+     and 12.6 goes to A.
+
+     THE CHECKBOX CONTROLS THIS. It used to happen automatically on the back
+     sheet, which meant ticking the box changed nothing an operator could see on
+     a two-page job — the margins had already swapped without being asked, and
+     the switch appeared dead. One control, one visible effect: ticked, the backs
+     mirror AND their art turns a half turn; unticked, neither happens.
+
+     Mirroring the cells keeps working on the doubled sheet, where the two blocks
+     mirror into each other, and the marks are ruled from the same mirrored cells
+     so the cut lines follow the art. */
   const mirrored = fit.cells.map((c) => ({ ...c, xMm: fit.sheetWMm - (c.xMm + c.wMm) }));
 
   const pages = [out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)])];
@@ -4792,14 +4802,14 @@ export async function imposeDivinityCards(
        whole point: a back already lying the cell's way round needs no quarter
        turn at all, and the old swap left it at 0 either way — so the switch did
        nothing for exactly the artwork most likely to need it. */
-    const spun = opts.spinBacks === true;
     const baseBack: 0 | 90 | 270 = needsTurn(back)
       ? ((opts.flip ?? 'long') === 'long' ? 270 : 90) : 0;
     const backTurn = ((baseBack + (spun ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
+    const backCells = spun ? mirrored : fit.cells;
     const bp = out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)]);
-    drawSheet(bp, back, backTurn, mirrored);
+    drawSheet(bp, back, backTurn, backCells);
     pages.push(bp);
-    cellsFor.push(mirrored);
+    cellsFor.push(backCells);
   }
 
   pages.forEach((pg, pi) => { if (opts.addMarks !== false) {
