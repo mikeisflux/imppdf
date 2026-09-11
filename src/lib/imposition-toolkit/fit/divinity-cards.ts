@@ -7,7 +7,7 @@
  * derived and never nudged to make a margin come out: a cell that is not the
  * cut size cuts cards that are the wrong size.
  *
- * B IS 7 — a real gap down the middle, measured off the machine. E, F and G are
+ * B IS 9 — a real gap down the middle, measured off the machine. E, F and G are
  * the three gaps between the rows, 0.5 each.
  *
  * EVERY GAP IS A SETTING, and C and H can be typed as readily as A and D — they
@@ -18,11 +18,11 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 14   B 7   D 8   E F G 0.5   sheet LETTER
- *     C and H then fall out at 14.10 and 9.90.
+ *     A 16.5   B 9   D 5   E F G 0.5   sheet LETTER
+ *     C and H then fall out at 9.60 and 12.90.
  *
- *     across  14 + 90.4 + 7 + 90.4 + 14.1     = 215.9
- *     down    8 + 4(65) + 3(0.5) + 9.9        = 279.4
+ *     across  16.5 + 90.4 + 9 + 90.4 + 9.6    = 215.9
+ *     down    5 + 4(65) + 3(0.5) + 12.9       = 279.4
  *
  * THERE IS NO BLEED. The card is a set size and the art is laid at exactly that
  * size, so EVERY GAP HERE IS WHAT THE RULER READS on the sheet — the paper you
@@ -34,11 +34,12 @@
  * millimetre of actual paper between two cards. Change one and H closes up by
  * exactly that much: D stays where it is and the block grows downward.
  *
- * A IS NOT EQUAL TO C, and that is not a mistake. An earlier set (A 14, D 6.5,
- * with 3 mm between the rows) was validated on TEST stock and did not hold when
- * the real card stock went in — heavier stock registers differently through the
- * machine. These numbers describe where the machine actually cuts; they are not
- * derived from any rule, and re-centring them breaks the template.
+ * A IS NOT EQUAL TO C — 16.5 against 9.6, so the block sits well right of
+ * centre. That is not a mistake and not something to tidy up: these numbers
+ * describe where the machine actually cuts, measured off its own output, and
+ * re-centring them breaks the template. Several earlier sets were validated and
+ * then abandoned when the stock changed; heavier card registers differently
+ * through the machine.
  *
  * THE CHAINS ARE THE WHOLE TRUTH. Nothing is drawn outside a cell, so A + the
  * cards + the gutters + C is the sheet width exactly, and D + the cards + E F G
@@ -92,10 +93,10 @@ const COLS_N = 2, ROWS_N = 4;
    left over — there is one degree of freedom per axis, because A, the cards and
    C have to sum to the sheet. The panel shows C and H live so the operator can
    see what a change did.                                                     */
-export const DEF_MARGIN_X_MM = 14;    // A — sheet edge to the first cut line
-export const DEF_MARGIN_TOP_MM = 8;   // D — head margin
+export const DEF_MARGIN_X_MM = 16.5;  // A — sheet edge to the first cut line
+export const DEF_MARGIN_TOP_MM = 5;   // D — head margin
 
-export const DEF_GUTTER_X_MM = 7;     // B — down the middle, between the columns
+export const DEF_GUTTER_X_MM = 9;     // B — down the middle, between the columns
 
 /* E, F and G: the three gaps BETWEEN THE ROWS, top to bottom. Each is its own
    setting and each DEFAULTS TO 0 — the rows touch, one cut line serves both
@@ -110,8 +111,8 @@ export const DEF_GUTTER_G_MM = 0.5;   // G — row 3 to row 4
 
 /* The vertical chain is four cells plus E, F and G:
 
-     D 8 + 4(65) + E + F + G + H             on a 279.4 sheet
-     at the default 0.5 0.5 0.5          ->  H 9.9
+     D 5 + 4(65) + E + F + G + H             on a 279.4 sheet
+     at the default 0.5 0.5 0.5          ->  H 12.9
 
    Nothing is drawn outside a cell, so that sum is the sheet exactly. */
 
