@@ -2945,7 +2945,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload <b>one card</b> and it fills the sheet. A standard <b>2.5 × 3.5&quot;</b> card
-        lying <b>sideways</b>, <b>1.5 mm over</b> on each dimension — every one of the <b>8</b>
+        lying <b>sideways</b>, <b>2 mm over</b> on each dimension — every one of the <b>8</b>
         is <b>{round2(CELL_W)} × {round2(CELL_H)} mm</b>, with the art <b>stretched</b> to fill
         it. Pick the stock below to match what is in the tray.
       </div>
@@ -2992,9 +2992,10 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           F {DEF_GUTTER_F_MM} · G {DEF_GUTTER_G_MM}</b> on Letter — the three row gaps are NOT
           equal, because the machine's feed is not. C and H are the remainder —
           C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
-          <br /><b>There is no bleed.</b> The art is laid at the cell exactly, so every number
-          here is the <b>white paper you can measure</b> on the sheet — E F G at 0.5 is half a
-          millimetre of white between the rows, not a cut line buried under ink.
+          <br /><b>There is no bleed</b> and nothing is drawn outside a cell, so every number
+          here is the <b>white paper you can measure</b> on the sheet. Making the card bigger
+          grows the <b>cell</b> and takes the difference back out of these gutters, which is
+          what keeps the cards in the same positions.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
             onClick={() => up({ marginXMm: DEF_MARGIN_X_MM, marginTopMm: DEF_MARGIN_TOP_MM,
               gutterXMm: DEF_GUTTER_X_MM, gutterEMm: DEF_GUTTER_E_MM,

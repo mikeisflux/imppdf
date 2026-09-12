@@ -76,11 +76,16 @@ by explicit owner instruction — do not "fix" it to combine pages.
 - All N-up tools default to 1 column × 1 row unless the tool is specifically
   designed otherwise, and default image fit is CONTAIN (never crop/stretch).
   EXCEPTION (owner): **Divinity Trading Cards** is 2×4 and STRETCHES the art to
-  the cell. The cell is the card's set size — 2.5 × 3.5" plus 1.5 mm on each
-  dimension, so 90.4 × 65 laid sideways — and there is NO BLEED: the art is laid
-  at exactly that size, nothing grown on any edge. Every gutter is therefore
-  real white paper you can measure, which is the point (a 0.5 mm row gap under
-  1.5 mm of bleed is invisible and the setting does nothing).
+  the cell. The cell is the card's set size — 2.5 × 3.5" plus 2 mm on each
+  dimension, so 90.9 × 65.5 laid sideways. **There is NO BLEED and nothing is
+  drawn outside a cell**, so every gutter is real white paper you can measure
+  and both chains close on the sheet exactly. To make the card bigger, GROW THE
+  CELL AND TAKE THE DIFFERENCE BACK OUT OF THE GUTTERS (an outer margin pays
+  once, an interior gutter twice) — that keeps the cards in the same positions.
+  Never do it by overflowing the cells instead: this template's gutters are
+  measured in tenths, and an earlier build that grew each cell 1.5 mm on all
+  four sides put 3 mm of ink into a 0.5 mm row gap, overlapped the rows, and
+  made the row settings do nothing visible on the sheet.
   EXCEPTION (owner): **30-Up Proof Labels** defaults to 1×1-overriding 3×10 AND
   to STRETCH — the die-cut label cell is the target size, so the art fills the
   cell instead of sitting proportionally inside it. It also defaults to

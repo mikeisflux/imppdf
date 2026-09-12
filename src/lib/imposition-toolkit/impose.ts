@@ -4658,12 +4658,10 @@ export interface DivinityCardOptions {
   /** E, F, G — the three gaps between the rows, top to bottom. Each defaults to
    *  0, which butts the rows onto one shared cut line. */
   gutterEMm?: number; gutterFMm?: number; gutterGMm?: number;
-  /* THERE IS NO BLEED. Deleted, not defaulted to zero: the card is a SET SIZE
-     and the art is laid at exactly that size, so every gutter on the sheet is
-     real paper you can see and measure. An earlier build grew each cell by
-     1.5 mm on all four sides; on a template whose row gaps are half a
-     millimetre that put 3 mm of ink into a 0.5 mm slot, the rows overlapped,
-     and a gutter you typed did nothing you could see. */
+  /* NOTHING IS DRAWN OUTSIDE A CELL. Growing the card is done by growing the
+     cell and taking the difference back out of the gutters, not by overflowing
+     them — so the cards do not move and every gutter stays the white paper the
+     panel says it is. */
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
   markLenMm?: number;      // default 3
@@ -4685,7 +4683,7 @@ export async function imposeDivinityCards(
   });
   const mm = (v: number) => v * PT_PER_MM;
 
-  /* No bleed term anywhere below: the art rect IS the cell rect. */
+  /* No growth term anywhere below: the art rect IS the cell rect. */
 
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();
@@ -4730,9 +4728,10 @@ export async function imposeDivinityCards(
     const artW = turn ? card.height : card.width;
     const artH = turn ? card.width : card.height;
     for (const c of cells) {
-      /* The art box IS the cell — nothing added on any side. The cell is the
-         card's set size, so what lands on the sheet is the card, and the gutters
-         around it stay paper. */
+      /* The art box IS the cell — nothing added on any side. When the card grew
+         0.25 on every edge, the CELL grew and the gutters came down to match, so
+         the cards stayed put; nothing is laid over a gutter to fake it. That
+         keeps every number in the panel equal to the white you can measure. */
       const bx = mm(c.xMm), by = mm(c.yMm);
       const cw = mm(c.wMm), ch = mm(c.hMm);
       /* STRETCH — the owner's instruction, and an exception to the house rule

@@ -1,13 +1,13 @@
 /* Divinity trading cards — one card artwork ganged 8-up on A4 and the block
  * duplicated onto A3, so one A3 cuts in half into two identical A4s to run.
  *
- * THE CELL IS THE CARD PLUS 1.5 mm, laid sideways: 90.4 x 65. A 2.5 x 3.5"
- * card is 88.9 x 63.5, and the shop cuts it 1.5 over on each dimension — the
- * cell size is the CUT size, stated by the operator off the machine. Never
- * derived and never nudged to make a margin come out: a cell that is not the
- * cut size cuts cards that are the wrong size.
+ * THE CELL IS THE CARD PLUS 2 mm, laid sideways: 90.9 x 65.5. A 2.5 x 3.5" card
+ * is 88.9 x 63.5, and the shop cuts it 2 over on each dimension — the cell size
+ * is the CUT size, stated by the operator off the machine. Never derived and
+ * never nudged to make a margin come out: a cell that is not the cut size cuts
+ * cards that are the wrong size.
  *
- * B IS 9 — a real gap down the middle, measured off the machine. E, F and G are
+ * B IS 8.5 — a real gap down the middle, measured off the machine. E, F and G are
  * the three gaps between the rows, 0.5 each.
  *
  * EVERY GAP IS A SETTING, and C and H can be typed as readily as A and D — they
@@ -18,24 +18,25 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 16.5   B 9   D 5   E 0.5   F 1.2   G 1.2   sheet LETTER
- *     C and H then fall out at 9.60 and 11.50.
+ *     A 16.25   B 8.5   D 4.75   E 0   F 0.7   G 0.7   sheet LETTER
+ *     C and H then fall out at 9.35 and 11.25.
  *
- *     across  16.5 + 90.4 + 9 + 90.4 + 9.6         = 215.9
- *     down    5 + 4(65) + 0.5 + 1.2 + 1.2 + 11.5   = 279.4
+ *     across  16.25 + 90.9 + 8.5 + 90.9 + 9.35     = 215.9
+ *     down    4.75 + 4(65.5) + 0 + 0.7 + 0.7 + 11.25 = 279.4
  *
- * THERE IS NO BLEED. The card is a set size and the art is laid at exactly that
- * size, so EVERY GAP HERE IS WHAT THE RULER READS on the sheet — the paper you
- * can see between two cards, not a cut line hidden under ink. A build that grew
- * each cell by 1.5 mm on all four sides put 3 mm of ink into a 0.5 mm row gap,
- * overlapped the rows, and made those settings do nothing visible.
+ * THERE IS NO BLEED AND NOTHING IS DRAWN OUTSIDE A CELL, so EVERY GAP HERE IS
+ * WHAT THE RULER READS on the sheet — the white paper between two cards. When
+ * the card is made bigger, the CELL grows and the gutters come down by the
+ * matching amount, which keeps the cards where they are. A build that instead
+ * overflowed the cells by 1.5 put 3 mm of ink into a 0.5 mm row gap, overlapped
+ * the rows, and made the row settings do nothing anyone could see.
  *
- * THE ROW GAPS ARE 0.5, 1.2, 1.2 — E, F and G, each its own setting and each
- * real paper between two cards. They differ because the machine's feed does.
- * Change one and H closes up by exactly that much: D stays where it is and the
- * block grows downward.
+ * THE ROW GAPS ARE 0, 0.7, 0.7 — E, F and G, each its own setting and each real
+ * paper between two cards. They differ because the machine's feed does; rows 1
+ * and 2 now share a cut line outright. Change one and H closes up by exactly
+ * that much: D stays where it is and the block grows downward.
  *
- * A IS NOT EQUAL TO C — 16.5 against 9.6, so the block sits well right of
+ * A IS NOT EQUAL TO C — 16.25 against 9.35, so the block sits well right of
  * centre. That is not a mistake and not something to tidy up: these numbers
  * describe where the machine actually cuts, measured off its own output, and
  * re-centring them breaks the template. Several earlier sets were validated and
@@ -94,10 +95,10 @@ const COLS_N = 2, ROWS_N = 4;
    left over — there is one degree of freedom per axis, because A, the cards and
    C have to sum to the sheet. The panel shows C and H live so the operator can
    see what a change did.                                                     */
-export const DEF_MARGIN_X_MM = 16.5;  // A — sheet edge to the first cut line
-export const DEF_MARGIN_TOP_MM = 5;   // D — head margin
+export const DEF_MARGIN_X_MM = 16.25; // A — sheet edge to the first cut line
+export const DEF_MARGIN_TOP_MM = 4.75;// D — head margin
 
-export const DEF_GUTTER_X_MM = 9;     // B — down the middle, between the columns
+export const DEF_GUTTER_X_MM = 8.5;   // B — down the middle, between the columns
 
 /* E, F and G: the three gaps BETWEEN THE ROWS, top to bottom. Each is its own
    setting and each DEFAULTS TO 0 — the rows touch, one cut line serves both
@@ -106,20 +107,26 @@ export const DEF_GUTTER_X_MM = 9;     // B — down the middle, between the colu
    on the sheet has its own letter and its own box: the operator measures three
    gaps with a ruler, not one gap three times, and a machine that drifts down
    the sheet needs them to differ. */
-export const DEF_GUTTER_E_MM = 0.5;   // E — row 1 to row 2
-export const DEF_GUTTER_F_MM = 1.2;   // F — row 2 to row 3
-export const DEF_GUTTER_G_MM = 1.2;   // G — row 3 to row 4
+export const DEF_GUTTER_E_MM = 0;     // E — row 1 to row 2 (rows 1/2 now touch)
+export const DEF_GUTTER_F_MM = 0.7;   // F — row 2 to row 3
+export const DEF_GUTTER_G_MM = 0.7;   // G — row 3 to row 4
 
 /* The vertical chain is four cells plus E, F and G:
 
-     D 5 + 4(65) + E + F + G + H             on a 279.4 sheet
-     at the default 0.5 1.2 1.2          ->  H 11.5
+     D 4.75 + 4(65.5) + E + F + G + H        on a 279.4 sheet
+     at the default 0 0.7 0.7            ->  H 11.25
 
    Nothing is drawn outside a cell, so that sum is the sheet exactly. */
 
-/** How much bigger the finished card is than the nominal 2.5 x 3.5". Not a bleed
- *  allowance: the shop's card is simply this size, and the art is laid at it. */
-export const CELL_OVERSIZE_MM = 1.5;
+/** How much bigger the finished card is than the nominal 2.5 x 3.5", per
+ *  dimension. Not a bleed allowance: the shop's card is simply this size and the
+ *  art is laid at it. It went 1.5 -> 2 when the card was extended a quarter
+ *  millimetre on every side; the gutters came down by the matching amount in the
+ *  same change, so not one card moved on the sheet. That is the rule here —
+ *  GROW THE CELL AND PAY FOR IT OUT OF THE GUTTERS, never overflow a gutter,
+ *  because a gutter that is partly under ink is a number nobody can measure. */
+export const CELL_OVERSIZE_MM = 2;
+
 
 /** The cell: the card laid sideways, 1.5 over on both dimensions. Never derived,
  *  never adjusted to make a margin come out — the cell IS the cut size. */
