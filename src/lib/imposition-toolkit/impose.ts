@@ -4662,6 +4662,9 @@ export interface DivinityCardOptions {
      cell and taking the difference back out of the gutters, not by overflowing
      them — so the cards do not move and every gutter stays the white paper the
      panel says it is. */
+  /** Flood the sheet with rich black behind the cards, leaving a white border.
+   *  Default OFF. See BLACK_BORDER_MM. */
+  blackBg?: boolean;
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
   markLenMm?: number;      // default 3
@@ -4669,11 +4672,16 @@ export interface DivinityCardOptions {
   markWeightPt?: number;   // default 0.25
 }
 
+/** White paper left all the way round the sheet when the black background is
+ *  on. Not zero: a flood run right to the sheet edge is what makes a digital
+ *  press band and pick, and most will not image the last millimetre anyway. */
+export const BLACK_BORDER_MM = 1.5;
+
 export async function imposeDivinityCards(
   bytes: Uint8Array, opts: DivinityCardOptions = {},
 ): Promise<Uint8Array> {
   const PL = await import('pdf-lib');
-  const { PDFDocument, rgb, degrees } = PL;
+  const { PDFDocument, rgb, cmyk, degrees } = PL;
   const { fitDivinityCards, PT_PER_MM } = await import('./fit/divinity-cards.ts');
 
   const fit = fitDivinityCards(opts.sheet ?? 'letter', {
@@ -4787,7 +4795,31 @@ export async function imposeDivinityCards(
      so the cut lines follow the art. */
   const mirrored = fit.cells.map((c) => ({ ...c, xMm: fit.sheetWMm - (c.xMm + c.wMm) }));
 
+  /* BLACK BACKGROUND, off by default. One flood behind everything, so the sheet
+     comes off the press ready to cut with no white showing between the cards —
+     the gutters go black and only a BLACK_BORDER_MM edge of paper is left all
+     the way round.
+
+     100/100/100/100 EXACTLY, in DeviceCMYK, because the shop asked for that
+     number: a four-plate black, not a single K. It must be written as CMYK and
+     not as an RGB 0,0,0 that a RIP would separate however it liked — cmyk()
+     emits a `k` operator and the value survives to the plate.
+
+     Drawn FIRST so every card lands on top of it. The cards are opaque, so a
+     flood behind them cannot touch the artwork; it only fills what was paper. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const paintBg = (pg: any) => {
+    if (opts.blackBg !== true) return;
+    const b = mm(BLACK_BORDER_MM);
+    pg.drawRectangle({
+      x: b, y: b,
+      width: mm(fit.sheetWMm) - 2 * b, height: mm(fit.sheetHMm) - 2 * b,
+      color: cmyk(1, 1, 1, 1),
+    });
+  };
+
   const pages = [out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)])];
+  paintBg(pages[0]!);
   /* A lone sheet marked as the backs pass (SPIN BACKS, no page 2) is a back
      sheet in every sense, so it mirrors too — otherwise the separate backs run
      would not register with the fronts run. */
@@ -4806,6 +4838,7 @@ export async function imposeDivinityCards(
     const backTurn = ((baseBack + (spun ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
     const backCells = spun ? mirrored : fit.cells;
     const bp = out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)]);
+    paintBg(bp);
     drawSheet(bp, back, backTurn, backCells);
     pages.push(bp);
     cellsFor.push(backCells);
@@ -4814,8 +4847,12 @@ export async function imposeDivinityCards(
   pages.forEach((pg, pi) => { if (opts.addMarks !== false) {
     const len = mm(opts.markLenMm ?? 3), off = mm(opts.markOffMm ?? 1.5);
     const w0 = opts.markWeightPt ?? 0.25;
+    /* On a flooded sheet a black mark sits on black and cannot be seen, so the
+       marks invert to white. They are ruled in the sheet margin, which the
+       flood covers except for its own 1.5 mm border. */
+    const markColor = opts.blackBg === true ? rgb(1, 1, 1) : rgb(0, 0, 0);
     const line = (x1: number, y1: number, x2: number, y2: number) =>
-      pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w0, color: rgb(0, 0, 0) });
+      pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w0, color: markColor });
     /* Marks live OUTSIDE the cards, in the sheet margins only. Every card edge
        is shared with its neighbour across a 3 mm gutter, so a mark long enough
        to be useful in the gutter would run onto the card next to it. Ruling the

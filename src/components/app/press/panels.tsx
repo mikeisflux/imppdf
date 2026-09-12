@@ -3035,6 +3035,20 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           checked={!!s.spinBacks} onChange={(v) => up({ spinBacks: v })} />
       </Section>
 
+      <Section label="// BACKGROUND" help="Floods the sheet behind the cards so it comes off the press ready to cut, with no white showing between them.">
+        <Check icon="fillbg" label="Black background"
+          sub="Rich black 100/100/100/100 behind everything, 1.5 mm of white left all round the sheet"
+          checked={!!s.blackBg} onChange={(v) => up({ blackBg: v })} />
+        {!!s.blackBg && (
+          <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
+            Every gutter above goes <b>black</b> — the numbers still place the cuts, you just
+            cannot see them as white any more. The flood is <b>DeviceCMYK</b>, so it reaches the
+            plate as a four-plate black rather than whatever a RIP decides to do with an RGB
+            zero. Cut marks turn <b>white</b> so they stay readable on it.
+          </div>
+        )}
+      </Section>
+
       <Section label="// MARKS" help="Cut marks are ruled off the sheet edges rather than into the gutters, so nothing can print on a neighbouring card.">
         <Check icon="crop" label="Cut marks" sub="At every card edge, in the sheet margins, plus the half-sheet cut on A3"
           checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />

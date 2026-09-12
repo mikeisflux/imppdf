@@ -158,7 +158,7 @@ export function defaultSettings(type: StepType): StepSettings {
          Letters. E, F and G are 0, 0.7, 0.7 — the machine's own feed. */
       return { sheet: 'letter', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false,
         marginXMm: 16.25, marginTopMm: 4.75, gutterXMm: 8.5,
-        gutterEMm: 0, gutterFMm: 0.7, gutterGMm: 0.7,
+        gutterEMm: 0, gutterFMm: 0.7, gutterGMm: 0.7, blackBg: false,
         addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
@@ -630,6 +630,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
           gutterXMm: s.gutterXMm,
           gutterEMm: s.gutterEMm, gutterFMm: s.gutterFMm, gutterGMm: s.gutterGMm,
+          blackBg: !!s.blackBg,
           addMarks: s.addMarks !== false,
         });
         break;

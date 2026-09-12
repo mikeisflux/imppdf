@@ -20,7 +20,7 @@ import {
   fitDivinityCards, PT_PER_MM, CARD_W_MM, CARD_H_MM, PLACED_W_MM, PLACED_H_MM,
   DEF_GUTTER_X_MM, DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, COLS, ROWS, CELL_OVERSIZE_MM,
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
-import { imposeDivinityCards } from '../src/lib/imposition-toolkit/impose.ts';
+import { imposeDivinityCards, BLACK_BORDER_MM } from '../src/lib/imposition-toolkit/impose.ts';
 
 const close = (a: number, b: number, tol = 1e-6) => Math.abs(a - b) <= tol;
 
@@ -144,6 +144,63 @@ test('EVERY GAP IS REAL PAPER — nothing is drawn outside a cell', async () => 
      and these are what catch it. */
   assert.ok(close(rects[0]![0], 16.25, 0.02), 'left column ink starts at 16.25');
   assert.ok(close(279.4 - (rects[0]![1] + rects[0]![3]), 4.75, 0.02), 'row 1 ink starts 4.75 down');
+});
+
+test('BLACK BACKGROUND: rich CMYK black, 1.5 of white left all round', async () => {
+  /* The shop asked for 100/100/100/100 by that number — a four-plate black, not
+     a single K and not an RGB zero a RIP would separate however it liked. So it
+     is checked as DeviceCMYK in the content stream: pdf-lib writes cmyk() as a
+     `k` operator, and only that carries the value to the plate. */
+  const zlib = await import('node:zlib');
+  const { PDFStream } = await import('pdf-lib');
+  const streamOf = async (bytes: Uint8Array) => {
+    const d = await PDFDocument.load(bytes);
+    const st = d.getPage(0).node.normalizedEntries().Contents;
+    let t = '';
+    for (let k = 0; st && k < st.size(); k++) {
+      const raw = (d.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+      try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+      catch { t += Buffer.from(raw).toString('latin1'); }
+    }
+    return t;
+  };
+  const off = await streamOf(await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false }));
+  assert.ok(!/\d+ \d+ \d+ \d+ k/.test(off), 'OFF by default — no flood at all');
+
+  const on = await streamOf(await imposeDivinityCards(
+    await cardPdf(), { sheet: 'letter', addMarks: false, blackBg: true }));
+  assert.ok(/1 1 1 1 k/.test(on), 'DeviceCMYK 100/100/100/100, not K-only and not RGB');
+  /* Painted FIRST, so every card lands on top of it and the artwork is untouched. */
+  assert.ok(on.indexOf('1 1 1 1 k') < on.indexOf('re'), 'the flood is behind the cards');
+  /* Inset BLACK_BORDER_MM on every side: pdf-lib translates to the corner, then
+     runs the path out to the size, so both come out of the stream. */
+  const b = BLACK_BORDER_MM * PT_PER_MM;
+  const at = on.match(/1 0 0 1 ([\d.]+) ([\d.]+) cm/);
+  assert.ok(at && close(Number(at[1]), b, 1e-6) && close(Number(at[2]), b, 1e-6),
+    `flood starts ${BLACK_BORDER_MM} in from the corner`);
+  const to = on.match(/0 ([\d.]+) l\n([\d.]+) [\d.]+ l/);
+  assert.ok(to, 'the flood path is in the stream');
+  assert.ok(close(Number(to![1]) / PT_PER_MM, 279.4 - 2 * BLACK_BORDER_MM, 0.01), 'height less both borders');
+  assert.ok(close(Number(to![2]) / PT_PER_MM, 215.9 - 2 * BLACK_BORDER_MM, 0.01), 'width less both borders');
+});
+
+test('BLACK BACKGROUND: the cut marks invert so they stay visible', async () => {
+  const zlib = await import('node:zlib');
+  const { PDFStream } = await import('pdf-lib');
+  const marks = async (blackBg: boolean) => {
+    const d = await PDFDocument.load(await imposeDivinityCards(
+      await cardPdf(), { sheet: 'letter', addMarks: true, blackBg }));
+    const st = d.getPage(0).node.normalizedEntries().Contents;
+    let t = '';
+    for (let k = 0; st && k < st.size(); k++) {
+      const raw = (d.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+      try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+      catch { t += Buffer.from(raw).toString('latin1'); }
+    }
+    return t;
+  };
+  assert.ok(/0 0 0 RG/.test(await marks(false)), 'black marks on white paper');
+  assert.ok(/1 1 1 RG/.test(await marks(true)), 'white marks on a flooded sheet');
 });
 
 test('A4: eight cards, 2 across x 4 down', () => {
