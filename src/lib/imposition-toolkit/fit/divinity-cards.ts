@@ -73,15 +73,32 @@ export const A4_W_MM = 210, A4_H_MM = 297;
 export const A3_W_MM = 420, A3_H_MM = 297;
 
 /** 'letter' / 'a4' hold one block; 'tabloid' / 'a3' hold two side by side and
- *  cut down the middle into two of the smaller sheet. */
+ *  cut into two of the smaller sheet. The doubled pair come out PORTRAIT: the
+ *  layout is reasoned about landscape and the finished page stood up, so their
+ *  cut runs across the page rather than down it. Nothing from this tool is
+ *  landscape (owner). */
 export type DivinityCardSheet = 'letter' | 'tabloid' | 'a4' | 'a3';
 
-interface SheetSpec { wMm: number; hMm: number; blockWMm: number; doubled: boolean; }
+interface SheetSpec {
+  wMm: number; hMm: number; blockWMm: number; doubled: boolean;
+  /** Turn the finished PAGE a quarter turn, so the layout below is laid out
+   *  landscape and then stood up. Everything in this module stays in the
+   *  landscape frame — A, B, C, D and the cells are unchanged — and only the
+   *  page the caller draws onto is portrait. */
+  rotated?: boolean;
+}
 const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
   letter:  { wMm: LETTER_W_MM,  hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false },
-  tabloid: { wMm: TABLOID_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: true },
+  /* 11 x 17 comes out PORTRAIT — 279.4 x 431.8 — with the two blocks and the
+     cut between them turned a quarter turn onto it. The cards keep exactly the
+     orientation they have on a Letter sheet relative to the block; it is the
+     page that stands up, so the half-sheet cut runs ACROSS the portrait page at
+     215.9 from the foot instead of down it. */
+  tabloid: { wMm: TABLOID_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: true, rotated: true },
   a4:      { wMm: A4_W_MM,      hMm: A4_H_MM,     blockWMm: A4_W_MM,     doubled: false },
-  a3:      { wMm: A3_W_MM,      hMm: A3_H_MM,     blockWMm: A4_W_MM,     doubled: true },
+  /* A3 stands up the same way — 297 x 420. NOTHING FROM THIS TOOL COMES OUT
+     LANDSCAPE (owner). */
+  a3:      { wMm: A3_W_MM,      hMm: A3_H_MM,     blockWMm: A4_W_MM,     doubled: true, rotated: true },
 };
 
 const COLS_N = 2, ROWS_N = 4;
@@ -165,6 +182,11 @@ export interface DivinityCardFit {
   /** Where an A3 is cut into two A4s, as an x DOWN the sheet. Empty for a plain
    *  A4. The blocks sit side by side, so the cut is vertical. */
   cutXMm: number[];
+  /** True when the PAGE is a quarter turn from the layout above: every figure
+   *  in this fit is in the landscape frame, and the caller stands the finished
+   *  page up. pageWMm / pageHMm are what the PDF page actually measures. */
+  rotated: boolean;
+  pageWMm: number; pageHMm: number;
 }
 
 export function fitDivinityCards(
@@ -226,5 +248,8 @@ export function fitDivinityCards(
     marginRightMm: spec.blockWMm - mX - blockW, blockWMm: blockW, blockHMm: blockH,
     rowGapsMm: rowGaps,
     cutXMm: spec.doubled ? [spec.blockWMm] : [],
+    rotated: spec.rotated === true,
+    pageWMm: spec.rotated ? spec.hMm : spec.wMm,
+    pageHMm: spec.rotated ? spec.wMm : spec.hMm,
   };
 }

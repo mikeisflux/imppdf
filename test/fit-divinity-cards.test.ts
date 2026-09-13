@@ -1,7 +1,9 @@
 /* Divinity trading cards — one card ganged 8-up on Letter, the block duplicated
  * onto 11 x 17 so one sheet cuts into two identical Letters to run.
  *
- *   sheet   215.9 x 279.4 (Letter) / 431.8 x 279.4 (11 x 17)
+ *   page    215.9 x 279.4 (Letter) / 279.4 x 431.8 (11 x 17) — ALWAYS PORTRAIT
+ *   layout  the 11 x 17 is reasoned about landscape, two blocks side by side,
+ *           and the finished PAGE is stood up; nothing inside it moves
  *   cell    90.9 x 65.5  the card, lying sideways, 2 over on each dimension
  *   art     the cell exactly — STRETCHED to it, and NO BLEED anywhere
  *
@@ -34,7 +36,7 @@ test('THE CELL IS THE CUT — the card laid sideways, 2 over on both sides', () 
   assert.ok(close(CELL_OVERSIZE_MM, 2), 'the shop cuts 2 over');
 });
 
-test('tabloid is two Letters side by side, cut at 215.9', () => {
+test('tabloid is two Letters side by side in the LAYOUT frame, cut at 215.9', () => {
   const f = fitDivinityCards('tabloid');
   assert.ok(close(f.sheetWMm, 431.8), '11 x 17');
   assert.ok(close(f.sheetHMm, 279.4));
@@ -264,17 +266,44 @@ async function cardPdf() {
   return d.save();
 }
 
-test('the sheets come out at real A4 and A3 sizes', async () => {
-  const a3 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet: 'a3', backs: false }));
-  assert.equal(a3.getPageCount(), 1);
-  let { width, height } = a3.getPage(0).getSize();
-  assert.ok(Math.abs(width - 420 * PT_PER_MM) < 0.5, `420 mm wide, got ${(width / PT_PER_MM).toFixed(2)}`);
-  assert.ok(Math.abs(height - 297 * PT_PER_MM) < 0.5);
+test('EVERY sheet comes off PORTRAIT, at a real stock size', async () => {
+  /* Owner's rule: nothing from this tool is landscape. The doubled stocks are
+     reasoned about landscape — two blocks side by side — and the finished page
+     is stood up, so an A3 is 297 x 420 and an 11 x 17 is 279.4 x 431.8, taller
+     than they are wide, same as the single-up stocks. */
+  const size = async (sheet: 'letter' | 'tabloid' | 'a4' | 'a3') => {
+    const d = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet, backs: false }));
+    assert.equal(d.getPageCount(), 1);
+    const { width, height } = d.getPage(0).getSize();
+    return [width / PT_PER_MM, height / PT_PER_MM] as const;
+  };
+  for (const [sheet, w, h] of [
+    ['letter', 215.9, 279.4], ['tabloid', 279.4, 431.8],
+    ['a4', 210, 297], ['a3', 297, 420],
+  ] as const) {
+    const [gw, gh] = await size(sheet);
+    assert.ok(Math.abs(gw - w) < 0.01, `${sheet} is ${w} wide, got ${gw.toFixed(2)}`);
+    assert.ok(Math.abs(gh - h) < 0.01, `${sheet} is ${h} tall, got ${gh.toFixed(2)}`);
+    assert.ok(gh > gw, `${sheet} must be PORTRAIT, got ${gw.toFixed(1)} x ${gh.toFixed(1)}`);
+  }
+});
 
-  const a4 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet: 'a4', backs: false }));
-  ({ width, height } = a4.getPage(0).getSize());
-  assert.ok(Math.abs(width - 210 * PT_PER_MM) < 0.5);
-  assert.ok(Math.abs(height - 297 * PT_PER_MM) < 0.5);
+test('standing the page up moves NOTHING inside the sheet', async () => {
+  /* The claim the rotation rests on: the page turns, the layout does not. The
+     landscape frame the fit reasons in is untouched, and one matrix carries the
+     flood, the cards and the marks round together — so a card's position on the
+     portrait page is exactly its landscape position with the axes swapped. */
+  const f = fitDivinityCards('tabloid');
+  assert.ok(f.rotated, '11 x 17 stands up');
+  assert.ok(close(f.sheetWMm, 431.8) && close(f.sheetHMm, 279.4), 'layout stays landscape');
+  assert.ok(close(f.pageWMm, 279.4) && close(f.pageHMm, 431.8), 'the PAGE is portrait');
+  assert.ok(close(f.pageWMm, f.sheetHMm) && close(f.pageHMm, f.sheetWMm), 'a quarter turn, nothing rescaled');
+  /* Same cells, same gutters, same cut as a Letter sheet — twice over. */
+  const letter = fitDivinityCards('letter');
+  assert.ok(close(f.marginXMm, letter.marginXMm) && close(f.marginRightMm, letter.marginRightMm));
+  assert.ok(close(f.marginTopMm, letter.marginTopMm) && close(f.marginBottomMm, letter.marginBottomMm));
+  assert.deepEqual(f.rowGapsMm, letter.rowGapsMm);
+  assert.ok(close(f.cutXMm[0]!, 215.9), 'cut at 215.9 — across the portrait page, from the foot');
 });
 
 /** Two pages, front and back, both portrait — the normal case. */

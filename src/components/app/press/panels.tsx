@@ -2936,9 +2936,11 @@ function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: Pa
  * real decision is which sheet. */
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
+/* PAGE sizes, which on the doubled stocks are the landscape layout stood up —
+   nothing from this tool comes off landscape. */
 const SHEET_LABEL: Record<string, string> = {
-  letter: '215.9 × 279.4 mm (8.5 × 11")', tabloid: '431.8 × 279.4 mm (11 × 17")',
-  a4: '210 × 297 mm (A4)', a3: '420 × 297 mm (A3)',
+  letter: '215.9 × 279.4 mm (8.5 × 11")', tabloid: '279.4 × 431.8 mm (11 × 17 portrait)',
+  a4: '210 × 297 mm (A4)', a3: '297 × 420 mm (A3 portrait)',
 };
 const DOUBLED = new Set(['tabloid', 'a3']);
 
@@ -2998,9 +3000,12 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           <div>Sheet <b>{SHEET_LABEL[s.sheet ?? 'letter']}</b> — <b>{FIT.n} cards</b>,
             {' '}{DOUBLED.has(s.sheet ?? 'letter') ? 'two blocks of 2 × 4' : '2 × 4'}</div>
           {DOUBLED.has(s.sheet ?? 'letter') && (
-            <div>Cut down the middle at <b>{round2(FIT.cutXMm[0] ?? 0)} mm</b> for two identical
-              sheets — each half carries its own A and C, so the two are interchangeable.
-              The cut is marked top and bottom.</div>
+            <div>Cut <b>across</b> at <b>{round2(FIT.cutXMm[0] ?? 0)} mm</b> from the foot for two
+              identical sheets — each half carries its own A and C, so the two are
+              interchangeable. The cut is marked on both sides.
+              <br />The page is <b>stood up</b> rather than re-laid: the block is worked out
+              landscape and the whole page turned a quarter turn, so every gutter is the one you
+              typed and no card moves in its cell.</div>
           )}
           <div style={{ marginTop: 4 }}>
             Set this to the paper that is actually <b>in the tray</b>. An A4 file on Letter

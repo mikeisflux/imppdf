@@ -91,6 +91,14 @@ by explicit owner instruction — do not "fix" it to combine pages.
   cell instead of sitting proportionally inside it. It also defaults to
   `trimArt` (crop the upload to its artwork) because label art is exported from
   a template at full sheet size.
+- **Nothing from Divinity Trading Cards comes out LANDSCAPE** (owner). The
+  doubled stocks are reasoned about landscape — two blocks side by side with the
+  guillotine cut between them — and the finished PAGE is then stood up a quarter
+  turn, so 11×17 is 279.4×431.8 and A3 is 297×420. Do this by pushing ONE
+  transformation matrix (`0 1 -1 0 pageW 0`) before anything is drawn, so the
+  flood, the cards and the marks are all carried round together and no gutter or
+  cell changes. Never re-lay the block to fit a portrait sheet, and never do it
+  with a `/Rotate` on the page dictionary — that is metadata a RIP may ignore.
 - Never assume how many items fit a sheet: always run the fit calculation
   accounting for margins, gutters, crop marks, and bleed before placing.
 - If rotating an item 90° lets more fit, rotate it.

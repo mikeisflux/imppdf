@@ -4795,6 +4795,36 @@ export async function imposeDivinityCards(
      so the cut lines follow the art. */
   const mirrored = fit.cells.map((c) => ({ ...c, xMm: fit.sheetWMm - (c.xMm + c.wMm) }));
 
+  /* THE PAGE STANDS UP, THE ART DOES NOT MOVE. On a doubled sheet the layout is
+     reasoned about landscape — two blocks side by side with the guillotine cut
+     between them — and then the whole PAGE is turned a quarter turn so it comes
+     off portrait. Nothing is re-laid and no card is rotated in its cell: one
+     transformation matrix is pushed before any drawing, so every later
+     operation — the flood, the cards, the cut marks — is carried round with it
+     and every relationship inside the sheet is preserved exactly.
+
+       landscape (x, y)  ->  portrait (pageW - y, x)
+
+     which is `0 1 -1 0 pageW 0`. The half-sheet cut, a vertical line down the
+     landscape layout, therefore lands as a horizontal cut ACROSS the portrait
+     page, and the two halves come apart the same way they always did.
+
+     Baked into the content, not written as a /Rotate on the page dictionary:
+     that is metadata a RIP is free to ignore, and this has to survive the
+     press. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const standUp = (pg: any) => {
+    if (!fit.rotated) return;
+    pg.pushOperators(PL.concatTransformationMatrix(0, 1, -1, 0, mm(fit.pageWMm), 0));
+  };
+
+  const newSheet = () => {
+    const pg = out.addPage([mm(fit.pageWMm), mm(fit.pageHMm)]);
+    standUp(pg);            // before ANYTHING is drawn, so it carries everything
+    paintBg(pg);
+    return pg;
+  };
+
   /* BLACK BACKGROUND, off by default. One flood behind everything, so the sheet
      comes off the press ready to cut with no white showing between the cards —
      the gutters go black and only a BLACK_BORDER_MM edge of paper is left all
@@ -4818,8 +4848,7 @@ export async function imposeDivinityCards(
     });
   };
 
-  const pages = [out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)])];
-  paintBg(pages[0]!);
+  const pages = [newSheet()];
   /* A lone sheet marked as the backs pass (SPIN BACKS, no page 2) is a back
      sheet in every sense, so it mirrors too — otherwise the separate backs run
      would not register with the fronts run. */
@@ -4837,8 +4866,7 @@ export async function imposeDivinityCards(
       ? ((opts.flip ?? 'long') === 'long' ? 270 : 90) : 0;
     const backTurn = ((baseBack + (spun ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
     const backCells = spun ? mirrored : fit.cells;
-    const bp = out.addPage([mm(fit.sheetWMm), mm(fit.sheetHMm)]);
-    paintBg(bp);
+    const bp = newSheet();
     drawSheet(bp, back, backTurn, backCells);
     pages.push(bp);
     cellsFor.push(backCells);
