@@ -157,7 +157,7 @@ export function defaultSettings(type: StepType): StepSettings {
          eight to a Letter, the block doubled onto 11 x 17 that cuts into two
          Letters. E, F and G are 0, 0.7, 0.7 — the machine's own feed. */
       return { sheet: 'letter', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false,
-        marginXMm: 16.25, marginTopMm: 4.75, gutterXMm: 8.5,
+        marginXMm: 16.5, marginTopMm: 4.75, gutterXMm: 8.5,
         gutterEMm: 0, gutterFMm: 0.7, gutterGMm: 0.7, blackBg: false,
         addMarks: true };
     case 'mediafix':

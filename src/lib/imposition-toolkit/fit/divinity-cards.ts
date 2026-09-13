@@ -18,10 +18,10 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 16.25   B 8.5   D 4.75   E 0   F 0.7   G 0.7   sheet LETTER
- *     C and H then fall out at 9.35 and 11.25.
+ *     A 16.5   B 8.5   D 4.75   E 0   F 0.7   G 0.7   sheet LETTER
+ *     C and H then fall out at 9.10 and 11.25.
  *
- *     across  16.25 + 90.9 + 8.5 + 90.9 + 9.35     = 215.9
+ *     across  16.5 + 90.9 + 8.5 + 90.9 + 9.1       = 215.9
  *     down    4.75 + 4(65.5) + 0 + 0.7 + 0.7 + 11.25 = 279.4
  *
  * THERE IS NO BLEED AND NOTHING IS DRAWN OUTSIDE A CELL, so EVERY GAP HERE IS
@@ -36,7 +36,7 @@
  * and 2 now share a cut line outright. Change one and H closes up by exactly
  * that much: D stays where it is and the block grows downward.
  *
- * A IS NOT EQUAL TO C — 16.25 against 9.35, so the block sits well right of
+ * A IS NOT EQUAL TO C — 16.5 against 9.10, so the block sits well right of
  * centre. That is not a mistake and not something to tidy up: these numbers
  * describe where the machine actually cuts, measured off its own output, and
  * re-centring them breaks the template. Several earlier sets were validated and
@@ -95,7 +95,7 @@ const COLS_N = 2, ROWS_N = 4;
    left over — there is one degree of freedom per axis, because A, the cards and
    C have to sum to the sheet. The panel shows C and H live so the operator can
    see what a change did.                                                     */
-export const DEF_MARGIN_X_MM = 16.25; // A — sheet edge to the first cut line
+export const DEF_MARGIN_X_MM = 16.5;  // A — sheet edge to the first cut line
 export const DEF_MARGIN_TOP_MM = 4.75;// D — head margin
 
 export const DEF_GUTTER_X_MM = 8.5;   // B — down the middle, between the columns

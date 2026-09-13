@@ -5,7 +5,7 @@
  *   cell    90.9 x 65.5  the card, lying sideways, 2 over on each dimension
  *   art     the cell exactly — STRETCHED to it, and NO BLEED anywhere
  *
- *   across  A 16.25 + 90.9 + B 8.5 + 90.9 + C 9.35        = 215.9
+ *   across  A 16.5 + 90.9 + B 8.5 + 90.9 + C 9.1          = 215.9
  *   down    D 4.75 + 4(65.5) + E 0 + F 0.7 + G 0.7 + H 11.25 = 279.4
  *
  * Because nothing is drawn outside a cell, every letter above is white paper on
@@ -142,7 +142,7 @@ test('EVERY GAP IS REAL PAPER — nothing is drawn outside a cell', async () => 
      lands exactly where it did before that change. Pinned as absolutes: if a
      future size change forgets to take it out of the gutters, the block shifts
      and these are what catch it. */
-  assert.ok(close(rects[0]![0], 16.25, 0.02), 'left column ink starts at 16.25');
+  assert.ok(close(rects[0]![0], 16.5, 0.02), 'left column ink starts at 16.5');
   assert.ok(close(279.4 - (rects[0]![1] + rects[0]![3]), 4.75, 0.02), 'row 1 ink starts 4.75 down');
 });
 
@@ -410,7 +410,7 @@ test('SPIN BACKS turns a lone sheet — and still never adds a page', async () =
 });
 
 test('the BACK sheet mirrors across — A and C trade places', async () => {
-  /* The template is NOT symmetric: A 16.25 against C 9.35, because that is where
+  /* The template is NOT symmetric: A 16.5 against C 9.10, because that is where
      the machine cuts on production stock. A sheet turned over about its long
      edge therefore only lands on its front if the block is mirrored. Nothing
      about a symmetric template would need this, and nothing would catch it
@@ -430,8 +430,8 @@ test('the BACK sheet mirrors across — A and C trade places', async () => {
     return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100))].sort((a, b) => a - b);
   };
-  assert.deepEqual(await colsOf(0), [16.25, 115.65], 'unticked, nothing mirrors');
-  assert.deepEqual(await colsOf(1), [16.25, 115.65], 'including the back sheet');
+  assert.deepEqual(await colsOf(0), [16.5, 115.9], 'unticked, nothing mirrors');
+  assert.deepEqual(await colsOf(1), [16.5, 115.9], 'including the back sheet');
 });
 
 test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
@@ -457,12 +457,12 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100));
   };
-  assert.equal(await leftEdge(off), 16.25, 'unticked: A 16.25');
-  assert.equal(await leftEdge(on), 9.35, 'ticked: A becomes C 9.35');
-  /* A 16.25 against C 9.35 is a 6.9 mm move — if the mirror ever silently stopped
+  assert.equal(await leftEdge(off), 16.5, 'unticked: A 16.5');
+  assert.equal(await leftEdge(on), 9.1, 'ticked: A becomes C 9.10');
+  /* A 16.5 against C 9.10 is a 6.9 mm move — if the mirror ever silently stopped
      working this is the assertion that screams, which the near-identical pairs
      of earlier templates could not do. */
-  assert.ok(Math.abs(16.25 - 9.35) > 5, 'and the two are far enough apart to see');
+  assert.ok(Math.abs(16.5 - 9.1) > 5, 'and the two are far enough apart to see');
   /* Run it again on a deliberately lopsided A, so the claim does not rest on one
      pair of numbers that happen to differ — the block really is flipped end for
      end, whatever A is set to. */
@@ -489,8 +489,8 @@ test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100));
   };
-  assert.equal(await leftOf(0), 16.25, 'fronts untouched');
-  assert.equal(await leftOf(1), 9.35, 'backs swapped');
+  assert.equal(await leftOf(0), 16.5, 'fronts untouched');
+  assert.equal(await leftOf(1), 9.1, 'backs swapped');
 });
 
 test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {
