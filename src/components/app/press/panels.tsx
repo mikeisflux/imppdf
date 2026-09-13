@@ -1670,34 +1670,70 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
     case 'gangsheet':
       return (
         <>
-          <Section label="// SHEET" help="The stock in the tray. Letter is 8.5 x 11; A4 is 17.6 mm TALLER, which is why an A4 file run on Letter paper loses the top row.">
-        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          {([['letter', 'Letter', '8 cards'], ['tabloid', '11 × 17', '16 cards'],
-             ['a4', 'A4', '8 cards'], ['a3', 'A3', '16 cards']] as const).map(([id, label, sub]) => (
-            <button key={id} className="pe-btn" style={pickStyle((s.sheet ?? 'letter') === id)}
-              onClick={() => up({ sheet: id })}>{label} · {sub}</button>
-          ))}
-        </div>
-        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
-          <div>Sheet <b>{SHEET_LABEL[s.sheet ?? 'letter']}</b></div>
-          <div>Grid <b>{DOUBLED.has(s.sheet ?? 'letter') ? '2 blocks of 2 × 4' : '2 × 4'}</b> —
-            {' '}<b>{DOUBLED.has(s.sheet ?? 'letter') ? 16 : 8} cards</b>, each a true 2.5 × 3.5&quot;</div>
-          {DOUBLED.has(s.sheet ?? 'letter') && (
-            <div>Cut down at <b>{(s.sheet === 'a3' ? 210 : 215.9)} mm</b> for two sheets, marked top and bottom</div>
-          )}
-          <div style={{ marginTop: 4 }}>
-            Set this to the paper that is actually <b>in the tray</b>. An A4 file on Letter
-            stock is 17.6 mm too tall and the top row runs off the sheet — the PDF measures
-            correct and the press still clips it.
-          </div>
-        </div>
-      </Section>
-
-      <Section label="// POSITION" help="Where the inserted pages land.">
+          <Section label="// SHEET" help="Nest target media.">
+            <div className="pe-grid2">
+              <div className="pe-field-col"><span className="pe-label-sm">Width</span><NumIn valueIn={s.sheetWIn} unit={unit} onIn={(v) => up({ sheetWIn: v })} /></div>
+              <div className="pe-field-col"><span className="pe-label-sm">Height</span><NumIn valueIn={s.sheetHIn} unit={unit} onIn={(v) => up({ sheetHIn: v })} /></div>
+            </div>
+            <div className="pe-row" style={{ marginTop: 10 }}><span className="pe-label pe-w96">Margin</span><NumIn valueIn={s.marginIn} unit={unit} onIn={(v) => up({ marginIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
+            <div className="pe-row"><span className="pe-label pe-w96">Spacing</span><NumIn valueIn={s.paddingIn} unit={unit} onIn={(v) => up({ paddingIn: v })} /></div>
+            <Check icon="rotate" label="Allow 90° rotation" checked={!!s.allowRotate} onChange={(v) => up({ allowRotate: v })} />
+            <Check icon="split" label="Roll media (variable length)" checked={!!s.roll} onChange={(v) => up({ roll: v })} />
+            <Check icon="gangsheet" label="True-shape nesting" checked={!!s.trueShape} onChange={(v) => up({ trueShape: v })} />
+            <Check icon="duplicate" label="Fill sheet with copies" checked={!!s.fillSheet} onChange={(v) => up({ fillSheet: v })} />
+          </Section>
+        </>
+      );
+    case 'stickers':
+      return (
+        <>
+          <Section label="// MEDIA FORMAT" help="Stacked sheets or continuous roll.">
+            <div className="pe-cards2">
+              <SelCard on={!s.roll} off={!!s.roll} cap="STACKED SHEETS" onClick={() => up({ roll: false })}><Ic name="stickers" size={20} /></SelCard>
+              <SelCard on={!!s.roll} off={!s.roll} cap="ROLL OF STICKERS" onClick={() => up({ roll: true })}><Ic name="split" size={20} /></SelCard>
+            </div>
+          </Section>
+          <PaperSize {...{ s, up, unit, onUnit }} />
+          <Section label="// REPEAT" help="Fill each sheet, or produce an exact copy count.">
+            <Radio label="Fill sheet" on={!!s.fillSheet} onSelect={() => up({ fillSheet: true })} />
+            <div className="pe-row">
+              <Radio label="Copies" on={!s.fillSheet} onSelect={() => up({ fillSheet: false })} />
+              <NumRaw value={s.copies} onValue={(v) => up({ copies: Math.max(1, Math.round(v)), fillSheet: false })} w={70} min={1} />
+            </div>
+          </Section>
+          <Section label="// WHITESPACE" help="Padding between stickers and margins around the block.">
+            <div className="pe-row"><span className="pe-label pe-w96">Padding</span><NumIn valueIn={s.paddingIn} unit={unit} onIn={(v) => up({ paddingIn: v })} /><UnitSel unit={unit} onChange={onUnit} /></div>
+            <div className="pe-row"><span className="pe-label pe-w96">Margin</span><NumIn valueIn={s.marginTopIn} unit={unit} onIn={(v) => up({ marginTopIn: v, marginLeftIn: v, marginRightIn: v, marginBottomIn: v })} /></div>
+          </Section>
+          <Section label="// NESTING" help="Allow 90° rotation for tighter packing.">
+            <Check icon="rotate" label="Allow rotations (0°, 90°)" checked={!!s.allowRotate} onChange={(v) => up({ allowRotate: v })} />
+          </Section>
+        </>
+      );
+    case 'insertpages':
+      return (
+        <>
+          <Section label="// SOURCE FILE" help="The PDF whose pages get inserted.">
+            <button className="pe-chipbtn" onClick={() => pickPdf((bytes, name) => up({ file: bytes, fileName: name }))}>
+              <Ic name="upload" size={14} /> {s.fileName || 'Choose file'}
+            </button>
+          </Section>
+          <Section label="// POSITION" help="Where the inserted pages land.">
             <div className="pe-row"><span className="pe-label pe-w96">Insert before page</span><NumRaw value={s.position} onValue={(v) => up({ position: Math.max(1, Math.round(v)), mode: 'at' })} w={70} min={1} /></div>
             <Check label={<span>and after every <b>{s.everyN}</b> pages</span>} checked={s.mode === 'everyN'} onChange={(v) => up({ mode: v ? 'everyN' : 'at' })} />
             {s.mode === 'everyN' && <div className="pe-row" style={{ marginBottom: 0 }}><span className="pe-label pe-w96">Every</span><NumRaw value={s.everyN} onValue={(v) => up({ everyN: Math.max(1, Math.round(v)) })} w={70} min={1} /><span className="pe-label-sm">pages</span></div>}
           </Section>
+        </>
+      );
+    case 'calendar':
+      return (
+        <>
+          <Section label="// PAGE LAYOUT" help="Wall calendars flip the back page so the hung spread reads upright.">
+            <Radio label="Full Sheet" on={!s.halfSheet} onSelect={() => up({ halfSheet: false })} />
+            <Radio label="Half Sheet" on={!!s.halfSheet} onSelect={() => up({ halfSheet: true })} />
+            <Check icon="rotate" label="Rotate back page 180°" sub="Wall-calendar back flip" checked={!!s.rotateBack} onChange={(v) => up({ rotateBack: v })} />
+          </Section>
+          <MarksSection {...{ s, up, unit, onUnit }} />
         </>
       );
     case 'mix':
@@ -2949,6 +2985,30 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         is <b>{round2(CELL_W)} × {round2(CELL_H)} mm</b>, with the art <b>stretched</b> to fill
         it. Pick the stock below to match what is in the tray.
       </div>
+
+      <Section label="// SHEET" help="The stock in the tray. Letter is 8.5 x 11; A4 is 17.6 mm TALLER, which is why an A4 file run on Letter paper loses the top row.">
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {([['letter', 'Letter', '8 cards'], ['tabloid', '11 × 17', '16 cards'],
+             ['a4', 'A4', '8 cards'], ['a3', 'A3', '16 cards']] as const).map(([id, label, sub]) => (
+            <button key={id} className="pe-btn" style={pickStyle((s.sheet ?? 'letter') === id)}
+              onClick={() => up({ sheet: id })}>{label} · {sub}</button>
+          ))}
+        </div>
+        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
+          <div>Sheet <b>{SHEET_LABEL[s.sheet ?? 'letter']}</b> — <b>{FIT.n} cards</b>,
+            {' '}{DOUBLED.has(s.sheet ?? 'letter') ? 'two blocks of 2 × 4' : '2 × 4'}</div>
+          {DOUBLED.has(s.sheet ?? 'letter') && (
+            <div>Cut down the middle at <b>{round2(FIT.cutXMm[0] ?? 0)} mm</b> for two identical
+              sheets — each half carries its own A and C, so the two are interchangeable.
+              The cut is marked top and bottom.</div>
+          )}
+          <div style={{ marginTop: 4 }}>
+            Set this to the paper that is actually <b>in the tray</b>. An A4 file on Letter
+            stock is 17.6 mm too tall and the top row runs off the sheet — the PDF measures
+            correct and the press still clips it.
+          </div>
+        </div>
+      </Section>
 
       <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E F G place the rows; C and H are what is left over.">
         {([
