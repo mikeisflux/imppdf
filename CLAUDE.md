@@ -99,6 +99,14 @@ by explicit owner instruction — do not "fix" it to combine pages.
   flood, the cards and the marks are all carried round together and no gutter or
   cell changes. Never re-lay the block to fit a portrait sheet, and never do it
   with a `/Rotate` on the page dictionary — that is metadata a RIP may ignore.
+- The Divinity Cards **`letterreg`** stock is the registration test sheet: same
+  eight cards and the same cell, but the block CENTRED (A=C 12.8, D=H 8) so every
+  corner has equal paper for camera marks, which are on by default there. It is a
+  separate stock so the proven `letter` template (A 16.5 / C 9.1 / D 4.75 /
+  H 11.25, measured off the machine) is never disturbed — do not add marks to
+  `letter` by moving its block. Marks are drawn LAST, each on a white pad, so a
+  camera still sees black-on-white when the black background is on. Mark shape,
+  size and inset are all settable because there is no one standard.
 - Never assume how many items fit a sheet: always run the fit calculation
   accounting for margins, gutters, crop marks, and bleed before placing.
 - If rotating an item 90° lets more fit, rotate it.

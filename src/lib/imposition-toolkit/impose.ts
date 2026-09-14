@@ -4665,6 +4665,17 @@ export interface DivinityCardOptions {
   /** Flood the sheet with rich black behind the cards, leaving a white border.
    *  Default OFF. See BLACK_BORDER_MM. */
   blackBg?: boolean;
+  /* ── REGISTRATION MARKS for an optical (camera) cutter. Off by default.
+     Shape, size and inset are ALL settable because there is no one standard:
+     Silhouette wants a filled square and two L-brackets, Graphtec L-corners,
+     Summa and most Chinese card cutters a filled square or circle per corner.
+     Rather than guess a machine, print the test sheet and keep whichever the
+     camera actually finds. ──────────────────────────────────────────────── */
+  regMarks?: boolean;
+  /** Default 'square' — the most widely read on cheap camera cutters. */
+  regShape?: 'square' | 'circle' | 'lshape' | 'cross';
+  /** Mark size across, mm. Default 5. */        regSizeMm?: number;
+  /** Sheet edge to the mark's OUTER edge, mm. Default 5. */ regInsetMm?: number;
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
   addMarks?: boolean;
   markLenMm?: number;      // default 3
@@ -4764,6 +4775,59 @@ export async function imposeDivinityCards(
       else if (deg === 180) pg.drawPage(card, { x: x + dw, y: y + dh, width: w, height: h, rotate: degrees(180) });
       else pg.drawPage(card, { x, y, width: dw, height: dh });
       pg.pushOperators(PL.popGraphicsState());
+    }
+  };
+
+  /* Registration marks, drawn LAST so nothing can land on top of one, and in
+     the LAYOUT frame so the stand-up matrix carries them to the page corners
+     just like everything else.
+
+     Each mark gets a WHITE PAD under it. A camera looks for black on white, and
+     with the black background on there is only a 1.5 mm white border — a mark
+     inset further than that would otherwise be black ink on a black flood and
+     completely invisible. The pad is the mark plus REG_PAD_MM all round. */
+  /* 1.5, not more: on the centred test sheet there is 8 mm of paper above the
+     block, and inset 1.5 + a 5 mm mark + this pad comes to exactly 8. Any wider
+     and the white pad would be drawn over the top row of cards. */
+  const REG_PAD_MM = 1.5;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const paintRegMarks = (pg: any) => {
+    if (!(opts.regMarks ?? fit.regTest)) return;
+    const size = Math.max(0.5, opts.regSizeMm ?? 5);
+    const inset = Math.max(0, opts.regInsetMm ?? 1.5);
+    const shape = opts.regShape ?? 'square';
+    const black = rgb(0, 0, 0);
+    /* Lower-left of each mark's box, and which way the corner points. */
+    const corners: Array<[number, number, 1 | -1, 1 | -1]> = [
+      [inset, inset, 1, 1],
+      [fit.sheetWMm - inset - size, inset, -1, 1],
+      [inset, fit.sheetHMm - inset - size, 1, -1],
+      [fit.sheetWMm - inset - size, fit.sheetHMm - inset - size, -1, -1],
+    ];
+    for (const [xMm, yMm, sx, sy] of corners) {
+      pg.drawRectangle({
+        x: mm(xMm - REG_PAD_MM), y: mm(yMm - REG_PAD_MM),
+        width: mm(size + 2 * REG_PAD_MM), height: mm(size + 2 * REG_PAD_MM),
+        color: rgb(1, 1, 1),
+      });
+      const x = mm(xMm), y = mm(yMm), sz = mm(size);
+      if (shape === 'circle') {
+        pg.drawCircle({ x: x + sz / 2, y: y + sz / 2, size: sz / 2, color: black });
+      } else if (shape === 'lshape') {
+        /* An L whose corner points AT the sheet corner, so the two legs run
+           back along the edges the camera is squaring up to. */
+        const t = mm(size / 4);
+        const bx = sx > 0 ? x : x + sz - t, by = sy > 0 ? y : y + sz - t;
+        pg.drawRectangle({ x: sx > 0 ? x : x + sz - t, y, width: t, height: sz, color: black });
+        pg.drawRectangle({ x, y: sy > 0 ? y : y + sz - t, width: sz, height: t, color: black });
+        void bx; void by;
+      } else if (shape === 'cross') {
+        const t = mm(size / 5);
+        pg.drawRectangle({ x: x + sz / 2 - t / 2, y, width: t, height: sz, color: black });
+        pg.drawRectangle({ x, y: y + sz / 2 - t / 2, width: sz, height: t, color: black });
+      } else {
+        pg.drawRectangle({ x, y, width: sz, height: sz, color: black });
+      }
     }
   };
 
@@ -4898,6 +4962,10 @@ export async function imposeDivinityCards(
       line(mm(cx), 0, mm(cx), len + off); line(mm(cx), sheetH, mm(cx), sheetH - len - off);
     }
   } });
+
+  /* LAST of all, so a card or a cut mark can never land on a mark the camera
+     has to find. */
+  pages.forEach(paintRegMarks);
 
   await carryColorContext(src, out);
   return out.save();

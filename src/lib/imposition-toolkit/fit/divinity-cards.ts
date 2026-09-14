@@ -77,7 +77,7 @@ export const A3_W_MM = 420, A3_H_MM = 297;
  *  layout is reasoned about landscape and the finished page stood up, so their
  *  cut runs across the page rather than down it. Nothing from this tool is
  *  landscape (owner). */
-export type DivinityCardSheet = 'letter' | 'tabloid' | 'a4' | 'a3';
+export type DivinityCardSheet = 'letter' | 'letterreg' | 'tabloid' | 'a4' | 'a3';
 
 interface SheetSpec {
   wMm: number; hMm: number; blockWMm: number; doubled: boolean;
@@ -86,9 +86,24 @@ interface SheetSpec {
    *  landscape frame — A, B, C, D and the cells are unchanged — and only the
    *  page the caller draws onto is portrait. */
   rotated?: boolean;
+  /** Centre the block instead of using the measured A and D. Only the
+   *  registration-test sheet does this: once a camera finds the marks the
+   *  machine locates the art optically, so the lopsided A/C compensation — which
+   *  exists to fight blind-feed drift — is no longer what you want. */
+  centred?: boolean;
+  /** Turn registration marks on for this sheet by default. */
+  regTest?: boolean;
 }
 const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
   letter:  { wMm: LETTER_W_MM,  hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false },
+  /* THE REGISTRATION TEST SHEET. A Letter sheet, same eight cards, same cell —
+     but the block is CENTRED so there is equal paper at all four corners for the
+     camera marks, and the marks are on by default. It is a separate stock rather
+     than a switch on 'letter' precisely so the proven Letter template is never
+     disturbed: A 16.5 / C 9.1 / D 4.75 / H 11.25 are measured values and stay
+     exactly where they are. */
+  letterreg: { wMm: LETTER_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false,
+               centred: true, regTest: true },
   /* 11 x 17 comes out PORTRAIT — 279.4 x 431.8 — with the two blocks and the
      cut between them turned a quarter turn onto it. The cards keep exactly the
      orientation they have on a Letter sheet relative to the block; it is the
@@ -187,6 +202,8 @@ export interface DivinityCardFit {
    *  page up. pageWMm / pageHMm are what the PDF page actually measures. */
   rotated: boolean;
   pageWMm: number; pageHMm: number;
+  /** This stock wants registration marks unless the caller says otherwise. */
+  regTest: boolean;
 }
 
 export function fitDivinityCards(
@@ -206,8 +223,11 @@ export function fitDivinityCards(
   const blockW = COLS * PLACED_W_MM + (COLS - 1) * gX;
   const blockH = ROWS * PLACED_H_MM + rowGaps[0] + rowGaps[1] + rowGaps[2];
 
-  const mX = t.marginXMm ?? DEF_MARGIN_X_MM;
-  const mTop = t.marginTopMm ?? DEF_MARGIN_TOP_MM;
+  /* On the centred stock the margins FALL OUT of the block rather than being
+     read off the machine — but a typed value still wins, so the operator can
+     nudge it after a test cut. */
+  const mX = t.marginXMm ?? (spec.centred ? (spec.blockWMm - blockW) / 2 : DEF_MARGIN_X_MM);
+  const mTop = t.marginTopMm ?? (spec.centred ? (spec.hMm - blockH) / 2 : DEF_MARGIN_TOP_MM);
   /* C and H are the leftovers, not settings — they cannot be, because A, the
      cards and C must sum to the sheet. Reported so the panel can show them. */
   const mBot = spec.hMm - mTop - blockH;
@@ -249,6 +269,7 @@ export function fitDivinityCards(
     rowGapsMm: rowGaps,
     cutXMm: spec.doubled ? [spec.blockWMm] : [],
     rotated: spec.rotated === true,
+    regTest: spec.regTest === true,
     pageWMm: spec.rotated ? spec.hMm : spec.wMm,
     pageHMm: spec.rotated ? spec.wMm : spec.hMm,
   };

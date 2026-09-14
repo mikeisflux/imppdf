@@ -205,6 +205,76 @@ test('BLACK BACKGROUND: the cut marks invert so they stay visible', async () => 
   assert.ok(/1 1 1 RG/.test(await marks(true)), 'white marks on a flooded sheet');
 });
 
+test('the REG TEST stock centres the block and leaves Letter alone', () => {
+  /* A separate stock, not a switch on 'letter': the proven template is measured
+     off the machine and must not move. Once a camera finds the marks the cutter
+     locates the art optically, so the lopsided A/C — which exists to fight
+     blind-feed drift — is exactly what you do NOT want on this one. */
+  const plain = fitDivinityCards('letter');
+  const reg = fitDivinityCards('letterreg');
+  assert.ok(close(plain.marginXMm, DEF_MARGIN_X_MM) && close(plain.marginTopMm, DEF_MARGIN_TOP_MM),
+    'Letter is untouched by any of this');
+  assert.equal(reg.n, 8, 'same eight cards');
+  assert.ok(close(reg.cells[0]!.wMm, PLACED_W_MM) && close(reg.cells[0]!.hMm, PLACED_H_MM),
+    'and the same cell — only the position changes');
+  assert.ok(close(reg.marginXMm, reg.marginRightMm), 'centred across');
+  assert.ok(close(reg.marginTopMm, reg.marginBottomMm), 'centred down');
+  assert.ok(close(reg.marginXMm, 12.8) && close(reg.marginTopMm, 8), 'A=C=12.8, D=H=8');
+  assert.ok(reg.regTest, 'and it asks for marks by default');
+  assert.ok(!plain.regTest, 'which Letter does not');
+  /* A typed margin still wins, so the operator can nudge after a test cut. */
+  assert.ok(close(fitDivinityCards('letterreg', { marginXMm: 20 }).marginXMm, 20));
+});
+
+test('REGISTRATION MARKS: four corners, black on white, clear of every card', async () => {
+  const zlib = await import('node:zlib');
+  const { PDFStream } = await import('pdf-lib');
+  const streamOf = async (bytes: Uint8Array) => {
+    const d = await PDFDocument.load(bytes);
+    const st = d.getPage(0).node.normalizedEntries().Contents;
+    let t = '';
+    for (let k = 0; st && k < st.size(); k++) {
+      const raw = (d.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+      try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+      catch { t += Buffer.from(raw).toString('latin1'); }
+    }
+    return t;
+  };
+  /* OFF on the normal Letter stock, and off unless asked. */
+  const plain = await streamOf(await imposeDivinityCards(await cardPdf(),
+    { sheet: 'letter', addMarks: false, backs: false }));
+  const reg = await streamOf(await imposeDivinityCards(await cardPdf(),
+    { sheet: 'letterreg', addMarks: false, backs: false }));
+  const whitePads = (t: string) => (t.match(/^1 1 1 rg$/gm) || []).length;
+  assert.equal(whitePads(plain), 0, 'Letter gets no marks');
+  assert.equal(whitePads(reg), 4, 'the reg stock gets one per corner');
+
+  /* The white pad must never be drawn over a card, or it rubs out the art. */
+  const f = fitDivinityCards('letterreg');
+  const size = 5, inset = 1.5, pad = 1.5;
+  const lo = inset - pad, box = size + 2 * pad;
+  for (const [bx, by] of [
+    [lo, lo], [f.sheetWMm - lo - box, lo],
+    [lo, f.sheetHMm - lo - box], [f.sheetWMm - lo - box, f.sheetHMm - lo - box],
+  ]) {
+    for (const c of f.cells) {
+      const apart = Math.max(
+        c.xMm - (bx! + box), bx! - (c.xMm + c.wMm),
+        c.yMm - (by! + box), by! - (c.yMm + c.hMm),
+      );
+      assert.ok(apart >= -1e-9, `mark pad at ${bx},${by} overlaps a card by ${(-apart).toFixed(2)}`);
+    }
+  }
+
+  /* Every shape draws, and the marks go on LAST so nothing lands on top. */
+  for (const regShape of ['square', 'circle', 'lshape', 'cross'] as const) {
+    const t = await streamOf(await imposeDivinityCards(await cardPdf(),
+      { sheet: 'letterreg', regShape, addMarks: false, backs: false }));
+    assert.equal(whitePads(t), 4, `${regShape} draws four marks`);
+    assert.ok(t.lastIndexOf('1 1 1 rg') > t.lastIndexOf('Do'), `${regShape} marks are drawn last`);
+  }
+});
+
 test('A4: eight cards, 2 across x 4 down', () => {
   const f = fitDivinityCards('a4');
   assert.equal(f.sheetWMm, 210);

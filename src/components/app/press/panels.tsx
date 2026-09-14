@@ -2939,7 +2939,9 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 /* PAGE sizes, which on the doubled stocks are the landscape layout stood up —
    nothing from this tool comes off landscape. */
 const SHEET_LABEL: Record<string, string> = {
-  letter: '215.9 × 279.4 mm (8.5 × 11")', tabloid: '279.4 × 431.8 mm (11 × 17 portrait)',
+  letter: '215.9 × 279.4 mm (8.5 × 11")',
+  letterreg: '215.9 × 279.4 mm (8.5 × 11, block centred)',
+  tabloid: '279.4 × 431.8 mm (11 × 17 portrait)',
   a4: '210 × 297 mm (A4)', a3: '297 × 420 mm (A3 portrait)',
 };
 const DOUBLED = new Set(['tabloid', 'a3']);
@@ -2990,7 +2992,8 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
 
       <Section label="// SHEET" help="The stock in the tray. Letter is 8.5 x 11; A4 is 17.6 mm TALLER, which is why an A4 file run on Letter paper loses the top row.">
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          {([['letter', 'Letter', '8 cards'], ['tabloid', '11 × 17', '16 cards'],
+          {([['letter', 'Letter', '8 cards'], ['letterreg', '8.5 Reg Test', '8 cards'],
+             ['tabloid', '11 × 17', '16 cards'],
              ['a4', 'A4', '8 cards'], ['a3', 'A3', '16 cards']] as const).map(([id, label, sub]) => (
             <button key={id} className="pe-btn" style={pickStyle((s.sheet ?? 'letter') === id)}
               onClick={() => up({ sheet: id })}>{label} · {sub}</button>
@@ -2999,6 +3002,16 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
           <div>Sheet <b>{SHEET_LABEL[s.sheet ?? 'letter']}</b> — <b>{FIT.n} cards</b>,
             {' '}{DOUBLED.has(s.sheet ?? 'letter') ? 'two blocks of 2 × 4' : '2 × 4'}</div>
+          {s.sheet === 'letterreg' && (
+            <div style={{ marginTop: 4 }}>
+              <b>Registration test.</b> Same eight cards, same cell — but the block is
+              <b> centred</b> (A = C = {round2(FIT.marginXMm)}, D = H = {round2(FIT.marginTopMm)})
+              so every corner has equal paper for the camera marks. A separate stock on purpose:
+              the proven Letter template is untouched, still A 16.5 / C 9.1 / D 4.75 / H 11.25.
+              Once the camera finds the marks the machine locates the art optically, so the
+              lopsided margins — which exist to fight blind-feed drift — are no longer wanted.
+            </div>
+          )}
           {DOUBLED.has(s.sheet ?? 'letter') && (
             <div>Cut <b>across</b> at <b>{round2(FIT.cutXMm[0] ?? 0)} mm</b> from the foot for two
               identical sheets — each half carries its own A and C, so the two are
@@ -3111,6 +3124,41 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
             plate as a four-plate black rather than whatever a RIP decides to do with an RGB
             zero. Cut marks turn <b>white</b> so they stay readable on it.
           </div>
+        )}
+      </Section>
+
+      <Section label="// REGISTRATION" help="Marks for a camera cutter. There is no one standard, so shape and size are settable — print the test sheet and keep whichever your machine actually finds.">
+        <Check icon="crop" label="Registration marks"
+          sub="One per sheet corner, black on a white pad so a camera can see them even with the black background on"
+          checked={s.regMarks ?? (s.sheet === 'letterreg')}
+          onChange={(v) => up({ regMarks: v })} />
+        {(s.regMarks ?? (s.sheet === 'letterreg')) && (
+          <>
+            <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              {([['square', 'Square'], ['circle', 'Circle'],
+                 ['lshape', 'L corner'], ['cross', 'Cross']] as const).map(([id, label]) => (
+                <button key={id} className="pe-btn" style={pickStyle((s.regShape ?? 'square') === id)}
+                  onClick={() => up({ regShape: id })}>{label}</button>
+              ))}
+            </div>
+            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
+              <span className="pe-label" style={{ flex: 1 }}>Size<span className="pe-label-sm"> · across, mm</span></span>
+              <NumRaw value={s.regSizeMm ?? 5} onValue={(v) => up({ regSizeMm: v })} w={70} />
+            </div>
+            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+              <span className="pe-label" style={{ flex: 1 }}>Inset<span className="pe-label-sm"> · sheet edge to mark, mm</span></span>
+              <NumRaw value={s.regInsetMm ?? 1.5} onValue={(v) => up({ regInsetMm: v })} w={70} />
+            </div>
+            <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>
+              At <b>{round2(s.regSizeMm ?? 5)}</b> mm inset <b>{round2(s.regInsetMm ?? 1.5)}</b>, each mark
+              and its white pad occupy the first{' '}
+              <b>{round2((s.regInsetMm ?? 1.5) + (s.regSizeMm ?? 5) + 1.5)}</b> mm of every corner.
+              {' '}{(s.regInsetMm ?? 1.5) + (s.regSizeMm ?? 5) + 1.5 > Math.min(FIT.marginTopMm, FIT.marginXMm)
+                ? <b style={{ color: 'var(--pe-warn, #e0a45f)' }}>That is more paper than this sheet has
+                    ({round2(Math.min(FIT.marginTopMm, FIT.marginXMm))} mm) — the pad will print over a card.</b>
+                : <>It fits: the tightest corner has {round2(Math.min(FIT.marginTopMm, FIT.marginXMm))} mm.</>}
+            </div>
+          </>
         )}
       </Section>
 

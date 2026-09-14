@@ -622,7 +622,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       case 'divinitycards': {
         const { imposeDivinityCards } = await import('@/lib/imposition-toolkit/impose');
         b = await imposeDivinityCards(b, {
-          sheet: ['letter', 'tabloid', 'a4', 'a3'].includes(s.sheet) ? s.sheet : 'letter',
+          sheet: ['letter', 'letterreg', 'tabloid', 'a4', 'a3'].includes(s.sheet) ? s.sheet : 'letter',
           page: s.page ?? 1,
           backPage: s.backPage ?? 2, backs: s.backs !== false,
           flip: s.flip === 'short' ? 'short' : 'long',
@@ -631,6 +631,8 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           gutterXMm: s.gutterXMm,
           gutterEMm: s.gutterEMm, gutterFMm: s.gutterFMm, gutterGMm: s.gutterGMm,
           blackBg: !!s.blackBg,
+          regMarks: s.regMarks, regShape: s.regShape,
+          regSizeMm: s.regSizeMm, regInsetMm: s.regInsetMm,
           addMarks: s.addMarks !== false,
         });
         break;
