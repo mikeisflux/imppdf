@@ -633,6 +633,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           blackBg: !!s.blackBg,
           regMarks: s.regMarks, regShape: s.regShape,
           regSizeMm: s.regSizeMm, regInsetMm: s.regInsetMm,
+          regEdge: s.regEdge, regBarLenMm: s.regBarLenMm, regBarDepthMm: s.regBarDepthMm,
           addMarks: s.addMarks !== false,
         });
         break;

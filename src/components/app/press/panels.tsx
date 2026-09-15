@@ -3127,39 +3127,77 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         )}
       </Section>
 
-      <Section label="// REGISTRATION" help="Marks for a camera cutter. There is no one standard, so shape and size are settable — print the test sheet and keep whichever your machine actually finds.">
-        <Check icon="crop" label="Registration marks"
-          sub="One per sheet corner, black on a white pad so a camera can see them even with the black background on"
+      <Section label="// REGISTRATION" help="For a slitter's MARK mode: one black bar on the edge that feeds in first. The single eye at the throat sees paper, then black, and indexes every cut off that step.">
+        <Check icon="crop" label="Registration mark"
+          sub="A black bar on the feed edge, on a white pad so the eye still sees a clean step with the background flood on"
           checked={s.regMarks ?? (s.sheet === 'letterreg')}
           onChange={(v) => up({ regMarks: v })} />
-        {(s.regMarks ?? (s.sheet === 'letterreg')) && (
-          <>
-            <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              {([['square', 'Square'], ['circle', 'Circle'],
-                 ['lshape', 'L corner'], ['cross', 'Cross']] as const).map(([id, label]) => (
-                <button key={id} className="pe-btn" style={pickStyle((s.regShape ?? 'square') === id)}
-                  onClick={() => up({ regShape: id })}>{label}</button>
-              ))}
-            </div>
-            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
-              <span className="pe-label" style={{ flex: 1 }}>Size<span className="pe-label-sm"> · across, mm</span></span>
-              <NumRaw value={s.regSizeMm ?? 5} onValue={(v) => up({ regSizeMm: v })} w={70} />
-            </div>
-            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
-              <span className="pe-label" style={{ flex: 1 }}>Inset<span className="pe-label-sm"> · sheet edge to mark, mm</span></span>
-              <NumRaw value={s.regInsetMm ?? 1.5} onValue={(v) => up({ regInsetMm: v })} w={70} />
-            </div>
-            <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>
-              At <b>{round2(s.regSizeMm ?? 5)}</b> mm inset <b>{round2(s.regInsetMm ?? 1.5)}</b>, each mark
-              and its white pad occupy the first{' '}
-              <b>{round2((s.regInsetMm ?? 1.5) + (s.regSizeMm ?? 5) + 1.5)}</b> mm of every corner.
-              {' '}{(s.regInsetMm ?? 1.5) + (s.regSizeMm ?? 5) + 1.5 > Math.min(FIT.marginTopMm, FIT.marginXMm)
-                ? <b style={{ color: 'var(--pe-warn, #e0a45f)' }}>That is more paper than this sheet has
-                    ({round2(Math.min(FIT.marginTopMm, FIT.marginXMm))} mm) — the pad will print over a card.</b>
-                : <>It fits: the tightest corner has {round2(Math.min(FIT.marginTopMm, FIT.marginXMm))} mm.</>}
-            </div>
-          </>
-        )}
+        {(s.regMarks ?? (s.sheet === 'letterreg')) && (() => {
+          const shape = s.regShape ?? (s.sheet === 'letterreg' ? 'bar' : 'square');
+          const edge = s.regEdge ?? 'top';
+          const inset = s.regInsetMm ?? (shape === 'bar' ? 3 : 1.5);
+          const depth = s.regBarDepthMm ?? 3;
+          const feedMargin = edge === 'top' ? FIT.marginTopMm : edge === 'bottom' ? FIT.marginBottomMm
+            : edge === 'left' ? FIT.marginXMm : FIT.marginRightMm;
+          const needs = inset + depth + 5;
+          return (
+            <>
+              <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                {([['bar', 'Bar · slitter'], ['square', 'Square'], ['circle', 'Circle'],
+                   ['lshape', 'L corner'], ['cross', 'Cross']] as const).map(([id, label]) => (
+                  <button key={id} className="pe-btn" style={pickStyle(shape === id)}
+                    onClick={() => up({ regShape: id })}>{label}</button>
+                ))}
+              </div>
+              {shape === 'bar' ? (
+                <>
+                  <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                    <span className="pe-label" style={{ flex: '1 0 100%' }}>Feed edge<span className="pe-label-sm"> · which edge goes in first</span></span>
+                    {([['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']] as const).map(([id, label]) => (
+                      <button key={id} className="pe-btn" style={pickStyle(edge === id)}
+                        onClick={() => up({ regEdge: id })}>{label}</button>
+                    ))}
+                  </div>
+                  <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
+                    <span className="pe-label" style={{ flex: 1 }}>Length<span className="pe-label-sm"> · along the edge, mm</span></span>
+                    <NumRaw value={s.regBarLenMm ?? 50} onValue={(v) => up({ regBarLenMm: v })} w={70} />
+                  </div>
+                  <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+                    <span className="pe-label" style={{ flex: 1 }}>Depth<span className="pe-label-sm"> · into the sheet, mm</span></span>
+                    <NumRaw value={depth} onValue={(v) => up({ regBarDepthMm: v })} w={70} />
+                  </div>
+                </>
+              ) : (
+                <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
+                  <span className="pe-label" style={{ flex: 1 }}>Size<span className="pe-label-sm"> · across, mm</span></span>
+                  <NumRaw value={s.regSizeMm ?? 5} onValue={(v) => up({ regSizeMm: v })} w={70} />
+                </div>
+              )}
+              <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+                <span className="pe-label" style={{ flex: 1 }}>Inset<span className="pe-label-sm"> · sheet edge to mark, mm</span></span>
+                <NumRaw value={inset} onValue={(v) => up({ regInsetMm: v })} w={70} />
+              </div>
+              {shape === 'bar' ? (
+                <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>
+                  Bar <b>{round2(s.regBarLenMm ?? 50)} × {round2(depth)}</b>, centred on the <b>{edge}</b> edge,
+                  <b> {round2(inset)}</b> mm in. The first cut then has to fall clear of it — bar plus a 5 mm
+                  gap is <b>{round2(needs)}</b> mm, and that edge has <b>{round2(feedMargin)}</b>.
+                  {' '}{needs > feedMargin + 1e-9
+                    ? <b style={{ color: 'var(--pe-warn, #e0a45f)' }}>Not enough: the first cut would land on the
+                        mark. Grow that margin or use the 8.5 Reg Test stock.</b>
+                    : <>Fits.</>}
+                  <br />Cousins of this machine want the bar <b>3–20 mm</b> from the leading edge with the first
+                  cut <b>5 mm</b> past it; Formax uses <b>50 × 3</b>. Start there and adjust off a test cut.
+                </div>
+              ) : (
+                <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>
+                  Corner marks are for a <b>camera</b> cutter. A slitter reads a single bar on the feed edge —
+                  pick <b>Bar</b> above for the 2102-F and its family.
+                </div>
+              )}
+            </>
+          );
+        })()}
       </Section>
 
       <Section label="// MARKS" help="Cut marks are ruled off the sheet edges rather than into the gutters, so nothing can print on a neighbouring card.">

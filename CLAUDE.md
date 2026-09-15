@@ -99,14 +99,26 @@ by explicit owner instruction — do not "fix" it to combine pages.
   flood, the cards and the marks are all carried round together and no gutter or
   cell changes. Never re-lay the block to fit a portrait sheet, and never do it
   with a `/Rotate` on the page dictionary — that is metadata a RIP may ignore.
-- The Divinity Cards **`letterreg`** stock is the registration test sheet: same
-  eight cards and the same cell, but the block CENTRED (A=C 12.8, D=H 8) so every
-  corner has equal paper for camera marks, which are on by default there. It is a
-  separate stock so the proven `letter` template (A 16.5 / C 9.1 / D 4.75 /
-  H 11.25, measured off the machine) is never disturbed — do not add marks to
-  `letter` by moving its block. Marks are drawn LAST, each on a white pad, so a
-  camera still sees black-on-white when the black background is on. Mark shape,
-  size and inset are all settable because there is no one standard.
+- **The shop's cutter is a SLITTER, not a camera plotter** — a 2102-F
+  "multifunctional card cutting machine", straight full-width cuts only, with
+  exactly two modes on the panel: **frontal** (index off the paper's leading
+  edge, cut at programmed distances — no mark) and **mark**. Mark mode is ONE
+  optical eye at the throat that sees paper, then black, and indexes every cut
+  off that step, so what it reads is a single black BAR on the leading edge. Four
+  corner marks are for a camera machine and this will not see them. (The corner
+  shapes remain in the code for a future camera cutter; `bar` is the default on
+  the mark stock.)
+- The Divinity Cards **`letterreg`** stock is the mark-mode test sheet: same
+  eight cards and the same cell, block centred ACROSS (A=C 12.8), but the head
+  margin is NOT centred — D is `REG_HEAD_MM` (bar inset + bar depth + the gap to
+  the first cut) so the blade never lands on the mark. It is a separate stock so
+  the proven `letter` template (A 16.5 / C 9.1 / D 4.75 / H 11.25, measured off
+  the machine) is never disturbed — do not add marks to `letter` by moving its
+  block; its 4.75 head cannot clear a bar. Marks are drawn LAST on a white pad,
+  so the eye still sees a clean paper-to-black step with the background flood on.
+  Bar length, depth, inset and feed edge are all settable: the published figures
+  (3-20 mm from the leading edge, first cut 5 mm past it, Formax 50x3) come from
+  the same OEM family, not this machine's own manual.
 - Never assume how many items fit a sheet: always run the fit calculation
   accounting for margins, gutters, crop marks, and bleed before placing.
 - If rotating an item 90° lets more fit, rotate it.

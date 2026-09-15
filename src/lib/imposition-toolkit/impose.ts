@@ -4672,8 +4672,16 @@ export interface DivinityCardOptions {
      Rather than guess a machine, print the test sheet and keep whichever the
      camera actually finds. ──────────────────────────────────────────────── */
   regMarks?: boolean;
-  /** Default 'square' — the most widely read on cheap camera cutters. */
-  regShape?: 'square' | 'circle' | 'lshape' | 'cross';
+  /** Default 'bar'. The 2102-F and its family are SLITTERS with one optical eye
+   *  at the leading edge, not camera plotters — their "mark" mode looks for a
+   *  single black BAR as the sheet feeds in. The corner shapes are kept for a
+   *  camera machine, but they are not what a slitter reads. */
+  regShape?: 'bar' | 'square' | 'circle' | 'lshape' | 'cross';
+  /** Which edge feeds into the machine first. The bar goes on that edge, and
+   *  the first cut has to clear it. Default 'top'. */
+  regEdge?: 'top' | 'bottom' | 'left' | 'right';
+  /** Bar length along the feed edge, mm. Default 50. */  regBarLenMm?: number;
+  /** Bar depth in from the feed edge, mm. Default 3. */   regBarDepthMm?: number;
   /** Mark size across, mm. Default 5. */        regSizeMm?: number;
   /** Sheet edge to the mark's OUTER edge, mm. Default 5. */ regInsetMm?: number;
   /** Cut marks in the margins, plus the half-sheet cut on an A3. Default on. */
@@ -4793,10 +4801,36 @@ export async function imposeDivinityCards(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const paintRegMarks = (pg: any) => {
     if (!(opts.regMarks ?? fit.regTest)) return;
+    const shape = opts.regShape ?? (fit.regTest ? 'bar' : 'square');
+    const black = rgb(0, 0, 0);
+
+    if (shape === 'bar') {
+      /* ONE BAR on the feed edge. The sensor is a single eye at the throat: it
+         sees paper, then black, and indexes every programmed cut from that
+         transition. So what matters is the bar's leading edge — its length only
+         has to be enough for the eye to cross, and its depth enough to register
+         at feed speed. */
+      const len = Math.max(1, opts.regBarLenMm ?? 50);
+      const depth = Math.max(0.5, opts.regBarDepthMm ?? 3);
+      const inset = Math.max(0, opts.regInsetMm ?? 3);
+      const edge = opts.regEdge ?? 'top';
+      const W = fit.sheetWMm, H = fit.sheetHMm;
+      const horizontal = edge === 'top' || edge === 'bottom';
+      const bw = horizontal ? len : depth, bh = horizontal ? depth : len;
+      const xMm = edge === 'left' ? inset : edge === 'right' ? W - inset - depth : (W - len) / 2;
+      const yMm = edge === 'bottom' ? inset : edge === 'top' ? H - inset - depth : (H - len) / 2;
+      /* A white pad so the eye sees a clean paper-to-black step even with the
+         background flood on — the same reason the corner marks get one. */
+      pg.drawRectangle({
+        x: mm(xMm - REG_PAD_MM), y: mm(yMm - REG_PAD_MM),
+        width: mm(bw + 2 * REG_PAD_MM), height: mm(bh + 2 * REG_PAD_MM), color: rgb(1, 1, 1),
+      });
+      pg.drawRectangle({ x: mm(xMm), y: mm(yMm), width: mm(bw), height: mm(bh), color: black });
+      return;
+    }
+
     const size = Math.max(0.5, opts.regSizeMm ?? 5);
     const inset = Math.max(0, opts.regInsetMm ?? 1.5);
-    const shape = opts.regShape ?? 'square';
-    const black = rgb(0, 0, 0);
     /* Lower-left of each mark's box, and which way the corner points. */
     const corners: Array<[number, number, 1 | -1, 1 | -1]> = [
       [inset, inset, 1, 1],

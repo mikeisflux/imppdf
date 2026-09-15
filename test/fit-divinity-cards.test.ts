@@ -21,6 +21,7 @@ import { PDFDocument, rgb } from 'pdf-lib';
 import {
   fitDivinityCards, PT_PER_MM, CARD_W_MM, CARD_H_MM, PLACED_W_MM, PLACED_H_MM,
   DEF_GUTTER_X_MM, DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, COLS, ROWS, CELL_OVERSIZE_MM,
+  REG_HEAD_MM, REG_MARK_INSET_MM, REG_MARK_DEPTH_MM, REG_FIRST_CUT_GAP_MM,
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
 import { imposeDivinityCards, BLACK_BORDER_MM } from '../src/lib/imposition-toolkit/impose.ts';
 
@@ -218,15 +219,56 @@ test('the REG TEST stock centres the block and leaves Letter alone', () => {
   assert.ok(close(reg.cells[0]!.wMm, PLACED_W_MM) && close(reg.cells[0]!.hMm, PLACED_H_MM),
     'and the same cell — only the position changes');
   assert.ok(close(reg.marginXMm, reg.marginRightMm), 'centred across');
-  assert.ok(close(reg.marginTopMm, reg.marginBottomMm), 'centred down');
-  assert.ok(close(reg.marginXMm, 12.8) && close(reg.marginTopMm, 8), 'A=C=12.8, D=H=8');
+
+  assert.ok(close(reg.marginXMm, 12.8), 'centred across at 12.8');
+  /* D is NOT centred: it has to clear the black bar. */
+  assert.ok(close(reg.marginTopMm, REG_HEAD_MM), `D clears the bar (${REG_HEAD_MM})`);
+  assert.ok(close(reg.marginTopMm, REG_MARK_INSET_MM + REG_MARK_DEPTH_MM + REG_FIRST_CUT_GAP_MM),
+    'inset + bar + the gap to the first cut, and nothing else');
   assert.ok(reg.regTest, 'and it asks for marks by default');
   assert.ok(!plain.regTest, 'which Letter does not');
   /* A typed margin still wins, so the operator can nudge after a test cut. */
   assert.ok(close(fitDivinityCards('letterreg', { marginXMm: 20 }).marginXMm, 20));
 });
 
-test('REGISTRATION MARKS: four corners, black on white, clear of every card', async () => {
+test('MARK MODE: one black bar on the feed edge, clear of the first cut', async () => {
+  /* The 2102-F is a SLITTER and offers exactly two modes, frontal and mark.
+     Mark mode is a single eye at the throat seeing paper then black, so what it
+     wants is one bar on the leading edge — not the corner marks a camera
+     plotter reads. The bar's trailing edge must sit clear of the first cut or
+     the blade lands on the mark. */
+  const zlib = await import('node:zlib');
+  const { PDFStream } = await import('pdf-lib');
+  const PT = PT_PER_MM;
+  const d = await PDFDocument.load(await imposeDivinityCards(await cardPdf(),
+    { sheet: 'letterreg', addMarks: false, backs: false }));
+  const st = d.getPage(0).node.normalizedEntries().Contents;
+  let t = '';
+  for (let k = 0; st && k < st.size(); k++) {
+    const raw = (d.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+    try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+    catch { t += Buffer.from(raw).toString('latin1'); }
+  }
+  const boxes = [...t.matchAll(/1 0 0 1 ([\d.]+) ([\d.]+) cm\n1 0 0 1 0 0 cm\n1 0 0 1 0 0 cm\n0 0 m\n0 ([\d.]+) l\n([\d.]+) [\d.]+ l/g)]
+    .map((m) => ({ x: Number(m[1]) / PT, y: Number(m[2]) / PT, h: Number(m[3]) / PT, w: Number(m[4]) / PT }));
+  const bar = boxes.find((b) => b.h < 5 && b.w > 20);
+  assert.ok(bar, 'a bar is drawn');
+  assert.ok(close(bar!.w, 50, 0.01) && close(bar!.h, REG_MARK_DEPTH_MM, 0.01), '50 x 3');
+  assert.ok(close(bar!.x + bar!.w / 2, 215.9 / 2, 0.01), 'centred on the edge');
+  const fromTop = 279.4 - (bar!.y + bar!.h);
+  assert.ok(close(fromTop, REG_MARK_INSET_MM, 0.01), `${REG_MARK_INSET_MM} mm in from the feed edge`);
+  const f = fitDivinityCards('letterreg');
+  const barEnds = fromTop + bar!.h;
+  assert.ok(close(f.marginTopMm - barEnds, REG_FIRST_CUT_GAP_MM, 0.01),
+    'the first cut falls exactly the gap past the bar');
+  assert.ok(f.marginTopMm > barEnds, 'and never on it');
+  /* A white pad under it, so the eye still sees paper-then-black on a flooded sheet. */
+  const pad = boxes.find((b) => b.h > bar!.h && b.h < 10 && b.w > bar!.w);
+  assert.ok(pad, 'the bar sits on a white pad');
+  assert.ok(pad!.y < bar!.y && pad!.x < bar!.x, 'which is bigger than it on every side');
+});
+
+test('the corner shapes still draw, for a camera machine', async () => {
   const zlib = await import('node:zlib');
   const { PDFStream } = await import('pdf-lib');
   const streamOf = async (bytes: Uint8Array) => {
@@ -247,26 +289,9 @@ test('REGISTRATION MARKS: four corners, black on white, clear of every card', as
     { sheet: 'letterreg', addMarks: false, backs: false }));
   const whitePads = (t: string) => (t.match(/^1 1 1 rg$/gm) || []).length;
   assert.equal(whitePads(plain), 0, 'Letter gets no marks');
-  assert.equal(whitePads(reg), 4, 'the reg stock gets one per corner');
+  assert.equal(whitePads(reg), 1, 'the reg stock defaults to ONE bar, not four corners');
 
-  /* The white pad must never be drawn over a card, or it rubs out the art. */
-  const f = fitDivinityCards('letterreg');
-  const size = 5, inset = 1.5, pad = 1.5;
-  const lo = inset - pad, box = size + 2 * pad;
-  for (const [bx, by] of [
-    [lo, lo], [f.sheetWMm - lo - box, lo],
-    [lo, f.sheetHMm - lo - box], [f.sheetWMm - lo - box, f.sheetHMm - lo - box],
-  ]) {
-    for (const c of f.cells) {
-      const apart = Math.max(
-        c.xMm - (bx! + box), bx! - (c.xMm + c.wMm),
-        c.yMm - (by! + box), by! - (c.yMm + c.hMm),
-      );
-      assert.ok(apart >= -1e-9, `mark pad at ${bx},${by} overlaps a card by ${(-apart).toFixed(2)}`);
-    }
-  }
-
-  /* Every shape draws, and the marks go on LAST so nothing lands on top. */
+  /* Every shape still draws, and the marks go on LAST so nothing lands on top. */
   for (const regShape of ['square', 'circle', 'lshape', 'cross'] as const) {
     const t = await streamOf(await imposeDivinityCards(await cardPdf(),
       { sheet: 'letterreg', regShape, addMarks: false, backs: false }));

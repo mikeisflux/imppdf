@@ -159,6 +159,19 @@ export const DEF_GUTTER_G_MM = 0.7;   // G — row 3 to row 4
  *  because a gutter that is partly under ink is a number nobody can measure. */
 export const CELL_OVERSIZE_MM = 2;
 
+/* ── The black BAR for a slitter's mark mode (the 2102-F has exactly two modes,
+   "frontal" and "mark"). One eye at the throat sees paper, then black, and
+   indexes every programmed cut off that step. Published figures from the same
+   OEM family: Akiles Cardmac Pro wants the mark 3-20 mm in from the leading
+   edge with the first cut 5 mm past it; Formax FlashCard uses a 50 x 3 mm bar,
+   top-centre, 5 mm above the first cut. These are those numbers, and they are
+   settings because this machine's own manual may differ. */
+export const REG_MARK_INSET_MM = 3;      // feed edge to the bar
+export const REG_MARK_DEPTH_MM = 3;      // bar depth, in the feed direction
+export const REG_FIRST_CUT_GAP_MM = 5;   // bar to the first cut
+/** Head margin the mark stock needs: bar inset + bar + the gap to the first cut. */
+export const REG_HEAD_MM = REG_MARK_INSET_MM + REG_MARK_DEPTH_MM + REG_FIRST_CUT_GAP_MM;
+
 
 /** The cell: the card laid sideways, 1.5 over on both dimensions. Never derived,
  *  never adjusted to make a margin come out — the cell IS the cut size. */
@@ -227,7 +240,12 @@ export function fitDivinityCards(
      read off the machine — but a typed value still wins, so the operator can
      nudge it after a test cut. */
   const mX = t.marginXMm ?? (spec.centred ? (spec.blockWMm - blockW) / 2 : DEF_MARGIN_X_MM);
-  const mTop = t.marginTopMm ?? (spec.centred ? (spec.hMm - blockH) / 2 : DEF_MARGIN_TOP_MM);
+  /* On the mark stock the HEAD margin is not centred — it has to clear the black
+     bar. The sensor needs the bar a few mm in from the feed edge, and the first
+     cut has to fall clear of it: REG_MARK_INSET_MM + REG_MARK_DEPTH_MM +
+     REG_FIRST_CUT_GAP_MM. Whatever is left goes to the foot. */
+  const mTop = t.marginTopMm
+    ?? (spec.regTest ? REG_HEAD_MM : spec.centred ? (spec.hMm - blockH) / 2 : DEF_MARGIN_TOP_MM);
   /* C and H are the leftovers, not settings — they cannot be, because A, the
      cards and C must sum to the sheet. Reported so the panel can show them. */
   const mBot = spec.hMm - mTop - blockH;
