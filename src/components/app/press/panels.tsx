@@ -3139,7 +3139,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           const depth = s.regBarDepthMm ?? 3;
           const feedMargin = edge === 'top' ? FIT.marginTopMm : edge === 'bottom' ? FIT.marginBottomMm
             : edge === 'left' ? FIT.marginXMm : FIT.marginRightMm;
-          const needs = inset + depth + 5;
+          /* What the file actually needs is that the bar AND its white pad clear
+             the first cut — anything more is wasted paper. */
+          const needs = inset + depth + 1.5;
           return (
             <>
               <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
@@ -3180,14 +3182,15 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               {shape === 'bar' ? (
                 <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>
                   Bar <b>{round2(s.regBarLenMm ?? 50)} × {round2(depth)}</b>, centred on the <b>{edge}</b> edge,
-                  <b> {round2(inset)}</b> mm in. The first cut then has to fall clear of it — bar plus a 5 mm
-                  gap is <b>{round2(needs)}</b> mm, and that edge has <b>{round2(feedMargin)}</b>.
+                  <b> {round2(inset)}</b> mm in. With its white pad that occupies the first{' '}
+                  <b>{round2(needs)}</b> mm, and that edge has <b>{round2(feedMargin)}</b>.
                   {' '}{needs > feedMargin + 1e-9
-                    ? <b style={{ color: 'var(--pe-warn, #e0a45f)' }}>Not enough: the first cut would land on the
-                        mark. Grow that margin or use the 8.5 Reg Test stock.</b>
-                    : <>Fits.</>}
-                  <br />Cousins of this machine want the bar <b>3–20 mm</b> from the leading edge with the first
-                  cut <b>5 mm</b> past it; Formax uses <b>50 × 3</b>. Start there and adjust off a test cut.
+                    ? <b style={{ color: 'var(--pe-warn, #e0a45f)' }}>Not enough — the pad would print over the
+                        first row. Grow that margin, or shrink the bar.</b>
+                    : <>Fits, with {round2(feedMargin - needs)} mm to spare.</>}
+                  <br />The <b>8.5 Reg Test</b> stock sets its head to <b>7.5</b>, which is exactly the bar
+                  plus its pad — the pad ends flush with the first cut, so no paper is wasted and nothing
+                  prints over.
                 </div>
               ) : (
                 <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>

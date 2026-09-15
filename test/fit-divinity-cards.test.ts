@@ -21,7 +21,7 @@ import { PDFDocument, rgb } from 'pdf-lib';
 import {
   fitDivinityCards, PT_PER_MM, CARD_W_MM, CARD_H_MM, PLACED_W_MM, PLACED_H_MM,
   DEF_GUTTER_X_MM, DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, COLS, ROWS, CELL_OVERSIZE_MM,
-  REG_HEAD_MM, REG_MARK_INSET_MM, REG_MARK_DEPTH_MM, REG_FIRST_CUT_GAP_MM,
+  REG_HEAD_MM, REG_MARK_INSET_MM, REG_MARK_DEPTH_MM, REG_MARK_PAD_MM,
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
 import { imposeDivinityCards, BLACK_BORDER_MM } from '../src/lib/imposition-toolkit/impose.ts';
 
@@ -223,8 +223,9 @@ test('the REG TEST stock centres the block and leaves Letter alone', () => {
   assert.ok(close(reg.marginXMm, 12.8), 'centred across at 12.8');
   /* D is NOT centred: it has to clear the black bar. */
   assert.ok(close(reg.marginTopMm, REG_HEAD_MM), `D clears the bar (${REG_HEAD_MM})`);
-  assert.ok(close(reg.marginTopMm, REG_MARK_INSET_MM + REG_MARK_DEPTH_MM + REG_FIRST_CUT_GAP_MM),
-    'inset + bar + the gap to the first cut, and nothing else');
+  assert.ok(close(reg.marginTopMm, REG_MARK_INSET_MM + REG_MARK_DEPTH_MM + REG_MARK_PAD_MM),
+    'exactly the bar and its pad — no wasted paper, nothing printed over');
+  assert.ok(close(reg.marginTopMm, 7.5), "the owner's figure off the machine");
   assert.ok(reg.regTest, 'and it asks for marks by default');
   assert.ok(!plain.regTest, 'which Letter does not');
   /* A typed margin still wins, so the operator can nudge after a test cut. */
@@ -259,13 +260,17 @@ test('MARK MODE: one black bar on the feed edge, clear of the first cut', async 
   assert.ok(close(fromTop, REG_MARK_INSET_MM, 0.01), `${REG_MARK_INSET_MM} mm in from the feed edge`);
   const f = fitDivinityCards('letterreg');
   const barEnds = fromTop + bar!.h;
-  assert.ok(close(f.marginTopMm - barEnds, REG_FIRST_CUT_GAP_MM, 0.01),
-    'the first cut falls exactly the gap past the bar');
+  assert.ok(close(f.marginTopMm - barEnds, REG_MARK_PAD_MM, 0.01),
+    'the first cut falls exactly one pad past the bar');
   assert.ok(f.marginTopMm > barEnds, 'and never on it');
   /* A white pad under it, so the eye still sees paper-then-black on a flooded sheet. */
   const pad = boxes.find((b) => b.h > bar!.h && b.h < 10 && b.w > bar!.w);
   assert.ok(pad, 'the bar sits on a white pad');
   assert.ok(pad!.y < bar!.y && pad!.x < bar!.x, 'which is bigger than it on every side');
+  /* The pad's trailing edge and the first cut are flush: any deeper and it
+     prints over the top row, any shallower and paper is wasted. */
+  const padEnds = 279.4 - pad!.y;
+  assert.ok(close(padEnds, f.marginTopMm, 0.01), 'pad ends flush with the first cut');
 });
 
 test('the corner shapes still draw, for a camera machine', async () => {

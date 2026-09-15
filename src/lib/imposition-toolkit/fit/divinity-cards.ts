@@ -168,9 +168,19 @@ export const CELL_OVERSIZE_MM = 2;
    settings because this machine's own manual may differ. */
 export const REG_MARK_INSET_MM = 3;      // feed edge to the bar
 export const REG_MARK_DEPTH_MM = 3;      // bar depth, in the feed direction
-export const REG_FIRST_CUT_GAP_MM = 5;   // bar to the first cut
-/** Head margin the mark stock needs: bar inset + bar + the gap to the first cut. */
-export const REG_HEAD_MM = REG_MARK_INSET_MM + REG_MARK_DEPTH_MM + REG_FIRST_CUT_GAP_MM;
+/** White pad drawn round the bar, so the eye sees a clean paper-to-black step
+ *  even when the background flood is on. */
+export const REG_MARK_PAD_MM = 1.5;
+
+/** HEAD MARGIN on the mark stock — 7.5, owner's figure off the machine.
+ *
+ *  Derived earlier as inset + bar + a 5 mm gap = 11, from the Akiles and Formax
+ *  figures for the same OEM family. That was wrong for THIS machine: it pushed
+ *  the first cut a long way down the sheet and the bar still crowded the art.
+ *  7.5 is what the 2102-F actually wants, and it is exactly what the bar and its
+ *  pad occupy: 3 + 3 + 1.5. The pad's trailing edge and the first cut line are
+ *  flush, so no paper is wasted and nothing is printed over. */
+export const REG_HEAD_MM = 7.5;
 
 
 /** The cell: the card laid sideways, 1.5 over on both dimensions. Never derived,

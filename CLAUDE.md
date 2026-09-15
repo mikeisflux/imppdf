@@ -111,14 +111,19 @@ by explicit owner instruction — do not "fix" it to combine pages.
 - The Divinity Cards **`letterreg`** stock is the mark-mode test sheet: same
   eight cards and the same cell, block centred ACROSS (A=C 12.8), but the head
   margin is NOT centred — D is `REG_HEAD_MM` (bar inset + bar depth + the gap to
-  the first cut) so the blade never lands on the mark. It is a separate stock so
+  its pad) so the blade never lands on the mark. **That head is 7.5** — owner's
+  figure off the machine, and exactly bar inset 3 + bar 3 + pad 1.5, so the pad's
+  trailing edge and the first cut are flush. An earlier build derived 11 from the
+  Akiles/Formax "first cut 5 mm past the mark" rule; that is not this machine and
+  it both wasted paper and still crowded the art. It is a separate stock so
   the proven `letter` template (A 16.5 / C 9.1 / D 4.75 / H 11.25, measured off
   the machine) is never disturbed — do not add marks to `letter` by moving its
   block; its 4.75 head cannot clear a bar. Marks are drawn LAST on a white pad,
   so the eye still sees a clean paper-to-black step with the background flood on.
-  Bar length, depth, inset and feed edge are all settable: the published figures
-  (3-20 mm from the leading edge, first cut 5 mm past it, Formax 50x3) come from
-  the same OEM family, not this machine's own manual.
+  Bar length, depth, inset and feed edge are all settable. The rule that matters
+  for the FILE is that the bar plus its pad clears the first cut; anything beyond
+  that is wasted paper, so do not build in a nominal gap from another maker's
+  spec sheet.
 - Never assume how many items fit a sheet: always run the fit calculation
   accounting for margins, gutters, crop marks, and bleed before placing.
 - If rotating an item 90° lets more fit, rotate it.
