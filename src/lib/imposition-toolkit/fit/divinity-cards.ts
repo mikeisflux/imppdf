@@ -7,8 +7,8 @@
  * never nudged to make a margin come out: a cell that is not the cut size cuts
  * cards that are the wrong size.
  *
- * B IS 8.5 — a real gap down the middle, measured off the machine. E, F and G are
- * the three gaps between the rows, 0.5 each.
+ * B IS 3, THE SAME AS THE ROW GUTTER — it is the machine's one programmed gutter
+ * in the other axis, not an independent measurement.
  *
  * EVERY GAP IS A SETTING, and C and H can be typed as readily as A and D — they
  * are the far end of the same two spans, so entering one just places the block
@@ -18,11 +18,18 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 16.5   B 8.5   D 4.75   E 0   F 0.7   G 0.7   sheet LETTER
- *     C and H then fall out at 9.10 and 11.25.
+ *     A 15.55   B 3   D 4.2   E F G 3   sheet LETTER
+ *     C and H then fall out at 15.55 and 4.20.
  *
- *     across  16.5 + 90.9 + 8.5 + 90.9 + 9.1       = 215.9
- *     down    4.75 + 4(65.5) + 0 + 0.7 + 0.7 + 11.25 = 279.4
+ *     across  15.55 + 90.9 + 3 + 90.9 + 15.55  = 215.9
+ *     down    4.2 + 4(65.5) + 3(3) + 4.2       = 279.4
+ *
+ * THE GUTTERS ARE THE MACHINE'S, NOT MEASUREMENTS OFF ITS OUTPUT. The cutter
+ * advances one constant pitch — card + 3 — and repeats it, so the file has to
+ * step exactly that or the blade walks into the art a little further on every
+ * row. An earlier set (0 / 0.7 / 0.7) was measured off cut sheets, but what was
+ * being measured was the drift between file and machine, not any gutter the
+ * machine was cutting.
  *
  * THERE IS NO BLEED AND NOTHING IS DRAWN OUTSIDE A CELL, so EVERY GAP HERE IS
  * WHAT THE RULER READS on the sheet — the white paper between two cards. When
@@ -31,17 +38,17 @@
  * overflowed the cells by 1.5 put 3 mm of ink into a 0.5 mm row gap, overlapped
  * the rows, and made the row settings do nothing anyone could see.
  *
- * THE ROW GAPS ARE 0, 0.7, 0.7 — E, F and G, each its own setting and each real
- * paper between two cards. They differ because the machine's feed does; rows 1
- * and 2 now share a cut line outright. Change one and H closes up by exactly
- * that much: D stays where it is and the block grows downward.
+ * THE ROW GAPS ARE 3, 3, 3 and MUST STAY EQUAL — see the note at DEF_GUTTER_E_MM.
+ * They are still three settings so an operator can prove a machine wrong, but a
+ * slitter steps one pitch and unequal values cannot describe it. Change one and
+ * H closes up by exactly that much: D stays where it is and the block grows
+ * downward.
  *
- * A IS NOT EQUAL TO C — 16.5 against 9.10, so the block sits well right of
- * centre. That is not a mistake and not something to tidy up: these numbers
- * describe where the machine actually cuts, measured off its own output, and
- * re-centring them breaks the template. Several earlier sets were validated and
- * then abandoned when the stock changed; heavier card registers differently
- * through the machine.
+ * A EQUALS C NOW, and D equals H. The lopsided sets that came before were hand
+ * compensation for feed drift in frontal mode — and that drift was really the
+ * pitch mismatch above. With the file stepping what the machine steps there is
+ * nothing to compensate for, so the block is simply centred and the leftovers
+ * fall where they fall.
  *
  * THE CHAINS ARE THE WHOLE TRUTH. Nothing is drawn outside a cell, so A + the
  * cards + the gutters + C is the sheet width exactly, and D + the cards + E F G
@@ -127,10 +134,10 @@ const COLS_N = 2, ROWS_N = 4;
    left over — there is one degree of freedom per axis, because A, the cards and
    C have to sum to the sheet. The panel shows C and H live so the operator can
    see what a change did.                                                     */
-export const DEF_MARGIN_X_MM = 16.5;  // A — sheet edge to the first cut line
-export const DEF_MARGIN_TOP_MM = 4.75;// D — head margin
+export const DEF_MARGIN_X_MM = 15.55; // A — sheet edge to the first cut line
+export const DEF_MARGIN_TOP_MM = 4.2; // D — head margin
 
-export const DEF_GUTTER_X_MM = 8.5;   // B — down the middle, between the columns
+export const DEF_GUTTER_X_MM = 3;     // B — down the middle, between the columns
 
 /* E, F and G: the three gaps BETWEEN THE ROWS, top to bottom. Each is its own
    setting and each DEFAULTS TO 0 — the rows touch, one cut line serves both
@@ -139,14 +146,23 @@ export const DEF_GUTTER_X_MM = 8.5;   // B — down the middle, between the colu
    on the sheet has its own letter and its own box: the operator measures three
    gaps with a ruler, not one gap three times, and a machine that drifts down
    the sheet needs them to differ. */
-export const DEF_GUTTER_E_MM = 0;     // E — row 1 to row 2 (rows 1/2 now touch)
-export const DEF_GUTTER_F_MM = 0.7;   // F — row 2 to row 3
-export const DEF_GUTTER_G_MM = 0.7;   // G — row 3 to row 4
+/* ALL THREE ARE THE MACHINE'S GUTTER, AND THEY MUST STAY EQUAL. The cutter is a
+   slitter: it advances ONE constant pitch per row (card + gutter) and repeats.
+   It cannot cut 0 then 0.7 then 0.7, so a template that says so can only ever
+   disagree with it — and the disagreement compounds down the sheet.
+
+   The old 0 / 0.7 / 0.7 came from measuring cut sheets, but those measurements
+   were never the machine's gutters: they were the DRIFT between where the file
+   put the art and where the machine put the blade. Feeding them back in chased
+   a moving target, which is why the numbers never settled. */
+export const DEF_GUTTER_E_MM = 3;     // E — row 1 to row 2
+export const DEF_GUTTER_F_MM = 3;     // F — row 2 to row 3
+export const DEF_GUTTER_G_MM = 3;     // G — row 3 to row 4
 
 /* The vertical chain is four cells plus E, F and G:
 
-     D 4.75 + 4(65.5) + E + F + G + H        on a 279.4 sheet
-     at the default 0 0.7 0.7            ->  H 11.25
+     D 4.2 + 4(65.5) + E + F + G + H         on a 279.4 sheet
+     at the default 3 3 3                ->  H 4.2
 
    Nothing is drawn outside a cell, so that sum is the sheet exactly. */
 

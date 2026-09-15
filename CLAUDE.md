@@ -124,6 +124,22 @@ by explicit owner instruction — do not "fix" it to combine pages.
   for the FILE is that the bar plus its pad clears the first cut; anything beyond
   that is wasted paper, so do not build in a nominal gap from another maker's
   spec sheet.
+- **The cutter steps ONE CONSTANT PITCH and the file must step the same.** It is
+  a slitter: it advances card-length + gutter per row and repeats, so E, F and G
+  have to be equal and equal to the machine's programmed gutter (3). Unequal row
+  gutters cannot describe what it does and the disagreement COMPOUNDS — a file
+  stepping 65.5 / 66.2 / 66.2 against a machine stepping 68.5 put the blade
+  7.6 mm into the art by row 4. The panel warns when the three differ.
+  **Never derive the gutters by measuring its output.** The 0 / 0.7 / 0.7 set
+  came from measuring cut sheets, but what was being measured was the drift
+  between file and machine, not any gutter the machine cut — feeding it back in
+  chases a moving target and never settles. Build the file FROM the machine's
+  program (leading margin, card length, gutter) instead.
+- **The machine is locked to A4 and the shop only has Letter.** It is programmed
+  with a 7.6 leading margin and 5 rows; on a Letter sheet four rows come out and
+  it then tries a fifth that is not there. Five rows inside A4 with a 3 mm gutter
+  forces its card length to about 54, which does NOT match the 65.5 cell here —
+  unresolved, pending photographs of its menus.
 - Never assume how many items fit a sheet: always run the fit calculation
   accounting for margins, gutters, crop marks, and bleed before placing.
 - If rotating an item 90° lets more fit, rotate it.

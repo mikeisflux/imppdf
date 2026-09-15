@@ -3059,6 +3059,24 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
             <NumRaw value={value} onValue={set} w={70} />
           </div>
         ))}
+        {(() => {
+          /* A slitter advances ONE pitch per row and repeats it. Unequal row
+             gutters cannot describe that, and the disagreement compounds — by
+             row 4 the blade is millimetres into the art. Worth shouting about:
+             this is exactly the fault that made every cut stack come out wrong. */
+          const e = (s.gutterEMm as number) ?? DEF_GUTTER_E_MM;
+          const f = (s.gutterFMm as number) ?? DEF_GUTTER_F_MM;
+          const g = (s.gutterGMm as number) ?? DEF_GUTTER_G_MM;
+          if (Math.abs(e - f) < 1e-9 && Math.abs(f - g) < 1e-9) return null;
+          return (
+            <div className="pe-gang-warn" style={{ marginTop: 10, lineHeight: 1.6 }}>
+              ⚠ <b>E, F and G are not equal.</b> The cutter steps one constant pitch per row
+              (card + gutter) and repeats it — it cannot cut {round2(e)}, then {round2(f)}, then
+              {' '}{round2(g)}. Every row after the first would be cut further out of place than
+              the last. Set all three to the machine&apos;s programmed gutter.
+            </div>
+          );
+        })()}
         <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.7 }}>
           {spun && (
             <div style={{ marginBottom: 6 }}>
@@ -3066,10 +3084,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               sheet lands behind its fronts.
             </div>
           )}
-          <b>A {DEF_MARGIN_X_MM} · B {DEF_GUTTER_X_MM} · D {DEF_MARGIN_TOP_MM} · E {DEF_GUTTER_E_MM} ·
-          F {DEF_GUTTER_F_MM} · G {DEF_GUTTER_G_MM}</b> on Letter — the three row gaps are NOT
-          equal, because the machine's feed is not. C and H are the remainder —
-          C <b>{round2(effC)}</b> and H <b>{round2(FIT.marginBottomMm)}</b>.
+          <b>A {DEF_MARGIN_X_MM} · B {DEF_GUTTER_X_MM} · D {DEF_MARGIN_TOP_MM} · E F G {DEF_GUTTER_E_MM}</b> on
+          Letter. Every gutter is the cutter&apos;s one programmed gutter, so the file steps
+          exactly what the machine steps — <b>{round2(CELL_H + DEF_GUTTER_E_MM)}</b> mm a row,
+          the same every row. C and H are the remainder — C <b>{round2(effC)}</b> and
+          H <b>{round2(FIT.marginBottomMm)}</b>.
           <br /><b>There is no bleed</b> and nothing is drawn outside a cell, so every number
           here is the <b>white paper you can measure</b> on the sheet. Making the card bigger
           grows the <b>cell</b> and takes the difference back out of these gutters, which is
