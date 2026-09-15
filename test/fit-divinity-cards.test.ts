@@ -4,11 +4,11 @@
  *   page    215.9 x 279.4 (Letter) / 279.4 x 431.8 (11 x 17) — ALWAYS PORTRAIT
  *   layout  the 11 x 17 is reasoned about landscape, two blocks side by side,
  *           and the finished PAGE is stood up; nothing inside it moves
- *   cell    90.9 x 65.5  the card, lying sideways, 2 over on each dimension
+ *   cell    89 x 63      the MACHINE'S programmed card, off its own panel
  *   art     the cell exactly — STRETCHED to it, and NO BLEED anywhere
  *
- *   across  A 15.55 + 90.9 + B 3 + 90.9 + C 15.55  = 215.9
- *   down    D 4.2 + 4(65.5) + 3(3) + H 4.2         = 279.4
+ *   across  A 17.45 + 89 + B 3 + 89 + C 17.45  = 215.9
+ *   down    D 7.6 + 4(63) + 3(3) + H 10.8      = 279.4
  *
  * Because nothing is drawn outside a cell, every letter above is white paper on
  * the sheet — which is what these tests check, by reading the drawn rectangles
@@ -20,21 +20,52 @@ import assert from 'node:assert/strict';
 import { PDFDocument, rgb } from 'pdf-lib';
 import {
   fitDivinityCards, PT_PER_MM, CARD_W_MM, CARD_H_MM, PLACED_W_MM, PLACED_H_MM,
-  DEF_GUTTER_X_MM, DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, COLS, ROWS, CELL_OVERSIZE_MM,
+  DEF_GUTTER_X_MM, DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, COLS, ROWS,
+  MACHINE_CARD_W_MM, MACHINE_CARD_L_MM, MACHINE_GROOVE_MM, MACHINE_FRONT_MM,
   REG_HEAD_MM, REG_MARK_INSET_MM, REG_MARK_DEPTH_MM, REG_MARK_PAD_MM,
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
 import { imposeDivinityCards, BLACK_BORDER_MM } from '../src/lib/imposition-toolkit/impose.ts';
 
 const close = (a: number, b: number, tol = 1e-6) => Math.abs(a - b) <= tol;
 
-test('THE CELL IS THE CUT — the card laid sideways, 2 over on both sides', () => {
-  assert.ok(close(PLACED_W_MM, 90.9), `3.5in + 2 across, got ${PLACED_W_MM}`);
-  assert.ok(close(PLACED_H_MM, 65.5), `2.5in + 2 down, got ${PLACED_H_MM}`);
-  /* Derived from the card and the oversize, not typed in twice — a copy of the
-     figures drifts the moment one of them is edited. */
-  assert.ok(close(PLACED_W_MM, CARD_H_MM + CELL_OVERSIZE_MM), 'and it IS card + oversize');
-  assert.ok(close(PLACED_H_MM, CARD_W_MM + CELL_OVERSIZE_MM));
-  assert.ok(close(CELL_OVERSIZE_MM, 2), 'the shop cuts 2 over');
+test("THE CELL IS THE MACHINE'S CARD — 89 x 63, off its own panel", () => {
+  assert.ok(close(PLACED_W_MM, 89), `89 across, got ${PLACED_W_MM}`);
+  assert.ok(close(PLACED_H_MM, 63), `63 in the feed direction, got ${PLACED_H_MM}`);
+  /* Taken from the machine constants, not typed twice — a copy drifts the
+     moment the cutter is reprogrammed and someone updates only one of them. */
+  assert.ok(close(PLACED_W_MM, MACHINE_CARD_W_MM) && close(PLACED_H_MM, MACHINE_CARD_L_MM),
+    'and it IS the machine figure');
+  /* Near enough a 2.5 x 3.5" card that the difference is the panel rounding to
+     whole millimetres — but the machine's number is the one that cuts. */
+  assert.ok(Math.abs(PLACED_W_MM - CARD_H_MM) < 0.2, 'within rounding of 3.5in');
+  assert.ok(Math.abs(PLACED_H_MM - CARD_W_MM) < 0.6, 'within rounding of 2.5in');
+});
+
+test("THE FILE STEPS WHAT THE MACHINE STEPS — Front 7.6, pitch 66", () => {
+  /* Everything the cutter does is these four numbers. If the file disagrees with
+     any of them the blade walks into the art, a little further every row. */
+  assert.ok(close(MACHINE_FRONT_MM, 7.6) && close(MACHINE_GROOVE_MM, 3));
+  const f = fitDivinityCards('letter');
+  assert.ok(close(f.marginTopMm, MACHINE_FRONT_MM), 'D is the panel Front len');
+  assert.deepEqual(f.rowGapsMm, [MACHINE_GROOVE_MM, MACHINE_GROOVE_MM, MACHINE_GROOVE_MM],
+    'E F G are the panel Groove len');
+  assert.ok(close(DEF_GUTTER_X_MM, MACHINE_GROOVE_MM), 'and so is B');
+  const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
+  for (let i = 1; i < ys.length; i++)
+    assert.ok(close(ys[i - 1]! - ys[i]!, MACHINE_CARD_L_MM + MACHINE_GROOVE_MM),
+      'row pitch is card + groove = 66, every row');
+});
+
+test('FIVE ROWS DO NOT FIT ANY SHEET IT TAKES — Cut pieces should be 8', () => {
+  /* The panel is left on 10. At a 63 mm card five rows need 334.6, which is over
+     Letter AND over A4, so after the eight that fit the machine goes hunting for
+     a fifth row that cannot exist. Harmless to the eight, but it is why it looks
+     like it is trying to cut past the end of the sheet. */
+  const need = (rows: number) =>
+    MACHINE_FRONT_MM + rows * MACHINE_CARD_L_MM + (rows - 1) * MACHINE_GROOVE_MM;
+  assert.ok(need(4) <= 279.4, `4 rows fit Letter (${need(4)})`);
+  assert.ok(need(5) > 297, `5 rows do not fit even A4 (${need(5)})`);
+  assert.equal(fitDivinityCards('letter').n, 8, 'so the sheet is eight up');
 });
 
 test('tabloid is two Letters side by side in the LAYOUT frame, cut at 215.9', () => {
@@ -50,10 +81,10 @@ test('tabloid is two Letters side by side in the LAYOUT frame, cut at 215.9', ()
 
 test('B is a setting, and the cell never moves with it', () => {
   const wide = fitDivinityCards('letter', { gutterXMm: 20 });
-  assert.ok(close(wide.cells[0]!.wMm, 90.9), 'still the cut size across');
-  assert.ok(close(wide.cells[0]!.hMm, 65.5), 'still the cut size down');
+  assert.ok(close(wide.cells[0]!.wMm, 89), 'still the cut size across');
+  assert.ok(close(wide.cells[0]!.hMm, 63), 'still the cut size down');
   const xs = [...new Set(wide.cells.map((c) => c.xMm))].sort((a, b) => a - b);
-  assert.ok(close(xs[1]! - xs[0]!, 90.9 + 20), 'column pitch follows the gutter');
+  assert.ok(close(xs[1]! - xs[0]!, 89 + 20), 'column pitch follows the gutter');
   assert.equal(wide.n, 8, 'and it still fits eight');
 });
 
@@ -149,8 +180,8 @@ test('EVERY GAP IS REAL PAPER — nothing is drawn outside a cell', async () => 
      lands exactly where it did before that change. Pinned as absolutes: if a
      future size change forgets to take it out of the gutters, the block shifts
      and these are what catch it. */
-  assert.ok(close(rects[0]![0], 15.55, 0.02), 'left column ink starts at 15.55');
-  assert.ok(close(279.4 - (rects[0]![1] + rects[0]![3]), 4.2, 0.02), 'row 1 ink starts 4.2 down');
+  assert.ok(close(rects[0]![0], 17.45, 0.02), 'left column ink starts at 17.45');
+  assert.ok(close(279.4 - (rects[0]![1] + rects[0]![3]), MACHINE_FRONT_MM, 0.02), 'row 1 ink starts at Front len');
   /* CONSTANT ROW PITCH is the property that matters against a slitter: the
      machine steps card + gutter and repeats, so the file must too. */
   const tops = left.map((r) => 279.4 - (r[1] + r[3])).sort((a, b) => a - b);
@@ -328,7 +359,7 @@ test('A4: eight cards, 2 across x 4 down', () => {
   assert.equal(ys.length, 4, 'four rows');
   assert.ok(close(xs[1]! - xs[0]!, PLACED_W_MM + DEF_GUTTER_X_MM), 'column pitch = the cell + B');
   for (let i = 1; i < ys.length; i++)
-    assert.ok(close(ys[i - 1]! - ys[i]!, 65.5 + f.rowGapsMm[i - 1]!), 'row pitch = cell + its own gap');
+    assert.ok(close(ys[i - 1]! - ys[i]!, PLACED_H_MM + f.rowGapsMm[i - 1]!), 'row pitch = cell + its own gap');
   assert.ok(close(Math.min(...ys), 297 - DEF_MARGIN_TOP_MM - 4 * PLACED_H_MM - 3 * DEF_GUTTER_X_MM), 'the last row sits on H');
 });
 
@@ -549,7 +580,7 @@ test('SPIN BACKS turns a lone sheet — and still never adds a page', async () =
 });
 
 test('the BACK sheet mirrors across — A and C trade places', async () => {
-  /* The template is NOT symmetric: A 15.55 against C 15.55, because that is where
+  /* The template is NOT symmetric: A 17.45 against C 17.45, because that is where
      the machine cuts on production stock. A sheet turned over about its long
      edge therefore only lands on its front if the block is mirrored. Nothing
      about a symmetric template would need this, and nothing would catch it
@@ -569,8 +600,8 @@ test('the BACK sheet mirrors across — A and C trade places', async () => {
     return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100))].sort((a, b) => a - b);
   };
-  assert.deepEqual(await colsOf(0), [15.55, 109.45], 'unticked, nothing mirrors');
-  assert.deepEqual(await colsOf(1), [15.55, 109.45], 'including the back sheet');
+  assert.deepEqual(await colsOf(0), [17.45, 109.45], 'unticked, nothing mirrors');
+  assert.deepEqual(await colsOf(1), [17.45, 109.45], 'including the back sheet');
 });
 
 test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
@@ -596,9 +627,9 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100));
   };
-  assert.equal(await leftEdge(off), 15.55, 'unticked: A 15.55');
-  assert.equal(await leftEdge(on), 15.55, 'ticked: A becomes C — equal now, so it does not move');
-  /* A 15.55 against C 15.55 is a 6.9 mm move — if the mirror ever silently stopped
+  assert.equal(await leftEdge(off), 17.45, 'unticked: A 17.45');
+  assert.equal(await leftEdge(on), 17.45, 'ticked: A becomes C — equal now, so it does not move');
+  /* A 17.45 against C 17.45 is a 6.9 mm move — if the mirror ever silently stopped
      working this is the assertion that screams, which the near-identical pairs
      of earlier templates could not do. */
   /* A and C are equal now, so the lopsided case below is what proves the mirror. */
@@ -629,8 +660,8 @@ test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100));
   };
-  assert.equal(await leftOf(0), 15.55, 'fronts untouched');
-  assert.equal(await leftOf(1), 15.55, 'backs swapped');
+  assert.equal(await leftOf(0), 17.45, 'fronts untouched');
+  assert.equal(await leftOf(1), 17.45, 'backs swapped');
 });
 
 test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {

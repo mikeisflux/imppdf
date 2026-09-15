@@ -1,14 +1,18 @@
 /* Divinity trading cards — one card artwork ganged 8-up on A4 and the block
  * duplicated onto A3, so one A3 cuts in half into two identical A4s to run.
  *
- * THE CELL IS THE CARD PLUS 2 mm, laid sideways: 90.9 x 65.5. A 2.5 x 3.5" card
- * is 88.9 x 63.5, and the shop cuts it 2 over on each dimension — the cell size
- * is the CUT size, stated by the operator off the machine. Never derived and
- * never nudged to make a margin come out: a cell that is not the cut size cuts
- * cards that are the wrong size.
+ * THE CELL IS THE MACHINE'S CARD: 89 x 63, read off the cutter's own panel.
+ * That is near enough a 2.5 x 3.5" card (88.9 x 63.5) that the difference is the
+ * panel rounding to whole millimetres — but the machine's figure governs,
+ * because the machine is what does the cutting. Never derived and never nudged
+ * to make a margin come out.
  *
- * B IS 3, THE SAME AS THE ROW GUTTER — it is the machine's one programmed gutter
- * in the other axis, not an independent measurement.
+ * B IS 3, THE SAME AS THE ROW GUTTER — both are the panel's Groove len.
+ *
+ * CUT PIECES MUST BE 8, NOT 10. At a 63 mm card length five rows need 334.6 mm,
+ * which does not fit Letter (279.4) OR A4 (297) — the machine was left set to
+ * ten, so after the eight that fit it goes looking for a fifth row that cannot
+ * exist on any sheet it takes.
  *
  * EVERY GAP IS A SETTING, and C and H can be typed as readily as A and D — they
  * are the far end of the same two spans, so entering one just places the block
@@ -18,11 +22,11 @@
  * THE VALIDATED TEMPLATE, measured off PRODUCTION stock and confirmed on a cut
  * stack:
  *
- *     A 15.55   B 3   D 4.2   E F G 3   sheet LETTER
- *     C and H then fall out at 15.55 and 4.20.
+ *     A 17.45   B 3   D 7.6   E F G 3   sheet LETTER
+ *     C and H then fall out at 17.45 and 10.80.
  *
- *     across  15.55 + 90.9 + 3 + 90.9 + 15.55  = 215.9
- *     down    4.2 + 4(65.5) + 3(3) + 4.2       = 279.4
+ *     across  17.45 + 89 + 3 + 89 + 17.45  = 215.9
+ *     down    7.6 + 4(63) + 3(3) + 10.8    = 279.4
  *
  * THE GUTTERS ARE THE MACHINE'S, NOT MEASUREMENTS OFF ITS OUTPUT. The cutter
  * advances one constant pitch — card + 3 — and repeats it, so the file has to
@@ -125,6 +129,30 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
 
 const COLS_N = 2, ROWS_N = 4;
 
+/* ── THE MACHINE'S OWN PROGRAM, read straight off the 2102-F's panel. These are
+   not measurements of its output and not preferences — they are the numbers the
+   cutter is set to, and the file exists to agree with them:
+
+       Front len    7.6 mm     leading edge to the first cut
+       Card len      63 mm     the feed direction
+       Card       89 x 63 mm
+       Groove len   3.0 mm     the gutter, both axes
+       Cut pieces  0010        (see the note below — it should be 8)
+
+   Everything else on this sheet falls out of them. Change one here only when it
+   has been changed on the machine. ───────────────────────────────────────── */
+
+/** The cell IS the machine's card: 89 wide, 63 in the feed direction. Near
+ *  enough a 2.5 x 3.5" card (88.9 x 63.5) that the difference is the panel
+ *  rounding to whole millimetres — but the MACHINE'S figure is the one that
+ *  governs, because the machine is what does the cutting. */
+export const MACHINE_CARD_W_MM = 89;
+export const MACHINE_CARD_L_MM = 63;
+/** Groove len on the panel. */
+export const MACHINE_GROOVE_MM = 3;
+/** Front len on the panel. */
+export const MACHINE_FRONT_MM = 7.6;
+
 /* ── The template. EVERY GAP IS A SETTING, and these are only the numbers the
    shop measured off its own cut machine. Nothing here is centred, derived from
    a rule, or clever: the operator has a ruler and the machine, and inferring
@@ -134,10 +162,10 @@ const COLS_N = 2, ROWS_N = 4;
    left over — there is one degree of freedom per axis, because A, the cards and
    C have to sum to the sheet. The panel shows C and H live so the operator can
    see what a change did.                                                     */
-export const DEF_MARGIN_X_MM = 15.55; // A — sheet edge to the first cut line
-export const DEF_MARGIN_TOP_MM = 4.2; // D — head margin
+export const DEF_MARGIN_X_MM = 17.45; // A — sheet edge to the first cut line (the remainder, halved)
+export const DEF_MARGIN_TOP_MM = MACHINE_FRONT_MM;  // D — the panel's Front len
 
-export const DEF_GUTTER_X_MM = 3;     // B — down the middle, between the columns
+export const DEF_GUTTER_X_MM = MACHINE_GROOVE_MM;  // B — the panel's Groove len
 
 /* E, F and G: the three gaps BETWEEN THE ROWS, top to bottom. Each is its own
    setting and each DEFAULTS TO 0 — the rows touch, one cut line serves both
@@ -155,25 +183,16 @@ export const DEF_GUTTER_X_MM = 3;     // B — down the middle, between the colu
    were never the machine's gutters: they were the DRIFT between where the file
    put the art and where the machine put the blade. Feeding them back in chased
    a moving target, which is why the numbers never settled. */
-export const DEF_GUTTER_E_MM = 3;     // E — row 1 to row 2
-export const DEF_GUTTER_F_MM = 3;     // F — row 2 to row 3
-export const DEF_GUTTER_G_MM = 3;     // G — row 3 to row 4
+export const DEF_GUTTER_E_MM = MACHINE_GROOVE_MM;  // E — row 1 to row 2
+export const DEF_GUTTER_F_MM = MACHINE_GROOVE_MM;  // F — row 2 to row 3
+export const DEF_GUTTER_G_MM = MACHINE_GROOVE_MM;  // G — row 3 to row 4
 
 /* The vertical chain is four cells plus E, F and G:
 
-     D 4.2 + 4(65.5) + E + F + G + H         on a 279.4 sheet
-     at the default 3 3 3                ->  H 4.2
+     D 7.6 + 4(63) + E + F + G + H           on a 279.4 sheet
+     at the default 3 3 3                ->  H 10.8
 
    Nothing is drawn outside a cell, so that sum is the sheet exactly. */
-
-/** How much bigger the finished card is than the nominal 2.5 x 3.5", per
- *  dimension. Not a bleed allowance: the shop's card is simply this size and the
- *  art is laid at it. It went 1.5 -> 2 when the card was extended a quarter
- *  millimetre on every side; the gutters came down by the matching amount in the
- *  same change, so not one card moved on the sheet. That is the rule here —
- *  GROW THE CELL AND PAY FOR IT OUT OF THE GUTTERS, never overflow a gutter,
- *  because a gutter that is partly under ink is a number nobody can measure. */
-export const CELL_OVERSIZE_MM = 2;
 
 /* ── The black BAR for a slitter's mark mode (the 2102-F has exactly two modes,
    "frontal" and "mark"). One eye at the throat sees paper, then black, and
@@ -201,8 +220,8 @@ export const REG_HEAD_MM = 7.5;
 
 /** The cell: the card laid sideways, 1.5 over on both dimensions. Never derived,
  *  never adjusted to make a margin come out — the cell IS the cut size. */
-export const PLACED_W_MM = CARD_H_MM + CELL_OVERSIZE_MM;   // 90.4
-export const PLACED_H_MM = CARD_W_MM + CELL_OVERSIZE_MM;   // 65
+export const PLACED_W_MM = MACHINE_CARD_W_MM;   // 89
+export const PLACED_H_MM = MACHINE_CARD_L_MM;   // 63
 
 export const COLS = COLS_N;
 export const ROWS = ROWS_N;

@@ -76,8 +76,10 @@ by explicit owner instruction — do not "fix" it to combine pages.
 - All N-up tools default to 1 column × 1 row unless the tool is specifically
   designed otherwise, and default image fit is CONTAIN (never crop/stretch).
   EXCEPTION (owner): **Divinity Trading Cards** is 2×4 and STRETCHES the art to
-  the cell. The cell is the card's set size — 2.5 × 3.5" plus 2 mm on each
-  dimension, so 90.9 × 65.5 laid sideways. **There is NO BLEED and nothing is
+  the cell. **The cell is the CUTTER'S programmed card, 89 × 63**, read off the
+  2102-F's own panel — near enough a 2.5 × 3.5" card (88.9 × 63.5) that the
+  difference is the panel rounding to whole millimetres, but the machine's figure
+  governs because the machine is what cuts. **There is NO BLEED and nothing is
   drawn outside a cell**, so every gutter is real white paper you can measure
   and both chains close on the sheet exactly. To make the card bigger, GROW THE
   CELL AND TAKE THE DIFFERENCE BACK OUT OF THE GUTTERS (an outer margin pays
@@ -135,11 +137,20 @@ by explicit owner instruction — do not "fix" it to combine pages.
   between file and machine, not any gutter the machine cut — feeding it back in
   chases a moving target and never settles. Build the file FROM the machine's
   program (leading margin, card length, gutter) instead.
-- **The machine is locked to A4 and the shop only has Letter.** It is programmed
-  with a 7.6 leading margin and 5 rows; on a Letter sheet four rows come out and
-  it then tries a fifth that is not there. Five rows inside A4 with a 3 mm gutter
-  forces its card length to about 54, which does NOT match the 65.5 cell here —
-  unresolved, pending photographs of its menus.
+- **THE CUTTER'S PROGRAM IS THE SOURCE OF TRUTH**, read off its panel and mirrored
+  in `MACHINE_*` in fit/divinity-cards.ts. Change these only when the machine is
+  changed:
+      Front len    7.6 mm   leading edge to the first cut  -> D
+      Card len      63 mm   the feed direction             -> cell height
+      Card       89 x 63 mm                                -> the cell
+      Groove len   3.0 mm   the gutter, both axes          -> B and E F G
+  Everything else falls out: on Letter, A = C = 17.45 and H = 10.80, row pitch a
+  constant 66. Do NOT measure its output and feed that back in — that measures
+  the drift between file and machine, not the machine.
+- **`Cut pieces` on the panel is 10 and cannot be changed.** At a 63 mm card five
+  rows need 334.6 mm, over Letter (279.4) AND over A4 (297), so after the eight
+  that fit the machine hunts for a fifth row that cannot exist on any sheet it
+  takes. It does not harm the eight — do not try to "fix" it in the file.
 - Never assume how many items fit a sheet: always run the fit calculation
   accounting for margins, gutters, crop marks, and bleed before placing.
 - If rotating an item 90° lets more fit, rotate it.
