@@ -4658,10 +4658,9 @@ export interface DivinityCardOptions {
   /** E, F, G — the three gaps between the rows, top to bottom. Each defaults to
    *  0, which butts the rows onto one shared cut line. */
   gutterEMm?: number; gutterFMm?: number; gutterGMm?: number;
-  /* NOTHING IS DRAWN OUTSIDE A CELL. Growing the card is done by growing the
-     cell and taking the difference back out of the gutters, not by overflowing
-     them — so the cards do not move and every gutter stays the white paper the
-     panel says it is. */
+  /* The art is laid at the manufacturer's LAYOUT SIZE, 92 x 66 against an
+     89 x 63 card — half the groove past the cut on every side. The cells below
+     are still the cut, so nothing here moves a blade position. */
   /** Flood the sheet with rich black behind the cards, leaving a white border.
    *  Default OFF. See BLACK_BORDER_MM. */
   blackBg?: boolean;
@@ -4701,7 +4700,7 @@ export async function imposeDivinityCards(
 ): Promise<Uint8Array> {
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, cmyk, degrees } = PL;
-  const { fitDivinityCards, PT_PER_MM } = await import('./fit/divinity-cards.ts');
+  const { fitDivinityCards, PT_PER_MM, LAYOUT_BLEED_MM } = await import('./fit/divinity-cards.ts');
 
   const fit = fitDivinityCards(opts.sheet ?? 'letter', {
     marginXMm: opts.marginXMm, marginTopMm: opts.marginTopMm,
@@ -4755,12 +4754,17 @@ export async function imposeDivinityCards(
     const artW = turn ? card.height : card.width;
     const artH = turn ? card.width : card.height;
     for (const c of cells) {
-      /* The art box IS the cell — nothing added on any side. When the card grew
-         0.25 on every edge, the CELL grew and the gutters came down to match, so
-         the cards stayed put; nothing is laid over a gutter to fake it. That
-         keeps every number in the panel equal to the white you can measure. */
-      const bx = mm(c.xMm), by = mm(c.yMm);
-      const cw = mm(c.wMm), ch = mm(c.hMm);
+      /* THE MANUFACTURER'S LAYOUT SIZE. The cell is where the blade goes — 89 x
+         63 — and their template draws the art at 92 x 66, so it runs half the
+         groove past the cut on every side. Two neighbours then meet exactly in
+         the middle of the groove, the groove is solid ink, and the blade cuts
+         through artwork however it drifts.
+
+         Drawn OUTSIDE the cell, so it moves no cut line: the gutters still place
+         the cuts and both chains still close on the sheet. */
+      const bl = mm(LAYOUT_BLEED_MM);
+      const bx = mm(c.xMm) - bl, by = mm(c.yMm) - bl;
+      const cw = mm(c.wMm) + 2 * bl, ch = mm(c.hMm) + 2 * bl;
       /* STRETCH — the owner's instruction, and an exception to the house rule
          that art is fitted CONTAIN and never distorted. The cell is the card's
          set size, 1.5 mm over a 2.5 x 3.5" on each dimension, and the art is

@@ -35,12 +35,11 @@
  * being measured was the drift between file and machine, not any gutter the
  * machine was cutting.
  *
- * THERE IS NO BLEED AND NOTHING IS DRAWN OUTSIDE A CELL, so EVERY GAP HERE IS
- * WHAT THE RULER READS on the sheet — the white paper between two cards. When
- * the card is made bigger, the CELL grows and the gutters come down by the
- * matching amount, which keeps the cards where they are. A build that instead
- * overflowed the cells by 1.5 put 3 mm of ink into a 0.5 mm row gap, overlapped
- * the rows, and made the row settings do nothing anyone could see.
+ * EVERY GAP HERE IS A CUT LINE, not white paper. The manufacturer's template
+ * lays the art at 92 x 66 against an 89 x 63 card, so it runs half the groove
+ * (1.5) past the cut on all four sides; two neighbours meet in the middle of the
+ * groove and the blade cuts through ink. The gutters below still place the CUTS
+ * — the bleed is drawn outside them and moves nothing.
  *
  * THE ROW GAPS ARE 3, 3, 3 and MUST STAY EQUAL — see the note at DEF_GUTTER_E_MM.
  * They are still three settings so an operator can prove a machine wrong, but a
@@ -152,6 +151,24 @@ export const MACHINE_CARD_L_MM = 63;
 export const MACHINE_GROOVE_MM = 3;
 /** Front len on the panel. */
 export const MACHINE_FRONT_MM = 7.6;
+
+/** LAYOUT SIZE — the manufacturer's own template, in their words:
+ *
+ *    "虚线是切卡机的刀的位置，实际排版不需要的。卡片尺寸89X63，排版尺寸是92X66"
+ *    "The dashed line is where the card cutter's blade goes — don't include it
+ *     in the actual layout. Card size 89x63, LAYOUT SIZE 92x66."
+ *
+ *  92 x 66 is exactly the card plus the groove (89+3, 63+3), so the art runs
+ *  HALF THE GROOVE past the cut on every side and two neighbours meet in the
+ *  middle of it. The groove is then solid ink and the blade cuts through
+ *  artwork rather than paper — no white sliver whichever way it drifts.
+ *
+ *  Derived from the groove rather than typed as 1.5, because that is what makes
+ *  the two arts meet exactly: change the groove on the machine and this follows.
+ *  It moves NO cut line — the cells are still 89 x 63 where the blade goes. */
+export const LAYOUT_BLEED_MM = MACHINE_GROOVE_MM / 2;
+export const LAYOUT_W_MM = MACHINE_CARD_W_MM + MACHINE_GROOVE_MM;   // 92
+export const LAYOUT_L_MM = MACHINE_CARD_L_MM + MACHINE_GROOVE_MM;   // 66
 
 /* ── The template. EVERY GAP IS A SETTING, and these are only the numbers the
    shop measured off its own cut machine. Nothing here is centred, derived from

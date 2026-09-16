@@ -79,15 +79,15 @@ by explicit owner instruction — do not "fix" it to combine pages.
   the cell. **The cell is the CUTTER'S programmed card, 89 × 63**, read off the
   2102-F's own panel — near enough a 2.5 × 3.5" card (88.9 × 63.5) that the
   difference is the panel rounding to whole millimetres, but the machine's figure
-  governs because the machine is what cuts. **There is NO BLEED and nothing is
-  drawn outside a cell**, so every gutter is real white paper you can measure
-  and both chains close on the sheet exactly. To make the card bigger, GROW THE
-  CELL AND TAKE THE DIFFERENCE BACK OUT OF THE GUTTERS (an outer margin pays
-  once, an interior gutter twice) — that keeps the cards in the same positions.
-  Never do it by overflowing the cells instead: this template's gutters are
-  measured in tenths, and an earlier build that grew each cell 1.5 mm on all
-  four sides put 3 mm of ink into a 0.5 mm row gap, overlapped the rows, and
-  made the row settings do nothing visible on the sheet.
+  governs because the machine is what cuts. The art is then laid at the
+  **manufacturer's LAYOUT SIZE, 92 × 66** (`LAYOUT_*`), which is the card plus
+  the groove — their template says so in as many words: *"card size 89×63, layout
+  size 92×66"*. That is HALF THE GROOVE past the cut on every side, derived as
+  `MACHINE_GROOVE_MM / 2` so it follows the machine rather than being typed as
+  1.5. Two neighbours then meet exactly in the middle of the groove, it fills
+  with ink, and the blade cuts through artwork however it drifts. It is drawn
+  OUTSIDE the cells and moves NO cut line — the gutters still place the cuts and
+  both chains still close on the sheet.
   EXCEPTION (owner): **30-Up Proof Labels** defaults to 1×1-overriding 3×10 AND
   to STRETCH — the die-cut label cell is the target size, so the art fills the
   cell instead of sitting proportionally inside it. It also defaults to
