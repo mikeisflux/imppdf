@@ -4791,20 +4791,32 @@ export async function imposeDivinityCards(
         && c.yMm - (d.yMm + d.hMm) < GAP), c.yMm);
       const top = edge(cells.some((d) => d !== c && spanX(d) && d.yMm - (c.yMm + c.hMm) >= 0
         && d.yMm - (c.yMm + c.hMm) < GAP), fit.sheetHMm - (c.yMm + c.hMm));
+      /* THE ART BOX IS SYMMETRIC ABOUT THE CELL, AND THE CLIP IS NOT.
+
+         These two must be kept apart. The art is laid at the cell grown by the
+         SAME amount on every side, so every card on the sheet is scaled and
+         positioned identically and the cut takes the same crop out of each. The
+         CLIP is then per edge — half a groove where a neighbour has to be met,
+         the full tolerance where there is only margin.
+
+         Tying the art to the clip instead is what put the cut closer to the
+         artwork on one column than the other: column one had its wide bleed on
+         the left and column two on the right, so the stretch pulled the picture
+         a different way in each and the two cropped differently. */
+      const B = mm(OUTER_BLEED_MM);
+      const ax = mm(c.xMm) - B, ay = mm(c.yMm) - B;
+      const aw = mm(c.wMm) + 2 * B, ah = mm(c.hMm) + 2 * B;
       const bx = mm(c.xMm) - l, by = mm(c.yMm) - bot;
       const cw = mm(c.wMm) + l + rgt, ch = mm(c.hMm) + bot + top;
       /* STRETCH — the owner's instruction, and an exception to the house rule
-         that art is fitted CONTAIN and never distorted. The cell is the card's
-         set size, 1.5 mm over a 2.5 x 3.5" on each dimension, and the art is
-         pulled to it exactly. Cover-fit would keep the aspect and shave the
-         difference off one axis, which crops the card; contain would leave white
-         inside it, which reads as a printing fault. Neither is wanted: the cell
-         IS the card, so the art becomes the cell.
+         that art is fitted CONTAIN and never distorted. Cover-fit would keep the
+         aspect and shave the difference off one axis, which crops the card;
+         contain would leave white inside it, which reads as a printing fault.
          The two axes scale independently, so a quarter turn swaps which of them
          drives the card's own width and height. */
-      const sx = cw / artW, sy = ch / artH;
-      const dw = cw, dh = ch;
-      const x = bx, y = by;
+      const sx = aw / artW, sy = ah / artH;
+      const dw = aw, dh = ah;
+      const x = ax, y = ay;
       const w = card.width * (turn ? sy : sx), h = card.height * (turn ? sx : sy);
       pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(bx, by, cw, ch), PL.clip(), PL.endPath());
       /* Rotating sweeps the box away from the placement point, so the anchor is
