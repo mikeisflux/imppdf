@@ -152,14 +152,15 @@ export function defaultSettings(type: StepType): StepSettings {
       // From RAISED_METAL_DEFAULTS, so the panel, the engine and this agree.
       return { ...RAISED_METAL_DEFAULTS };
     case 'divinitycards':
-      /* The shop's card template, measured off its own cut machine: an 89 x 63
-         cell — the machine's own programmed card, read off its panel —
-         eight to a Letter, the block doubled onto 11 x 17 that cuts into two
-         Letters. E, F and G are the machine's one gutter, 3, and must stay equal. */
+      /* An 89 x 63 cell — the machine's own programmed card, read off its
+         panel — eight to a Letter, the block doubled onto 11 x 17 that cuts
+         into two Letters. NO gutters are stored here: each stock carries its
+         own template in fit/divinity-cards.ts (Letter the shop's measured one,
+         Letter Test the manufacturer's), and an untyped gap takes the stock's
+         figure. Storing one stock's numbers here is what made the Letter Test
+         tab open on Letter's 17.45. */
       return { sheet: 'letter', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false,
-        marginXMm: 17.45, marginTopMm: 7.6, gutterXMm: 3,
-        gutterEMm: 3, gutterFMm: 3, gutterGMm: 3, blackBg: false,
-        addMarks: true };
+        blackBg: false, addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this

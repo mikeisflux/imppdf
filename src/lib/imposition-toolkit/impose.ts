@@ -4700,7 +4700,7 @@ export async function imposeDivinityCards(
 ): Promise<Uint8Array> {
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, cmyk, degrees } = PL;
-  const { fitDivinityCards, PT_PER_MM, LAYOUT_BLEED_MM, OUTER_BLEED_MM, MACHINE_GROOVE_MM } =
+  const { fitDivinityCards, PT_PER_MM, LAYOUT_BLEED_MM, OUTER_BLEED_MM, STREAK_MM } =
     await import('./fit/divinity-cards.ts');
 
   const fit = fitDivinityCards(opts.sheet ?? 'letter', {
@@ -4710,7 +4710,8 @@ export async function imposeDivinityCards(
   });
   const mm = (v: number) => v * PT_PER_MM;
 
-  /* No growth term anywhere below: the art rect IS the cell rect. */
+  /* The art rect is the cell rect grown by the template's layout bleed, and
+     nothing else — see drawSheet. */
 
   const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();
@@ -4777,56 +4778,81 @@ export async function imposeDivinityCards(
          layout bleed and meet in the middle of the groove; outside edges have
          only margin beyond them, so they get the tolerance bleed, clamped to
          whatever paper is actually there. */
-      const GAP = MACHINE_GROOVE_MM * 1.5;
+      /* Draw the card so that the WHOLE art maps onto the box (x, y, dw, dh),
+         showing only what falls inside the clip. STRETCH — the owner's
+         instruction, and an exception to the house rule that art is fitted
+         CONTAIN and never distorted: the two axes scale independently, so a
+         quarter turn swaps which of them drives the card's own width and
+         height. Rotating sweeps the box away from the placement point, so the
+         anchor is the corner it sweeps FROM: bottom-right at 90, top-left at
+         270, and the far corner at 180. */
+      const place = (x: number, y: number, dw: number, dh: number,
+                     cx: number, cy: number, cw: number, ch: number) => {
+        const sx = dw / artW, sy = dh / artH;
+        const w = card.width * (turn ? sy : sx), h = card.height * (turn ? sx : sy);
+        pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(cx, cy, cw, ch), PL.clip(), PL.endPath());
+        if (deg === 90) pg.drawPage(card, { x: x + dw, y, width: w, height: h, rotate: degrees(90) });
+        else if (deg === 270) pg.drawPage(card, { x, y: y + dh, width: w, height: h, rotate: degrees(-90) });
+        else if (deg === 180) pg.drawPage(card, { x: x + dw, y: y + dh, width: w, height: h, rotate: degrees(180) });
+        else pg.drawPage(card, { x, y, width: dw, height: dh });
+        pg.pushOperators(PL.popGraphicsState());
+      };
+
+      /* THE ART IS THE TEMPLATE'S LAYOUT BOX, ON EVERY CARD, ON EVERY EDGE:
+         the cell grown by LAYOUT_BLEED_MM all round, 92 x 66. That is the
+         manufacturer's own drawing, and it is symmetric, so every card on the
+         sheet is scaled and positioned identically and the cut takes the same
+         1.5 mm off each edge of each one. Nothing else ever sizes the art.
+
+         An earlier build stretched the art to a lopsided bleed box — wide on
+         the outside of the block, narrow on the inside — and the stretch pulled
+         the picture a different way in each column, so the two cropped
+         differently and the cut ran into the heading on one side. Then it
+         stretched to a symmetric 8 mm box instead, which cropped 8 mm off every
+         edge of every card. The crop is the template's, and only the template's. */
+      const L = mm(LAYOUT_BLEED_MM);
+      const ax = mm(c.xMm) - L, ay = mm(c.yMm) - L;
+      const aw = mm(c.wMm) + 2 * L, ah = mm(c.hMm) + 2 * L;
+      place(ax, ay, aw, ah, ax, ay, aw, ah);
+
+      /* OUTSIDE the block there is no neighbour to meet, only margin, so the
+         art's outermost sliver is drawn OUT across it to OUTER_BLEED_MM (or as
+         far as the paper goes). That is registration tolerance for a hand-fed
+         sheet: an outer blade a couple of millimetres out still lands in ink,
+         and a card border just comes out a shade wider rather than white. The
+         art itself is not moved or rescaled by it — the sliver is a separate
+         draw of the same page, scaled so STREAK_MM of its edge covers the strip.
+         Interior edges get nothing: there the neighbour's own layout box is the
+         other side of the gap, exactly as the template draws it. */
       const spanY = (d: typeof c) => d.yMm < c.yMm + c.hMm && d.yMm + d.hMm > c.yMm;
       const spanX = (d: typeof c) => d.xMm < c.xMm + c.wMm && d.xMm + d.wMm > c.xMm;
-      const edge = (has: boolean, room: number) => has
-        ? mm(LAYOUT_BLEED_MM)
-        : mm(Math.max(LAYOUT_BLEED_MM, Math.min(OUTER_BLEED_MM, room)));
-      const l = edge(cells.some((d) => d !== c && spanY(d) && c.xMm - (d.xMm + d.wMm) >= 0
-        && c.xMm - (d.xMm + d.wMm) < GAP), c.xMm);
-      const rgt = edge(cells.some((d) => d !== c && spanY(d) && d.xMm - (c.xMm + c.wMm) >= 0
-        && d.xMm - (c.xMm + c.wMm) < GAP), fit.sheetWMm - (c.xMm + c.wMm));
-      const bot = edge(cells.some((d) => d !== c && spanX(d) && c.yMm - (d.yMm + d.hMm) >= 0
-        && c.yMm - (d.yMm + d.hMm) < GAP), c.yMm);
-      const top = edge(cells.some((d) => d !== c && spanX(d) && d.yMm - (c.yMm + c.hMm) >= 0
-        && d.yMm - (c.yMm + c.hMm) < GAP), fit.sheetHMm - (c.yMm + c.hMm));
-      /* THE ART BOX IS SYMMETRIC ABOUT THE CELL, AND THE CLIP IS NOT.
-
-         These two must be kept apart. The art is laid at the cell grown by the
-         SAME amount on every side, so every card on the sheet is scaled and
-         positioned identically and the cut takes the same crop out of each. The
-         CLIP is then per edge — half a groove where a neighbour has to be met,
-         the full tolerance where there is only margin.
-
-         Tying the art to the clip instead is what put the cut closer to the
-         artwork on one column than the other: column one had its wide bleed on
-         the left and column two on the right, so the stretch pulled the picture
-         a different way in each and the two cropped differently. */
-      const B = mm(OUTER_BLEED_MM);
-      const ax = mm(c.xMm) - B, ay = mm(c.yMm) - B;
-      const aw = mm(c.wMm) + 2 * B, ah = mm(c.hMm) + 2 * B;
-      const bx = mm(c.xMm) - l, by = mm(c.yMm) - bot;
-      const cw = mm(c.wMm) + l + rgt, ch = mm(c.hMm) + bot + top;
-      /* STRETCH — the owner's instruction, and an exception to the house rule
-         that art is fitted CONTAIN and never distorted. Cover-fit would keep the
-         aspect and shave the difference off one axis, which crops the card;
-         contain would leave white inside it, which reads as a printing fault.
-         The two axes scale independently, so a quarter turn swaps which of them
-         drives the card's own width and height. */
-      const sx = aw / artW, sy = ah / artH;
-      const dw = aw, dh = ah;
-      const x = ax, y = ay;
-      const w = card.width * (turn ? sy : sx), h = card.height * (turn ? sx : sy);
-      pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(bx, by, cw, ch), PL.clip(), PL.endPath());
-      /* Rotating sweeps the box away from the placement point, so the anchor is
-         the corner it sweeps FROM: bottom-right at 90, top-left at 270, and the
-         far corner at 180. */
-      if (deg === 90) pg.drawPage(card, { x: x + dw, y, width: w, height: h, rotate: degrees(90) });
-      else if (deg === 270) pg.drawPage(card, { x, y: y + dh, width: w, height: h, rotate: degrees(-90) });
-      else if (deg === 180) pg.drawPage(card, { x: x + dw, y: y + dh, width: w, height: h, rotate: degrees(180) });
-      else pg.drawPage(card, { x, y, width: dw, height: dh });
-      pg.pushOperators(PL.popGraphicsState());
+      /* A neighbour is a cell on that side closer than two outer bleeds — any
+         nearer and the two streaks would run into each other. The gap between
+         the two blocks on a doubled sheet is wider than that, so both sides of
+         the half-sheet cut get their tolerance. */
+      const near = (gapMm: number) => gapMm >= 0 && gapMm < 2 * OUTER_BLEED_MM;
+      const reach = (has: boolean, roomMm: number) =>
+        has ? 0 : mm(Math.max(0, Math.min(OUTER_BLEED_MM, roomMm) - LAYOUT_BLEED_MM));
+      const outL = reach(cells.some((d) => d !== c && spanY(d) && near(c.xMm - (d.xMm + d.wMm))), c.xMm);
+      const outR = reach(cells.some((d) => d !== c && spanY(d) && near(d.xMm - (c.xMm + c.wMm))),
+        fit.sheetWMm - (c.xMm + c.wMm));
+      const outB = reach(cells.some((d) => d !== c && spanX(d) && near(c.yMm - (d.yMm + d.hMm))), c.yMm);
+      const outT = reach(cells.some((d) => d !== c && spanX(d) && near(d.yMm - (c.yMm + c.hMm))),
+        fit.sheetHMm - (c.yMm + c.hMm));
+      const S = mm(STREAK_MM);
+      /* One axis: where the art box lands and what is shown, for the strip
+         below the box, the box itself, and the strip above it. */
+      type Span = { b0: number; bl: number; c0: number; cl: number } | null;
+      const axis = (a0: number, al: number, lo: number, hi: number): Span[] => [
+        lo > 0.01 ? { b0: a0 - lo, bl: al * lo / S, c0: a0 - lo, cl: lo } : null,
+        { b0: a0, bl: al, c0: a0, cl: al },
+        hi > 0.01 ? { b0: a0 + al + hi - al * hi / S, bl: al * hi / S, c0: a0 + al, cl: hi } : null,
+      ];
+      const xs = axis(ax, aw, outL, outR), ys = axis(ay, ah, outB, outT);
+      xs.forEach((X, i) => ys.forEach((Y, j) => {
+        if (!X || !Y || (i === 1 && j === 1)) return;   // the middle is the art, drawn above
+        place(X.b0, Y.b0, X.bl, Y.bl, X.c0, Y.c0, X.cl, Y.cl);
+      }));
     }
   };
 
@@ -4845,7 +4871,7 @@ export async function imposeDivinityCards(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const paintRegMarks = (pg: any) => {
     if (!(opts.regMarks ?? fit.regTest)) return;
-    const shape = opts.regShape ?? (fit.regTest ? 'bar' : 'square');
+    const shape = opts.regShape ?? 'bar';
     const black = rgb(0, 0, 0);
 
     if (shape === 'bar') {

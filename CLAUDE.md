@@ -75,26 +75,27 @@ by explicit owner instruction — do not "fix" it to combine pages.
 
 - All N-up tools default to 1 column × 1 row unless the tool is specifically
   designed otherwise, and default image fit is CONTAIN (never crop/stretch).
-  EXCEPTION (owner): **Divinity Trading Cards** is 2×4 and STRETCHES the art to
-  the cell. **The cell is the CUTTER'S programmed card, 89 × 63**, read off the
-  2102-F's own panel — near enough a 2.5 × 3.5" card (88.9 × 63.5) that the
-  difference is the panel rounding to whole millimetres, but the machine's figure
-  governs because the machine is what cuts. The art is then laid at the
-  **manufacturer's LAYOUT SIZE, 92 × 66** (`LAYOUT_*`), which is the card plus
-  the groove — their template says so in as many words: *"card size 89×63, layout
-  size 92×66"*. That is HALF THE GROOVE past the cut on every side, derived as
-  `MACHINE_GROOVE_MM / 2` so it follows the machine rather than being typed as
-  1.5. Two neighbours then meet exactly in the middle of the groove, it fills
-  with ink, and the blade cuts through artwork however it drifts. It is drawn
-  OUTSIDE the cells and moves NO cut line — the gutters still place the cuts and
-  both chains still close on the sheet.
-  **OUTSIDE edges bleed much further (`OUTER_BLEED_MM`, 8), clamped to the margin
-  there.** That is the REGISTRATION TOLERANCE, and it is not optional: the cutter
-  is hard-wired for A4 while the shop runs Letter centred by hand, so the blades
-  land wherever the sheet does. At the interior 1.5 alone there was only 1.5 mm
-  of slop and the shop measured 5-5.5 mm of white down one side. The outer
-  margins (17.45 across, 7.6 / 10.8 down) are otherwise wasted paper. Interior
-  edges must KEEP the 1.5 — more would overlap a neighbour rather than meet it.
+  EXCEPTION (owner): **Divinity Trading Cards** is 2×4 and STRETCHES the art.
+  **The cell is the CUTTER'S programmed card, 89 × 63**, read off the 2102-F's
+  own panel — near enough a 2.5 × 3.5" card (88.9 × 63.5) that the difference is
+  the panel rounding to whole millimetres, but the machine's figure governs
+  because the machine is what cuts. **The art is stretched to the manufacturer's
+  LAYOUT SIZE, 92 × 66 (`LAYOUT_*`), and to NOTHING ELSE, EVER.** Their template
+  says so in as many words: *"card size 89×63, layout size 92×66"* — 1.5 past
+  the cut on every side, the same on every card and every edge, so every card is
+  cropped identically. Stretching the art to any other box is a crop the owner
+  did not ask for: a lopsided box (wide outside, narrow inside) pulled the
+  picture a different way in each column and ran the cut into the heading on
+  one side; a symmetric 8 mm box took 8 mm off every edge of every card ("that's
+  not going to work"). It is drawn OUTSIDE the cells and moves NO cut line — the
+  gutters still place the cuts and both chains still close on the sheet.
+  **OUTSIDE the block the art's EDGE is carried across the margin to
+  `OUTER_BLEED_MM` (8), clamped to the paper there** — a separate draw of the
+  outermost `STREAK_MM` sliver, so a card border just comes out wider if an
+  outer blade lands a little out. It does not move or rescale the art. Interior
+  edges get nothing: there the neighbour's own layout box is the other side of
+  the gap, exactly as the template draws it (10 mm of white between the
+  columns' boxes on the Letter Test, 3 between the rows').
   EXCEPTION (owner): **30-Up Proof Labels** defaults to 1×1-overriding 3×10 AND
   to STRETCH — the die-cut label cell is the target size, so the art fills the
   cell instead of sitting proportionally inside it. It also defaults to
@@ -117,27 +118,35 @@ by explicit owner instruction — do not "fix" it to combine pages.
   corner marks are for a camera machine and this will not see them. (The corner
   shapes remain in the code for a future camera cutter; `bar` is the default on
   the mark stock.)
-- The Divinity Cards **`letterreg`** stock is the mark-mode test sheet: same
-  eight cards and the same cell, block centred ACROSS (A=C 12.8), but the head
-  margin is NOT centred — D is `REG_HEAD_MM` (bar inset + bar depth + the gap to
-  its pad) so the blade never lands on the mark. **That head is 7.5** — owner's
-  figure off the machine, and exactly bar inset 3 + bar 3 + pad 1.5, so the pad's
-  trailing edge and the first cut are flush. An earlier build derived 11 from the
-  Akiles/Formax "first cut 5 mm past the mark" rule; that is not this machine and
-  it both wasted paper and still crowded the art. It is a separate stock so
-  the proven `letter` template (A 16.5 / C 9.1 / D 4.75 / H 11.25, measured off
-  the machine) is never disturbed — do not add marks to `letter` by moving its
-  block; its 4.75 head cannot clear a bar. Marks are drawn LAST, and their white pad
-  appears ONLY when the black background is on — it exists to give the eye a
-  paper-to-black step through the flood, and printed on plain paper it paints
-  over the bleed and shows up as a white band on the cut cards.
-  Bar length, depth, inset and feed edge are all settable. The rule that matters
-  for the FILE is that the bar plus its pad clears the first cut; anything beyond
-  that is wasted paper, so do not build in a nominal gap from another maker's
-  spec sheet.
+- The Divinity Cards **`letterreg`** stock ("Letter Test" on the panel) is **the
+  manufacturer's A4 template converted for Letter stock centred in a cutter that
+  is hard-wired for A4.** Their drawing: layout boxes 92 × 66 at 8 mm from the A4
+  edge with **10 mm between the two columns' boxes**, cut lines 89 × 63 inside
+  them, **6 mm between the row cut lines**. Across, that drawing IS the blades —
+  fixed hardware at **±6.5 and ±95.5 from the machine's centre line**
+  (`BLADE_INNER_MM` / `BLADE_OUTER_MM`) — so a Letter sheet centred on the same
+  line meets them at 12.45 / 101.45 / 114.45 / 203.45: **B is 13, not the
+  panel's 3-mm groove, and A = C = 12.45** (`LETTER_TEST_MARGIN_X_MM`, and
+  `centred` yields exactly that). Reading the groove as the column gap is what
+  put the outer blades 5 mm outside the art and the inner ones 5 mm into it —
+  10 mm of missing gap, halved, and the 5 mm of white the shop measured was that
+  number. Down, the leading edge is the reference: D is the panel's Front len
+  7.6 and E = F = G = the template's 6 (pitch 69; the cut stacks measured 68.5,
+  the panel's 3 is not what comes off). H falls out at 1.8, and four rows fit.
+  **No mark** (owner: "not needed") — the machine runs frontal and the bar is
+  OFF on every stock; it stays on the switch. Each stock carries its OWN
+  template (`sheetDefaults`), the step stores no gutters, and switching stocks
+  clears anything typed — storing one stock's numbers in the step is what made
+  the Letter Test open on Letter's 17.45. The `letter` template (A 17.45 / B 3 /
+  D 7.6 / E F G 3) is never disturbed by any of this.
+  If the bar IS turned on: it is drawn LAST, its white pad appears ONLY when the
+  black background is on (on plain paper the pad paints over the bleed and shows
+  as a white band on the cut cards), bar + pad + inset is `REG_HEAD_MM` 7.5 and
+  the head must clear that. Bar length, depth, inset and feed edge are settable.
 - **The cutter steps ONE CONSTANT PITCH and the file must step the same.** It is
   a slitter: it advances card-length + gutter per row and repeats, so E, F and G
-  have to be equal and equal to the machine's programmed gutter (3). Unequal row
+  have to be equal — the shop's `letter` template steps the panel's 3, the
+  Letter Test steps the manufacturer's 6. Unequal row
   gutters cannot describe what it does and the disagreement COMPOUNDS — a file
   stepping 65.5 / 66.2 / 66.2 against a machine stepping 68.5 put the blade
   7.6 mm into the art by row 4. The panel warns when the three differ.
@@ -149,13 +158,17 @@ by explicit owner instruction — do not "fix" it to combine pages.
 - **THE CUTTER'S PROGRAM IS THE SOURCE OF TRUTH**, read off its panel and mirrored
   in `MACHINE_*` in fit/divinity-cards.ts. Change these only when the machine is
   changed:
+      Norm sel     Frontal  indexes off the leading edge   -> no mark
       Front len    7.6 mm   leading edge to the first cut  -> D
       Card len      63 mm   the feed direction             -> cell height
       Card       89 x 63 mm                                -> the cell
-      Groove len   3.0 mm   the gutter, both axes          -> B and E F G
-  Everything else falls out: on Letter, A = C = 17.45 and H = 10.80, row pitch a
-  constant 66. Do NOT measure its output and feed that back in — that measures
-  the drift between file and machine, not the machine.
+      Groove len   3.0 mm                                  -> `letter`'s B and E F G
+      all four "comp" offsets +0.000; Cut pieces 0010
+  **The panel does not know where its own slitting blades are** — that is
+  hardware, and the manufacturer's template is the drawing of it (see the
+  Letter Test above): 13 mm between the inner pair, not the groove. Do NOT
+  measure its output and feed that back in — that measures the drift between
+  file and machine, not the machine.
 - **`Cut pieces` on the panel is 10 and cannot be changed.** At a 63 mm card five
   rows need 334.6 mm, over Letter (279.4) AND over A4 (297), so after the eight
   that fit the machine hunts for a fifth row that cannot exist on any sheet it

@@ -3,9 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import '@/lib/polyfills';
 import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, RAISED_METAL_DEFAULTS as RM, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import {
-  fitDivinityCards, type DivinityCardSheet,
-  DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, DEF_GUTTER_X_MM,
-  DEF_GUTTER_E_MM, DEF_GUTTER_F_MM, DEF_GUTTER_G_MM,
+  fitDivinityCards, sheetDefaults, type DivinityCardSheet,
   PLACED_W_MM as CELL_W, PLACED_H_MM as CELL_H,
   LAYOUT_W_MM, LAYOUT_L_MM, LAYOUT_BLEED_MM,
 } from '@/lib/imposition-toolkit/fit/divinity-cards';
@@ -2941,7 +2939,7 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
    nothing from this tool comes off landscape. */
 const SHEET_LABEL: Record<string, string> = {
   letter: '215.9 × 279.4 mm (8.5 × 11")',
-  letterreg: '215.9 × 279.4 mm (8.5 × 11, block centred)',
+  letterreg: '215.9 × 279.4 mm (8.5 × 11, centred in an A4 cutter)',
   tabloid: '279.4 × 431.8 mm (11 × 17 portrait)',
   a4: '210 × 297 mm (A4)', a3: '297 × 420 mm (A3 portrait)',
 };
@@ -2950,11 +2948,19 @@ const DOUBLED = new Set(['tabloid', 'a3']);
 function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
   /* Live from the fit module so the panel can never quote a margin the engine
      is not using — that is how it came to advertise an 89 x 63 cell. */
-  const FIT = fitDivinityCards((s.sheet ?? 'letter') as DivinityCardSheet, {
+  const SHEET = (s.sheet ?? 'letter') as DivinityCardSheet;
+  const FIT = fitDivinityCards(SHEET, {
     marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
     gutterXMm: s.gutterXMm,
     gutterEMm: s.gutterEMm, gutterFMm: s.gutterFMm, gutterGMm: s.gutterGMm,
   });
+  /* Each stock starts from its OWN template — Letter from the shop's measured
+     one, the Letter Test from the manufacturer's — so the defaults come from
+     the fit module per sheet, and nothing typed for one stock leaks into
+     another. */
+  const DEFS = sheetDefaults(SHEET);
+  const untyped = { marginXMm: undefined, marginTopMm: undefined, gutterXMm: undefined,
+    gutterEMm: undefined, gutterFMm: undefined, gutterGMm: undefined };
   /* Spinning the backs mirrors the block across, so A and C trade places. The
      panel shows the EFFECTIVE pair — what the sheet in front of you actually
      has — rather than the stored one, because a switch whose numbers do not
@@ -2995,11 +3001,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
 
       <Section label="// SHEET" help="The stock in the tray. Letter is 8.5 x 11; A4 is 17.6 mm TALLER, which is why an A4 file run on Letter paper loses the top row.">
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          {([['letter', 'Letter', '8 cards'], ['letterreg', '8.5 Reg Test', '8 cards'],
+          {([['letter', 'Letter', '8 cards'], ['letterreg', 'Letter Test', '8 cards'],
              ['tabloid', '11 × 17', '16 cards'],
              ['a4', 'A4', '8 cards'], ['a3', 'A3', '16 cards']] as const).map(([id, label, sub]) => (
             <button key={id} className="pe-btn" style={pickStyle((s.sheet ?? 'letter') === id)}
-              onClick={() => up({ sheet: id })}>{label} · {sub}</button>
+              onClick={() => up({ sheet: id, ...untyped })}>{label} · {sub}</button>
           ))}
         </div>
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
@@ -3007,12 +3013,14 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
             {' '}{DOUBLED.has(s.sheet ?? 'letter') ? 'two blocks of 2 × 4' : '2 × 4'}</div>
           {s.sheet === 'letterreg' && (
             <div style={{ marginTop: 4 }}>
-              <b>Registration test.</b> Same eight cards, same cell — but the block is
-              <b> centred</b> (A = C = {round2(FIT.marginXMm)}, D = H = {round2(FIT.marginTopMm)})
-              so every corner has equal paper for the camera marks. A separate stock on purpose:
-              the proven Letter template is untouched, still A 16.5 / C 9.1 / D 4.75 / H 11.25.
-              Once the camera finds the marks the machine locates the art optically, so the
-              lopsided margins — which exist to fight blind-feed drift — are no longer wanted.
+              <b>The manufacturer&apos;s template, converted.</b> Their A4 drawing puts the
+              cuts at 9.5 / 98.5 / 111.5 / 200.5 — the blades sit <b>±6.5</b> and <b>±95.5</b> from
+              the machine&apos;s centre line and never move. A Letter sheet centred on that same
+              line meets them at <b>12.45 / 101.45 / 114.45 / 203.45</b>, so B is <b>13</b>, not 3,
+              and A = C = <b>{round2(DEFS.marginXMm)}</b>. Down the sheet the first cut is the
+              panel&apos;s Front len <b>{round2(DEFS.marginTopMm)}</b> and the rows step the
+              template&apos;s <b>{round2(DEFS.gutterEMm)}</b> between cuts. No mark: the machine runs
+              frontal. A separate stock so the Letter template is untouched.
             </div>
           )}
           {DOUBLED.has(s.sheet ?? 'letter') && (
@@ -3044,16 +3052,16 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
              backs are spun, so each field always names the gap you can measure
              on the sheet that comes out. */
           ['A', 'Left edge to card', round2(effA), setA],
-          ['B', 'Between the columns', (s.gutterXMm as number) ?? DEF_GUTTER_X_MM,
+          ['B', 'Between the columns', round2(FIT.gutterXMm),
             (v: number) => up({ gutterXMm: v })],
           ['C', 'Card to right edge', round2(effC), setEffC],
-          ['D', 'Head to row 1', (s.marginTopMm as number) ?? DEF_MARGIN_TOP_MM,
+          ['D', 'Head to row 1', round2(FIT.marginTopMm),
             (v: number) => up({ marginTopMm: v })],
-          ['E', 'Row 1 to row 2', (s.gutterEMm as number) ?? DEF_GUTTER_E_MM,
+          ['E', 'Row 1 to row 2', round2(FIT.rowGapsMm[0]),
             (v: number) => up({ gutterEMm: v })],
-          ['F', 'Row 2 to row 3', (s.gutterFMm as number) ?? DEF_GUTTER_F_MM,
+          ['F', 'Row 2 to row 3', round2(FIT.rowGapsMm[1]),
             (v: number) => up({ gutterFMm: v })],
-          ['G', 'Row 3 to row 4', (s.gutterGMm as number) ?? DEF_GUTTER_G_MM,
+          ['G', 'Row 3 to row 4', round2(FIT.rowGapsMm[2]),
             (v: number) => up({ gutterGMm: v })],
           ['H', 'Row 4 to foot', round2(FIT.marginBottomMm), setH],
         ] as const).map(([tag, what, value, set]) => (
@@ -3067,9 +3075,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
              gutters cannot describe that, and the disagreement compounds — by
              row 4 the blade is millimetres into the art. Worth shouting about:
              this is exactly the fault that made every cut stack come out wrong. */
-          const e = (s.gutterEMm as number) ?? DEF_GUTTER_E_MM;
-          const f = (s.gutterFMm as number) ?? DEF_GUTTER_F_MM;
-          const g = (s.gutterGMm as number) ?? DEF_GUTTER_G_MM;
+          const [e, f, g] = FIT.rowGapsMm;
           if (Math.abs(e - f) < 1e-9 && Math.abs(f - g) < 1e-9) return null;
           return (
             <div className="pe-gang-warn" style={{ marginTop: 10, lineHeight: 1.6 }}>
@@ -3087,22 +3093,20 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               sheet lands behind its fronts.
             </div>
           )}
-          <b>A {DEF_MARGIN_X_MM} · B {DEF_GUTTER_X_MM} · D {DEF_MARGIN_TOP_MM} · E F G {DEF_GUTTER_E_MM}</b> on
-          Letter. Every gutter is the cutter&apos;s one programmed gutter, so the file steps
-          exactly what the machine steps — <b>{round2(CELL_H + DEF_GUTTER_E_MM)}</b> mm a row,
+          <b>A {round2(DEFS.marginXMm)} · B {round2(DEFS.gutterXMm)} · D {round2(DEFS.marginTopMm)} ·
+          E F G {round2(DEFS.gutterEMm)}</b> is this stock&apos;s template. The file steps
+          exactly what the machine steps — <b>{round2(CELL_H + DEFS.gutterEMm)}</b> mm a row,
           the same every row. C and H are the remainder — C <b>{round2(effC)}</b> and
           H <b>{round2(FIT.marginBottomMm)}</b>.
-          <br />Every number here places a <b>cut</b>, and they come off the cutter&apos;s own
-          panel — Front len, Card len, Groove len. The art is then laid at the manufacturer&apos;s
-          <b> layout size, {round2(LAYOUT_W_MM)} × {round2(LAYOUT_L_MM)}</b>, which is the card
-          plus the groove: it runs <b>{round2(LAYOUT_BLEED_MM)}</b> past every cut, so two
-          neighbours meet in the middle of the groove, it fills with ink, and the blade cuts
-          through artwork however it drifts. That is drawn outside the cells and moves no cut.
+          <br />Every number here places a <b>cut</b>. The art is laid at the manufacturer&apos;s
+          <b> layout size, {round2(LAYOUT_W_MM)} × {round2(LAYOUT_L_MM)}</b> — it runs
+          <b> {round2(LAYOUT_BLEED_MM)}</b> past every cut on every card, the same on all four
+          sides, so each card is cropped identically. On the outside of the block the art&apos;s
+          edge is carried on across the margin, so an outer blade a little out still lands in
+          ink. None of it moves a cut.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
-            onClick={() => up({ marginXMm: DEF_MARGIN_X_MM, marginTopMm: DEF_MARGIN_TOP_MM,
-              gutterXMm: DEF_GUTTER_X_MM, gutterEMm: DEF_GUTTER_E_MM,
-              gutterFMm: DEF_GUTTER_F_MM, gutterGMm: DEF_GUTTER_G_MM })}>
-            Reset to the proven template</button>
+            onClick={() => up({ ...untyped })}>
+            Reset to this stock&apos;s template</button>
         </div>
       </Section>
 
@@ -3154,10 +3158,10 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
       <Section label="// REGISTRATION" help="For a slitter's MARK mode: one black bar on the edge that feeds in first. The single eye at the throat sees paper, then black, and indexes every cut off that step.">
         <Check icon="crop" label="Registration mark"
           sub="A black bar on the feed edge, on a white pad so the eye still sees a clean step with the background flood on"
-          checked={s.regMarks ?? (s.sheet === 'letterreg')}
+          checked={s.regMarks ?? FIT.regTest}
           onChange={(v) => up({ regMarks: v })} />
-        {(s.regMarks ?? (s.sheet === 'letterreg')) && (() => {
-          const shape = s.regShape ?? (s.sheet === 'letterreg' ? 'bar' : 'square');
+        {(s.regMarks ?? FIT.regTest) && (() => {
+          const shape = s.regShape ?? 'bar';
           const edge = s.regEdge ?? 'top';
           const inset = s.regInsetMm ?? (shape === 'bar' ? 3 : 1.5);
           const depth = s.regBarDepthMm ?? 3;
@@ -3212,9 +3216,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
                     ? <b style={{ color: 'var(--pe-warn, #e0a45f)' }}>Not enough — the pad would print over the
                         first row. Grow that margin, or shrink the bar.</b>
                     : <>Fits, with {round2(feedMargin - needs)} mm to spare.</>}
-                  <br />The <b>8.5 Reg Test</b> stock sets its head to <b>7.5</b>, which is exactly the bar
-                  plus its pad — the pad ends flush with the first cut, so no paper is wasted and nothing
-                  prints over.
+                  <br />Off by default on every stock: the 2102-F runs <b>frontal</b> and indexes off
+                  the leading edge, so no mark is needed. Bar, pad and inset add up to 7.5, and a head
+                  of at least that keeps the first cut off it.
                 </div>
               ) : (
                 <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>
