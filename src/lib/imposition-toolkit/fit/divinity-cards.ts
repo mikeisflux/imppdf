@@ -2,23 +2,23 @@
  * and the block duplicated onto 11 x 17 / A3, so one sheet cuts in half into
  * two identical singles to run.
  *
- * THE CELL IS THE MACHINE'S CARD: 89 x 63, read off the cutter's own panel.
- * That is near enough a 2.5 x 3.5" card (88.9 x 63.5) that the difference is the
- * panel rounding to whole millimetres — but the machine's figure governs,
- * because the machine is what does the cutting. Never derived and never nudged
- * to make a margin come out.
+ * THE CELL IS THE CARD AS THE BLADES CUT IT. The panel says 89 x 63; on Letter
+ * the red cut lines showed the blades bracketing 91 and 90.5 (the two pairs
+ * are mounted one by one and differ), so that is the cell. Near enough a
+ * 2.5 x 3.5" card (88.9 x 63.5) either way — but the machine's figure governs,
+ * because the machine is what does the cutting, and the blade governs over
+ * the panel. Never derived and never nudged to make a margin come out.
  *
- * TWO TEMPLATES, TWO STOCKS.
+ * THE LETTER TEMPLATE is the manufacturer's A4 drawing converted for Letter
+ * stock in a machine hard-wired for A4, then honed over six test cuts with the
+ * red cut lines to what the blades actually do:
  *
- *   `letter`     the shop's own, measured off production stock:
- *                    across  A 17.45 + 89 + B 3 + 89 + C 17.45  = 215.9
- *                    down    D 7.6 + 4(63) + 3(3) + H 10.8      = 279.4
+ *     across  A 15.45 + 91 + B 9 + 90.5 + C 9.95 = 215.9
+ *     down    D 5.9 + 4(63) + 3(3.2) + H 11.9   = 279.4
  *
- *   `letterreg`  the LETTER TEST — the manufacturer's A4 template converted
- *                for Letter stock in a machine hard-wired for A4, then honed
- *                with the red cut lines to what the blades actually do:
- *                    across  A 15.45 + 91 + B 9 + 90.5 + C 9.95 = 215.9
- *                    down    D 5.9 + 4(63) + 3(3.2) + H 11.9   = 279.4
+ * (The shop's earlier hand-measured template — A 17.45 / B 3 / D 7.6 / E F G
+ * 3 — was retired once this was honed; A4 and A3 still start from those
+ * figures as DEF_*, having never been honed on this machine.)
  *
  * CUT PIECES MUST BE 8, NOT 10. At a 63 mm card length five rows need more than
  * Letter (279.4) OR A4 (297) — the machine was left set to ten, so after the
@@ -169,8 +169,8 @@ export const MACHINE_CARD_W_AS_CUT_MM = [
   LETTER_BLADES_MM[1] - LETTER_BLADES_MM[0], LETTER_BLADES_MM[3] - LETTER_BLADES_MM[2],
 ] as const;                                                                // 91, 90.5
 export const MACHINE_COL_GAP_MM = LETTER_BLADES_MM[2] - LETTER_BLADES_MM[1];   // 9
-/** A on the Letter Test: the first blade. */
-export const LETTER_TEST_MARGIN_X_MM = LETTER_BLADES_MM[0];                    // 15.45
+/** A on Letter: the first blade. */
+export const LETTER_MARGIN_X_MM = LETTER_BLADES_MM[0];                         // 15.45
 
 /** THE FEED AS IT LANDS: the panel says Front len 7.6 and Groove 3; the blade
  *  lands at 5.9 and steps 66.2. Read off the red lines on a sheet cut at
@@ -203,10 +203,11 @@ export const OUTER_BLEED_MM = 8;
  *  so it reads as the border carried on rather than a smeared picture. */
 export const STREAK_MM = 0.5;
 
-/* ── The shop's own template, measured off its own cut machine. Nothing here is
-   centred, derived from a rule, or clever: the operator has a ruler and the
-   machine, and inferring this instead of exposing it produced twenty rounds of
-   wrong sheets.
+/* ── The shop's original hand-measured template. Letter no longer uses it (see
+   LETTER_TEMPLATE); A4 and A3 still start from it, never having been honed on
+   this machine. Nothing here is centred, derived from a rule, or clever: the
+   operator has a ruler and the machine, and inferring this instead of exposing
+   it produced twenty rounds of wrong sheets.
 
    A and B place the columns; D, E, F and G place the rows. C and H are then what
    is left over — there is one degree of freedom per axis, because A, the cards
@@ -270,7 +271,7 @@ export interface DivinityCardTemplate {
  *  layout is reasoned about landscape and the finished page stood up, so their
  *  cut runs across the page rather than down it. Nothing from this tool is
  *  landscape (owner). */
-export type DivinityCardSheet = 'letter' | 'letterreg' | 'tabloid' | 'a4' | 'a3';
+export type DivinityCardSheet = 'letter' | 'tabloid' | 'a4' | 'a3';
 
 interface SheetSpec {
   wMm: number; hMm: number; blockWMm: number; doubled: boolean;
@@ -308,10 +309,15 @@ interface SheetSpec {
  *  narrow one that is either there or not is the finer gauge. Past 1 mm the
  *  art's carried edge shows beyond the red, which still reads as "over". */
 export const CUT_LINE_MM = 1;
+/** THE LETTER TEMPLATE — every gap as honed, shared by Letter and by each half
+ *  of an 11 x 17, which is two Letters side by side and has to cut as two. */
+const LETTER_TEMPLATE: DivinityCardTemplate = {
+  marginXMm: LETTER_MARGIN_X_MM, gutterXMm: MACHINE_COL_GAP_MM, marginTopMm: MACHINE_FRONT_AS_CUT_MM,
+  gutterEMm: MACHINE_GROOVE_AS_CUT_MM, gutterFMm: MACHINE_GROOVE_AS_CUT_MM, gutterGMm: MACHINE_GROOVE_AS_CUT_MM,
+};
 const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
-  letter:  { wMm: LETTER_W_MM,  hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false },
-  /* THE LETTER TEST SHEET — the manufacturer's A4 template, converted for a
-     Letter sheet sitting centred in a machine that is hard-wired for A4.
+  /* LETTER — the manufacturer's A4 template, converted for a Letter sheet
+     sitting in a machine that is hard-wired for A4, then honed.
 
      Across, the blades are hardware and never move: on A4 the template puts the
      cuts at 9.5 / 98.5 / 111.5 / 200.5, which is ±6.5 and ±95.5 either side of
@@ -329,20 +335,19 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
      machine (see TEMPLATE_ROW_CUT_GAP_MM).
 
      No mark. Frontal mode indexes off the leading edge, and the owner's word is
-     that the bar is not needed; the marks stay available on the switch. It is a
-     separate stock so the `letter` template is never disturbed. */
-  letterreg: { wMm: LETTER_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false,
-               regTest: false, showCuts: false, cellWMm: MACHINE_CARD_W_AS_CUT_MM,
-               template: { marginXMm: LETTER_TEST_MARGIN_X_MM,
-                           gutterXMm: MACHINE_COL_GAP_MM, marginTopMm: MACHINE_FRONT_AS_CUT_MM,
-                           gutterEMm: MACHINE_GROOVE_AS_CUT_MM, gutterFMm: MACHINE_GROOVE_AS_CUT_MM,
-                           gutterGMm: MACHINE_GROOVE_AS_CUT_MM } },
+     that the bar is not needed; the marks stay available on the switch. This
+     was the "Letter Test" stock while it was being honed; once honed it was
+     promoted to THE Letter stock and the hand-measured one retired (owner). */
+  letter:  { wMm: LETTER_W_MM,  hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false,
+             cellWMm: MACHINE_CARD_W_AS_CUT_MM, template: LETTER_TEMPLATE },
   /* 11 x 17 comes out PORTRAIT — 279.4 x 431.8 — with the two blocks and the
      cut between them turned a quarter turn onto it. The cards keep exactly the
      orientation they have on a Letter sheet relative to the block; it is the
      page that stands up, so the half-sheet cut runs ACROSS the portrait page at
-     215.9 from the foot instead of down it. */
-  tabloid: { wMm: TABLOID_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: true, rotated: true },
+     215.9 from the foot instead of down it. Each half IS a Letter sheet to the
+     cutter, so it carries the Letter template and cells. */
+  tabloid: { wMm: TABLOID_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: true, rotated: true,
+             cellWMm: MACHINE_CARD_W_AS_CUT_MM, template: LETTER_TEMPLATE },
   a4:      { wMm: A4_W_MM,      hMm: A4_H_MM,     blockWMm: A4_W_MM,     doubled: false },
   /* A3 stands up the same way — 297 x 420. NOTHING FROM THIS TOOL COMES OUT
      LANDSCAPE (owner). */

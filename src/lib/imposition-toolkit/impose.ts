@@ -4953,22 +4953,28 @@ export async function imposeDivinityCards(
   const spinFront = spun && !backPage;
   const frontTurn = (((needsTurn(front) ? 90 : 0) + (spinFront ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
 
-  /* SPIN BACKS MIRRORS THE MARGINS ACROSS. The template is not symmetric — A is
-     15.5 and C is 12.6, because that is where the machine cuts on production
-     stock — so a sheet turned over about its long edge only lands on its front
-     if the block is mirrored. In the shop's terms: on the backs, 15.5 goes to C
-     and 12.6 goes to A.
+  /* A BACK SHEET IS ALWAYS MIRRORED. The template is not symmetric — A is 15.45
+     and C 9.95, the left cell 91 and the right 90.5, because that is where the
+     blades are — so a sheet turned over only lands on its front if every cell
+     is mirrored, cell by cell (`sheetW − (x + w)` keeps the two widths where
+     they belong). That is geometry, not a preference, and it is not on the
+     switch: for a while it was, because with the old A = C = 17.45 a block
+     mirrored onto itself and the switch looked dead — but with this template
+     an unmirrored back is 6 mm off its front. SPIN BACKS is the half turn of
+     the art and only that.
 
-     THE CHECKBOX CONTROLS THIS. It used to happen automatically on the back
-     sheet, which meant ticking the box changed nothing an operator could see on
-     a two-page job — the margins had already swapped without being asked, and
-     the switch appeared dead. One control, one visible effect: ticked, the backs
-     mirror AND their art turns a half turn; unticked, neither happens.
-
-     Mirroring the cells keeps working on the doubled sheet, where the two blocks
-     mirror into each other, and the marks are ruled from the same mirrored cells
-     so the cut lines follow the art. */
-  const mirrored = fit.cells.map((c) => ({ ...c, xMm: fit.sheetWMm - (c.xMm + c.wMm) }));
+     THE MIRROR AXIS IS THE DUPLEX FLIP'S. The printer turns the PAGE about one
+     of its edges: a long-edge flip of a portrait page mirrors page x. On the
+     doubled stocks the page is the layout stood up, so page x is layout y and
+     the two blocks do NOT swap — each mirrors top to bottom, D to H — while a
+     short-edge flip there mirrors layout x and the blocks do swap. The marks
+     and the red lines are ruled from the same mirrored cells so the cut lines
+     follow the art. */
+  const flipLong = (opts.flip ?? 'long') === 'long';
+  const mirrorAcross = fit.rotated ? !flipLong : flipLong;
+  const mirrored = fit.cells.map((c) => mirrorAcross
+    ? { ...c, xMm: fit.sheetWMm - (c.xMm + c.wMm) }
+    : { ...c, yMm: fit.sheetHMm - (c.yMm + c.hMm) });
 
   /* THE PAGE STANDS UP, THE ART DOES NOT MOVE. On a doubled sheet the layout is
      reasoned about landscape — two blocks side by side with the guillotine cut
@@ -5037,10 +5043,17 @@ export async function imposeDivinityCards(
        whole point: a back already lying the cell's way round needs no quarter
        turn at all, and the old swap left it at 0 either way — so the switch did
        nothing for exactly the artwork most likely to need it. */
-    const baseBack: 0 | 90 | 270 = needsTurn(back)
-      ? ((opts.flip ?? 'long') === 'long' ? 270 : 90) : 0;
+    /* The base turn follows the MIRROR AXIS, not the flip's name: mirroring
+       about the other axis is the same physical outcome as mirroring plus a
+       half turn, so a back mirrored down (a long-edge flip of the stood-up
+       doubled page, or a short-edge flip of a portrait one) takes the turn
+       180 from one mirrored across. Raster-checked in every state: the back
+       lands exactly behind its front unspun, exactly a half turn from it spun. */
+    const baseBack: 0 | 90 | 180 | 270 = needsTurn(back)
+      ? (mirrorAcross ? 270 : 90)
+      : (mirrorAcross ? 0 : 180);
     const backTurn = ((baseBack + (spun ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
-    const backCells = spun ? mirrored : fit.cells;
+    const backCells = mirrored;   // always — see above
     const bp = newSheet();
     drawSheet(bp, back, backTurn, backCells);
     pages.push(bp);

@@ -7,13 +7,13 @@
  *   cell    89 x 63      the MACHINE'S programmed card, off its own panel
  *   art     92 x 66, the vendor's LAYOUT SIZE — 1.5 past every cut, every card
  *
- *   letter      across  A 17.45 + 89 + B 3 + 89 + C 17.45  = 215.9
- *               down    D 7.6 + 4(63) + 3(3) + H 10.8      = 279.4
- *   letterreg   the manufacturer's A4 template, converted for Letter stock
- *               in a cutter hard-wired for A4, blades 3 mm right of centre
- *               the blades at 15.45 / 106.45 / 115.45 / 205.95:
+ *   letter      the manufacturer's A4 template, converted for Letter stock
+ *               in a cutter hard-wired for A4 and honed with the red cut
+ *               lines to the blades at 15.45 / 106.45 / 115.45 / 205.95:
  *               across  A 15.45 + 91 + B 9 + 90.5 + C 9.95 = 215.9
  *               down    D 5.9 + 4(63) + 3(3.2) + H 11.9   = 279.4
+ *               (11 x 17 is two of these; A4 / A3 keep the panel's 89 x 63
+ *               and the shop's original A 17.45 / B 3 / D 7.6 / E F G 3)
  *
  * The gutters place the CUTS and are read off the cutter's own panel (Front len,
  * Card len, Groove len) — never measured back off its output, which measures the
@@ -32,7 +32,7 @@ import {
   LAYOUT_BLEED_MM, LAYOUT_W_MM, LAYOUT_L_MM, OUTER_BLEED_MM,
   REG_HEAD_MM, REG_MARK_INSET_MM, REG_MARK_DEPTH_MM, REG_MARK_PAD_MM,
   sheetDefaults, TEMPLATE_A4_EDGE_MM, TEMPLATE_COL_GAP_MM, TEMPLATE_COL_CUT_GAP_MM,
-  TEMPLATE_ROW_CUT_GAP_MM, LETTER_TEST_MARGIN_X_MM,
+  TEMPLATE_ROW_CUT_GAP_MM, LETTER_MARGIN_X_MM,
   TEMPLATE_BLADE_INNER_MM, TEMPLATE_BLADE_OUTER_MM, MACHINE_COL_GAP_MM, CUT_LINE_MM,
   FRONT_OFFSET_MM, MACHINE_FRONT_AS_CUT_MM, MACHINE_CARD_W_AS_CUT_MM, LETTER_BLADES_MM,
   MACHINE_GROOVE_AS_CUT_MM,
@@ -54,19 +54,20 @@ test("THE CELL IS THE MACHINE'S CARD — 89 x 63, off its own panel", () => {
   assert.ok(Math.abs(PLACED_H_MM - CARD_W_MM) < 0.6, 'within rounding of 2.5in');
 });
 
-test("THE FILE STEPS WHAT THE MACHINE STEPS — Front 7.6, pitch 66", () => {
-  /* Everything the cutter does is these four numbers. If the file disagrees with
-     any of them the blade walks into the art, a little further every row. */
-  assert.ok(close(MACHINE_FRONT_MM, 7.6) && close(MACHINE_GROOVE_MM, 3));
+test("THE FILE STEPS WHAT THE MACHINE STEPS — as it lands: 5.9, then 66.2 a row", () => {
+  /* The panel says Front len 7.6 and Groove 3; the red cut lines showed the
+     blade landing at 5.9 and stepping 66.2. The file steps what the blade
+     does. If it disagrees the blade walks into the art a little further every
+     row — which is exactly how the 66.2 was found. */
+  assert.ok(close(MACHINE_FRONT_MM, 7.6) && close(MACHINE_GROOVE_MM, 3), "the panel's figures, for the record");
   const f = fitDivinityCards('letter');
-  assert.ok(close(f.marginTopMm, MACHINE_FRONT_MM), 'D is the panel Front len');
-  assert.deepEqual(f.rowGapsMm, [MACHINE_GROOVE_MM, MACHINE_GROOVE_MM, MACHINE_GROOVE_MM],
-    'E F G are the panel Groove len');
-  assert.ok(close(DEF_GUTTER_X_MM, MACHINE_GROOVE_MM), 'and so is B');
+  assert.ok(close(f.marginTopMm, MACHINE_FRONT_AS_CUT_MM) && close(f.marginTopMm, 5.9, 1e-9), 'D is the first cut as it lands');
+  assert.deepEqual(f.rowGapsMm, [MACHINE_GROOVE_AS_CUT_MM, MACHINE_GROOVE_AS_CUT_MM, MACHINE_GROOVE_AS_CUT_MM],
+    'E F G are the groove as cut');
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
   for (let i = 1; i < ys.length; i++)
-    assert.ok(close(ys[i - 1]! - ys[i]!, MACHINE_CARD_L_MM + MACHINE_GROOVE_MM),
-      'row pitch is card + groove = 66, every row');
+    assert.ok(close(ys[i - 1]! - ys[i]!, MACHINE_CARD_L_MM + MACHINE_GROOVE_AS_CUT_MM, 1e-9),
+      'row pitch is card + groove = 66.2, every row');
 });
 
 test('FIVE ROWS DO NOT FIT ANY SHEET IT TAKES — Cut pieces should be 8', () => {
@@ -88,30 +89,30 @@ test('tabloid is two Letters side by side in the LAYOUT frame, cut at 215.9', ()
   assert.equal(f.n, 16);
   assert.ok(close(f.cutXMm[0]!, 215.9), 'cut down the middle into two Letters');
   const right = f.cells.slice(8);
-  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, DEF_MARGIN_X_MM),
+  assert.ok(close(Math.min(...right.map((c) => c.xMm)) - 215.9, fitDivinityCards('letter').marginXMm),
     'each half carries its own A margin');
 });
 
 test('B is a setting, and the cell never moves with it', () => {
   const wide = fitDivinityCards('letter', { gutterXMm: 20 });
-  assert.ok(close(wide.cells[0]!.wMm, 89), 'still the cut size across');
+  assert.ok(close(wide.cells[0]!.wMm, 91, 1e-9) && close(wide.cells[1]!.wMm, 90.5, 1e-9), 'still the cut sizes across');
   assert.ok(close(wide.cells[0]!.hMm, 63), 'still the cut size down');
   const xs = [...new Set(wide.cells.map((c) => c.xMm))].sort((a, b) => a - b);
-  assert.ok(close(xs[1]! - xs[0]!, 89 + 20), 'column pitch follows the gutter');
+  assert.ok(close(xs[1]! - xs[0]!, 91 + 20, 1e-9), 'column pitch follows the gutter');
   assert.equal(wide.n, 8, 'and it still fits eight');
 });
 
-test('ONE gutter everywhere — B 3 and E F G 3, the machine steps one pitch', () => {
+test('E F G EQUAL, and B is its own gap — the machine steps one pitch', () => {
   const f = fitDivinityCards('letter');
-  assert.ok(close(DEF_GUTTER_X_MM, 3), 'B defaults to the machine gutter, 3');
-  assert.deepEqual(f.rowGapsMm, [3, 3, 3], 'E F G are the machine gutter, and EQUAL');
+  assert.ok(close(f.gutterXMm, MACHINE_COL_GAP_MM) && close(f.gutterXMm, 9, 1e-9), 'B is the gap between the inner blades');
+  assert.deepEqual(f.rowGapsMm, [3.2, 3.2, 3.2], 'E F G are the groove as cut, and EQUAL');
   /* The whole point: a slitter advances one pitch and repeats it. Unequal row
      gutters cannot describe that, and the error compounds down the sheet. */
   const pitches = [...new Set(f.rowGapsMm)];
   assert.equal(pitches.length, 1, 'one gutter, not three different ones');
   const xs = [...new Set(f.cells.map((c) => c.xMm))].sort((a, b) => a - b);
   const ys = [...new Set(f.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  assert.ok(close(xs[1]! - xs[0]!, PLACED_W_MM + 3), 'column pitch = cell + B');
+  assert.ok(close(xs[1]! - xs[0]!, f.cellWsMm[0]! + f.gutterXMm, 1e-9), 'column pitch = the left cell + B');
   for (let i = 1; i < ys.length; i++)
     assert.ok(close(ys[i - 1]! - ys[i]!, PLACED_H_MM + f.rowGapsMm[i - 1]!), 'row pitch = cell + its own gap');
 });
@@ -175,43 +176,40 @@ test("THE VENDOR'S LAYOUT SIZE — art at 92 x 66 over an 89 x 63 cut", async ()
   const f = fitDivinityCards('letter');
   const B = LAYOUT_BLEED_MM;
   assert.ok(close(B, 1.5), 'the layout box is 1.5 past the cut');
-  assert.ok(close(LAYOUT_W_MM, 92) && close(LAYOUT_L_MM, 66), "the vendor's 92 x 66");
-  /* THE ART IS THE LAYOUT BOX AND NOTHING ELSE: eight rectangles of exactly
-     92 x 66, one per card, each the cell grown 1.5 on every side. Identical on
-     every card and symmetric on every edge, so the cut takes the same 1.5 off
-     each edge of each one — the crop is the template's. */
-  const art = rects.filter((r) => close(r[2], LAYOUT_W_MM, 0.02) && close(r[3], LAYOUT_L_MM, 0.02));
+  assert.ok(close(LAYOUT_W_MM, 92) && close(LAYOUT_L_MM, 66), "the vendor's 92 x 66 on their 89 card");
+  /* THE ART IS THE LAYOUT BOX AND NOTHING ELSE: eight rectangles, one per
+     card, each ITS cell grown 1.5 on every side — 94 x 66 down the left
+     column and 93.5 x 66 down the right, since the two blade pairs differ.
+     Symmetric on every edge, so the cut takes the same 1.5 off each edge of
+     each one — the crop is the template's. */
+  const art = rects.filter((r) => f.cells.some((c) =>
+    close(r[0], c.xMm - B, 0.02) && close(r[1], c.yMm - B, 0.02)
+    && close(r[2], c.wMm + 2 * B, 0.02) && close(r[3], c.hMm + 2 * B, 0.02)));
   assert.equal(art.length, 8, `eight layout boxes drawn, got ${art.length}`);
-  for (const c of f.cells) {
-    assert.ok(art.some((r) => close(r[0], c.xMm - B, 0.02) && close(r[1], c.yMm - B, 0.02)),
-      `a layout box sits 1.5 outside the cell at ${c.xMm},${c.yMm}`);
-  }
-  /* EVERY OTHER RECTANGLE IS OUTSIDE THE BLOCK. The outer strips carry the
-     art's edge across the margin (registration tolerance) and none of them
-     reaches into a cell — the crop cannot be touched by them. */
+  /* EVERY OTHER RECTANGLE IS OUTSIDE THE CELLS: the strips carry the art's
+     edge across the margins and into the gaps, and none reaches into a cell —
+     the crop cannot be touched by them. */
   const strips = rects.filter((r) => !art.includes(r));
-  assert.ok(strips.length > 0, 'the outer edges are carried across the margin');
+  assert.ok(strips.length > 0, 'the edges are carried past the layout boxes');
   for (const r of strips) {
     const inside = f.cells.some((c) =>
       r[0] < c.xMm + c.wMm - 0.01 && r[0] + r[2] > c.xMm + 0.01
       && r[1] < c.yMm + c.hMm - 0.01 && r[1] + r[3] > c.yMm + 0.01);
     assert.ok(!inside, `a strip at ${r.join(',')} overlaps a cell`);
-    const inBlock = r[0] >= f.marginXMm - 0.01 && r[0] + r[2] <= f.marginXMm + f.blockWMm + 0.01
-      && r[1] >= f.marginBottomMm - 0.01 && r[1] + r[3] <= f.marginBottomMm + f.blockHMm + 0.01;
-    assert.ok(!inBlock, `a strip at ${r.join(',')} lies inside the block — interior edges get none`);
   }
-  /* On the Letter template B is 3, so the two columns' layout boxes MEET in the
-     middle of the groove, and so do the rows. */
+  /* The two columns' boxes sit the gap less two bleeds apart, and the carries
+     from each side meet in the MIDDLE of the gap. */
   const left = art.filter((r) => r[0] < 60).sort((a, b) => b[1] - a[1]);
   const right = art.filter((r) => r[0] > 60);
-  assert.ok(close(right[0]![0] - (left[0]![0] + left[0]![2]), 0, 0.02),
-    'the two columns of art MEET — the groove is ink, not paper');
-  for (let i = 1; i < left.length; i++)
-    assert.ok(close(left[i - 1]![1] - (left[i]![1] + left[i]![3]), 0, 0.02), 'and so do the rows');
+  assert.ok(close(right[0]![0] - (left[0]![0] + left[0]![2]), f.gutterXMm - 2 * B, 0.02),
+    'the boxes are the gap less a bleed each side apart');
+  const mid = f.marginXMm + f.cellWsMm[0]! + f.gutterXMm / 2;
+  assert.ok(strips.some((r) => close(r[0] + r[2], mid, 0.02)) && strips.some((r) => close(r[0], mid, 0.02)),
+    'and the carries meet in the middle of the gap');
   /* ...while every CUT line is exactly where the gutters put it. */
   assert.ok(close(left[0]![0] + B, f.marginXMm, 0.02), 'A cut line unmoved');
-  assert.ok(close((right[0]![0] + B) - (left[0]![0] + left[0]![2] - B), MACHINE_GROOVE_MM, 0.02),
-    'B cut lines still one groove apart');
+  assert.ok(close((right[0]![0] + B) - (left[0]![0] + left[0]![2] - B), f.gutterXMm, 0.02),
+    'B cut lines still the gap apart');
   assert.ok(close(left[3]![1] + B, f.marginBottomMm, 0.02), 'H unmoved');
 
   /* THE REGISTRATION TOLERANCE reaches OUTER_BLEED_MM from the cut on the
@@ -221,12 +219,12 @@ test("THE VENDOR'S LAYOUT SIZE — art at 92 x 66 over an 89 x 63 cut", async ()
   assert.ok(close(Math.max(...rects.map((r) => r[0] + r[2])),
     215.9 - f.marginRightMm + Math.min(OUTER_BLEED_MM, f.marginRightMm), 0.02), 'and so is the right');
   assert.ok(close(Math.max(...rects.map((r) => r[1] + r[3])), 279.4, 0.02),
-    'row 1 runs to the sheet edge — the head has only Front len of room');
+    'row 1 runs to the sheet edge — the head has less than an outer bleed of room');
   /* CONSTANT ROW PITCH is the property that matters against a slitter. */
   const cuts = [...new Set(f.cells.map((c) => 279.4 - c.yMm - c.hMm))].sort((a, b) => a - b);
   for (let i = 1; i < cuts.length; i++)
-    assert.ok(close(cuts[i]! - cuts[i - 1]!, PLACED_H_MM + MACHINE_GROOVE_MM, 0.02),
-      `row pitch is ${PLACED_H_MM + MACHINE_GROOVE_MM} every time, got ${cuts[i]! - cuts[i - 1]!}`);
+    assert.ok(close(cuts[i]! - cuts[i - 1]!, PLACED_H_MM + f.rowGapsMm[0]!, 0.02),
+      `row pitch is ${PLACED_H_MM + f.rowGapsMm[0]!} every time, got ${cuts[i]! - cuts[i - 1]!}`);
 });
 
 test('BLACK BACKGROUND: rich CMYK black, 1.5 of white left all round', async () => {
@@ -286,7 +284,7 @@ test('BLACK BACKGROUND: the cut marks invert so they stay visible', async () => 
   assert.ok(/1 1 1 RG/.test(await marks(true)), 'white marks on a flooded sheet');
 });
 
-test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", async () => {
+test("LETTER is the manufacturer's template, converted for an A4 cutter and honed", async () => {
   /* Their A4 drawing, to the millimetre: layout boxes 92 x 66 at 8 from the
      sheet edge with 10 between the two columns, cut lines 89 x 63 inside them
      and 6 between the rows. Across, that is a drawing of the BLADES — hardware,
@@ -311,24 +309,24 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
      panel's 3 mm groove as the column gap, 10 short of the truth, halved. */
   assert.ok(close((TEMPLATE_COL_CUT_GAP_MM - MACHINE_GROOVE_MM) / 2, 5), 'the missing 5 mm, explained');
 
-  const plain = fitDivinityCards('letter');
-  const reg = fitDivinityCards('letterreg');
+  const plain = fitDivinityCards('a4');
+  const reg = fitDivinityCards('letter');
   assert.ok(close(plain.marginXMm, DEF_MARGIN_X_MM) && close(plain.marginTopMm, DEF_MARGIN_TOP_MM)
-    && close(plain.gutterXMm, DEF_GUTTER_X_MM), 'Letter is untouched by any of this');
-  assert.equal(reg.n, 8, 'same eight cards');
+    && close(plain.gutterXMm, DEF_GUTTER_X_MM), "A4 still starts from the shop's original figures");
+  assert.equal(reg.n, 8, 'eight cards');
   assert.ok(close(reg.cells[0]!.wMm, 91, 1e-9) && close(reg.cells[1]!.wMm, 90.5, 1e-9),
     'the cells across are the cards as cut, 91 and 90.5');
   assert.deepEqual(reg.cellWsMm.map((v) => Math.round(v * 100) / 100), [91, 90.5]);
   assert.ok(close(reg.cellWMm, 91, 1e-9), 'and the first column is what is quoted as the cell');
   assert.ok(close(reg.cellHMm, PLACED_H_MM) && close(reg.cells[0]!.hMm, 63), 'and 63 down');
-  assert.ok(close(plain.cellWMm, 89) && close(plain.cells[0]!.wMm, 89), "Letter's cell is still 89");
+  assert.ok(close(plain.cellWMm, 89) && close(plain.cells[0]!.wMm, 89), "A4's cell is the panel's 89");
   /* ACROSS: Letter's centre is 107.95, so a centred sheet would meet the cuts
      at 12.45 / 101.45 / 114.45 / 203.45 — B 13. The test cut of that sheet
      came back with 1.5 of white on the LEFT column's inner edge and the right
      column's inner cut 3 into its art, nothing on either outer edge: the whole
      set sits BLADE_OFFSET_MM to the right, so A carries it and C gives it up. */
   assert.ok(close(reg.gutterXMm, MACHINE_COL_GAP_MM) && close(reg.gutterXMm, 9, 1e-9), 'B is the gap as cut, 9');
-  assert.ok(close(reg.marginXMm, LETTER_TEST_MARGIN_X_MM) && close(reg.marginXMm, 15.45, 1e-9),
+  assert.ok(close(reg.marginXMm, LETTER_MARGIN_X_MM) && close(reg.marginXMm, 15.45, 1e-9),
     'A 15.45 — the first blade');
   assert.ok(close(reg.marginRightMm, 9.95, 1e-9), 'C 9.95');
   assert.ok(close(reg.marginXMm + reg.blockWMm + reg.marginRightMm, 215.9, 1e-9), 'and the chain closes');
@@ -350,21 +348,28 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66.2, 1e-9), 'pitch 66.2');
   assert.ok(close(reg.marginBottomMm, 279.4 - 5.9 - 4 * 63 - 3 * 3.2, 1e-9), 'H is the 11.9 left over');
   const plainYs = [...new Set(plain.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  for (let i = 1; i < plainYs.length; i++) assert.ok(close(plainYs[i - 1]! - plainYs[i]!, 66), 'Letter still steps 66');
+  for (let i = 1; i < plainYs.length; i++) assert.ok(close(plainYs[i - 1]! - plainYs[i]!, 66), 'A4 still steps the panel 66');
+  /* 11 x 17 is two Letters side by side, so each half carries this template. */
+  const tab = fitDivinityCards('tabloid');
+  assert.deepEqual(tab.cells.slice(0, 8).map((c) => [c.xMm, c.yMm, c.wMm].map((v) => Math.round(v * 100) / 100)),
+    reg.cells.map((c) => [c.xMm, c.yMm, c.wMm].map((v) => Math.round(v * 100) / 100)), 'left half IS Letter');
+  assert.deepEqual(tab.cells.slice(8).map((c) => [c.xMm - 215.9, c.yMm, c.wMm].map((v) => Math.round(v * 100) / 100)),
+    reg.cells.map((c) => [c.xMm, c.yMm, c.wMm].map((v) => Math.round(v * 100) / 100)), 'and so is the right half');
   /* NO MARK. The machine runs frontal and the owner says the bar is not needed. */
   assert.ok(!reg.regTest && !plain.regTest, 'no stock asks for marks');
   /* The panel's defaults come from the same place. */
   const same = (got: Record<string, number>, want: Record<string, number>) =>
     Object.entries(want).every(([k, v]) => close(got[k]!, v, 1e-9));
-  assert.ok(same(sheetDefaults('letterreg'),
-    { marginXMm: 15.45, gutterXMm: 9, marginTopMm: 5.9, gutterEMm: 3.2, gutterFMm: 3.2, gutterGMm: 3.2 }),
-    `Letter Test defaults: ${JSON.stringify(sheetDefaults('letterreg'))}`);
   assert.ok(same(sheetDefaults('letter'),
-    { marginXMm: 17.45, gutterXMm: 3, marginTopMm: 7.6, gutterEMm: 3, gutterFMm: 3, gutterGMm: 3 }),
+    { marginXMm: 15.45, gutterXMm: 9, marginTopMm: 5.9, gutterEMm: 3.2, gutterFMm: 3.2, gutterGMm: 3.2 }),
     `Letter defaults: ${JSON.stringify(sheetDefaults('letter'))}`);
+  assert.ok(same(sheetDefaults('tabloid'), sheetDefaults('letter')), '11 x 17 starts from the same');
+  assert.ok(same(sheetDefaults('a4'),
+    { marginXMm: 17.45, gutterXMm: 3, marginTopMm: 7.6, gutterEMm: 3, gutterFMm: 3, gutterGMm: 3 }),
+    `A4 defaults: ${JSON.stringify(sheetDefaults('a4'))}`);
   /* A typed value still wins, so the operator can nudge after a test cut. */
-  assert.ok(close(fitDivinityCards('letterreg', { marginXMm: 20 }).marginXMm, 20));
-  assert.ok(close(fitDivinityCards('letterreg', { gutterEMm: 3 }).rowGapsMm[0], 3));
+  assert.ok(close(fitDivinityCards('letter', { marginXMm: 20 }).marginXMm, 20));
+  assert.ok(close(fitDivinityCards('letter', { gutterEMm: 3 }).rowGapsMm[0], 3));
 
   /* RENDERED: eight layout boxes, each its cell plus 1.5 all round (94 x 66
      and 93.5 x 66), the two columns' boxes 6 apart and the rows' boxes 0.2
@@ -374,7 +379,7 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   const zlib = await import('node:zlib');
   const { PDFStream } = await import('pdf-lib');
   const d = await PDFDocument.load(await imposeDivinityCards(await cardPdf(),
-    { sheet: 'letterreg', addMarks: false, backs: false }));
+    { sheet: 'letter', addMarks: false, backs: false }));
   const st = d.getPage(0).node.normalizedEntries().Contents;
   let t = '';
   for (let k = 0; st && k < st.size(); k++) {
@@ -412,7 +417,7 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
      put each cut against where the blade went. */
   assert.ok(!reg.showCuts && !plain.showCuts, 'off by default everywhere');
   const d3 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(),
-    { sheet: 'letterreg', addMarks: false, backs: false, showCuts: true }));
+    { sheet: 'letter', addMarks: false, backs: false, showCuts: true }));
   const st3 = d3.getPage(0).node.normalizedEntries().Contents;
   t = '';
   for (let k = 0; st3 && k < st3.size(); k++) {
@@ -442,7 +447,7 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   }
   assert.ok(t.indexOf('1 0 0 rg') > t.lastIndexOf('Do'), 'and the red goes on AFTER the art');
   const plainT = await (async () => {
-    const d2 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false, backs: false }));
+    const d2 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet: 'a4', addMarks: false, backs: false }));
     const st2 = d2.getPage(0).node.normalizedEntries().Contents;
     let s = '';
     for (let k = 0; st2 && k < st2.size(); k++) {
@@ -452,7 +457,7 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
     }
     return s;
   })();
-  assert.ok(!/1 0 0 rg/.test(plainT), 'Letter gets none either');
+  assert.ok(!/1 0 0 rg/.test(plainT), 'A4 gets none either');
 });
 
 test('MARK MODE: one black bar on the feed edge, clear of the first cut', async () => {
@@ -467,7 +472,7 @@ test('MARK MODE: one black bar on the feed edge, clear of the first cut', async 
   /* OFF unless asked — the machine runs frontal. When it IS asked for, the
      head has to be grown to clear it: the stock's own 6.9 does not. */
   const d = await PDFDocument.load(await imposeDivinityCards(await cardPdf(),
-    { sheet: 'letterreg', addMarks: false, backs: false, regMarks: true, marginTopMm: REG_HEAD_MM }));
+    { sheet: 'letter', addMarks: false, backs: false, regMarks: true, marginTopMm: REG_HEAD_MM }));
   const st = d.getPage(0).node.normalizedEntries().Contents;
   let t = '';
   for (let k = 0; st && k < st.size(); k++) {
@@ -483,7 +488,7 @@ test('MARK MODE: one black bar on the feed edge, clear of the first cut', async 
   assert.ok(close(bar!.x + bar!.w / 2, 215.9 / 2, 0.01), 'centred on the edge');
   const fromTop = 279.4 - (bar!.y + bar!.h);
   assert.ok(close(fromTop, REG_MARK_INSET_MM, 0.01), `${REG_MARK_INSET_MM} mm in from the feed edge`);
-  const f = fitDivinityCards('letterreg', { marginTopMm: REG_HEAD_MM });
+  const f = fitDivinityCards('letter', { marginTopMm: REG_HEAD_MM });
   const barEnds = fromTop + bar!.h;
   assert.ok(close(REG_HEAD_MM, REG_MARK_INSET_MM + REG_MARK_DEPTH_MM + REG_MARK_PAD_MM), 'bar + pad + inset = 7.5');
   assert.ok(f.marginTopMm - barEnds >= REG_MARK_PAD_MM - 1e-9,
@@ -511,27 +516,27 @@ test('the corner shapes still draw, for a camera machine', async () => {
     }
     return t;
   };
-  /* OFF on the normal Letter stock, and off unless asked. */
+  /* OFF on every stock, and off unless asked. */
   const plain = await streamOf(await imposeDivinityCards(await cardPdf(),
-    { sheet: 'letter', addMarks: false, backs: false }));
+    { sheet: 'a4', addMarks: false, backs: false }));
   const reg = await streamOf(await imposeDivinityCards(await cardPdf(),
-    { sheet: 'letterreg', addMarks: false, backs: false }));
+    { sheet: 'letter', addMarks: false, backs: false }));
   const whitePads = (t: string) => (t.match(/^1 1 1 rg$/gm) || []).length;
-  assert.equal(whitePads(plain), 0, 'Letter gets no marks');
+  assert.equal(whitePads(plain), 0, 'A4 gets no marks');
   assert.equal(whitePads(reg), 0, 'and no pad on plain paper — it would print AS white');
   const regFlooded = await streamOf(await imposeDivinityCards(await cardPdf(),
-    { sheet: 'letterreg', addMarks: false, backs: false, blackBg: true, regMarks: true }));
+    { sheet: 'letter', addMarks: false, backs: false, blackBg: true, regMarks: true }));
   assert.equal(whitePads(regFlooded), 1, 'ONE bar, not four corners, once there is a flood');
   const noAsk = await streamOf(await imposeDivinityCards(await cardPdf(),
-    { sheet: 'letterreg', addMarks: false, backs: false, blackBg: true }));
+    { sheet: 'letter', addMarks: false, backs: false, blackBg: true }));
   assert.equal(whitePads(noAsk), 0, 'and nothing at all unless the switch is on');
 
   /* Every shape still draws, and the marks go on LAST so nothing lands on top. */
   for (const regShape of ['square', 'circle', 'lshape', 'cross'] as const) {
     const t = await streamOf(await imposeDivinityCards(await cardPdf(),
-      { sheet: 'letterreg', regShape, addMarks: false, backs: false, regMarks: true }));
+      { sheet: 'letter', regShape, addMarks: false, backs: false, regMarks: true }));
     const withFlood = await streamOf(await imposeDivinityCards(await cardPdf(),
-      { sheet: 'letterreg', regShape, addMarks: false, backs: false, blackBg: true, regMarks: true }));
+      { sheet: 'letter', regShape, addMarks: false, backs: false, blackBg: true, regMarks: true }));
     assert.equal(whitePads(withFlood), 4, `${regShape} draws four marks on a flooded sheet`);
     assert.ok(withFlood.lastIndexOf('1 1 1 rg') > withFlood.lastIndexOf('Do'),
       `${regShape} marks are drawn last`);
@@ -778,11 +783,12 @@ test('SPIN BACKS turns a lone sheet — and still never adds a page', async () =
 });
 
 test('the BACK sheet mirrors across — A and C trade places', async () => {
-  /* The template is NOT symmetric: A 17.45 against C 17.45, because that is where
-     the machine cuts on production stock. A sheet turned over about its long
-     edge therefore only lands on its front if the block is mirrored. Nothing
-     about a symmetric template would need this, and nothing would catch it
-     breaking either — hence the test. */
+  /* The template is NOT symmetric — A 15.45 against C 9.95, and the left cell
+     91 against the right 90.5, because that is where the blades are. A sheet
+     turned over about its long edge therefore only lands on its front if the
+     block is mirrored, cell by cell — ALWAYS, ticked or not. The switch is the
+     half turn of the art; the mirror is geometry. (It was on the switch once,
+     when A = C made an unmirrored back land anyway; here it would be 6 mm off.) */
   const out = await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', addMarks: false });
   const zlib = await import('node:zlib');
   const { PDFStream } = await import('pdf-lib');
@@ -798,10 +804,53 @@ test('the BACK sheet mirrors across — A and C trade places', async () => {
     return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100))].sort((a, b) => a - b);
   };
-  /* Every rectangle's left edge: the left column's outer strip and layout box,
-     the right column's layout box and its outer strip. */
-  assert.deepEqual(await colsOf(0), [9.45, 15.95, 107.95, 199.95], 'unticked, nothing mirrors');
-  assert.deepEqual(await colsOf(1), [9.45, 15.95, 107.95, 199.95], 'including the back sheet');
+  /* Every rectangle's left edge: the left column's outer strip (15.45 − 1.5 −
+     6.5) and layout box (13.95), the carry to mid-gap from the left box
+     (107.95), the carry back from the right box (110.95), the right box
+     (113.95) and its outer strip (205.95 + 1.5). */
+  const laid = [7.45, 13.95, 107.95, 110.95, 113.95, 207.45];
+  assert.deepEqual(await colsOf(0), laid, 'the front is laid as the template says');
+  /* Mirrored cell by cell: the 90.5 cell comes to the left at C 9.95 (box 8.45,
+     outer strip 1.95), the 91 cell goes to the right at 109.45 (box 107.95,
+     outer strip 201.95), and the carries meet at the new mid-gap 104.95. */
+  const mirroredLaid = [1.95, 8.45, 101.95, 104.95, 107.95, 201.95];
+  assert.deepEqual(await colsOf(1), mirroredLaid, 'the back is mirrored — unticked');
+  const spunDoc = await PDFDocument.load(await imposeDivinityCards(await frontBackPdf(),
+    { sheet: 'letter', addMarks: false, spinBacks: true }));
+  const spunCols = async (i: number) => {
+    const st = spunDoc.getPage(i).node.normalizedEntries().Contents;
+    let t = '';
+    for (let k = 0; st && k < st.size(); k++) {
+      const raw = (spunDoc.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+      try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+      catch { t += Buffer.from(raw).toString('latin1'); }
+    }
+    return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
+      .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100))].sort((a, b) => a - b);
+  };
+  assert.deepEqual(await spunCols(0), laid, 'ticked: the front does not move');
+  assert.deepEqual(await spunCols(1), mirroredLaid, 'ticked: the back is mirrored exactly the same — the switch is the turn, not the mirror');
+  /* A SHORT-edge flip turns the page about the other edge, so the back mirrors
+     top to bottom instead: D 5.9 goes to the foot, H 11.9 to the head. */
+  const shortDoc = await PDFDocument.load(await imposeDivinityCards(await frontBackPdf(),
+    { sheet: 'letter', addMarks: false, flip: 'short' }));
+  const rowsOf = async (i: number) => {
+    const st = shortDoc.getPage(i).node.normalizedEntries().Contents;
+    let t = '';
+    for (let k = 0; st && k < st.size(); k++) {
+      const raw = (shortDoc.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+      try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+      catch { t += Buffer.from(raw).toString('latin1'); }
+    }
+    const ys = [...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
+      .map((m) => [Number(m[2]) / PT_PER_MM, Number(m[4]) / PT_PER_MM] as const);
+    return { top: Math.round(Math.max(...ys.map(([y, h]) => y + h)) * 100) / 100, bottom: Math.round(Math.min(...ys.map(([y]) => y)) * 100) / 100,
+      xs: [...new Set(ys.length ? [...t.matchAll(/([\d.]+) [\d.]+ [\d.]+ [\d.]+ re/g)].map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100) : [])].sort((a, b) => a - b) };
+  };
+  const sf = await rowsOf(0), sb = await rowsOf(1);
+  assert.deepEqual(sb.xs, laid, 'short-edge: across is untouched');
+  assert.ok(close(sf.top, 279.4, 0.02) && close(sf.bottom, 11.9 - 1.5 - 6.5, 0.02), 'front: head 5.9 runs to the edge, foot 11.9 carried 8');
+  assert.ok(close(sb.bottom, 0, 0.02) && close(sb.top, 279.4 - 11.9 + 1.5 + 6.5, 0.02), 'back: mirrored top to bottom');
 });
 
 test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
@@ -827,12 +876,13 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100));
   };
-  assert.equal(await leftEdge(off), 9.45, 'unticked: A 17.45, less the outer bleed');
-  assert.equal(await leftEdge(on), 9.45, 'ticked: A becomes C — equal now, so it does not move');
-  /* A 17.45 against C 17.45 is a 6.9 mm move — if the mirror ever silently stopped
-     working this is the assertion that screams, which the near-identical pairs
-     of earlier templates could not do. */
-  /* A and C are equal now, so the lopsided case below is what proves the mirror. */
+  assert.equal(await leftEdge(off), 7.45, 'unticked: A 15.45, less the outer bleed 8');
+  /* Ticked, C 9.95 comes to the left — with the RIGHT column's 90.5 cell, since
+     the mirror is cell by cell: 9.95 − 1.5 − (8 − 1.5) = 1.95. A 5.5 mm move,
+     and the narrower cell on the left: if the mirror ever silently stopped
+     working, or mirrored the block without its cells, this is the assertion
+     that screams. */
+  assert.equal(await leftEdge(on), 1.95, 'ticked: C 9.95 comes to the left, less the outer bleed');
   /* Run it again on a deliberately lopsided A, so the claim does not rest on one
      pair of numbers that happen to differ — the block really is flipped end for
      end, whatever A is set to. */
@@ -840,7 +890,7 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
   assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), lop)),
     20 - Math.min(OUTER_BLEED_MM, 20), 'lopsided, unticked: A 20, less the outer bleed');
   assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), { ...lop, spinBacks: true })),
-    (() => { const C = 215.9 - 20 - (2 * PLACED_W_MM + DEF_GUTTER_X_MM);
+    (() => { const C = 215.9 - 20 - fitDivinityCards('letter').blockWMm;
       return Math.round((C - Math.min(OUTER_BLEED_MM, C)) * 100) / 100; })(),
     'lopsided, ticked: C comes to the left');
 });
@@ -861,8 +911,19 @@ test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100));
   };
-  assert.equal(await leftOf(0), 9.45, 'fronts untouched');
-  assert.equal(await leftOf(1), 9.45, 'backs swapped');
+  assert.equal(await leftOf(0), 7.45, 'fronts untouched');
+  assert.equal(await leftOf(1), 1.95, 'backs mirrored — C to the left, with the right column\'s cell');
+  /* And unticked the back is mirrored just the same — the switch is only the turn. */
+  const plain = await PDFDocument.load(await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', addMarks: false }));
+  const st = plain.getPage(1).node.normalizedEntries().Contents;
+  let t = '';
+  for (let k = 0; st && k < st.size(); k++) {
+    const raw = (plain.context.lookup(st.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+    try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+    catch { t += Buffer.from(raw).toString('latin1'); }
+  }
+  assert.equal(Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
+    .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100)), 1.95, 'unticked backs mirrored too');
 });
 
 test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {

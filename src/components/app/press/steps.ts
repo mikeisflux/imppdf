@@ -155,10 +155,9 @@ export function defaultSettings(type: StepType): StepSettings {
       /* An 89 x 63 cell — the machine's own programmed card, read off its
          panel — eight to a Letter, the block doubled onto 11 x 17 that cuts
          into two Letters. NO gutters are stored here: each stock carries its
-         own template in fit/divinity-cards.ts (Letter the shop's measured one,
-         Letter Test the manufacturer's), and an untyped gap takes the stock's
-         figure. Storing one stock's numbers here is what made the Letter Test
-         tab open on Letter's 17.45. */
+         own template in fit/divinity-cards.ts, and an untyped gap takes the
+         stock's figure. Storing one stock's numbers here is what once made
+         the test stock open on another stock's margins. */
       return { sheet: 'letter', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false,
         blackBg: false, addMarks: true };
     case 'mediafix':
@@ -623,7 +622,9 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       case 'divinitycards': {
         const { imposeDivinityCards } = await import('@/lib/imposition-toolkit/impose');
         b = await imposeDivinityCards(b, {
-          sheet: ['letter', 'letterreg', 'tabloid', 'a4', 'a3'].includes(s.sheet) ? s.sheet : 'letter',
+          /* 'letterreg' (the Letter Test) was promoted to 'letter'; a saved job
+             that still says it falls through to Letter here. */
+          sheet: ['letter', 'tabloid', 'a4', 'a3'].includes(s.sheet) ? s.sheet : 'letter',
           page: s.page ?? 1,
           backPage: s.backPage ?? 2, backs: s.backs !== false,
           flip: s.flip === 'short' ? 'short' : 'long',

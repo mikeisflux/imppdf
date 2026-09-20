@@ -2937,8 +2937,7 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 /* PAGE sizes, which on the doubled stocks are the landscape layout stood up —
    nothing from this tool comes off landscape. */
 const SHEET_LABEL: Record<string, string> = {
-  letter: '215.9 × 279.4 mm (8.5 × 11")',
-  letterreg: '215.9 × 279.4 mm (8.5 × 11, centred in an A4 cutter)',
+  letter: '215.9 × 279.4 mm (8.5 × 11", honed to the 2102-F)',
   tabloid: '279.4 × 431.8 mm (11 × 17 portrait)',
   a4: '210 × 297 mm (A4)', a3: '297 × 420 mm (A3 portrait)',
 };
@@ -2953,10 +2952,8 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
     gutterXMm: s.gutterXMm,
     gutterEMm: s.gutterEMm, gutterFMm: s.gutterFMm, gutterGMm: s.gutterGMm,
   });
-  /* Each stock starts from its OWN template — Letter from the shop's measured
-     one, the Letter Test from the manufacturer's — so the defaults come from
-     the fit module per sheet, and nothing typed for one stock leaks into
-     another. */
+  /* Each stock starts from its OWN template, so the defaults come from the
+     fit module per sheet and nothing typed for one stock leaks into another. */
   const DEFS = sheetDefaults(SHEET);
   const untyped = { marginXMm: undefined, marginTopMm: undefined, gutterXMm: undefined,
     gutterEMm: undefined, gutterFMm: undefined, gutterGMm: undefined };
@@ -3001,8 +2998,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
 
       <Section label="// SHEET" help="The stock in the tray. Letter is 8.5 x 11; A4 is 17.6 mm TALLER, which is why an A4 file run on Letter paper loses the top row.">
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          {([['letter', 'Letter', '8 cards'], ['letterreg', 'Letter Test', '8 cards'],
-             ['tabloid', '11 × 17', '16 cards'],
+          {([['letter', 'Letter', '8 cards'], ['tabloid', '11 × 17', '16 cards'],
              ['a4', 'A4', '8 cards'], ['a3', 'A3', '16 cards']] as const).map(([id, label, sub]) => (
             <button key={id} className="pe-btn" style={pickStyle((s.sheet ?? 'letter') === id)}
               onClick={() => up({ sheet: id, ...untyped })}>{label} · {sub}</button>
@@ -3011,9 +3007,9 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
           <div>Sheet <b>{SHEET_LABEL[s.sheet ?? 'letter']}</b> — <b>{FIT.n} cards</b>,
             {' '}{DOUBLED.has(s.sheet ?? 'letter') ? 'two blocks of 2 × 4' : '2 × 4'}</div>
-          {s.sheet === 'letterreg' && (
+          {!DOUBLED.has(s.sheet ?? 'letter') && (s.sheet ?? 'letter') === 'letter' && (
             <div style={{ marginTop: 4 }}>
-              <b>The manufacturer&apos;s template, converted.</b> Their A4 drawing puts the
+              <b>The manufacturer&apos;s template, converted and honed.</b> Their A4 drawing puts the
               cuts at 9.5 / 98.5 / 111.5 / 200.5 — the blades sit <b>±6.5</b> and <b>±95.5</b> from
               the machine&apos;s centre line and never move. A Letter sheet centred on that same
               line would meet them at 12.45 / 101.45 / 114.45 / 203.45. The test cuts with the red
@@ -3026,8 +3022,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               7.6 and 66: the red lines showed the tops shrinking down the sheet and a bottom
               appearing on the last row, which only a longer pitch does.
               No mark: it runs frontal. Honed over six test cuts with a {round2(CUT_LINE_MM)} mm
-              red line on every cut; the lines are off now. A separate stock so the Letter
-              template is untouched.
+              red line on every cut; the lines are off now. 11 × 17 is two of these side by side.
             </div>
           )}
           {DOUBLED.has(s.sheet ?? 'letter') && (
