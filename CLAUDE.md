@@ -139,26 +139,38 @@ by explicit owner instruction — do not "fix" it to combine pages.
   lines on a sheet cut to 13 showed the full band on BOTH columns' inner edges
   and only the thin on-the-line half on both outer edges — inner blades a
   millimetre outside the lines, outer pair a millimetre inside, symmetric,
-  i.e. the pairs 2 mm closer at the centre. So **A = 16.45, B = 11, C = 10.45**
-  (`LETTER_TEST_MARGIN_X_MM`). Lateral registration and blade spacing are
-  hardware, and a test cut with the red lines on is exactly how they are
-  measured; a pitch is not.
-  Down, the leading edge is the reference: D is the panel's Front len 7.6 and
-  **E = F = G = the panel's Groove 3, pitch 66** — NOT the template's 6. A sheet
-  cut at 69 came back with the white growing row by row (none / 1.5 / 3 / 3
-  plus a sliver of the card above), which is 3 mm of pitch error compounding;
-  the old "68.5" measurement that seemed to back the 6 was drift, exactly as
-  the rule below says. H falls out at 10.8.
+  i.e. the pairs 2 mm closer at the centre. The 1 mm red lines then took 1 mm
+  back off the offset (red down every LEFT edge, none down the right — the
+  set a millimetre left of the file; `BLADE_OFFSET_MM` is **2**). So
+  **A = 15.45, B = 11, C = 11.45** (`LETTER_TEST_MARGIN_X_MM`). Lateral
+  registration and blade spacing are hardware, and a test cut with the red
+  lines on is exactly how they are measured; a pitch is not. **The sheet is
+  held by lock rails on both sides — placement is NOT a variable** (owner), so
+  every red edge is the machine and goes straight into the file.
+  Down, the leading edge is the reference: **D is 6.9** — the panel's Front len
+  7.6 plus `FRONT_OFFSET_MM` −0.7, the red lines showing ~0.7 along the TOP of
+  all eight cards and none along the bottoms (every row early by the same
+  amount: reference, not pitch) — and **E = F = G = the panel's Groove 3, pitch
+  66** — NOT the template's 6. A sheet cut at 69 came back with the white
+  growing row by row (none / 1.5 / 3 / 3 plus a sliver of the card above),
+  which is 3 mm of pitch error compounding; the old "68.5" measurement that
+  seemed to back the 6 was drift, exactly as the rule below says. H falls out
+  at 11.5.
   **No mark** (owner: "not needed") — the machine runs frontal and the bar is
   OFF on every stock; it stays on the switch. **Every cut line is painted as a
-  3 mm RED band (`CUT_LINE_MM`, `showCuts`) over the art, full width/height
+  1 mm RED band (`CUT_LINE_MM`, `showCuts`) over the art, full width/height
   like the blade, hard-coded on this stock (owner). The band lies entirely
   OUTSIDE the cell with its inner edge ON the cut line** — so a blade on the
   line leaves NO red on the card, red left on a card is the blade landing
-  outside the line by exactly that width, and art missing off an edge is it
-  landing inside. (Centred on the line it left 1.5 on every edge of a perfect
-  cut, which had to be subtracted by eye.) Between two rows the two bands are
-  the one 3 mm groove. Each stock carries its OWN
+  outside the line by exactly that width (past 1 mm the carried art edge shows
+  beyond it), and art missing off an edge is it landing inside. (Centred on
+  the line it left 1.5 on every edge of a perfect cut, which had to be
+  subtracted by eye; 3 wide it only said "some" once the error was under a
+  millimetre — owner: "shrink the red down to 1mm and let's hone it in".)
+  **Honing rule: read the red, put it in.** With the lock rails the sheet
+  cannot move, so a red edge is the machine: red down a LEFT edge on every
+  card = take that off A (and D for a TOP edge); red down a RIGHT edge = add
+  it; red on BOTH sides of a card = the card is cut wider than the cell. Each stock carries its OWN
   template (`sheetDefaults`), the step stores no gutters, and switching stocks
   clears anything typed — storing one stock's numbers in the step is what made
   the Letter Test open on Letter's 17.45. The `letter` template (A 17.45 / B 3 /

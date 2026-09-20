@@ -163,7 +163,20 @@ export const BLADE_OUTER_MM = BLADE_INNER_MM + MACHINE_CARD_W_MM;          // 94
  *  (The earlier `letter` sheet, 5 mm of white on the outer right, is the same
  *  shift plus the 5 mm the wrong B accounted for.) This is a lateral
  *  registration, the one thing a test cut IS for — not a pitch. */
-export const BLADE_OFFSET_MM = 3;
+export const BLADE_OFFSET_MM = 2;
+/* 2, not the 3 first read: with the 1 mm red lines on, the sheet cut at 3 came
+   back with ~1 mm of red down the LEFT edge of all eight cards and none down
+   the right — the whole set a millimetre left of the file. The sheet is held
+   by lock rails on both sides (owner: "placement is not an issue"), so that
+   is the machine, not the feed, and it is taken off. */
+
+/** THE FIRST CUT AS IT LANDS: the panel says Front len 7.6, the blade lands
+ *  0.7 earlier. Same sheet, same red lines: ~0.7 mm of red along the TOP of
+ *  all eight cards, none along the bottoms — every row early by the same
+ *  amount, so the pitch is right and it is the leading-edge reference that is
+ *  off. (The panel's "Frontal comp" would do the same thing on the machine.) */
+export const FRONT_OFFSET_MM = -0.7;
+export const MACHINE_FRONT_AS_CUT_MM = MACHINE_FRONT_MM + FRONT_OFFSET_MM;   // 6.9
 
 /** OUTER bleed — how far the art's edge is carried past the cuts on the
  *  OUTSIDE of the block, where there is no neighbour to meet and nothing but
@@ -273,8 +286,12 @@ interface SheetSpec {
  *  edge IS the cut line — so a blade on the line leaves no red on the card at
  *  all, and any red that does come through is the overshoot, exact width.
  *  (Centred on the line it left 1.5 on every edge of a perfect cut, which had
- *  to be subtracted by eye before the sheet could be read.) */
-export const CUT_LINE_MM = 3;
+ *  to be subtracted by eye before the sheet could be read.)
+ *  1, down from 3 (owner, "shrink the red down to 1mm and let's hone it in"):
+ *  once the error is under a millimetre a wide band only says "some", and a
+ *  narrow one that is either there or not is the finer gauge. Past 1 mm the
+ *  art's carried edge shows beyond the red, which still reads as "over". */
+export const CUT_LINE_MM = 1;
 const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
   letter:  { wMm: LETTER_W_MM,  hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false },
   /* THE LETTER TEST SHEET — the manufacturer's A4 template, converted for a
@@ -289,12 +306,13 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
      Then the blade set is BLADE_OFFSET_MM to the right of where the centred
      sheet expects it, and the inner pair are MACHINE_COL_GAP_MM apart rather
      than the 13 drawn (both measured off test cuts with the red lines on), so
-     the cuts fall at 16.45 / 105.45 / 116.45 / 205.45 — A 16.45, B 11, C 10.45.
+     the cuts fall at 15.45 / 104.45 / 115.45 / 204.45 — A 15.45, B 11, C 11.45.
 
      Down, the leading edge is the reference so the sheet's length does not
-     matter: the first cut is the panel's Front len and the rows step the
-     panel's Groove — 66 a row, which the cut stacks confirmed. The template's
-     6 is NOT this machine (see TEMPLATE_ROW_CUT_GAP_MM).
+     matter: the first cut lands FRONT_OFFSET_MM before the panel's Front len
+     (6.9, red lines again) and the rows step the panel's Groove — 66 a row,
+     which the cut stacks confirmed. The template's 6 is NOT this machine (see
+     TEMPLATE_ROW_CUT_GAP_MM).
 
      No mark. Frontal mode indexes off the leading edge, and the owner's word is
      that the bar is not needed; the marks stay available on the switch. It is a
@@ -302,7 +320,7 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
   letterreg: { wMm: LETTER_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false,
                regTest: false, showCuts: true,
                template: { marginXMm: LETTER_W_MM / 2 - BLADE_OUTER_MM + BLADE_OFFSET_MM,
-                           gutterXMm: MACHINE_COL_GAP_MM, marginTopMm: MACHINE_FRONT_MM,
+                           gutterXMm: MACHINE_COL_GAP_MM, marginTopMm: MACHINE_FRONT_AS_CUT_MM,
                            gutterEMm: MACHINE_GROOVE_MM, gutterFMm: MACHINE_GROOVE_MM,
                            gutterGMm: MACHINE_GROOVE_MM } },
   /* 11 x 17 comes out PORTRAIT — 279.4 x 431.8 — with the two blocks and the
@@ -320,7 +338,7 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
 /** Where the Letter Test's first cut falls from the sheet edge: the outer blade
  *  is BLADE_OUTER_MM off the centre line, Letter's centre is at 107.95, and
  *  the set sits BLADE_OFFSET_MM to the right of that. */
-export const LETTER_TEST_MARGIN_X_MM = LETTER_W_MM / 2 - BLADE_OUTER_MM + BLADE_OFFSET_MM;   // 16.45
+export const LETTER_TEST_MARGIN_X_MM = LETTER_W_MM / 2 - BLADE_OUTER_MM + BLADE_OFFSET_MM;   // 15.45
 
 /** Every gap a stock starts from, A B D E F G, before the operator types over
  *  any of them. The panel shows these as the field defaults and the reset

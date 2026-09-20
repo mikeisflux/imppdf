@@ -5071,13 +5071,12 @@ export async function imposeDivinityCards(
   } });
 
   /* THE CUT LINES, IN RED, ON TOP OF THE ART — hard-coded on the test stock
-     (owner). A 3 mm red band on every cut, run the full width or height of the
-     sheet the way the blade runs, and lying entirely OUTSIDE the cell: its
-     inner edge is the cut line. So a blade on the line leaves NO red on the
-     card, any red that comes through is the blade landing outside the line by
-     exactly that width, and art missing off an edge is it landing inside.
-     Readable with a ruler. Drawn after the art so nothing covers it. Between
-     two rows the two bands are the same 3 mm groove. */
+     (owner). A CUT_LINE_MM red band on every cut, run the full width or height
+     of the sheet the way the blade runs, and lying entirely OUTSIDE the cell:
+     its inner edge is the cut line. So a blade on the line leaves NO red on
+     the card, any red that comes through is the blade landing outside the line
+     by exactly that width, and art missing off an edge is it landing inside.
+     Readable with a ruler. Drawn after the art so nothing covers it. */
   pages.forEach((pg, pi) => { if (fit.showCuts) {
     const bands = new Set<string>();
     const k = (v: number) => Math.round(v * 1e6) / 1e6;   // so a shared groove is one band

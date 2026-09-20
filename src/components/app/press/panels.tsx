@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import '@/lib/polyfills';
 import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, RAISED_METAL_DEFAULTS as RM, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import {
-  fitDivinityCards, sheetDefaults, type DivinityCardSheet,
+  fitDivinityCards, sheetDefaults, type DivinityCardSheet, CUT_LINE_MM, BLADE_OFFSET_MM, FRONT_OFFSET_MM,
   PLACED_W_MM as CELL_W, PLACED_H_MM as CELL_H,
   LAYOUT_W_MM, LAYOUT_L_MM, LAYOUT_BLEED_MM,
 } from '@/lib/imposition-toolkit/fit/divinity-cards';
@@ -3017,14 +3017,15 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               cuts at 9.5 / 98.5 / 111.5 / 200.5 — the blades sit <b>±6.5</b> and <b>±95.5</b> from
               the machine&apos;s centre line and never move. A Letter sheet centred on that same
               line would meet them at 12.45 / 101.45 / 114.45 / 203.45. The test cuts then showed
-              the whole set sitting <b>3 mm to the right</b> of that, and the inner pair
-              <b> {round2(DEFS.gutterXMm)}</b> apart rather than the 13 drawn — so A is
-              <b> {round2(DEFS.marginXMm)}</b>, B <b>{round2(DEFS.gutterXMm)}</b>, and C what is
-              left. Down the sheet the first cut is the panel&apos;s Front len
-              <b> {round2(DEFS.marginTopMm)}</b> and the rows step the panel&apos;s Groove
+              the whole set sitting <b>{round2(BLADE_OFFSET_MM)} mm to the right</b> of that, and
+              the inner pair <b>{round2(DEFS.gutterXMm)}</b> apart rather than the 13 drawn — so A
+              is <b>{round2(DEFS.marginXMm)}</b>, B <b>{round2(DEFS.gutterXMm)}</b>, and C what is
+              left. Down the sheet the first cut lands at <b>{round2(DEFS.marginTopMm)}</b> — the
+              panel&apos;s Front len 7.6 less the {round2(-FRONT_OFFSET_MM)} the red lines showed it
+              cutting early — and the rows step the panel&apos;s Groove
               <b> {round2(DEFS.gutterEMm)}</b> — 66 a row; the template&apos;s 6 is not this machine.
-              No mark: it runs frontal. <b>Every cut is painted as a 3 mm red band just outside
-              the card</b>, full width like the blade, its inner edge on the cut line: a blade on
+              No mark: it runs frontal. <b>Every cut is painted as a {round2(CUT_LINE_MM)} mm red
+              band just outside the card</b>, full width like the blade, its inner edge on the cut line: a blade on
               the line leaves no red on the card, red left on a card is the blade landing outside
               the line by exactly that much, and art missing off an edge is it landing inside. A
               separate stock so the Letter template is untouched.
