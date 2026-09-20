@@ -76,10 +76,11 @@ by explicit owner instruction — do not "fix" it to combine pages.
 - All N-up tools default to 1 column × 1 row unless the tool is specifically
   designed otherwise, and default image fit is CONTAIN (never crop/stretch).
   EXCEPTION (owner): **Divinity Trading Cards** is 2×4 and STRETCHES the art.
-  **The cell is the CUTTER'S programmed card, 89 × 63**, read off the 2102-F's
-  own panel — near enough a 2.5 × 3.5" card (88.9 × 63.5) that the difference is
-  the panel rounding to whole millimetres, but the machine's figure governs
-  because the machine is what cuts. **The art is stretched to the manufacturer's
+  **The cell is the card AS THE BLADES CUT IT** — 89 × 63 off the 2102-F's
+  panel on the shop's `letter` template, **90 × 63 on the Letter Test** where
+  the red cut lines showed the blades bracketing 90 (see below). Near enough a
+  2.5 × 3.5" card (88.9 × 63.5) either way, but the machine's figure governs
+  because the machine is what cuts — and the blade governs over the panel. **The art is stretched to the manufacturer's
   LAYOUT SIZE, 92 × 66 (`LAYOUT_*`), and to NOTHING ELSE, EVER.** Their template
   says so in as many words: *"card size 89×63, layout size 92×66"* — 1.5 past
   the cut on every side, the same on every card and every edge, so every card is
@@ -93,8 +94,8 @@ by explicit owner instruction — do not "fix" it to combine pages.
   `OUTER_BLEED_MM` (8), clamped to the paper there** — a separate draw of the
   outermost `STREAK_MM` sliver, so a card border just comes out wider if an
   blade lands a little out. It does not move or rescale the art. Between two
-  cards the same carry runs to the MIDDLE of the gap from each side (4 mm each
-  into the Letter Test's 11 mm column gap), so a lateral shift up to half the
+  cards the same carry runs to the MIDDLE of the gap from each side (3.5 mm each
+  into the Letter Test's 10 mm column gap), so a lateral shift up to half the
   gap shows no white on any card; where the gap is only the 3 mm groove the
   layout boxes already meet and there is nothing to carry.
   EXCEPTION (owner): **30-Up Proof Labels** defaults to 1×1-overriding 3×10 AND
@@ -133,20 +134,21 @@ by explicit owner instruction — do not "fix" it to combine pages.
   (`BLADE_OFFSET_MM`, measured off the first test cut of this template: 1.5 mm
   of white on the left column's inner edge, the right column's inner cut 3 mm
   into its art, nothing on either outer edge — only a whole-set shift does
-  that). **And the inner pair are 11 apart as cut, not the 13 drawn**
-  (`MACHINE_COL_GAP_MM`; blades `BLADE_INNER_MM` ±5.5 / `BLADE_OUTER_MM`
-  ±94.5, the drawing's ±6.5 / ±95.5 kept as `TEMPLATE_BLADE_*`): the red
-  lines on a sheet cut to 13 showed the full band on BOTH columns' inner edges
-  and only the thin on-the-line half on both outer edges — inner blades a
-  millimetre outside the lines, outer pair a millimetre inside, symmetric,
-  i.e. the pairs 2 mm closer at the centre. The 1 mm red lines then took 1 mm
-  back off the offset (red down every LEFT edge, none down the right — the
-  set a millimetre left of the file; `BLADE_OFFSET_MM` is **2**). So
-  **A = 15.45, B = 11, C = 11.45** (`LETTER_TEST_MARGIN_X_MM`). Lateral
-  registration and blade spacing are hardware, and a test cut with the red
-  lines on is exactly how they are measured; a pitch is not. **The sheet is
-  held by lock rails on both sides — placement is NOT a variable** (owner), so
-  every red edge is the machine and goes straight into the file.
+  that). **Then the blades cut the card 90 WIDE, not the panel's 89, and the
+  inner pair are 10 apart** (`MACHINE_CARD_W_AS_CUT_MM`, `MACHINE_COL_GAP_MM`;
+  blades `BLADE_INNER_MM` ±5 / `BLADE_OUTER_MM` ±95 from the set's centre, the
+  drawing's ±6.5 / ±95.5 kept as `TEMPLATE_BLADE_*`). The tell, off the 1 mm
+  red lines: a sheet had ~1 mm of red down every LEFT edge; the block was
+  moved 1 mm left; the next sheet had ~1 mm of red down every RIGHT edge. A
+  shift cannot do that — only a card cut wider than the cell can — so the
+  Letter Test's cell is **90 × 63** (`cellWMm` on the stock; `letter` keeps
+  89) and the set's centre is midway, `BLADE_OFFSET_MM` **2.5**. So **A =
+  15.45, cell 90, B = 10, C = 10.45** (`LETTER_TEST_MARGIN_X_MM`); the layout
+  box is the cell + 1.5, 93 × 66 here. Lateral registration and blade spacing
+  are hardware, and a test cut with the red lines on is exactly how they are
+  measured; a pitch is not. **The sheet is held by lock rails on both sides —
+  placement is NOT a variable** (owner), so every red edge is the machine and
+  goes straight into the file.
   Down, the leading edge is the reference: **D is 6.9** — the panel's Front len
   7.6 plus `FRONT_OFFSET_MM` −0.7, the red lines showing ~0.7 along the TOP of
   all eight cards and none along the bottoms (every row early by the same
@@ -202,8 +204,8 @@ by explicit owner instruction — do not "fix" it to combine pages.
       all four "comp" offsets +0.000; Cut pieces 0010
   **The panel does not know where its own slitting blades are** — that is
   hardware, and the manufacturer's template is the drawing of it (see the
-  Letter Test above): 13 mm between the inner pair as drawn, 11 as cut, never
-  the groove. Do NOT
+  Letter Test above): the card 90 wide as cut against the panel's 89, 13 mm
+  between the inner pair as drawn and 10 as cut, never the groove. Do NOT
   measure its output and feed that back in — that measures the drift between
   file and machine, not the machine.
 - **`Cut pieces` on the panel is 10 and cannot be changed.** At a 63 mm card five

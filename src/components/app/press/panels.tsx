@@ -4,7 +4,6 @@ import '@/lib/polyfills';
 import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, RAISED_METAL_DEFAULTS as RM, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import {
   fitDivinityCards, sheetDefaults, type DivinityCardSheet, CUT_LINE_MM, BLADE_OFFSET_MM, FRONT_OFFSET_MM,
-  PLACED_W_MM as CELL_W, PLACED_H_MM as CELL_H,
   LAYOUT_W_MM, LAYOUT_L_MM, LAYOUT_BLEED_MM,
 } from '@/lib/imposition-toolkit/fit/divinity-cards';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
@@ -2993,10 +2992,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload <b>one card</b> and it fills the sheet. A standard <b>2.5 × 3.5&quot;</b> card
         lying <b>sideways</b>. Every one of the <b>8</b> is cut at
-        <b> {round2(CELL_W)} × {round2(CELL_H)} mm</b> — the cutter&apos;s own programmed card —
-        with the art <b>stretched</b> to the manufacturer&apos;s layout size of
-        <b> {round2(LAYOUT_W_MM)} × {round2(LAYOUT_L_MM)}</b>. Pick the stock below to match
-        what is in the tray.
+        <b> {round2(FIT.cellWMm)} × {round2(FIT.cellHMm)} mm</b> — the card as this stock&apos;s
+        blades cut it — with the art <b>stretched</b> to that plus {round2(LAYOUT_BLEED_MM)} on
+        every side, <b>{round2(FIT.cellWMm + 2 * LAYOUT_BLEED_MM)} × {round2(FIT.cellHMm + 2 * LAYOUT_BLEED_MM)}</b>
+        (the manufacturer&apos;s layout size, {round2(LAYOUT_W_MM)} × {round2(LAYOUT_L_MM)} on their
+        89 card). Pick the stock below to match what is in the tray.
       </div>
 
       <Section label="// SHEET" help="The stock in the tray. Letter is 8.5 x 11; A4 is 17.6 mm TALLER, which is why an A4 file run on Letter paper loses the top row.">
@@ -3016,11 +3016,12 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               <b>The manufacturer&apos;s template, converted.</b> Their A4 drawing puts the
               cuts at 9.5 / 98.5 / 111.5 / 200.5 — the blades sit <b>±6.5</b> and <b>±95.5</b> from
               the machine&apos;s centre line and never move. A Letter sheet centred on that same
-              line would meet them at 12.45 / 101.45 / 114.45 / 203.45. The test cuts then showed
-              the whole set sitting <b>{round2(BLADE_OFFSET_MM)} mm to the right</b> of that, and
-              the inner pair <b>{round2(DEFS.gutterXMm)}</b> apart rather than the 13 drawn — so A
-              is <b>{round2(DEFS.marginXMm)}</b>, B <b>{round2(DEFS.gutterXMm)}</b>, and C what is
-              left. Down the sheet the first cut lands at <b>{round2(DEFS.marginTopMm)}</b> — the
+              line would meet them at 12.45 / 101.45 / 114.45 / 203.45. The test cuts with the red
+              lines then showed the blades cutting the card <b>{round2(FIT.cellWMm)}</b> wide, the
+              inner pair <b>{round2(DEFS.gutterXMm)}</b> apart, and the whole set sitting
+              <b> {round2(BLADE_OFFSET_MM)} mm to the right</b> — so A is
+              <b> {round2(DEFS.marginXMm)}</b>, the cell {round2(FIT.cellWMm)}, B
+              <b> {round2(DEFS.gutterXMm)}</b>, and C what is left. Down the sheet the first cut lands at <b>{round2(DEFS.marginTopMm)}</b> — the
               panel&apos;s Front len 7.6 less the {round2(-FRONT_OFFSET_MM)} the red lines showed it
               cutting early — and the rows step the panel&apos;s Groove
               <b> {round2(DEFS.gutterEMm)}</b> — 66 a row; the template&apos;s 6 is not this machine.
@@ -3103,13 +3104,13 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           )}
           <b>A {round2(DEFS.marginXMm)} · B {round2(DEFS.gutterXMm)} · D {round2(DEFS.marginTopMm)} ·
           E F G {round2(DEFS.gutterEMm)}</b> is this stock&apos;s template. The file steps
-          exactly what the machine steps — <b>{round2(CELL_H + DEFS.gutterEMm)}</b> mm a row,
+          exactly what the machine steps — <b>{round2(FIT.cellHMm + DEFS.gutterEMm)}</b> mm a row,
           the same every row. C and H are the remainder — C <b>{round2(effC)}</b> and
           H <b>{round2(FIT.marginBottomMm)}</b>.
           <br />Every number here places a <b>cut</b>. The art is laid at the manufacturer&apos;s
-          <b> layout size, {round2(LAYOUT_W_MM)} × {round2(LAYOUT_L_MM)}</b> — it runs
-          <b> {round2(LAYOUT_BLEED_MM)}</b> past every cut on every card, the same on all four
-          sides, so each card is cropped identically. Past that the art&apos;s edge is carried on —
+          <b> layout size</b> — the cell plus <b>{round2(LAYOUT_BLEED_MM)}</b> on every side,
+          {' '}{round2(FIT.cellWMm + 2 * LAYOUT_BLEED_MM)} × {round2(FIT.cellHMm + 2 * LAYOUT_BLEED_MM)} here —
+          so it runs the same past every cut on every card and each card is cropped identically. Past that the art&apos;s edge is carried on —
           across the margin outside the block, to the middle of the gap between cards — so a
           blade a few millimetres off still lands in ink on both sides of the cut. None of it
           moves a cut.
