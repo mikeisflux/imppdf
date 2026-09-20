@@ -93,8 +93,8 @@ by explicit owner instruction — do not "fix" it to combine pages.
   `OUTER_BLEED_MM` (8), clamped to the paper there** — a separate draw of the
   outermost `STREAK_MM` sliver, so a card border just comes out wider if an
   blade lands a little out. It does not move or rescale the art. Between two
-  cards the same carry runs to the MIDDLE of the gap from each side (5 mm each
-  into the Letter Test's 13 mm column gap), so a lateral shift up to half the
+  cards the same carry runs to the MIDDLE of the gap from each side (4 mm each
+  into the Letter Test's 11 mm column gap), so a lateral shift up to half the
   gap shows no white on any card; where the gap is only the 3 mm groove the
   layout boxes already meet and there is nothing to carry.
   EXCEPTION (owner): **30-Up Proof Labels** defaults to 1×1-overriding 3×10 AND
@@ -133,8 +133,16 @@ by explicit owner instruction — do not "fix" it to combine pages.
   (`BLADE_OFFSET_MM`, measured off the first test cut of this template: 1.5 mm
   of white on the left column's inner edge, the right column's inner cut 3 mm
   into its art, nothing on either outer edge — only a whole-set shift does
-  that), so **A = 15.45 and C = 9.45** (`LETTER_TEST_MARGIN_X_MM`). A lateral
-  registration is the one thing a test cut IS for; a pitch is not.
+  that). **And the inner pair are 11 apart as cut, not the 13 drawn**
+  (`MACHINE_COL_GAP_MM`; blades `BLADE_INNER_MM` ±5.5 / `BLADE_OUTER_MM`
+  ±94.5, the drawing's ±6.5 / ±95.5 kept as `TEMPLATE_BLADE_*`): the red
+  lines on a sheet cut to 13 showed the full band on BOTH columns' inner edges
+  and only the thin on-the-line half on both outer edges — inner blades a
+  millimetre outside the lines, outer pair a millimetre inside, symmetric,
+  i.e. the pairs 2 mm closer at the centre. So **A = 16.45, B = 11, C = 10.45**
+  (`LETTER_TEST_MARGIN_X_MM`). Lateral registration and blade spacing are
+  hardware, and a test cut with the red lines on is exactly how they are
+  measured; a pitch is not.
   Down, the leading edge is the reference: D is the panel's Front len 7.6 and
   **E = F = G = the panel's Groove 3, pitch 66** — NOT the template's 6. A sheet
   cut at 69 came back with the white growing row by row (none / 1.5 / 3 / 3
@@ -144,9 +152,13 @@ by explicit owner instruction — do not "fix" it to combine pages.
   **No mark** (owner: "not needed") — the machine runs frontal and the bar is
   OFF on every stock; it stays on the switch. **Every cut line is painted as a
   3 mm RED band (`CUT_LINE_MM`, `showCuts`) over the art, full width/height
-  like the blade, hard-coded on this stock (owner)** — the diagnostic: on the
-  cut sheet, red left on a card is the blade inside the file's line, art past
-  the red is it outside, and the width of the red is the error. Each stock carries its OWN
+  like the blade, hard-coded on this stock (owner). The band lies entirely
+  OUTSIDE the cell with its inner edge ON the cut line** — so a blade on the
+  line leaves NO red on the card, red left on a card is the blade landing
+  outside the line by exactly that width, and art missing off an edge is it
+  landing inside. (Centred on the line it left 1.5 on every edge of a perfect
+  cut, which had to be subtracted by eye.) Between two rows the two bands are
+  the one 3 mm groove. Each stock carries its OWN
   template (`sheetDefaults`), the step stores no gutters, and switching stocks
   clears anything typed — storing one stock's numbers in the step is what made
   the Letter Test open on Letter's 17.45. The `letter` template (A 17.45 / B 3 /
@@ -178,7 +190,8 @@ by explicit owner instruction — do not "fix" it to combine pages.
       all four "comp" offsets +0.000; Cut pieces 0010
   **The panel does not know where its own slitting blades are** — that is
   hardware, and the manufacturer's template is the drawing of it (see the
-  Letter Test above): 13 mm between the inner pair, not the groove. Do NOT
+  Letter Test above): 13 mm between the inner pair as drawn, 11 as cut, never
+  the groove. Do NOT
   measure its output and feed that back in — that measures the drift between
   file and machine, not the machine.
 - **`Cut pieces` on the panel is 10 and cannot be changed.** At a 63 mm card five

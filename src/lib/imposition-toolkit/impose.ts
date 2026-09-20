@@ -5071,22 +5071,27 @@ export async function imposeDivinityCards(
   } });
 
   /* THE CUT LINES, IN RED, ON TOP OF THE ART — hard-coded on the test stock
-     (owner). A 3 mm red band centred on every cut, run the full width or height
-     of the sheet the way the blade runs, so a cut sheet shows at a glance where
-     the file put each cut against where the blade actually went: red on the
-     card is the blade landing inside the line, art past the red is it landing
-     outside, and the width of the red left on a card IS the error, readable
-     with a ruler. Drawn after the art so nothing covers it. */
+     (owner). A 3 mm red band on every cut, run the full width or height of the
+     sheet the way the blade runs, and lying entirely OUTSIDE the cell: its
+     inner edge is the cut line. So a blade on the line leaves NO red on the
+     card, any red that comes through is the blade landing outside the line by
+     exactly that width, and art missing off an edge is it landing inside.
+     Readable with a ruler. Drawn after the art so nothing covers it. Between
+     two rows the two bands are the same 3 mm groove. */
   pages.forEach((pg, pi) => { if (fit.showCuts) {
-    const xs = new Set<number>(), ys = new Set<number>();
+    const bands = new Set<string>();
+    const k = (v: number) => Math.round(v * 1e6) / 1e6;   // so a shared groove is one band
     for (const c of cellsFor[pi]!) {
-      xs.add(mm(c.xMm)); xs.add(mm(c.xMm + c.wMm));
-      ys.add(mm(c.yMm)); ys.add(mm(c.yMm + c.hMm));
+      bands.add(`x,${k(c.xMm - CUT_LINE_MM)}`); bands.add(`x,${k(c.xMm + c.wMm)}`);
+      bands.add(`y,${k(c.yMm - CUT_LINE_MM)}`); bands.add(`y,${k(c.yMm + c.hMm)}`);
     }
     const band = mm(CUT_LINE_MM);
     pg.pushOperators(PL.pushGraphicsState(), PL.setFillingColor(rgb(1, 0, 0)));
-    for (const x of xs) pg.pushOperators(PL.rectangle(x - band / 2, 0, band, mm(fit.sheetHMm)), PL.fill());
-    for (const y of ys) pg.pushOperators(PL.rectangle(0, y - band / 2, mm(fit.sheetWMm), band), PL.fill());
+    for (const b of bands) {
+      const [axis, at] = b.split(',');
+      if (axis === 'x') pg.pushOperators(PL.rectangle(mm(Number(at)), 0, band, mm(fit.sheetHMm)), PL.fill());
+      else pg.pushOperators(PL.rectangle(0, mm(Number(at)), mm(fit.sheetWMm), band), PL.fill());
+    }
     pg.pushOperators(PL.popGraphicsState());
   } });
 

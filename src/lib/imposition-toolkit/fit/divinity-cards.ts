@@ -136,12 +136,23 @@ export const TEMPLATE_ROW_CUT_GAP_MM = 6;
 /** Between the CUT lines across: the layout gap plus a bleed on each side. */
 export const TEMPLATE_COL_CUT_GAP_MM = TEMPLATE_COL_GAP_MM + 2 * LAYOUT_BLEED_MM;   // 13
 
-/** THE BLADES, either side of the machine's centre line. From the template:
- *  A4 is 210 wide, the first cut is 8 + 1.5 in, so it sits 105 − 9.5 = 95.5
- *  from centre; the inner pair straddle the 13 mm gap at ±6.5. These are the
- *  machine's hardware — they do not move when the sheet changes. */
-export const BLADE_INNER_MM = TEMPLATE_COL_CUT_GAP_MM / 2;                 // 6.5
-export const BLADE_OUTER_MM = BLADE_INNER_MM + MACHINE_CARD_W_MM;          // 95.5
+/** THE BLADES AS DRAWN, either side of the machine's centre line: A4 is 210
+ *  wide, the first cut is 8 + 1.5 in, so it sits 105 − 9.5 = 95.5 from centre;
+ *  the inner pair straddle the 13 mm gap at ±6.5. */
+export const TEMPLATE_BLADE_INNER_MM = TEMPLATE_COL_CUT_GAP_MM / 2;                 // 6.5
+export const TEMPLATE_BLADE_OUTER_MM = TEMPLATE_BLADE_INNER_MM + MACHINE_CARD_W_MM; // 95.5
+
+/** THE BLADES AS THEY ARE. The gap between the inner pair on this machine is
+ *  11, not the 13 drawn: with the red cut lines on, a sheet cut to 13 came
+ *  back with the full 3 mm of red on BOTH columns' inner edges and only a
+ *  thin ~1 mm (the on-the-line half) on both outer edges — both inner blades a
+ *  millimetre outside the file's lines, symmetric, and the outer pair a
+ *  millimetre inside, which is one and the same thing: the pairs are 2 mm
+ *  closer together at the centre than drawn. Card 89 either side of it. This
+ *  is hardware, measured once, and does not move when the sheet changes. */
+export const MACHINE_COL_GAP_MM = 11;
+export const BLADE_INNER_MM = MACHINE_COL_GAP_MM / 2;                      // 5.5
+export const BLADE_OUTER_MM = BLADE_INNER_MM + MACHINE_CARD_W_MM;          // 94.5
 
 /** WHERE THE BLADE SET ACTUALLY SITS against a Letter sheet the shop centres
  *  by hand: 3 mm to the RIGHT of centre. Measured off the first cut of this
@@ -258,7 +269,11 @@ interface SheetSpec {
   /** This stock's own gutters, where they differ from the shop template. */
   template?: DivinityCardTemplate;
 }
-/** Width of that red cut line. */
+/** Width of that red cut line. It lies entirely OUTSIDE the cell — its inner
+ *  edge IS the cut line — so a blade on the line leaves no red on the card at
+ *  all, and any red that does come through is the overshoot, exact width.
+ *  (Centred on the line it left 1.5 on every edge of a perfect cut, which had
+ *  to be subtracted by eye before the sheet could be read.) */
 export const CUT_LINE_MM = 3;
 const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
   letter:  { wMm: LETTER_W_MM,  hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false },
@@ -272,7 +287,9 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
      12.45. (`centred` gets exactly that: the block is 191 wide.)
 
      Then the blade set is BLADE_OFFSET_MM to the right of where the centred
-     sheet expects it (measured off the test cut), so A is 15.45 and C 9.45.
+     sheet expects it, and the inner pair are MACHINE_COL_GAP_MM apart rather
+     than the 13 drawn (both measured off test cuts with the red lines on), so
+     the cuts fall at 16.45 / 105.45 / 116.45 / 205.45 — A 16.45, B 11, C 10.45.
 
      Down, the leading edge is the reference so the sheet's length does not
      matter: the first cut is the panel's Front len and the rows step the
@@ -285,7 +302,7 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
   letterreg: { wMm: LETTER_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false,
                regTest: false, showCuts: true,
                template: { marginXMm: LETTER_W_MM / 2 - BLADE_OUTER_MM + BLADE_OFFSET_MM,
-                           gutterXMm: TEMPLATE_COL_CUT_GAP_MM, marginTopMm: MACHINE_FRONT_MM,
+                           gutterXMm: MACHINE_COL_GAP_MM, marginTopMm: MACHINE_FRONT_MM,
                            gutterEMm: MACHINE_GROOVE_MM, gutterFMm: MACHINE_GROOVE_MM,
                            gutterGMm: MACHINE_GROOVE_MM } },
   /* 11 x 17 comes out PORTRAIT — 279.4 x 431.8 — with the two blocks and the
@@ -303,7 +320,7 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
 /** Where the Letter Test's first cut falls from the sheet edge: the outer blade
  *  is BLADE_OUTER_MM off the centre line, Letter's centre is at 107.95, and
  *  the set sits BLADE_OFFSET_MM to the right of that. */
-export const LETTER_TEST_MARGIN_X_MM = LETTER_W_MM / 2 - BLADE_OUTER_MM + BLADE_OFFSET_MM;   // 15.45
+export const LETTER_TEST_MARGIN_X_MM = LETTER_W_MM / 2 - BLADE_OUTER_MM + BLADE_OFFSET_MM;   // 16.45
 
 /** Every gap a stock starts from, A B D E F G, before the operator types over
  *  any of them. The panel shows these as the field defaults and the reset

@@ -10,8 +10,9 @@
  *   letter      across  A 17.45 + 89 + B 3 + 89 + C 17.45  = 215.9
  *               down    D 7.6 + 4(63) + 3(3) + H 10.8      = 279.4
  *   letterreg   the manufacturer's A4 template, converted for Letter stock
- *               in a cutter hard-wired for A4, blades 3 mm right of centre:
- *               across  A 15.45 + 89 + B 13 + 89 + C 9.45  = 215.9
+ *               in a cutter hard-wired for A4, blades 3 mm right of centre
+ *               and the inner pair 11 apart as cut (13 as drawn):
+ *               across  A 16.45 + 89 + B 11 + 89 + C 10.45 = 215.9
  *               down    D 7.6 + 4(63) + 3(3) + H 10.8      = 279.4
  *
  * The gutters place the CUTS and are read off the cutter's own panel (Front len,
@@ -32,7 +33,7 @@ import {
   REG_HEAD_MM, REG_MARK_INSET_MM, REG_MARK_DEPTH_MM, REG_MARK_PAD_MM,
   sheetDefaults, TEMPLATE_A4_EDGE_MM, TEMPLATE_COL_GAP_MM, TEMPLATE_COL_CUT_GAP_MM,
   TEMPLATE_ROW_CUT_GAP_MM, BLADE_INNER_MM, BLADE_OUTER_MM, BLADE_OFFSET_MM, LETTER_TEST_MARGIN_X_MM,
-  CUT_LINE_MM,
+  TEMPLATE_BLADE_INNER_MM, TEMPLATE_BLADE_OUTER_MM, MACHINE_COL_GAP_MM, CUT_LINE_MM,
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
 import { imposeDivinityCards, BLACK_BORDER_MM } from '../src/lib/imposition-toolkit/impose.ts';
 
@@ -292,9 +293,15 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   assert.ok(close(TEMPLATE_A4_EDGE_MM, 8) && close(TEMPLATE_COL_GAP_MM, 10), "the template's own figures");
   assert.ok(close(TEMPLATE_COL_CUT_GAP_MM, 13), '10 between the boxes is 13 between the cuts');
   assert.ok(close(TEMPLATE_ROW_CUT_GAP_MM, 6), 'and 6 between the row cuts as DRAWN — not what this machine cuts');
-  assert.ok(close(BLADE_INNER_MM, 6.5) && close(BLADE_OUTER_MM, 95.5), 'blades at ±6.5 and ±95.5');
+  assert.ok(close(TEMPLATE_BLADE_INNER_MM, 6.5) && close(TEMPLATE_BLADE_OUTER_MM, 95.5), 'drawn at ±6.5 and ±95.5');
   /* On A4 those blades fall exactly where the template draws them. */
-  assert.ok(close(105 - BLADE_OUTER_MM, TEMPLATE_A4_EDGE_MM + LAYOUT_BLEED_MM), 'first cut at 9.5 on A4');
+  assert.ok(close(105 - TEMPLATE_BLADE_OUTER_MM, TEMPLATE_A4_EDGE_MM + LAYOUT_BLEED_MM), 'first cut at 9.5 on A4');
+  /* And where they ARE: the red lines on a sheet cut to 13 came back with the
+     full band on both inner edges and a thin on-the-line half on both outer
+     edges — the inner pair are 11 apart, not 13, and the card is still 89. */
+  assert.ok(close(MACHINE_COL_GAP_MM, 11), 'the inner gap as cut');
+  assert.ok(close(BLADE_INNER_MM, 5.5) && close(BLADE_OUTER_MM, 94.5), 'blades at ±5.5 and ±94.5');
+  assert.ok(close(BLADE_OUTER_MM - BLADE_INNER_MM, MACHINE_CARD_W_MM), 'a card apart');
   /* And this is the 5 mm of white the shop measured: the old file read the
      panel's 3 mm groove as the column gap, 10 short of the truth, halved. */
   assert.ok(close((TEMPLATE_COL_CUT_GAP_MM - MACHINE_GROOVE_MM) / 2, 5), 'the missing 5 mm, explained');
@@ -311,12 +318,12 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
      came back with 1.5 of white on the LEFT column's inner edge and the right
      column's inner cut 3 into its art, nothing on either outer edge: the whole
      set sits BLADE_OFFSET_MM to the right, so A carries it and C gives it up. */
-  assert.ok(close(reg.gutterXMm, 13), 'B is 13, not the groove');
+  assert.ok(close(reg.gutterXMm, MACHINE_COL_GAP_MM) && close(reg.gutterXMm, 11), 'B is the gap as cut, 11');
   assert.ok(close(BLADE_OFFSET_MM, 3), 'the set sits 3 to the right of centre');
-  assert.ok(close(reg.marginXMm, LETTER_TEST_MARGIN_X_MM) && close(reg.marginXMm, 15.45, 1e-9), 'A 15.45');
-  assert.ok(close(reg.marginRightMm, 9.45, 1e-9), 'C 9.45 — the same 3 the other way');
+  assert.ok(close(reg.marginXMm, LETTER_TEST_MARGIN_X_MM) && close(reg.marginXMm, 16.45, 1e-9), 'A 16.45');
+  assert.ok(close(reg.marginRightMm, 10.45, 1e-9), 'C 10.45 — the same 3 the other way');
   const cutsX = [...new Set(reg.cells.flatMap((c) => [c.xMm, c.xMm + c.wMm]))].sort((a, b) => a - b);
-  assert.deepEqual(cutsX.map((v) => Math.round(v * 100) / 100), [15.45, 104.45, 117.45, 206.45]);
+  assert.deepEqual(cutsX.map((v) => Math.round(v * 100) / 100), [16.45, 105.45, 116.45, 205.45]);
   for (const x of cutsX)
     assert.ok([BLADE_INNER_MM, BLADE_OUTER_MM].some((b) => close(Math.abs(x - (215.9 / 2 + BLADE_OFFSET_MM)), b, 1e-9)),
       `every cut ${x} is a blade`);
@@ -336,7 +343,7 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   const same = (got: Record<string, number>, want: Record<string, number>) =>
     Object.entries(want).every(([k, v]) => close(got[k]!, v, 1e-9));
   assert.ok(same(sheetDefaults('letterreg'),
-    { marginXMm: 15.45, gutterXMm: 13, marginTopMm: 7.6, gutterEMm: 3, gutterFMm: 3, gutterGMm: 3 }),
+    { marginXMm: 16.45, gutterXMm: 11, marginTopMm: 7.6, gutterEMm: 3, gutterFMm: 3, gutterGMm: 3 }),
     `Letter Test defaults: ${JSON.stringify(sheetDefaults('letterreg'))}`);
   assert.ok(same(sheetDefaults('letter'),
     { marginXMm: 17.45, gutterXMm: 3, marginTopMm: 7.6, gutterEMm: 3, gutterFMm: 3, gutterGMm: 3 }),
@@ -367,7 +374,8 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   const art = allRects.filter((r) => close(r[2], 92, 0.02) && close(r[3], 66, 0.02));
   assert.equal(art.length, 8, 'eight layout boxes');
   const xs = [...new Set(art.map((r) => r[0]))].sort((a, b) => a - b);
-  assert.ok(close(xs[1]! - (xs[0]! + 92), TEMPLATE_COL_GAP_MM, 0.02), '10 between the columns\' boxes');
+  assert.ok(close(xs[1]! - (xs[0]! + 92), MACHINE_COL_GAP_MM - 2 * LAYOUT_BLEED_MM, 0.02),
+    "8 between the columns' boxes — the 11 gap less a bleed each side");
   const top = [...new Set(art.map((r) => r[1]))].sort((a, b) => b - a);
   for (let i = 1; i < top.length; i++)
     assert.ok(close(top[i - 1]! - (top[i]! + 66), MACHINE_GROOVE_MM - 2 * LAYOUT_BLEED_MM, 0.02),
@@ -386,14 +394,21 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   /* The red is set once and the bands follow it as filled rectangles. */
   const redAt = [...t.slice(t.lastIndexOf('1 0 0 rg')).matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re\nf/g)]
     .map((m) => [mm2(m[1]!), mm2(m[2]!), mm2(m[3]!), mm2(m[4]!)] as [number, number, number, number]);
-  assert.equal(redAt.length, 4 + 8, 'four cuts across, eight down');
-  for (const x of cutsX)
-    assert.ok(redAt.some((r) => close(r[0] + r[2] / 2, x, 0.02) && close(r[2], CUT_LINE_MM, 0.02)
-      && close(r[3], 279.4, 0.02)), `a full-height 3 mm red band centred on the cut at ${x}`);
-  const cutsY = [...new Set(reg.cells.flatMap((c) => [c.yMm, c.yMm + c.hMm]))];
-  for (const y of cutsY)
-    assert.ok(redAt.some((r) => close(r[1] + r[3] / 2, y, 0.02) && close(r[3], CUT_LINE_MM, 0.02)
-      && close(r[2], 215.9, 0.02)), `a full-width 3 mm red band centred on the cut at ${y}`);
+  /* The band lies OUTSIDE the cell with its inner edge ON the cut, so a blade
+     on the line leaves no red on the card. Between two rows the two bands are
+     the one 3 mm groove, so down the sheet there are five, not eight. */
+  assert.equal(redAt.length, 4 + 5, 'four bands across, five down');
+  for (const c of reg.cells) {
+    const edges: Array<[number, number, number, number]> = [
+      [c.xMm - CUT_LINE_MM, 0, CUT_LINE_MM, 279.4], [c.xMm + c.wMm, 0, CUT_LINE_MM, 279.4],
+      [0, c.yMm - CUT_LINE_MM, 215.9, CUT_LINE_MM], [0, c.yMm + c.hMm, 215.9, CUT_LINE_MM],
+    ];
+    for (const e of edges)
+      assert.ok(redAt.some((r) => r.every((v, i) => close(v, e[i]!, 0.02))),
+        `a 3 mm band just outside the cell at ${e.join(',')}`);
+    assert.ok(!redAt.some((r) => r[0] < c.xMm + c.wMm - 0.01 && r[0] + r[2] > c.xMm + 0.01
+      && r[1] < c.yMm + c.hMm - 0.01 && r[1] + r[3] > c.yMm + 0.01), 'and none inside the cell');
+  }
   assert.ok(t.indexOf('1 0 0 rg') > t.lastIndexOf('Do'), 'and the red goes on AFTER the art');
   const plainT = await (async () => {
     const d2 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false, backs: false }));
