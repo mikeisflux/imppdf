@@ -4700,7 +4700,7 @@ export async function imposeDivinityCards(
 ): Promise<Uint8Array> {
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, cmyk, degrees } = PL;
-  const { fitDivinityCards, PT_PER_MM, LAYOUT_BLEED_MM, OUTER_BLEED_MM, STREAK_MM } =
+  const { fitDivinityCards, PT_PER_MM, LAYOUT_BLEED_MM, OUTER_BLEED_MM, STREAK_MM, CUT_LINE_MM } =
     await import('./fit/divinity-cards.ts');
 
   const fit = fitDivinityCards(opts.sheet ?? 'letter', {
@@ -4815,30 +4815,27 @@ export async function imposeDivinityCards(
       const aw = mm(c.wMm) + 2 * L, ah = mm(c.hMm) + 2 * L;
       place(ax, ay, aw, ah, ax, ay, aw, ah);
 
-      /* OUTSIDE the block there is no neighbour to meet, only margin, so the
-         art's outermost sliver is drawn OUT across it to OUTER_BLEED_MM (or as
-         far as the paper goes). That is registration tolerance for a hand-fed
-         sheet: an outer blade a couple of millimetres out still lands in ink,
-         and a card border just comes out a shade wider rather than white. The
-         art itself is not moved or rescaled by it — the sliver is a separate
-         draw of the same page, scaled so STREAK_MM of its edge covers the strip.
-         Interior edges get nothing: there the neighbour's own layout box is the
-         other side of the gap, exactly as the template draws it. */
+      /* PAST the layout box the art's outermost sliver is drawn OUT: across
+         the margin to OUTER_BLEED_MM (or as far as the paper goes) where there
+         is no neighbour, and to the MIDDLE of the gap where there is one, so
+         the two cards' carries meet there. That is registration tolerance for
+         a hand-fed sheet: a blade that lands a few millimetres off still lands
+         in ink on both sides of the cut, and a card border just comes out a
+         shade wider rather than white. The art itself is not moved or rescaled
+         by it — the sliver is a separate draw of the same page, scaled so
+         STREAK_MM of its edge covers the strip. Where the gap is only a groove
+         the layout boxes already meet and there is nothing to carry. */
       const spanY = (d: typeof c) => d.yMm < c.yMm + c.hMm && d.yMm + d.hMm > c.yMm;
       const spanX = (d: typeof c) => d.xMm < c.xMm + c.wMm && d.xMm + d.wMm > c.xMm;
-      /* A neighbour is a cell on that side closer than two outer bleeds — any
-         nearer and the two streaks would run into each other. The gap between
-         the two blocks on a doubled sheet is wider than that, so both sides of
-         the half-sheet cut get their tolerance. */
-      const near = (gapMm: number) => gapMm >= 0 && gapMm < 2 * OUTER_BLEED_MM;
-      const reach = (has: boolean, roomMm: number) =>
-        has ? 0 : mm(Math.max(0, Math.min(OUTER_BLEED_MM, roomMm) - LAYOUT_BLEED_MM));
-      const outL = reach(cells.some((d) => d !== c && spanY(d) && near(c.xMm - (d.xMm + d.wMm))), c.xMm);
-      const outR = reach(cells.some((d) => d !== c && spanY(d) && near(d.xMm - (c.xMm + c.wMm))),
-        fit.sheetWMm - (c.xMm + c.wMm));
-      const outB = reach(cells.some((d) => d !== c && spanX(d) && near(c.yMm - (d.yMm + d.hMm))), c.yMm);
-      const outT = reach(cells.some((d) => d !== c && spanX(d) && near(d.yMm - (c.yMm + c.hMm))),
-        fit.sheetHMm - (c.yMm + c.hMm));
+      const nearest = (gaps: number[]) => gaps.filter((g) => g >= 0).reduce((a, b) => Math.min(a, b), Infinity);
+      const reach = (gapMm: number, roomMm: number) => mm(Math.max(0, LAYOUT_BLEED_MM * -1
+        + (Number.isFinite(gapMm) ? Math.min(gapMm / 2, OUTER_BLEED_MM) : Math.min(OUTER_BLEED_MM, roomMm))));
+      const besideY = cells.filter((d) => d !== c && spanY(d));
+      const besideX = cells.filter((d) => d !== c && spanX(d));
+      const outL = reach(nearest(besideY.map((d) => c.xMm - (d.xMm + d.wMm))), c.xMm);
+      const outR = reach(nearest(besideY.map((d) => d.xMm - (c.xMm + c.wMm))), fit.sheetWMm - (c.xMm + c.wMm));
+      const outB = reach(nearest(besideX.map((d) => c.yMm - (d.yMm + d.hMm))), c.yMm);
+      const outT = reach(nearest(besideX.map((d) => d.yMm - (c.yMm + c.hMm))), fit.sheetHMm - (c.yMm + c.hMm));
       const S = mm(STREAK_MM);
       /* One axis: where the art box lands and what is shown, for the strip
          below the box, the box itself, and the strip above it. */
@@ -5071,6 +5068,26 @@ export async function imposeDivinityCards(
     for (const cx of fit.cutXMm) {
       line(mm(cx), 0, mm(cx), len + off); line(mm(cx), sheetH, mm(cx), sheetH - len - off);
     }
+  } });
+
+  /* THE CUT LINES, IN RED, ON TOP OF THE ART — hard-coded on the test stock
+     (owner). A 3 mm red band centred on every cut, run the full width or height
+     of the sheet the way the blade runs, so a cut sheet shows at a glance where
+     the file put each cut against where the blade actually went: red on the
+     card is the blade landing inside the line, art past the red is it landing
+     outside, and the width of the red left on a card IS the error, readable
+     with a ruler. Drawn after the art so nothing covers it. */
+  pages.forEach((pg, pi) => { if (fit.showCuts) {
+    const xs = new Set<number>(), ys = new Set<number>();
+    for (const c of cellsFor[pi]!) {
+      xs.add(mm(c.xMm)); xs.add(mm(c.xMm + c.wMm));
+      ys.add(mm(c.yMm)); ys.add(mm(c.yMm + c.hMm));
+    }
+    const band = mm(CUT_LINE_MM);
+    pg.pushOperators(PL.pushGraphicsState(), PL.setFillingColor(rgb(1, 0, 0)));
+    for (const x of xs) pg.pushOperators(PL.rectangle(x - band / 2, 0, band, mm(fit.sheetHMm)), PL.fill());
+    for (const y of ys) pg.pushOperators(PL.rectangle(0, y - band / 2, mm(fit.sheetWMm), band), PL.fill());
+    pg.pushOperators(PL.popGraphicsState());
   } });
 
   /* LAST of all, so a card or a cut mark can never land on a mark the camera

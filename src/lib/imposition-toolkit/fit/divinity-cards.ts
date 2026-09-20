@@ -126,9 +126,12 @@ export const LAYOUT_L_MM = MACHINE_CARD_L_MM + 2 * LAYOUT_BLEED_MM;   // 66
  *  template's own figures. */
 export const TEMPLATE_A4_EDGE_MM = 8;
 export const TEMPLATE_COL_GAP_MM = 10;
-/** Between the CUT lines, row to row — dimensioned on the template dashed line
- *  to dashed line. Not the panel's 3: the panel's groove is not what comes off
- *  the machine, and the cut stacks measured a pitch of 68.5, not 66. */
+/** Between the CUT lines, row to row, as the template draws it. NOT what this
+ *  machine cuts: it is programmed Groove 3 and it steps 66, and a sheet cut at
+ *  the template's 69 came back with the white growing row by row — none on
+ *  row 1, 1.5 on row 2, 3 on row 3, 3 plus a sliver of the previous card on
+ *  row 4, which is exactly 3 mm of pitch error compounding. The feed direction
+ *  is the panel's, and this figure is kept only as a record of the drawing. */
 export const TEMPLATE_ROW_CUT_GAP_MM = 6;
 /** Between the CUT lines across: the layout gap plus a bleed on each side. */
 export const TEMPLATE_COL_CUT_GAP_MM = TEMPLATE_COL_GAP_MM + 2 * LAYOUT_BLEED_MM;   // 13
@@ -140,10 +143,23 @@ export const TEMPLATE_COL_CUT_GAP_MM = TEMPLATE_COL_GAP_MM + 2 * LAYOUT_BLEED_MM
 export const BLADE_INNER_MM = TEMPLATE_COL_CUT_GAP_MM / 2;                 // 6.5
 export const BLADE_OUTER_MM = BLADE_INNER_MM + MACHINE_CARD_W_MM;          // 95.5
 
+/** WHERE THE BLADE SET ACTUALLY SITS against a Letter sheet the shop centres
+ *  by hand: 3 mm to the RIGHT of centre. Measured off the first cut of this
+ *  template — the left column came out with 1.5 mm of white on its INNER edge
+ *  and the right column's inner cut landed 3 mm into its art, with no white on
+ *  either outer edge. Only a whole-set shift does that: the gap is 13 as drawn,
+ *  the blades are just 3 mm over. A carries the offset and C gives it up.
+ *  (The earlier `letter` sheet, 5 mm of white on the outer right, is the same
+ *  shift plus the 5 mm the wrong B accounted for.) This is a lateral
+ *  registration, the one thing a test cut IS for — not a pitch. */
+export const BLADE_OFFSET_MM = 3;
+
 /** OUTER bleed — how far the art's edge is carried past the cuts on the
  *  OUTSIDE of the block, where there is no neighbour to meet and nothing but
  *  margin beyond. It is registration tolerance for a sheet centred by hand: an
  *  outer blade that lands a couple of millimetres out still lands in ink.
+ *  Between two cards the same carry runs to the MIDDLE of the gap from each
+ *  side, so a lateral shift up to half the gap shows no white anywhere.
  *
  *  The art itself is NOT stretched to it — the art is laid at the layout size
  *  and this zone is its outermost sliver drawn out, so the card's crop is the
@@ -235,9 +251,15 @@ interface SheetSpec {
   centred?: boolean;
   /** Turn registration marks on for this sheet by default. */
   regTest?: boolean;
+  /** Paint every cut line in red, full width, ON TOP of the art — the test
+   *  stock's diagnostic, hard-coded (owner): a cut sheet then shows where the
+   *  file put each cut against where the blade went. */
+  showCuts?: boolean;
   /** This stock's own gutters, where they differ from the shop template. */
   template?: DivinityCardTemplate;
 }
+/** Width of that red cut line. */
+export const CUT_LINE_MM = 3;
 const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
   letter:  { wMm: LETTER_W_MM,  hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false },
   /* THE LETTER TEST SHEET — the manufacturer's A4 template, converted for a
@@ -249,18 +271,23 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
      them at 12.45 / 101.45 / 114.45 / 203.45 — so B is 13, not 3, and A = C =
      12.45. (`centred` gets exactly that: the block is 191 wide.)
 
+     Then the blade set is BLADE_OFFSET_MM to the right of where the centred
+     sheet expects it (measured off the test cut), so A is 15.45 and C 9.45.
+
      Down, the leading edge is the reference so the sheet's length does not
      matter: the first cut is the panel's Front len and the rows step the
-     template's 6 mm cut gap.
+     panel's Groove — 66 a row, which the cut stacks confirmed. The template's
+     6 is NOT this machine (see TEMPLATE_ROW_CUT_GAP_MM).
 
      No mark. Frontal mode indexes off the leading edge, and the owner's word is
      that the bar is not needed; the marks stay available on the switch. It is a
      separate stock so the `letter` template is never disturbed. */
   letterreg: { wMm: LETTER_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false,
-               centred: true, regTest: false,
-               template: { gutterXMm: TEMPLATE_COL_CUT_GAP_MM, marginTopMm: MACHINE_FRONT_MM,
-                           gutterEMm: TEMPLATE_ROW_CUT_GAP_MM, gutterFMm: TEMPLATE_ROW_CUT_GAP_MM,
-                           gutterGMm: TEMPLATE_ROW_CUT_GAP_MM } },
+               regTest: false, showCuts: true,
+               template: { marginXMm: LETTER_W_MM / 2 - BLADE_OUTER_MM + BLADE_OFFSET_MM,
+                           gutterXMm: TEMPLATE_COL_CUT_GAP_MM, marginTopMm: MACHINE_FRONT_MM,
+                           gutterEMm: MACHINE_GROOVE_MM, gutterFMm: MACHINE_GROOVE_MM,
+                           gutterGMm: MACHINE_GROOVE_MM } },
   /* 11 x 17 comes out PORTRAIT — 279.4 x 431.8 — with the two blocks and the
      cut between them turned a quarter turn onto it. The cards keep exactly the
      orientation they have on a Letter sheet relative to the block; it is the
@@ -274,8 +301,9 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
 };
 
 /** Where the Letter Test's first cut falls from the sheet edge: the outer blade
- *  is BLADE_OUTER_MM off the centre line, and Letter's centre is at 107.95. */
-export const LETTER_TEST_MARGIN_X_MM = LETTER_W_MM / 2 - BLADE_OUTER_MM;   // 12.45
+ *  is BLADE_OUTER_MM off the centre line, Letter's centre is at 107.95, and
+ *  the set sits BLADE_OFFSET_MM to the right of that. */
+export const LETTER_TEST_MARGIN_X_MM = LETTER_W_MM / 2 - BLADE_OUTER_MM + BLADE_OFFSET_MM;   // 15.45
 
 /** Every gap a stock starts from, A B D E F G, before the operator types over
  *  any of them. The panel shows these as the field defaults and the reset
@@ -324,6 +352,8 @@ export interface DivinityCardFit {
   pageWMm: number; pageHMm: number;
   /** This stock wants registration marks unless the caller says otherwise. */
   regTest: boolean;
+  /** This stock paints its cut lines in red over the art. */
+  showCuts: boolean;
 }
 
 export function fitDivinityCards(
@@ -393,6 +423,7 @@ export function fitDivinityCards(
     cutXMm: spec.doubled ? [spec.blockWMm] : [],
     rotated: spec.rotated === true,
     regTest: spec.regTest === true,
+    showCuts: spec.showCuts === true,
     pageWMm: spec.rotated ? spec.hMm : spec.wMm,
     pageHMm: spec.rotated ? spec.wMm : spec.hMm,
   };

@@ -10,9 +10,9 @@
  *   letter      across  A 17.45 + 89 + B 3 + 89 + C 17.45  = 215.9
  *               down    D 7.6 + 4(63) + 3(3) + H 10.8      = 279.4
  *   letterreg   the manufacturer's A4 template, converted for Letter stock
- *               centred in a cutter hard-wired for A4:
- *               across  A 12.45 + 89 + B 13 + 89 + C 12.45 = 215.9
- *               down    D 7.6 + 4(63) + 3(6) + H 1.8       = 279.4
+ *               in a cutter hard-wired for A4, blades 3 mm right of centre:
+ *               across  A 15.45 + 89 + B 13 + 89 + C 9.45  = 215.9
+ *               down    D 7.6 + 4(63) + 3(3) + H 10.8      = 279.4
  *
  * The gutters place the CUTS and are read off the cutter's own panel (Front len,
  * Card len, Groove len) — never measured back off its output, which measures the
@@ -31,7 +31,8 @@ import {
   LAYOUT_BLEED_MM, LAYOUT_W_MM, LAYOUT_L_MM, OUTER_BLEED_MM,
   REG_HEAD_MM, REG_MARK_INSET_MM, REG_MARK_DEPTH_MM, REG_MARK_PAD_MM,
   sheetDefaults, TEMPLATE_A4_EDGE_MM, TEMPLATE_COL_GAP_MM, TEMPLATE_COL_CUT_GAP_MM,
-  TEMPLATE_ROW_CUT_GAP_MM, BLADE_INNER_MM, BLADE_OUTER_MM, LETTER_TEST_MARGIN_X_MM,
+  TEMPLATE_ROW_CUT_GAP_MM, BLADE_INNER_MM, BLADE_OUTER_MM, BLADE_OFFSET_MM, LETTER_TEST_MARGIN_X_MM,
+  CUT_LINE_MM,
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
 import { imposeDivinityCards, BLACK_BORDER_MM } from '../src/lib/imposition-toolkit/impose.ts';
 
@@ -290,7 +291,7 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
      sheet centred in the same machine has to meet. */
   assert.ok(close(TEMPLATE_A4_EDGE_MM, 8) && close(TEMPLATE_COL_GAP_MM, 10), "the template's own figures");
   assert.ok(close(TEMPLATE_COL_CUT_GAP_MM, 13), '10 between the boxes is 13 between the cuts');
-  assert.ok(close(TEMPLATE_ROW_CUT_GAP_MM, 6), 'and 6 between the row cuts, dashed line to dashed line');
+  assert.ok(close(TEMPLATE_ROW_CUT_GAP_MM, 6), 'and 6 between the row cuts as DRAWN — not what this machine cuts');
   assert.ok(close(BLADE_INNER_MM, 6.5) && close(BLADE_OUTER_MM, 95.5), 'blades at ±6.5 and ±95.5');
   /* On A4 those blades fall exactly where the template draws them. */
   assert.ok(close(105 - BLADE_OUTER_MM, TEMPLATE_A4_EDGE_MM + LAYOUT_BLEED_MM), 'first cut at 9.5 on A4');
@@ -305,32 +306,37 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   assert.equal(reg.n, 8, 'same eight cards');
   assert.ok(close(reg.cells[0]!.wMm, PLACED_W_MM) && close(reg.cells[0]!.hMm, PLACED_H_MM),
     'and the same cell');
-  /* ACROSS: Letter's centre is 107.95, so the cuts land at 12.45 / 101.45 /
-     114.45 / 203.45 — B 13, A = C 12.45. */
+  /* ACROSS: Letter's centre is 107.95, so a centred sheet would meet the cuts
+     at 12.45 / 101.45 / 114.45 / 203.45 — B 13. The test cut of that sheet
+     came back with 1.5 of white on the LEFT column's inner edge and the right
+     column's inner cut 3 into its art, nothing on either outer edge: the whole
+     set sits BLADE_OFFSET_MM to the right, so A carries it and C gives it up. */
   assert.ok(close(reg.gutterXMm, 13), 'B is 13, not the groove');
-  assert.ok(close(reg.marginXMm, LETTER_TEST_MARGIN_X_MM) && close(reg.marginXMm, 12.45, 1e-9), 'A 12.45');
-  assert.ok(close(reg.marginXMm, reg.marginRightMm), 'centred across, as the sheet is in the machine');
+  assert.ok(close(BLADE_OFFSET_MM, 3), 'the set sits 3 to the right of centre');
+  assert.ok(close(reg.marginXMm, LETTER_TEST_MARGIN_X_MM) && close(reg.marginXMm, 15.45, 1e-9), 'A 15.45');
+  assert.ok(close(reg.marginRightMm, 9.45, 1e-9), 'C 9.45 — the same 3 the other way');
   const cutsX = [...new Set(reg.cells.flatMap((c) => [c.xMm, c.xMm + c.wMm]))].sort((a, b) => a - b);
-  assert.deepEqual(cutsX.map((v) => Math.round(v * 100) / 100), [12.45, 101.45, 114.45, 203.45]);
+  assert.deepEqual(cutsX.map((v) => Math.round(v * 100) / 100), [15.45, 104.45, 117.45, 206.45]);
   for (const x of cutsX)
-    assert.ok([BLADE_INNER_MM, BLADE_OUTER_MM].some((b) => close(Math.abs(x - 215.9 / 2), b, 1e-9)),
+    assert.ok([BLADE_INNER_MM, BLADE_OUTER_MM].some((b) => close(Math.abs(x - (215.9 / 2 + BLADE_OFFSET_MM)), b, 1e-9)),
       `every cut ${x} is a blade`);
   /* DOWN: the leading edge is the reference, so the sheet's length is
-     irrelevant — first cut at the panel's Front len, then the template's
-     pitch, 63 + 6 = 69, every row. */
+     irrelevant — first cut at the panel's Front len, then the PANEL'S pitch,
+     63 + 3 = 66, every row. A sheet cut at the template's 69 came back with
+     the white growing 1.5 / 3 / 3-plus-a-sliver down the rows: 3 mm of pitch
+     error compounding. */
   assert.ok(close(reg.marginTopMm, MACHINE_FRONT_MM), 'D is Front len');
-  assert.deepEqual(reg.rowGapsMm, [6, 6, 6], "E F G are the template's 6");
+  assert.deepEqual(reg.rowGapsMm, [3, 3, 3], "E F G are the panel's 3, NOT the template's 6");
   const ys = [...new Set(reg.cells.map((c) => c.yMm))].sort((a, b) => b - a);
-  for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 69), 'pitch 69');
-  assert.ok(close(reg.marginBottomMm, 279.4 - 7.6 - 4 * 63 - 3 * 6), 'H is the 1.8 left over');
-  assert.ok(reg.marginBottomMm > 0, 'and four rows do fit Letter');
+  for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66), 'pitch 66');
+  assert.ok(close(reg.marginBottomMm, 279.4 - 7.6 - 4 * 63 - 3 * 3), 'H is the 10.8 left over');
   /* NO MARK. The machine runs frontal and the owner says the bar is not needed. */
   assert.ok(!reg.regTest && !plain.regTest, 'no stock asks for marks');
   /* The panel's defaults come from the same place. */
   const same = (got: Record<string, number>, want: Record<string, number>) =>
     Object.entries(want).every(([k, v]) => close(got[k]!, v, 1e-9));
   assert.ok(same(sheetDefaults('letterreg'),
-    { marginXMm: 12.45, gutterXMm: 13, marginTopMm: 7.6, gutterEMm: 6, gutterFMm: 6, gutterGMm: 6 }),
+    { marginXMm: 15.45, gutterXMm: 13, marginTopMm: 7.6, gutterEMm: 3, gutterFMm: 3, gutterGMm: 3 }),
     `Letter Test defaults: ${JSON.stringify(sheetDefaults('letterreg'))}`);
   assert.ok(same(sheetDefaults('letter'),
     { marginXMm: 17.45, gutterXMm: 3, marginTopMm: 7.6, gutterEMm: 3, gutterFMm: 3, gutterGMm: 3 }),
@@ -339,8 +345,10 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   assert.ok(close(fitDivinityCards('letterreg', { marginXMm: 20 }).marginXMm, 20));
   assert.ok(close(fitDivinityCards('letterreg', { gutterEMm: 3 }).rowGapsMm[0], 3));
 
-  /* RENDERED, it is the template's drawing: eight 92 x 66 layout boxes, the
-     two columns' boxes 10 apart and the rows' boxes 3 apart, white between. */
+  /* RENDERED: eight 92 x 66 layout boxes, the two columns' boxes 10 apart as
+     the template draws them and the rows' boxes meeting (a 3 groove, 1.5 each).
+     Then the art's edge is carried to the MIDDLE of the 13 mm gap from each
+     side, so a lateral shift of up to 6.5 shows no white on any card. */
   const zlib = await import('node:zlib');
   const { PDFStream } = await import('pdf-lib');
   const d = await PDFDocument.load(await imposeDivinityCards(await cardPdf(),
@@ -353,18 +361,52 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
     catch { t += Buffer.from(raw).toString('latin1'); }
   }
   const mm2 = (v: string) => Math.round((Number(v) / PT_PER_MM) * 100) / 100;
-  const art = [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
+  const allRects = [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
     .map((m) => [mm2(m[1]!), mm2(m[2]!), mm2(m[3]!), mm2(m[4]!)].join(',')))]
-    .map((r) => r.split(',').map(Number) as [number, number, number, number])
-    .filter((r) => close(r[2], 92, 0.02) && close(r[3], 66, 0.02));
+    .map((r) => r.split(',').map(Number) as [number, number, number, number]);
+  const art = allRects.filter((r) => close(r[2], 92, 0.02) && close(r[3], 66, 0.02));
   assert.equal(art.length, 8, 'eight layout boxes');
   const xs = [...new Set(art.map((r) => r[0]))].sort((a, b) => a - b);
   assert.ok(close(xs[1]! - (xs[0]! + 92), TEMPLATE_COL_GAP_MM, 0.02), '10 between the columns\' boxes');
   const top = [...new Set(art.map((r) => r[1]))].sort((a, b) => b - a);
   for (let i = 1; i < top.length; i++)
-    assert.ok(close(top[i - 1]! - (top[i]! + 66), TEMPLATE_ROW_CUT_GAP_MM - 2 * LAYOUT_BLEED_MM, 0.02),
-      "3 between the rows' boxes");
+    assert.ok(close(top[i - 1]! - (top[i]! + 66), MACHINE_GROOVE_MM - 2 * LAYOUT_BLEED_MM, 0.02),
+      "the rows' boxes meet");
+  const mid = reg.marginXMm + PLACED_W_MM + reg.gutterXMm / 2;   // middle of the 13 mm gap
+  assert.ok(allRects.some((r) => close(r[0], xs[0]! + 92, 0.02) && close(r[0] + r[2], mid, 0.02)),
+    'the left column carries its edge to the middle of the gap');
+  assert.ok(allRects.some((r) => close(r[0] + r[2], xs[1]!, 0.02) && close(r[0], mid, 0.02)),
+    'and the right column carries its edge back to meet it');
   assert.ok(!/1 1 1 rg/.test(t) && !/0 0 0 rg/.test(t), 'no mark, no pad');
+
+  /* THE RED CUT LINES — hard-coded on this stock (owner): a 3 mm red band on
+     every cut, full width or height like the blade, drawn AFTER the art so a
+     cut sheet shows where the file put each cut against where the blade went. */
+  assert.ok(reg.showCuts && !plain.showCuts, 'red cut lines on the test stock only');
+  /* The red is set once and the bands follow it as filled rectangles. */
+  const redAt = [...t.slice(t.lastIndexOf('1 0 0 rg')).matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re\nf/g)]
+    .map((m) => [mm2(m[1]!), mm2(m[2]!), mm2(m[3]!), mm2(m[4]!)] as [number, number, number, number]);
+  assert.equal(redAt.length, 4 + 8, 'four cuts across, eight down');
+  for (const x of cutsX)
+    assert.ok(redAt.some((r) => close(r[0] + r[2] / 2, x, 0.02) && close(r[2], CUT_LINE_MM, 0.02)
+      && close(r[3], 279.4, 0.02)), `a full-height 3 mm red band centred on the cut at ${x}`);
+  const cutsY = [...new Set(reg.cells.flatMap((c) => [c.yMm, c.yMm + c.hMm]))];
+  for (const y of cutsY)
+    assert.ok(redAt.some((r) => close(r[1] + r[3] / 2, y, 0.02) && close(r[3], CUT_LINE_MM, 0.02)
+      && close(r[2], 215.9, 0.02)), `a full-width 3 mm red band centred on the cut at ${y}`);
+  assert.ok(t.indexOf('1 0 0 rg') > t.lastIndexOf('Do'), 'and the red goes on AFTER the art');
+  const plainT = await (async () => {
+    const d2 = await PDFDocument.load(await imposeDivinityCards(await cardPdf(), { sheet: 'letter', addMarks: false, backs: false }));
+    const st2 = d2.getPage(0).node.normalizedEntries().Contents;
+    let s = '';
+    for (let k = 0; st2 && k < st2.size(); k++) {
+      const raw = (d2.context.lookup(st2.get(k), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+      try { s += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+      catch { s += Buffer.from(raw).toString('latin1'); }
+    }
+    return s;
+  })();
+  assert.ok(!/1 0 0 rg/.test(plainT), 'Letter gets none');
 });
 
 test('MARK MODE: one black bar on the feed edge, clear of the first cut', async () => {

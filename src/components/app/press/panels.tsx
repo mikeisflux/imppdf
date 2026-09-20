@@ -3016,11 +3016,17 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               <b>The manufacturer&apos;s template, converted.</b> Their A4 drawing puts the
               cuts at 9.5 / 98.5 / 111.5 / 200.5 — the blades sit <b>±6.5</b> and <b>±95.5</b> from
               the machine&apos;s centre line and never move. A Letter sheet centred on that same
-              line meets them at <b>12.45 / 101.45 / 114.45 / 203.45</b>, so B is <b>13</b>, not 3,
-              and A = C = <b>{round2(DEFS.marginXMm)}</b>. Down the sheet the first cut is the
-              panel&apos;s Front len <b>{round2(DEFS.marginTopMm)}</b> and the rows step the
-              template&apos;s <b>{round2(DEFS.gutterEMm)}</b> between cuts. No mark: the machine runs
-              frontal. A separate stock so the Letter template is untouched.
+              line would meet them at 12.45 / 101.45 / 114.45 / 203.45 — so B is <b>13</b>, not 3.
+              The test cut then showed the whole set sitting <b>3 mm to the right</b> of that
+              (white on the left column&apos;s inner edge, the right column cut 3 into its art), so
+              A is <b>{round2(DEFS.marginXMm)}</b> and C gives up the same. Down the sheet the first
+              cut is the panel&apos;s Front len <b>{round2(DEFS.marginTopMm)}</b> and the rows step
+              the panel&apos;s Groove <b>{round2(DEFS.gutterEMm)}</b> — 66 a row; the template&apos;s 6
+              is not this machine. No mark: it runs frontal. <b>Every cut is painted as a 3 mm
+              red line over the art</b>, full width like the blade, so a cut sheet shows where the
+              file put the cut against where the blade went — red left on a card is the blade
+              inside the line, art past the red is it outside. A separate stock so the Letter
+              template is untouched.
             </div>
           )}
           {DOUBLED.has(s.sheet ?? 'letter') && (
@@ -3101,9 +3107,10 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           <br />Every number here places a <b>cut</b>. The art is laid at the manufacturer&apos;s
           <b> layout size, {round2(LAYOUT_W_MM)} × {round2(LAYOUT_L_MM)}</b> — it runs
           <b> {round2(LAYOUT_BLEED_MM)}</b> past every cut on every card, the same on all four
-          sides, so each card is cropped identically. On the outside of the block the art&apos;s
-          edge is carried on across the margin, so an outer blade a little out still lands in
-          ink. None of it moves a cut.
+          sides, so each card is cropped identically. Past that the art&apos;s edge is carried on —
+          across the margin outside the block, to the middle of the gap between cards — so a
+          blade a few millimetres off still lands in ink on both sides of the cut. None of it
+          moves a cut.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
             onClick={() => up({ ...untyped })}>
             Reset to this stock&apos;s template</button>

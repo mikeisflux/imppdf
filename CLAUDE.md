@@ -92,10 +92,11 @@ by explicit owner instruction — do not "fix" it to combine pages.
   **OUTSIDE the block the art's EDGE is carried across the margin to
   `OUTER_BLEED_MM` (8), clamped to the paper there** — a separate draw of the
   outermost `STREAK_MM` sliver, so a card border just comes out wider if an
-  outer blade lands a little out. It does not move or rescale the art. Interior
-  edges get nothing: there the neighbour's own layout box is the other side of
-  the gap, exactly as the template draws it (10 mm of white between the
-  columns' boxes on the Letter Test, 3 between the rows').
+  blade lands a little out. It does not move or rescale the art. Between two
+  cards the same carry runs to the MIDDLE of the gap from each side (5 mm each
+  into the Letter Test's 13 mm column gap), so a lateral shift up to half the
+  gap shows no white on any card; where the gap is only the 3 mm groove the
+  layout boxes already meet and there is nothing to carry.
   EXCEPTION (owner): **30-Up Proof Labels** defaults to 1×1-overriding 3×10 AND
   to STRETCH — the die-cut label cell is the target size, so the art fills the
   cell instead of sitting proportionally inside it. It also defaults to
@@ -125,16 +126,27 @@ by explicit owner instruction — do not "fix" it to combine pages.
   them, **6 mm between the row cut lines**. Across, that drawing IS the blades —
   fixed hardware at **±6.5 and ±95.5 from the machine's centre line**
   (`BLADE_INNER_MM` / `BLADE_OUTER_MM`) — so a Letter sheet centred on the same
-  line meets them at 12.45 / 101.45 / 114.45 / 203.45: **B is 13, not the
-  panel's 3-mm groove, and A = C = 12.45** (`LETTER_TEST_MARGIN_X_MM`, and
-  `centred` yields exactly that). Reading the groove as the column gap is what
-  put the outer blades 5 mm outside the art and the inner ones 5 mm into it —
-  10 mm of missing gap, halved, and the 5 mm of white the shop measured was that
-  number. Down, the leading edge is the reference: D is the panel's Front len
-  7.6 and E = F = G = the template's 6 (pitch 69; the cut stacks measured 68.5,
-  the panel's 3 is not what comes off). H falls out at 1.8, and four rows fit.
+  line would meet them at 12.45 / 101.45 / 114.45 / 203.45: **B is 13, not the
+  panel's 3-mm groove.** Reading the groove as the column gap is what put the
+  outer blades 5 mm outside the art and the inner ones 5 mm into it — 10 mm of
+  missing gap, halved. **The blade set then sits 3 mm RIGHT of centre**
+  (`BLADE_OFFSET_MM`, measured off the first test cut of this template: 1.5 mm
+  of white on the left column's inner edge, the right column's inner cut 3 mm
+  into its art, nothing on either outer edge — only a whole-set shift does
+  that), so **A = 15.45 and C = 9.45** (`LETTER_TEST_MARGIN_X_MM`). A lateral
+  registration is the one thing a test cut IS for; a pitch is not.
+  Down, the leading edge is the reference: D is the panel's Front len 7.6 and
+  **E = F = G = the panel's Groove 3, pitch 66** — NOT the template's 6. A sheet
+  cut at 69 came back with the white growing row by row (none / 1.5 / 3 / 3
+  plus a sliver of the card above), which is 3 mm of pitch error compounding;
+  the old "68.5" measurement that seemed to back the 6 was drift, exactly as
+  the rule below says. H falls out at 10.8.
   **No mark** (owner: "not needed") — the machine runs frontal and the bar is
-  OFF on every stock; it stays on the switch. Each stock carries its OWN
+  OFF on every stock; it stays on the switch. **Every cut line is painted as a
+  3 mm RED band (`CUT_LINE_MM`, `showCuts`) over the art, full width/height
+  like the blade, hard-coded on this stock (owner)** — the diagnostic: on the
+  cut sheet, red left on a card is the blade inside the file's line, art past
+  the red is it outside, and the width of the red is the error. Each stock carries its OWN
   template (`sheetDefaults`), the step stores no gutters, and switching stocks
   clears anything typed — storing one stock's numbers in the step is what made
   the Letter Test open on Letter's 17.45. The `letter` template (A 17.45 / B 3 /
@@ -145,8 +157,8 @@ by explicit owner instruction — do not "fix" it to combine pages.
   the head must clear that. Bar length, depth, inset and feed edge are settable.
 - **The cutter steps ONE CONSTANT PITCH and the file must step the same.** It is
   a slitter: it advances card-length + gutter per row and repeats, so E, F and G
-  have to be equal — the shop's `letter` template steps the panel's 3, the
-  Letter Test steps the manufacturer's 6. Unequal row
+  have to be equal and equal to the panel's Groove (3) — on BOTH stocks; the
+  manufacturer's template draws 6 and this machine does not cut 6. Unequal row
   gutters cannot describe what it does and the disagreement COMPOUNDS — a file
   stepping 65.5 / 66.2 / 66.2 against a machine stepping 68.5 put the blade
   7.6 mm into the art by row 4. The panel warns when the three differ.
