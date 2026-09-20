@@ -29,7 +29,7 @@ import {
   fitDivinityCards, PT_PER_MM, CARD_W_MM, CARD_H_MM, PLACED_W_MM, PLACED_H_MM,
   DEF_GUTTER_X_MM, DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, COLS, ROWS,
   MACHINE_CARD_W_MM, MACHINE_CARD_L_MM, MACHINE_GROOVE_MM, MACHINE_FRONT_MM,
-  LAYOUT_BLEED_MM, LAYOUT_W_MM, LAYOUT_L_MM, OUTER_BLEED_MM,
+  LAYOUT_BLEED_MM, LAYOUT_W_MM, LAYOUT_L_MM, OUTER_BLEED_MM, SEAM_MM,
   REG_HEAD_MM, REG_MARK_INSET_MM, REG_MARK_DEPTH_MM, REG_MARK_PAD_MM,
   sheetDefaults, TEMPLATE_A4_EDGE_MM, TEMPLATE_COL_GAP_MM, TEMPLATE_COL_CUT_GAP_MM,
   TEMPLATE_ROW_CUT_GAP_MM, LETTER_MARGIN_X_MM,
@@ -187,10 +187,12 @@ test("THE VENDOR'S LAYOUT SIZE — art at 92 x 66 over an 89 x 63 cut", async ()
     && close(r[2], c.wMm + 2 * B, 0.02) && close(r[3], c.hMm + 2 * B, 0.02)));
   assert.equal(art.length, 8, `eight layout boxes drawn, got ${art.length}`);
   /* EVERY OTHER RECTANGLE IS OUTSIDE THE CELLS: the strips carry the art's
-     edge across the margins and into the gaps, and none reaches into a cell —
-     the crop cannot be touched by them. */
+     edge across the margins and into the gaps, SEAM_MM under the boxes so no
+     two draws merely touch, and none reaches into a cell — the crop cannot
+     be touched by them. And they are drawn FIRST, the boxes over them. */
   const strips = rects.filter((r) => !art.includes(r));
   assert.ok(strips.length > 0, 'the edges are carried past the layout boxes');
+  assert.ok(SEAM_MM > 0 && SEAM_MM < LAYOUT_BLEED_MM, 'the seam overlap is bleed, never cell');
   for (const r of strips) {
     const inside = f.cells.some((c) =>
       r[0] < c.xMm + c.wMm - 0.01 && r[0] + r[2] > c.xMm + 0.01
@@ -204,8 +206,8 @@ test("THE VENDOR'S LAYOUT SIZE — art at 92 x 66 over an 89 x 63 cut", async ()
   assert.ok(close(right[0]![0] - (left[0]![0] + left[0]![2]), f.gutterXMm - 2 * B, 0.02),
     'the boxes are the gap less a bleed each side apart');
   const mid = f.marginXMm + f.cellWsMm[0]! + f.gutterXMm / 2;
-  assert.ok(strips.some((r) => close(r[0] + r[2], mid, 0.02)) && strips.some((r) => close(r[0], mid, 0.02)),
-    'and the carries meet in the middle of the gap');
+  assert.ok(strips.some((r) => close(r[0] + r[2], mid + SEAM_MM, 0.02)) && strips.some((r) => close(r[0], mid - SEAM_MM, 0.02)),
+    'and the carries meet in the middle of the gap, overlapping by the seam');
   /* ...while every CUT line is exactly where the gutters put it. */
   assert.ok(close(left[0]![0] + B, f.marginXMm, 0.02), 'A cut line unmoved');
   assert.ok(close((right[0]![0] + B) - (left[0]![0] + left[0]![2] - B), f.gutterXMm, 0.02),
@@ -214,10 +216,10 @@ test("THE VENDOR'S LAYOUT SIZE — art at 92 x 66 over an 89 x 63 cut", async ()
 
   /* THE REGISTRATION TOLERANCE reaches OUTER_BLEED_MM from the cut on the
      outside of the block, clamped to the paper there. */
-  assert.ok(close(Math.min(...rects.map((r) => r[0])), f.marginXMm - Math.min(OUTER_BLEED_MM, f.marginXMm), 0.02),
-    'the left edge is carried a full outer bleed past the cut');
+  assert.ok(close(Math.min(...rects.map((r) => r[0])), f.marginXMm - Math.min(OUTER_BLEED_MM, f.marginXMm) - SEAM_MM, 0.02),
+    'the left edge is carried a full outer bleed past the cut (plus the seam)');
   assert.ok(close(Math.max(...rects.map((r) => r[0] + r[2])),
-    215.9 - f.marginRightMm + Math.min(OUTER_BLEED_MM, f.marginRightMm), 0.02), 'and so is the right');
+    215.9 - f.marginRightMm + Math.min(OUTER_BLEED_MM, f.marginRightMm) + SEAM_MM, 0.02), 'and so is the right');
   assert.ok(close(Math.max(...rects.map((r) => r[1] + r[3])), 279.4, 0.02),
     'row 1 runs to the sheet edge — the head has less than an outer bleed of room');
   /* CONSTANT ROW PITCH is the property that matters against a slitter. */
@@ -404,9 +406,9 @@ test("LETTER is the manufacturer's template, converted for an A4 cutter and hone
     assert.ok(close(top[i - 1]! - (top[i]! + boxH), MACHINE_GROOVE_AS_CUT_MM - 2 * LAYOUT_BLEED_MM, 0.02),
       "the rows' boxes sit a 3.2 groove less two bleeds apart");
   const mid = reg.marginXMm + reg.cellWsMm[0]! + reg.gutterXMm / 2;   // middle of the gap
-  assert.ok(allRects.some((r) => close(r[0], xs[0]! + boxWs[0]!, 0.02) && close(r[0] + r[2], mid, 0.02)),
-    'the left column carries its edge to the middle of the gap');
-  assert.ok(allRects.some((r) => close(r[0] + r[2], xs[1]!, 0.02) && close(r[0], mid, 0.02)),
+  assert.ok(allRects.some((r) => close(r[0], xs[0]! + boxWs[0]! - SEAM_MM, 0.02) && close(r[0] + r[2], mid + SEAM_MM, 0.02)),
+    'the left column carries its edge to the middle of the gap, a seam under the box and a seam past the middle');
+  assert.ok(allRects.some((r) => close(r[0] + r[2], xs[1]! + SEAM_MM, 0.02) && close(r[0], mid - SEAM_MM, 0.02)),
     'and the right column carries its edge back to meet it');
   assert.ok(!/1 1 1 rg/.test(t) && !/0 0 0 rg/.test(t), 'no mark, no pad');
   assert.ok(!/1 0 0 rg/.test(t), 'and no red: the honing is done and the lines are off (owner)');
@@ -808,12 +810,14 @@ test('the BACK sheet mirrors across — A and C trade places', async () => {
      6.5) and layout box (13.95), the carry to mid-gap from the left box
      (107.95), the carry back from the right box (110.95), the right box
      (113.95) and its outer strip (205.95 + 1.5). */
-  const laid = [7.45, 13.95, 107.95, 110.95, 113.95, 207.45];
+  const e = SEAM_MM;
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  const laid = [7.45 - e, 13.95, 107.95 - e, 110.95 - e, 113.95, 207.45 - e].map(r2);
   assert.deepEqual(await colsOf(0), laid, 'the front is laid as the template says');
   /* Mirrored cell by cell: the 90.5 cell comes to the left at C 9.95 (box 8.45,
      outer strip 1.95), the 91 cell goes to the right at 109.45 (box 107.95,
      outer strip 201.95), and the carries meet at the new mid-gap 104.95. */
-  const mirroredLaid = [1.95, 8.45, 101.95, 104.95, 107.95, 201.95];
+  const mirroredLaid = [1.95 - e, 8.45, 101.95 - e, 104.95 - e, 107.95, 201.95 - e].map(r2);
   assert.deepEqual(await colsOf(1), mirroredLaid, 'the back is mirrored — unticked');
   const spunDoc = await PDFDocument.load(await imposeDivinityCards(await frontBackPdf(),
     { sheet: 'letter', addMarks: false, spinBacks: true }));
@@ -849,8 +853,8 @@ test('the BACK sheet mirrors across — A and C trade places', async () => {
   };
   const sf = await rowsOf(0), sb = await rowsOf(1);
   assert.deepEqual(sb.xs, laid, 'short-edge: across is untouched');
-  assert.ok(close(sf.top, 279.4, 0.02) && close(sf.bottom, 11.9 - 1.5 - 6.5, 0.02), 'front: head 5.9 runs to the edge, foot 11.9 carried 8');
-  assert.ok(close(sb.bottom, 0, 0.02) && close(sb.top, 279.4 - 11.9 + 1.5 + 6.5, 0.02), 'back: mirrored top to bottom');
+  assert.ok(close(sf.top, 279.4, 0.02) && close(sf.bottom, 11.9 - 1.5 - 6.5 - SEAM_MM, 0.02), 'front: head 5.9 runs to the edge, foot 11.9 carried 8');
+  assert.ok(close(sb.bottom, 0, 0.02) && close(sb.top, 279.4 - 11.9 + 1.5 + 6.5 + SEAM_MM, 0.02), 'back: mirrored top to bottom');
 });
 
 test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
@@ -876,22 +880,22 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100));
   };
-  assert.equal(await leftEdge(off), 7.45, 'unticked: A 15.45, less the outer bleed 8');
+  assert.equal(await leftEdge(off), Math.round((7.45 - SEAM_MM) * 100) / 100, 'unticked: A 15.45, less the outer bleed 8 and the seam');
   /* Ticked, C 9.95 comes to the left — with the RIGHT column's 90.5 cell, since
      the mirror is cell by cell: 9.95 − 1.5 − (8 − 1.5) = 1.95. A 5.5 mm move,
      and the narrower cell on the left: if the mirror ever silently stopped
      working, or mirrored the block without its cells, this is the assertion
      that screams. */
-  assert.equal(await leftEdge(on), 1.95, 'ticked: C 9.95 comes to the left, less the outer bleed');
+  assert.equal(await leftEdge(on), Math.round((1.95 - SEAM_MM) * 100) / 100, 'ticked: C 9.95 comes to the left, less the outer bleed');
   /* Run it again on a deliberately lopsided A, so the claim does not rest on one
      pair of numbers that happen to differ — the block really is flipped end for
      end, whatever A is set to. */
   const lop = { sheet: 'letter' as const, addMarks: false, marginXMm: 20 };
   assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), lop)),
-    20 - Math.min(OUTER_BLEED_MM, 20), 'lopsided, unticked: A 20, less the outer bleed');
+    Math.round((20 - Math.min(OUTER_BLEED_MM, 20) - SEAM_MM) * 100) / 100, 'lopsided, unticked: A 20, less the outer bleed');
   assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), { ...lop, spinBacks: true })),
     (() => { const C = 215.9 - 20 - fitDivinityCards('letter').blockWMm;
-      return Math.round((C - Math.min(OUTER_BLEED_MM, C)) * 100) / 100; })(),
+      return Math.round(Math.max(0, C - Math.min(OUTER_BLEED_MM, C) - SEAM_MM) * 100) / 100; })(),
     'lopsided, ticked: C comes to the left');
 });
 
@@ -911,8 +915,8 @@ test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100));
   };
-  assert.equal(await leftOf(0), 7.45, 'fronts untouched');
-  assert.equal(await leftOf(1), 1.95, 'backs mirrored — C to the left, with the right column\'s cell');
+  assert.equal(await leftOf(0), Math.round((7.45 - SEAM_MM) * 100) / 100, 'fronts untouched');
+  assert.equal(await leftOf(1), Math.round((1.95 - SEAM_MM) * 100) / 100, 'backs mirrored — C to the left, with the right column\'s cell');
   /* And unticked the back is mirrored just the same — the switch is only the turn. */
   const plain = await PDFDocument.load(await imposeDivinityCards(await frontBackPdf(), { sheet: 'letter', addMarks: false }));
   const st = plain.getPage(1).node.normalizedEntries().Contents;
@@ -923,7 +927,7 @@ test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
     catch { t += Buffer.from(raw).toString('latin1'); }
   }
   assert.equal(Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
-    .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100)), 1.95, 'unticked backs mirrored too');
+    .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100)), Math.round((1.95 - SEAM_MM) * 100) / 100, 'unticked backs mirrored too');
 });
 
 test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {

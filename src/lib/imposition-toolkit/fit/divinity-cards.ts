@@ -202,6 +202,12 @@ export const OUTER_BLEED_MM = 8;
 /** How much of the art's edge is drawn out across that outer zone: a sliver,
  *  so it reads as the border carried on rather than a smeared picture. */
 export const STREAK_MM = 0.5;
+/** How far every carried strip is drawn PAST its slot on every side, under
+ *  the layout boxes and under each other, so no two clipped draws merely
+ *  touch: two edges that only meet leave a hairline of paper in a viewer
+ *  (and on some RIPs), right across the art. Bleed only — a strip reaches
+ *  this far into a layout box and never into a cell. */
+export const SEAM_MM = 0.3;
 
 /* ── The shop's original hand-measured template. Letter no longer uses it (see
    LETTER_TEMPLATE); A4 and A3 still start from it, never having been honed on
