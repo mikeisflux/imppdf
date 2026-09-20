@@ -4700,7 +4700,8 @@ export async function imposeDivinityCards(
 ): Promise<Uint8Array> {
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, cmyk, degrees } = PL;
-  const { fitDivinityCards, PT_PER_MM, LAYOUT_BLEED_MM } = await import('./fit/divinity-cards.ts');
+  const { fitDivinityCards, PT_PER_MM, LAYOUT_BLEED_MM, OUTER_BLEED_MM, MACHINE_GROOVE_MM } =
+    await import('./fit/divinity-cards.ts');
 
   const fit = fitDivinityCards(opts.sheet ?? 'letter', {
     marginXMm: opts.marginXMm, marginTopMm: opts.marginTopMm,
@@ -4754,17 +4755,44 @@ export async function imposeDivinityCards(
     const artW = turn ? card.height : card.width;
     const artH = turn ? card.width : card.height;
     for (const c of cells) {
-      /* THE MANUFACTURER'S LAYOUT SIZE. The cell is where the blade goes — 89 x
-         63 — and their template draws the art at 92 x 66, so it runs half the
-         groove past the cut on every side. Two neighbours then meet exactly in
-         the middle of the groove, the groove is solid ink, and the blade cuts
-         through artwork however it drifts.
+      /* BLEED, and it differs INSIDE the block and OUTSIDE it.
 
-         Drawn OUTSIDE the cell, so it moves no cut line: the gutters still place
-         the cuts and both chains still close on the sheet. */
-      const bl = mm(LAYOUT_BLEED_MM);
-      const bx = mm(c.xMm) - bl, by = mm(c.yMm) - bl;
-      const cw = mm(c.wMm) + 2 * bl, ch = mm(c.hMm) + 2 * bl;
+         Inside, the manufacturer's layout size governs: the cell is where the
+         blade goes (89 x 63) and their template draws 92 x 66, so the art runs
+         half the groove past each cut and two neighbours meet exactly in the
+         middle of it. More than that would overlap a neighbour; less would leave
+         paper in the groove.
+
+         Outside, there is no neighbour to meet — only margin — so the art runs
+         much further, and that is the machine's REGISTRATION TOLERANCE. The
+         cutter is hard-wired for A4 and the shop runs Letter, hand centred: the
+         blades sit a fixed 181 apart wherever the sheet lands, so a couple of
+         millimetres off centre used to walk a blade off the artwork and leave a
+         white edge. At OUTER_BLEED_MM the sheet can sit that far out and every
+         cut still falls in ink.
+
+         All of it is drawn OUTSIDE the cells, so no cut line moves. */
+      /* A cell has a NEIGHBOUR on a side when another cell sits within a groove
+         of it and the two overlap on the other axis. Interior edges get the
+         layout bleed and meet in the middle of the groove; outside edges have
+         only margin beyond them, so they get the tolerance bleed, clamped to
+         whatever paper is actually there. */
+      const GAP = MACHINE_GROOVE_MM * 1.5;
+      const spanY = (d: typeof c) => d.yMm < c.yMm + c.hMm && d.yMm + d.hMm > c.yMm;
+      const spanX = (d: typeof c) => d.xMm < c.xMm + c.wMm && d.xMm + d.wMm > c.xMm;
+      const edge = (has: boolean, room: number) => has
+        ? mm(LAYOUT_BLEED_MM)
+        : mm(Math.max(LAYOUT_BLEED_MM, Math.min(OUTER_BLEED_MM, room)));
+      const l = edge(cells.some((d) => d !== c && spanY(d) && c.xMm - (d.xMm + d.wMm) >= 0
+        && c.xMm - (d.xMm + d.wMm) < GAP), c.xMm);
+      const rgt = edge(cells.some((d) => d !== c && spanY(d) && d.xMm - (c.xMm + c.wMm) >= 0
+        && d.xMm - (c.xMm + c.wMm) < GAP), fit.sheetWMm - (c.xMm + c.wMm));
+      const bot = edge(cells.some((d) => d !== c && spanX(d) && c.yMm - (d.yMm + d.hMm) >= 0
+        && c.yMm - (d.yMm + d.hMm) < GAP), c.yMm);
+      const top = edge(cells.some((d) => d !== c && spanX(d) && d.yMm - (c.yMm + c.hMm) >= 0
+        && d.yMm - (c.yMm + c.hMm) < GAP), fit.sheetHMm - (c.yMm + c.hMm));
+      const bx = mm(c.xMm) - l, by = mm(c.yMm) - bot;
+      const cw = mm(c.wMm) + l + rgt, ch = mm(c.hMm) + bot + top;
       /* STRETCH — the owner's instruction, and an exception to the house rule
          that art is fitted CONTAIN and never distorted. The cell is the card's
          set size, 1.5 mm over a 2.5 x 3.5" on each dimension, and the art is
@@ -4823,12 +4851,16 @@ export async function imposeDivinityCards(
       const bw = horizontal ? len : depth, bh = horizontal ? depth : len;
       const xMm = edge === 'left' ? inset : edge === 'right' ? W - inset - depth : (W - len) / 2;
       const yMm = edge === 'bottom' ? inset : edge === 'top' ? H - inset - depth : (H - len) / 2;
-      /* A white pad so the eye sees a clean paper-to-black step even with the
-         background flood on — the same reason the corner marks get one. */
-      pg.drawRectangle({
-        x: mm(xMm - REG_PAD_MM), y: mm(yMm - REG_PAD_MM),
-        width: mm(bw + 2 * REG_PAD_MM), height: mm(bh + 2 * REG_PAD_MM), color: rgb(1, 1, 1),
-      });
+      /* The white pad exists ONLY to give the eye a paper-to-black step when the
+         background is flooded. On plain paper it is not just redundant, it is
+         harmful: it paints white over the bleed and that white then shows up on
+         the cut cards. So it is drawn only when there is a flood to cut through. */
+      if (opts.blackBg === true) {
+        pg.drawRectangle({
+          x: mm(xMm - REG_PAD_MM), y: mm(yMm - REG_PAD_MM),
+          width: mm(bw + 2 * REG_PAD_MM), height: mm(bh + 2 * REG_PAD_MM), color: rgb(1, 1, 1),
+        });
+      }
       pg.drawRectangle({ x: mm(xMm), y: mm(yMm), width: mm(bw), height: mm(bh), color: black });
       return;
     }
@@ -4843,11 +4875,13 @@ export async function imposeDivinityCards(
       [fit.sheetWMm - inset - size, fit.sheetHMm - inset - size, -1, -1],
     ];
     for (const [xMm, yMm, sx, sy] of corners) {
-      pg.drawRectangle({
-        x: mm(xMm - REG_PAD_MM), y: mm(yMm - REG_PAD_MM),
-        width: mm(size + 2 * REG_PAD_MM), height: mm(size + 2 * REG_PAD_MM),
-        color: rgb(1, 1, 1),
-      });
+      if (opts.blackBg === true) {
+        pg.drawRectangle({
+          x: mm(xMm - REG_PAD_MM), y: mm(yMm - REG_PAD_MM),
+          width: mm(size + 2 * REG_PAD_MM), height: mm(size + 2 * REG_PAD_MM),
+          color: rgb(1, 1, 1),
+        });
+      }
       const x = mm(xMm), y = mm(yMm), sz = mm(size);
       if (shape === 'circle') {
         pg.drawCircle({ x: x + sz / 2, y: y + sz / 2, size: sz / 2, color: black });

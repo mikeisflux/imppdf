@@ -167,6 +167,27 @@ export const MACHINE_FRONT_MM = 7.6;
  *  the two arts meet exactly: change the groove on the machine and this follows.
  *  It moves NO cut line — the cells are still 89 x 63 where the blade goes. */
 export const LAYOUT_BLEED_MM = MACHINE_GROOVE_MM / 2;
+
+/** OUTER bleed — how far the art runs past the cuts on the OUTSIDE of the block,
+ *  where there is no neighbour to meet and nothing but margin beyond.
+ *
+ *  This is the registration tolerance, and it is the whole reason white edges
+ *  come back. The machine is hard-wired for A4 and the shop runs Letter, hand
+ *  centred: the blades sit 181 mm apart wherever the sheet happens to land, and
+ *  with only the interior 1.5 to spare, being a couple of millimetres off centre
+ *  walks a blade straight off the artwork. The margins are 17.45 on both sides
+ *  doing nothing, so spend them — at 5 the sheet can sit 5 mm out and every cut
+ *  still lands in ink.
+ *
+ *  It cannot be used BETWEEN cards: there the two arts have to meet in the
+ *  middle of the groove, which is what LAYOUT_BLEED_MM does. Interior edges keep
+ *  that; only outside edges get this. Clamped to the margin available, so it can
+ *  never run off the sheet.
+ *
+ *  8, not 5: the shop measured the white at 5-5.5 mm with the stock centred by
+ *  hand, so 5 only just covers it and leaves nothing for the next sheet. The
+ *  outer margins are 17.45 across and 7.6 / 10.8 down, so 8 costs nothing. */
+export const OUTER_BLEED_MM = 8;
 export const LAYOUT_W_MM = MACHINE_CARD_W_MM + MACHINE_GROOVE_MM;   // 92
 export const LAYOUT_L_MM = MACHINE_CARD_L_MM + MACHINE_GROOVE_MM;   // 66
 

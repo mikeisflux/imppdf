@@ -24,7 +24,7 @@ import {
   fitDivinityCards, PT_PER_MM, CARD_W_MM, CARD_H_MM, PLACED_W_MM, PLACED_H_MM,
   DEF_GUTTER_X_MM, DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, COLS, ROWS,
   MACHINE_CARD_W_MM, MACHINE_CARD_L_MM, MACHINE_GROOVE_MM, MACHINE_FRONT_MM,
-  LAYOUT_BLEED_MM, LAYOUT_W_MM, LAYOUT_L_MM,
+  LAYOUT_BLEED_MM, LAYOUT_W_MM, LAYOUT_L_MM, OUTER_BLEED_MM,
   REG_HEAD_MM, REG_MARK_INSET_MM, REG_MARK_DEPTH_MM, REG_MARK_PAD_MM,
 } from '../src/lib/imposition-toolkit/fit/divinity-cards.ts';
 import { imposeDivinityCards, BLACK_BORDER_MM } from '../src/lib/imposition-toolkit/impose.ts';
@@ -166,12 +166,25 @@ test("THE VENDOR'S LAYOUT SIZE — art at 92 x 66 over an 89 x 63 cut", async ()
   const B = LAYOUT_BLEED_MM;
   assert.ok(close(B, MACHINE_GROOVE_MM / 2), 'the bleed is HALF the groove, so neighbours meet in it');
   assert.equal(rects.length, 8, 'eight cards drawn');
-  for (const r of rects) {
-    assert.ok(close(r[2], LAYOUT_W_MM, 0.02), `art is the layout size across, got ${r[2]}`);
-    assert.ok(close(r[3], LAYOUT_L_MM, 0.02), `art is the layout size down, got ${r[3]}`);
-  }
   assert.ok(close(LAYOUT_W_MM, 92) && close(LAYOUT_L_MM, 66), "the vendor's 92 x 66");
-  /* THE GROOVE IS SOLID INK: adjacent arts meet exactly, no paper between. */
+  /* Each edge gets the vendor's layout bleed when it faces a NEIGHBOUR — any
+     wider and a card would overlap instead of meeting it in the groove — and the
+     tolerance bleed when it faces only margin, clamped to the paper there.
+     Worked out per cell from the fit rather than assumed. */
+  const cap = (room: number) => Math.min(OUTER_BLEED_MM, room);
+  for (const r of rects) {
+    const onLeft = close(r[0] + cap(f.marginXMm), f.marginXMm, 0.05);
+    const wantW = PLACED_W_MM + LAYOUT_BLEED_MM + cap(onLeft ? f.marginXMm : f.marginRightMm);
+    assert.ok(close(r[2], wantW, 0.05), `art across = cell + inner + outer, got ${r[2]}`);
+    const topOuter = close(279.4 - (r[1] + r[3]) + cap(f.marginTopMm), f.marginTopMm, 0.05);
+    const botOuter = close(r[1] + cap(f.marginBottomMm), f.marginBottomMm, 0.05);
+    const wantH = PLACED_H_MM
+      + (topOuter ? cap(f.marginTopMm) : LAYOUT_BLEED_MM)
+      + (botOuter ? cap(f.marginBottomMm) : LAYOUT_BLEED_MM);
+    assert.ok(close(r[3], wantH, 0.05), `art down = cell + its edges, got ${r[3]}`);
+  }
+  /* THE GROOVE IS SOLID INK: adjacent arts meet exactly, no paper between — the
+     interior bleed is half a groove from each side and they touch. */
   const left = rects.filter((r) => r[0] < 60);
   assert.ok(close(rects[1]![0] - (rects[0]![0] + rects[0]![2]), 0, 0.02),
     'the two columns of art MEET — the groove is ink, not paper');
@@ -180,27 +193,42 @@ test("THE VENDOR'S LAYOUT SIZE — art at 92 x 66 over an 89 x 63 cut", async ()
       'and so do the rows');
   /* ...while every CUT line is exactly where the gutters put it. Add the bleed
      back onto each ink edge and the machine's own program has to come out. */
-  assert.ok(close(rects[0]![0] + B, f.marginXMm, 0.02), 'A cut line unmoved');
-  assert.ok(close(279.4 - (rects[0]![1] + rects[0]![3]) + B, MACHINE_FRONT_MM, 0.02),
-    'first cut is still the panel Front len');
+  const O = Math.min(OUTER_BLEED_MM, f.marginXMm);
+  assert.ok(close(rects[0]![0] + O, f.marginXMm, 0.02), 'A cut line unmoved');
   assert.ok(close((rects[1]![0] + B) - (rects[0]![0] + rects[0]![2] - B), MACHINE_GROOVE_MM, 0.02),
     'B cut lines still one groove apart');
-  assert.ok(close(left[3]![1] + B, f.marginBottomMm, 0.02), 'H unmoved');
+  assert.ok(close(left[3]![1] + Math.min(OUTER_BLEED_MM, f.marginBottomMm), f.marginBottomMm, 0.02),
+    'H unmoved');
+
+  /* THE REGISTRATION TOLERANCE. The cutter is hard-wired for A4 and the stock is
+     Letter, centred by hand, so the blades land wherever the sheet does. The
+     outer bleed is how far the sheet may sit off before a cut misses the ink —
+     the shop measured 5-5.5 mm of white, so this has to beat that. */
+  assert.ok(OUTER_BLEED_MM >= 6, 'more headroom than the 5.5 mm that was measured');
+  assert.ok(close(f.marginXMm - rects[0]![0], Math.min(OUTER_BLEED_MM, f.marginXMm), 0.02),
+    'the left cut can miss by the whole outer bleed and still land in ink');
+  const rightArt = Math.max(...rects.map((r) => r[0] + r[2]));
+  assert.ok(close(rightArt - (f.marginXMm + 2 * PLACED_W_MM + DEF_GUTTER_X_MM),
+    Math.min(OUTER_BLEED_MM, f.marginRightMm), 0.02), 'and so can the right');
   /* The card grew 0.25 on every edge and the gutters paid for it, so the ink
      lands exactly where it did before that change. Pinned as absolutes: if a
      future size change forgets to take it out of the gutters, the block shifts
      and these are what catch it. */
   /* Pinned as absolutes: the ink starts one bleed outside the cut line, and the
      cut line is the machine's own program. If either drifts, this catches it. */
-  assert.ok(close(rects[0]![0], 17.45 - LAYOUT_BLEED_MM, 0.02), 'left column ink starts at 15.95');
-  assert.ok(close(279.4 - (rects[0]![1] + rects[0]![3]), MACHINE_FRONT_MM - LAYOUT_BLEED_MM, 0.02),
-    'row 1 ink starts one bleed above the Front len cut');
+  assert.ok(close(rects[0]![0], 17.45 - Math.min(OUTER_BLEED_MM, 17.45), 0.02),
+    'left column ink starts one OUTER bleed before the cut');
+  assert.ok(close(279.4 - (rects[0]![1] + rects[0]![3]),
+    MACHINE_FRONT_MM - Math.min(OUTER_BLEED_MM, MACHINE_FRONT_MM), 0.02),
+    'row 1 ink runs to the sheet edge — the head has only Front len of room');
   /* CONSTANT ROW PITCH is the property that matters against a slitter: the
      machine steps card + gutter and repeats, so the file must too. */
-  const tops = left.map((r) => 279.4 - (r[1] + r[3])).sort((a, b) => a - b);
-  for (let i = 1; i < tops.length; i++)
-    assert.ok(close(tops[i]! - tops[i - 1]!, PLACED_H_MM + 3, 0.02),
-      `row pitch is ${PLACED_H_MM + 3} every time, got ${tops[i]! - tops[i - 1]!}`);
+  /* Pitch is a property of the CUTS. Ink tops differ by row now, because the
+     outer rows bleed further than the interior ones. */
+  const cuts = [...new Set(f.cells.map((c) => 279.4 - c.yMm - c.hMm))].sort((a, b) => a - b);
+  for (let i = 1; i < cuts.length; i++)
+    assert.ok(close(cuts[i]! - cuts[i - 1]!, PLACED_H_MM + MACHINE_GROOVE_MM, 0.02),
+      `row pitch is ${PLACED_H_MM + MACHINE_GROOVE_MM} every time, got ${cuts[i]! - cuts[i - 1]!}`);
 });
 
 test('BLACK BACKGROUND: rich CMYK black, 1.5 of white left all round', async () => {
@@ -317,14 +345,12 @@ test('MARK MODE: one black bar on the feed edge, clear of the first cut', async 
   assert.ok(close(f.marginTopMm - barEnds, REG_MARK_PAD_MM, 0.01),
     'the first cut falls exactly one pad past the bar');
   assert.ok(f.marginTopMm > barEnds, 'and never on it');
-  /* A white pad under it, so the eye still sees paper-then-black on a flooded sheet. */
+  /* NO WHITE PAD on plain paper. It exists only to give the eye a paper-to-black
+     step through the background flood; printed on white it paints over the bleed
+     and that white then shows on the cut cards, which is exactly what came back
+     off the machine. */
   const pad = boxes.find((b) => b.h > bar!.h && b.h < 10 && b.w > bar!.w);
-  assert.ok(pad, 'the bar sits on a white pad');
-  assert.ok(pad!.y < bar!.y && pad!.x < bar!.x, 'which is bigger than it on every side');
-  /* The pad's trailing edge and the first cut are flush: any deeper and it
-     prints over the top row, any shallower and paper is wasted. */
-  const padEnds = 279.4 - pad!.y;
-  assert.ok(close(padEnds, f.marginTopMm, 0.01), 'pad ends flush with the first cut');
+  assert.ok(!pad, 'no pad is drawn when there is no flood to cut through');
 });
 
 test('the corner shapes still draw, for a camera machine', async () => {
@@ -348,14 +374,21 @@ test('the corner shapes still draw, for a camera machine', async () => {
     { sheet: 'letterreg', addMarks: false, backs: false }));
   const whitePads = (t: string) => (t.match(/^1 1 1 rg$/gm) || []).length;
   assert.equal(whitePads(plain), 0, 'Letter gets no marks');
-  assert.equal(whitePads(reg), 1, 'the reg stock defaults to ONE bar, not four corners');
+  assert.equal(whitePads(reg), 0, 'and no pad on plain paper — it would print AS white');
+  const regFlooded = await streamOf(await imposeDivinityCards(await cardPdf(),
+    { sheet: 'letterreg', addMarks: false, backs: false, blackBg: true }));
+  assert.equal(whitePads(regFlooded), 1, 'ONE bar, not four corners, once there is a flood');
 
   /* Every shape still draws, and the marks go on LAST so nothing lands on top. */
   for (const regShape of ['square', 'circle', 'lshape', 'cross'] as const) {
     const t = await streamOf(await imposeDivinityCards(await cardPdf(),
       { sheet: 'letterreg', regShape, addMarks: false, backs: false }));
-    assert.equal(whitePads(t), 4, `${regShape} draws four marks`);
-    assert.ok(t.lastIndexOf('1 1 1 rg') > t.lastIndexOf('Do'), `${regShape} marks are drawn last`);
+    const withFlood = await streamOf(await imposeDivinityCards(await cardPdf(),
+      { sheet: 'letterreg', regShape, addMarks: false, backs: false, blackBg: true }));
+    assert.equal(whitePads(withFlood), 4, `${regShape} draws four marks on a flooded sheet`);
+    assert.ok(withFlood.lastIndexOf('1 1 1 rg') > withFlood.lastIndexOf('Do'),
+      `${regShape} marks are drawn last`);
+    assert.equal(whitePads(t), 0, `${regShape} needs no pad on plain paper`);
   }
 });
 
@@ -613,8 +646,8 @@ test('the BACK sheet mirrors across — A and C trade places', async () => {
     return [...new Set([...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100))].sort((a, b) => a - b);
   };
-  assert.deepEqual(await colsOf(0), [15.95, 107.95], 'unticked, nothing mirrors');
-  assert.deepEqual(await colsOf(1), [15.95, 107.95], 'including the back sheet');
+  assert.deepEqual(await colsOf(0), [9.45, 107.95], 'unticked, nothing mirrors');
+  assert.deepEqual(await colsOf(1), [9.45, 107.95], 'including the back sheet');
 });
 
 test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
@@ -640,8 +673,8 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100));
   };
-  assert.equal(await leftEdge(off), 15.95, 'unticked: A 17.45, less the bleed');
-  assert.equal(await leftEdge(on), 15.95, 'ticked: A becomes C — equal now, so it does not move');
+  assert.equal(await leftEdge(off), 9.45, 'unticked: A 17.45, less the outer bleed');
+  assert.equal(await leftEdge(on), 9.45, 'ticked: A becomes C — equal now, so it does not move');
   /* A 17.45 against C 17.45 is a 6.9 mm move — if the mirror ever silently stopped
      working this is the assertion that screams, which the near-identical pairs
      of earlier templates could not do. */
@@ -651,9 +684,10 @@ test('SPIN BACKS swaps the margins on a ONE-PAGE upload', async () => {
      end, whatever A is set to. */
   const lop = { sheet: 'letter' as const, addMarks: false, marginXMm: 20 };
   assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), lop)),
-    20 - LAYOUT_BLEED_MM, 'lopsided, unticked: A 20, less the bleed');
+    20 - Math.min(OUTER_BLEED_MM, 20), 'lopsided, unticked: A 20, less the outer bleed');
   assert.equal(await leftEdge(await imposeDivinityCards(await cardPdf(), { ...lop, spinBacks: true })),
-    Math.round((215.9 - 20 - (2 * PLACED_W_MM + DEF_GUTTER_X_MM) - LAYOUT_BLEED_MM) * 100) / 100,
+    (() => { const C = 215.9 - 20 - (2 * PLACED_W_MM + DEF_GUTTER_X_MM);
+      return Math.round((C - Math.min(OUTER_BLEED_MM, C)) * 100) / 100; })(),
     'lopsided, ticked: C comes to the left');
 });
 
@@ -673,8 +707,8 @@ test('SPIN BACKS swaps the back sheet of a TWO-PAGE upload', async () => {
     return Math.min(...[...t.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re/g)]
       .map((m) => Math.round((Number(m[1]) / PT_PER_MM) * 100) / 100));
   };
-  assert.equal(await leftOf(0), 15.95, 'fronts untouched');
-  assert.equal(await leftOf(1), 15.95, 'backs swapped');
+  assert.equal(await leftOf(0), 9.45, 'fronts untouched');
+  assert.equal(await leftOf(1), 9.45, 'backs swapped');
 });
 
 test('11 x 17 doubles the sheet up and cuts back to two Letters', () => {

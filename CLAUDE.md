@@ -88,6 +88,13 @@ by explicit owner instruction — do not "fix" it to combine pages.
   with ink, and the blade cuts through artwork however it drifts. It is drawn
   OUTSIDE the cells and moves NO cut line — the gutters still place the cuts and
   both chains still close on the sheet.
+  **OUTSIDE edges bleed much further (`OUTER_BLEED_MM`, 8), clamped to the margin
+  there.** That is the REGISTRATION TOLERANCE, and it is not optional: the cutter
+  is hard-wired for A4 while the shop runs Letter centred by hand, so the blades
+  land wherever the sheet does. At the interior 1.5 alone there was only 1.5 mm
+  of slop and the shop measured 5-5.5 mm of white down one side. The outer
+  margins (17.45 across, 7.6 / 10.8 down) are otherwise wasted paper. Interior
+  edges must KEEP the 1.5 — more would overlap a neighbour rather than meet it.
   EXCEPTION (owner): **30-Up Proof Labels** defaults to 1×1-overriding 3×10 AND
   to STRETCH — the die-cut label cell is the target size, so the art fills the
   cell instead of sitting proportionally inside it. It also defaults to
@@ -120,8 +127,10 @@ by explicit owner instruction — do not "fix" it to combine pages.
   it both wasted paper and still crowded the art. It is a separate stock so
   the proven `letter` template (A 16.5 / C 9.1 / D 4.75 / H 11.25, measured off
   the machine) is never disturbed — do not add marks to `letter` by moving its
-  block; its 4.75 head cannot clear a bar. Marks are drawn LAST on a white pad,
-  so the eye still sees a clean paper-to-black step with the background flood on.
+  block; its 4.75 head cannot clear a bar. Marks are drawn LAST, and their white pad
+  appears ONLY when the black background is on — it exists to give the eye a
+  paper-to-black step through the flood, and printed on plain paper it paints
+  over the bleed and shows up as a white band on the cut cards.
   Bar length, depth, inset and feed edge are all settable. The rule that matters
   for the FILE is that the bar plus its pad clears the first cut; anything beyond
   that is wasted paper, so do not build in a nominal gap from another maker's
