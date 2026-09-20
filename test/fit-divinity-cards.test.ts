@@ -11,9 +11,9 @@
  *               down    D 7.6 + 4(63) + 3(3) + H 10.8      = 279.4
  *   letterreg   the manufacturer's A4 template, converted for Letter stock
  *               in a cutter hard-wired for A4, blades 3 mm right of centre
- *               the card cut 90 wide and the inner pair 10 apart:
- *               across  A 15.45 + 90 + B 10 + 90 + C 10.45 = 215.9
- *               down    D 6.9 + 4(63) + 3(3) + H 11.5      = 279.4
+ *               the card cut 90.5 wide and the inner pair 9.5 apart:
+ *               across  A 15.45 + 90.5 + B 9.5 + 90.5 + C 9.95 = 215.9
+ *               down    D 6.4 + 4(63) + 3(3) + H 12          = 279.4
  *
  * The gutters place the CUTS and are read off the cutter's own panel (Front len,
  * Card len, Groove len) — never measured back off its output, which measures the
@@ -301,9 +301,9 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
      every LEFT edge to every RIGHT edge, which only a card cut WIDER than the
      cell can do — the blades bracket 90, not the panel's 89 — and the inner
      pair are then 10 apart: ±5 and ±95, and the template's "10.00" is that gap. */
-  assert.ok(close(MACHINE_CARD_W_AS_CUT_MM, 90), 'the card as the blades cut it');
-  assert.ok(close(MACHINE_COL_GAP_MM, 10), 'the inner gap as cut');
-  assert.ok(close(BLADE_INNER_MM, 5) && close(BLADE_OUTER_MM, 95), 'blades at ±5 and ±95');
+  assert.ok(close(MACHINE_CARD_W_AS_CUT_MM, 90.5), 'the card as the blades cut it');
+  assert.ok(close(MACHINE_COL_GAP_MM, 9.5), 'the inner gap as cut');
+  assert.ok(close(BLADE_INNER_MM, 4.75) && close(BLADE_OUTER_MM, 95.25), 'blades at ±4.75 and ±95.25');
   assert.ok(close(BLADE_OUTER_MM - BLADE_INNER_MM, MACHINE_CARD_W_AS_CUT_MM), 'a card apart');
   /* And this is the 5 mm of white the shop measured: the old file read the
      panel's 3 mm groove as the column gap, 10 short of the truth, halved. */
@@ -314,8 +314,8 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   assert.ok(close(plain.marginXMm, DEF_MARGIN_X_MM) && close(plain.marginTopMm, DEF_MARGIN_TOP_MM)
     && close(plain.gutterXMm, DEF_GUTTER_X_MM), 'Letter is untouched by any of this');
   assert.equal(reg.n, 8, 'same eight cards');
-  assert.ok(close(reg.cellWMm, MACHINE_CARD_W_AS_CUT_MM) && close(reg.cells[0]!.wMm, 90),
-    'the cell across is the card as cut, 90');
+  assert.ok(close(reg.cellWMm, MACHINE_CARD_W_AS_CUT_MM) && close(reg.cells[0]!.wMm, 90.5),
+    'the cell across is the card as cut, 90.5');
   assert.ok(close(reg.cellHMm, PLACED_H_MM) && close(reg.cells[0]!.hMm, 63), 'and 63 down');
   assert.ok(close(plain.cellWMm, 89) && close(plain.cells[0]!.wMm, 89), "Letter's cell is still 89");
   /* ACROSS: Letter's centre is 107.95, so a centred sheet would meet the cuts
@@ -323,13 +323,14 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
      came back with 1.5 of white on the LEFT column's inner edge and the right
      column's inner cut 3 into its art, nothing on either outer edge: the whole
      set sits BLADE_OFFSET_MM to the right, so A carries it and C gives it up. */
-  assert.ok(close(reg.gutterXMm, MACHINE_COL_GAP_MM) && close(reg.gutterXMm, 10), 'B is the gap as cut, 10');
-  assert.ok(close(BLADE_OFFSET_MM, 2.5), 'the set sits 2.5 to the right of centre — midway between the 3 and 2 sheets');
-  assert.ok(close(reg.marginXMm, LETTER_TEST_MARGIN_X_MM) && close(reg.marginXMm, 15.45, 1e-9), 'A 15.45');
-  assert.ok(close(reg.marginRightMm, 10.45, 1e-9), 'C 10.45');
+  assert.ok(close(reg.gutterXMm, MACHINE_COL_GAP_MM) && close(reg.gutterXMm, 9.5), 'B is the gap as cut, 9.5');
+  assert.ok(close(BLADE_OFFSET_MM, 2.75), 'the offset that keeps A on the left blades');
+  assert.ok(close(reg.marginXMm, LETTER_TEST_MARGIN_X_MM) && close(reg.marginXMm, 15.45, 1e-9),
+    'A 15.45 — the left blades, pinned by three sheets');
+  assert.ok(close(reg.marginRightMm, 9.95, 1e-9), 'C 9.95');
   assert.ok(close(reg.marginXMm + reg.blockWMm + reg.marginRightMm, 215.9, 1e-9), 'and the chain closes');
   const cutsX = [...new Set(reg.cells.flatMap((c) => [c.xMm, c.xMm + c.wMm]))].sort((a, b) => a - b);
-  assert.deepEqual(cutsX.map((v) => Math.round(v * 100) / 100), [15.45, 105.45, 115.45, 205.45]);
+  assert.deepEqual(cutsX.map((v) => Math.round(v * 100) / 100), [15.45, 105.95, 115.45, 205.95]);
   for (const x of cutsX)
     assert.ok([BLADE_INNER_MM, BLADE_OUTER_MM].some((b) => close(Math.abs(x - (215.9 / 2 + BLADE_OFFSET_MM)), b, 1e-9)),
       `every cut ${x} is a blade`);
@@ -341,19 +342,19 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   /* The first cut lands 0.7 before the panel's Front len — red along the top
      of all eight cards, none along the bottoms, so every row early by the
      same amount: reference, not pitch. */
-  assert.ok(close(FRONT_OFFSET_MM, -0.7) && close(MACHINE_FRONT_AS_CUT_MM, 6.9), 'first cut as it lands');
+  assert.ok(close(FRONT_OFFSET_MM, -1.2) && close(MACHINE_FRONT_AS_CUT_MM, 6.4), 'first cut as it lands');
   assert.ok(close(reg.marginTopMm, MACHINE_FRONT_AS_CUT_MM), 'D is Front len as cut');
   assert.deepEqual(reg.rowGapsMm, [3, 3, 3], "E F G are the panel's 3, NOT the template's 6");
   const ys = [...new Set(reg.cells.map((c) => c.yMm))].sort((a, b) => b - a);
   for (let i = 1; i < ys.length; i++) assert.ok(close(ys[i - 1]! - ys[i]!, 66), 'pitch 66');
-  assert.ok(close(reg.marginBottomMm, 279.4 - 6.9 - 4 * 63 - 3 * 3), 'H is the 11.5 left over');
+  assert.ok(close(reg.marginBottomMm, 279.4 - 6.4 - 4 * 63 - 3 * 3), 'H is the 12 left over');
   /* NO MARK. The machine runs frontal and the owner says the bar is not needed. */
   assert.ok(!reg.regTest && !plain.regTest, 'no stock asks for marks');
   /* The panel's defaults come from the same place. */
   const same = (got: Record<string, number>, want: Record<string, number>) =>
     Object.entries(want).every(([k, v]) => close(got[k]!, v, 1e-9));
   assert.ok(same(sheetDefaults('letterreg'),
-    { marginXMm: 15.45, gutterXMm: 10, marginTopMm: 6.9, gutterEMm: 3, gutterFMm: 3, gutterGMm: 3 }),
+    { marginXMm: 15.45, gutterXMm: 9.5, marginTopMm: 6.4, gutterEMm: 3, gutterFMm: 3, gutterGMm: 3 }),
     `Letter Test defaults: ${JSON.stringify(sheetDefaults('letterreg'))}`);
   assert.ok(same(sheetDefaults('letter'),
     { marginXMm: 17.45, gutterXMm: 3, marginTopMm: 7.6, gutterEMm: 3, gutterFMm: 3, gutterGMm: 3 }),
@@ -362,10 +363,10 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
   assert.ok(close(fitDivinityCards('letterreg', { marginXMm: 20 }).marginXMm, 20));
   assert.ok(close(fitDivinityCards('letterreg', { gutterEMm: 3 }).rowGapsMm[0], 3));
 
-  /* RENDERED: eight layout boxes of the cell plus 1.5 all round (93 x 66 on
-     this stock's 90 card), the two columns' boxes 7 apart and the rows' boxes
-     meeting (a 3 groove, 1.5 each). Then the art's edge is carried to the
-     MIDDLE of the 10 mm gap from each side, so a lateral error of up to 5
+  /* RENDERED: eight layout boxes of the cell plus 1.5 all round (93.5 x 66 on
+     this stock's 90.5 card), the two columns' boxes 6.5 apart and the rows'
+     boxes meeting (a 3 groove, 1.5 each). Then the art's edge is carried to
+     the MIDDLE of the gap from each side, so a lateral error of up to 4.75
      shows no white on any card. */
   const zlib = await import('node:zlib');
   const { PDFStream } = await import('pdf-lib');
@@ -383,12 +384,12 @@ test("THE LETTER TEST is the manufacturer's template, centred in an A4 cutter", 
     .map((m) => [mm2(m[1]!), mm2(m[2]!), mm2(m[3]!), mm2(m[4]!)].join(',')))]
     .map((r) => r.split(',').map(Number) as [number, number, number, number]);
   const boxW = reg.cellWMm + 2 * LAYOUT_BLEED_MM, boxH = reg.cellHMm + 2 * LAYOUT_BLEED_MM;
-  assert.ok(close(boxW, 93) && close(boxH, 66), 'the layout box is the cell plus 1.5 all round');
+  assert.ok(close(boxW, 93.5) && close(boxH, 66), 'the layout box is the cell plus 1.5 all round');
   const art = allRects.filter((r) => close(r[2], boxW, 0.02) && close(r[3], boxH, 0.02));
   assert.equal(art.length, 8, 'eight layout boxes');
   const xs = [...new Set(art.map((r) => r[0]))].sort((a, b) => a - b);
   assert.ok(close(xs[1]! - (xs[0]! + boxW), MACHINE_COL_GAP_MM - 2 * LAYOUT_BLEED_MM, 0.02),
-    "7 between the columns' boxes — the 10 gap less a bleed each side");
+    "6.5 between the columns' boxes — the 9.5 gap less a bleed each side");
   const top = [...new Set(art.map((r) => r[1]))].sort((a, b) => b - a);
   for (let i = 1; i < top.length; i++)
     assert.ok(close(top[i - 1]! - (top[i]! + boxH), MACHINE_GROOVE_MM - 2 * LAYOUT_BLEED_MM, 0.02),

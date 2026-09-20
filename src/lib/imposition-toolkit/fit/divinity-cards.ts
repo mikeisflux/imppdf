@@ -15,9 +15,10 @@
  *                    down    D 7.6 + 4(63) + 3(3) + H 10.8      = 279.4
  *
  *   `letterreg`  the LETTER TEST — the manufacturer's A4 template converted
- *                for Letter stock centred in a machine hard-wired for A4:
- *                    across  A 12.45 + 89 + B 13 + 89 + C 12.45 = 215.9
- *                    down    D 7.6 + 4(63) + 3(6) + H 1.8       = 279.4
+ *                for Letter stock in a machine hard-wired for A4, then honed
+ *                with the red cut lines to what the blades actually do:
+ *                    across  A 15.45 + 90.5 + B 9.5 + 90.5 + C 9.95 = 215.9
+ *                    down    D 6.4 + 4(63) + 3(3) + H 12          = 279.4
  *
  * CUT PIECES MUST BE 8, NOT 10. At a 63 mm card length five rows need more than
  * Letter (279.4) OR A4 (297) — the machine was left set to ten, so after the
@@ -156,10 +157,15 @@ export const TEMPLATE_BLADE_OUTER_MM = TEMPLATE_BLADE_INNER_MM + MACHINE_CARD_W_
  *  its blades are set to. Hardware, measured once, does not move with the
  *  sheet. The Letter Test's cell is therefore 90 x 63 (`cellWMm`); the shop's
  *  `letter` template keeps its 89. */
-export const MACHINE_CARD_W_AS_CUT_MM = 90;
-export const MACHINE_COL_GAP_MM = 10;
-export const BLADE_INNER_MM = MACHINE_COL_GAP_MM / 2;                      // 5
-export const BLADE_OUTER_MM = BLADE_INNER_MM + MACHINE_CARD_W_AS_CUT_MM;   // 95
+export const MACHINE_CARD_W_AS_CUT_MM = 90.5;
+export const MACHINE_COL_GAP_MM = 9.5;
+export const BLADE_INNER_MM = MACHINE_COL_GAP_MM / 2;                      // 4.75
+export const BLADE_OUTER_MM = BLADE_INNER_MM + MACHINE_CARD_W_AS_CUT_MM;   // 95.25
+/* 90.5 / 9.5, from 90 / 10: the sheet cut at 90 came back with ~0.5 of red
+   down every RIGHT edge and none down the left. Three sheets in a row have
+   put the LEFT blades exactly on 15.45 and 115.45 (red there only when the
+   line was moved off them), so the right-edge red is the card wider still,
+   not the set moved: both right blades another half a millimetre out. */
 
 /** WHERE THE BLADE SET ACTUALLY SITS against a Letter sheet the shop centres
  *  by hand: 3 mm to the RIGHT of centre. Measured off the first cut of this
@@ -170,20 +176,23 @@ export const BLADE_OUTER_MM = BLADE_INNER_MM + MACHINE_CARD_W_AS_CUT_MM;   // 95
  *  (The earlier `letter` sheet, 5 mm of white on the outer right, is the same
  *  shift plus the 5 mm the wrong B accounted for.) This is a lateral
  *  registration, the one thing a test cut IS for — not a pitch. */
-export const BLADE_OFFSET_MM = 2.5;
-/* 2.5: the sheet cut at 3 had red down every LEFT edge, the one at 2 red down
-   every RIGHT edge, both ~1 mm — that is the 90-wide card straddling an 89
-   cell, and the set's centre is midway. The sheet is held by lock rails on
-   both sides (owner: "placement is not an issue"), so this is the machine,
-   not the feed. */
+export const BLADE_OFFSET_MM = 2.75;
+/* Whatever keeps A at 15.45 — the left blades are pinned there by three
+   sheets — as the measured card width grows: A = 107.95 − BLADE_OUTER + this.
+   (The sheet cut at 3 had red down every LEFT edge, the one at 2 red down
+   every RIGHT edge, both ~1 mm: the 90-wide card straddling an 89 cell.) The
+   sheet is held by lock rails on both sides (owner: "placement is not an
+   issue"), so this is the machine, not the feed. */
 
 /** THE FIRST CUT AS IT LANDS: the panel says Front len 7.6, the blade lands
  *  0.7 earlier. Same sheet, same red lines: ~0.7 mm of red along the TOP of
  *  all eight cards, none along the bottoms — every row early by the same
  *  amount, so the pitch is right and it is the leading-edge reference that is
  *  off. (The panel's "Frontal comp" would do the same thing on the machine.) */
-export const FRONT_OFFSET_MM = -0.7;
-export const MACHINE_FRONT_AS_CUT_MM = MACHINE_FRONT_MM + FRONT_OFFSET_MM;   // 6.9
+export const FRONT_OFFSET_MM = -1.2;
+export const MACHINE_FRONT_AS_CUT_MM = MACHINE_FRONT_MM + FRONT_OFFSET_MM;   // 6.4
+/* −1.2, from −0.7: the sheet cut at 6.9 still had ~0.5 of red along every
+   TOP and none along the bottoms. */
 
 /** OUTER bleed — how far the art's edge is carried past the cuts on the
  *  OUTSIDE of the block, where there is no neighbour to meet and nothing but
@@ -313,14 +322,14 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
      them at 12.45 / 101.45 / 114.45 / 203.45 — so B is 13, not 3, and A = C =
      12.45. (`centred` gets exactly that: the block is 191 wide.)
 
-     Then, off test cuts with the red lines on: the blades cut the card 90
+     Then, off test cuts with the red lines on: the blades cut the card 90.5
      wide, the inner pair are MACHINE_COL_GAP_MM apart, and the set sits
-     BLADE_OFFSET_MM right of centre — so the cuts fall at 15.45 / 105.45 /
-     115.45 / 205.45: A 15.45, cell 90, B 10, C 10.45.
+     BLADE_OFFSET_MM right of centre — so the cuts fall at 15.45 / 105.95 /
+     115.45 / 205.95: A 15.45, cell 90.5, B 9.5, C 9.95.
 
      Down, the leading edge is the reference so the sheet's length does not
      matter: the first cut lands FRONT_OFFSET_MM before the panel's Front len
-     (6.9, red lines again) and the rows step the panel's Groove — 66 a row,
+     (6.4, red lines again) and the rows step the panel's Groove — 66 a row,
      which the cut stacks confirmed. The template's 6 is NOT this machine (see
      TEMPLATE_ROW_CUT_GAP_MM).
 

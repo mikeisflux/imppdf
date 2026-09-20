@@ -77,8 +77,8 @@ by explicit owner instruction — do not "fix" it to combine pages.
   designed otherwise, and default image fit is CONTAIN (never crop/stretch).
   EXCEPTION (owner): **Divinity Trading Cards** is 2×4 and STRETCHES the art.
   **The cell is the card AS THE BLADES CUT IT** — 89 × 63 off the 2102-F's
-  panel on the shop's `letter` template, **90 × 63 on the Letter Test** where
-  the red cut lines showed the blades bracketing 90 (see below). Near enough a
+  panel on the shop's `letter` template, **90.5 × 63 on the Letter Test** where
+  the red cut lines showed the blades bracketing 90.5 (see below). Near enough a
   2.5 × 3.5" card (88.9 × 63.5) either way, but the machine's figure governs
   because the machine is what cuts — and the blade governs over the panel. **The art is stretched to the manufacturer's
   LAYOUT SIZE, 92 × 66 (`LAYOUT_*`), and to NOTHING ELSE, EVER.** Their template
@@ -94,8 +94,8 @@ by explicit owner instruction — do not "fix" it to combine pages.
   `OUTER_BLEED_MM` (8), clamped to the paper there** — a separate draw of the
   outermost `STREAK_MM` sliver, so a card border just comes out wider if an
   blade lands a little out. It does not move or rescale the art. Between two
-  cards the same carry runs to the MIDDLE of the gap from each side (3.5 mm each
-  into the Letter Test's 10 mm column gap), so a lateral shift up to half the
+  cards the same carry runs to the MIDDLE of the gap from each side (3.25 mm
+  each into the Letter Test's 9.5 mm column gap), so a lateral shift up to half the
   gap shows no white on any card; where the gap is only the 3 mm groove the
   layout boxes already meet and there is nothing to carry.
   EXCEPTION (owner): **30-Up Proof Labels** defaults to 1×1-overriding 3×10 AND
@@ -134,30 +134,35 @@ by explicit owner instruction — do not "fix" it to combine pages.
   (`BLADE_OFFSET_MM`, measured off the first test cut of this template: 1.5 mm
   of white on the left column's inner edge, the right column's inner cut 3 mm
   into its art, nothing on either outer edge — only a whole-set shift does
-  that). **Then the blades cut the card 90 WIDE, not the panel's 89, and the
-  inner pair are 10 apart** (`MACHINE_CARD_W_AS_CUT_MM`, `MACHINE_COL_GAP_MM`;
-  blades `BLADE_INNER_MM` ±5 / `BLADE_OUTER_MM` ±95 from the set's centre, the
-  drawing's ±6.5 / ±95.5 kept as `TEMPLATE_BLADE_*`). The tell, off the 1 mm
+  that). **Then the blades cut the card 90.5 WIDE, not the panel's 89, and
+  the inner pair are 9.5 apart** (`MACHINE_CARD_W_AS_CUT_MM`,
+  `MACHINE_COL_GAP_MM`; blades `BLADE_INNER_MM` ±4.75 / `BLADE_OUTER_MM`
+  ±95.25 from the set's centre, the drawing's ±6.5 / ±95.5 kept as
+  `TEMPLATE_BLADE_*`). The tell, off the 1 mm
   red lines: a sheet had ~1 mm of red down every LEFT edge; the block was
   moved 1 mm left; the next sheet had ~1 mm of red down every RIGHT edge. A
   shift cannot do that — only a card cut wider than the cell can — so the
-  Letter Test's cell is **90 × 63** (`cellWMm` on the stock; `letter` keeps
-  89) and the set's centre is midway, `BLADE_OFFSET_MM` **2.5**. So **A =
-  15.45, cell 90, B = 10, C = 10.45** (`LETTER_TEST_MARGIN_X_MM`); the layout
-  box is the cell + 1.5, 93 × 66 here. Lateral registration and blade spacing
+  Letter Test's cell is the card as cut (`cellWMm` on the stock; `letter`
+  keeps 89). Three sheets then pinned the LEFT blades exactly on 15.45 and
+  115.45 (red there only when a line was moved off them), so a hair of red
+  down the RIGHT edges alone is the card wider still, never a shift: **90.5,
+  gap 9.5**, and `BLADE_OFFSET_MM` (2.75) is simply whatever keeps A on the
+  left blades as the width grows. So **A = 15.45, cell 90.5, B = 9.5, C =
+  9.95** (`LETTER_TEST_MARGIN_X_MM`); the layout box is the cell + 1.5,
+  93.5 × 66 here. Lateral registration and blade spacing
   are hardware, and a test cut with the red lines on is exactly how they are
   measured; a pitch is not. **The sheet is held by lock rails on both sides —
   placement is NOT a variable** (owner), so every red edge is the machine and
   goes straight into the file.
-  Down, the leading edge is the reference: **D is 6.9** — the panel's Front len
-  7.6 plus `FRONT_OFFSET_MM` −0.7, the red lines showing ~0.7 along the TOP of
-  all eight cards and none along the bottoms (every row early by the same
-  amount: reference, not pitch) — and **E = F = G = the panel's Groove 3, pitch
+  Down, the leading edge is the reference: **D is 6.4** — the panel's Front len
+  7.6 plus `FRONT_OFFSET_MM` −1.2, the red lines showing ~0.7 and then another
+  ~0.5 along the TOP of all eight cards and none along the bottoms (every row
+  early by the same amount: reference, not pitch) — and **E = F = G = the panel's Groove 3, pitch
   66** — NOT the template's 6. A sheet cut at 69 came back with the white
   growing row by row (none / 1.5 / 3 / 3 plus a sliver of the card above),
   which is 3 mm of pitch error compounding; the old "68.5" measurement that
   seemed to back the 6 was drift, exactly as the rule below says. H falls out
-  at 11.5.
+  at 12.
   **No mark** (owner: "not needed") — the machine runs frontal and the bar is
   OFF on every stock; it stays on the switch. **Every cut line is painted as a
   1 mm RED band (`CUT_LINE_MM`, `showCuts`) over the art, full width/height
@@ -204,8 +209,8 @@ by explicit owner instruction — do not "fix" it to combine pages.
       all four "comp" offsets +0.000; Cut pieces 0010
   **The panel does not know where its own slitting blades are** — that is
   hardware, and the manufacturer's template is the drawing of it (see the
-  Letter Test above): the card 90 wide as cut against the panel's 89, 13 mm
-  between the inner pair as drawn and 10 as cut, never the groove. Do NOT
+  Letter Test above): the card 90.5 wide as cut against the panel's 89, 13 mm
+  between the inner pair as drawn and 9.5 as cut, never the groove. Do NOT
   measure its output and feed that back in — that measures the drift between
   file and machine, not the machine.
 - **`Cut pieces` on the panel is 10 and cannot be changed.** At a 63 mm card five
