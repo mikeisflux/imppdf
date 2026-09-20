@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import '@/lib/polyfills';
 import { zineSheetLayout, zinePanels, orientCell, replicateGrid, DIVINITY_BOX_PANELS, RAISED_METAL_DEFAULTS as RM, type ZineFormat } from '@/lib/imposition-toolkit/impose';
 import {
-  fitDivinityCards, sheetDefaults, type DivinityCardSheet, CUT_LINE_MM, BLADE_OFFSET_MM, FRONT_OFFSET_MM,
+  fitDivinityCards, sheetDefaults, type DivinityCardSheet, CUT_LINE_MM, LETTER_BLADES_MM,
   LAYOUT_W_MM, LAYOUT_L_MM, LAYOUT_BLEED_MM,
 } from '@/lib/imposition-toolkit/fit/divinity-cards';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
@@ -2992,11 +2992,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload <b>one card</b> and it fills the sheet. A standard <b>2.5 × 3.5&quot;</b> card
         lying <b>sideways</b>. Every one of the <b>8</b> is cut at
-        <b> {round2(FIT.cellWMm)} × {round2(FIT.cellHMm)} mm</b> — the card as this stock&apos;s
-        blades cut it — with the art <b>stretched</b> to that plus {round2(LAYOUT_BLEED_MM)} on
-        every side, <b>{round2(FIT.cellWMm + 2 * LAYOUT_BLEED_MM)} × {round2(FIT.cellHMm + 2 * LAYOUT_BLEED_MM)}</b>
-        (the manufacturer&apos;s layout size, {round2(LAYOUT_W_MM)} × {round2(LAYOUT_L_MM)} on their
-        89 card). Pick the stock below to match what is in the tray.
+        <b> {[...new Set(FIT.cellWsMm.map(round2))].join(' / ')} × {round2(FIT.cellHMm)} mm</b> — the
+        card as this stock&apos;s blades cut it{FIT.cellWsMm.length > 1 && round2(FIT.cellWsMm[0]!) !== round2(FIT.cellWsMm[1]!)
+          ? ', left column / right column' : ''} — with the art <b>stretched</b> to that plus
+        {' '}{round2(LAYOUT_BLEED_MM)} on every side (the manufacturer&apos;s layout size,
+        {' '}{round2(LAYOUT_W_MM)} × {round2(LAYOUT_L_MM)} on their 89 card). Pick the stock below to match what is in the tray.
       </div>
 
       <Section label="// SHEET" help="The stock in the tray. Letter is 8.5 x 11; A4 is 17.6 mm TALLER, which is why an A4 file run on Letter paper loses the top row.">
@@ -3017,19 +3017,17 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               cuts at 9.5 / 98.5 / 111.5 / 200.5 — the blades sit <b>±6.5</b> and <b>±95.5</b> from
               the machine&apos;s centre line and never move. A Letter sheet centred on that same
               line would meet them at 12.45 / 101.45 / 114.45 / 203.45. The test cuts with the red
-              lines then showed the blades cutting the card <b>{round2(FIT.cellWMm)}</b> wide, the
-              inner pair <b>{round2(DEFS.gutterXMm)}</b> apart, and the whole set sitting
-              <b> {round2(BLADE_OFFSET_MM)} mm to the right</b> — so A is
-              <b> {round2(DEFS.marginXMm)}</b>, the cell {round2(FIT.cellWMm)}, B
-              <b> {round2(DEFS.gutterXMm)}</b>, and C what is left. Down the sheet the first cut lands at <b>{round2(DEFS.marginTopMm)}</b> — the
-              panel&apos;s Front len 7.6 less the {round2(-FRONT_OFFSET_MM)} the red lines showed it
-              cutting early — and the rows step the panel&apos;s Groove
-              <b> {round2(DEFS.gutterEMm)}</b> — 66 a row; the template&apos;s 6 is not this machine.
-              No mark: it runs frontal. <b>Every cut is painted as a {round2(CUT_LINE_MM)} mm red
-              band just outside the card</b>, full width like the blade, its inner edge on the cut line: a blade on
-              the line leaves no red on the card, red left on a card is the blade landing outside
-              the line by exactly that much, and art missing off an edge is it landing inside. A
-              separate stock so the Letter template is untouched.
+              lines then put the four blades where they actually are on a Letter sheet —
+              <b> {LETTER_BLADES_MM.map(round2).join(' / ')}</b> — so A is
+              <b> {round2(DEFS.marginXMm)}</b>, the cells {FIT.cellWsMm.map(round2).join(' and ')}
+              (the two blade pairs are not the same width), B <b>{round2(DEFS.gutterXMm)}</b>, and C
+              what is left. Down the sheet the first cut lands at <b>{round2(DEFS.marginTopMm)}</b>
+              and the rows step <b>{round2(FIT.cellHMm + DEFS.gutterEMm)}</b> — not the panel&apos;s
+              7.6 and 66: the red lines showed the tops shrinking down the sheet and a bottom
+              appearing on the last row, which only a longer pitch does.
+              No mark: it runs frontal. Honed over six test cuts with a {round2(CUT_LINE_MM)} mm
+              red line on every cut; the lines are off now. A separate stock so the Letter
+              template is untouched.
             </div>
           )}
           {DOUBLED.has(s.sheet ?? 'letter') && (

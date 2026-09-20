@@ -4671,6 +4671,10 @@ export interface DivinityCardOptions {
      Rather than guess a machine, print the test sheet and keep whichever the
      camera actually finds. ──────────────────────────────────────────────── */
   regMarks?: boolean;
+  /** Paint every cut line in red, just outside the cell, over the art — the
+   *  honing diagnostic. OFF on every stock now that the Letter Test is honed
+   *  (owner); pass true to bring it back for another round. */
+  showCuts?: boolean;
   /** Default 'bar'. The 2102-F and its family are SLITTERS with one optical eye
    *  at the leading edge, not camera plotters — their "mark" mode looks for a
    *  single black BAR as the sheet feeds in. The corner shapes are kept for a
@@ -5077,7 +5081,7 @@ export async function imposeDivinityCards(
      the card, any red that comes through is the blade landing outside the line
      by exactly that width, and art missing off an edge is it landing inside.
      Readable with a ruler. Drawn after the art so nothing covers it. */
-  pages.forEach((pg, pi) => { if (fit.showCuts) {
+  pages.forEach((pg, pi) => { if (opts.showCuts ?? fit.showCuts) {
     const bands = new Set<string>();
     const k = (v: number) => Math.round(v * 1e6) / 1e6;   // so a shared groove is one band
     for (const c of cellsFor[pi]!) {

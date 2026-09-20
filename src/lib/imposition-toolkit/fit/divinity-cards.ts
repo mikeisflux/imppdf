@@ -17,8 +17,8 @@
  *   `letterreg`  the LETTER TEST — the manufacturer's A4 template converted
  *                for Letter stock in a machine hard-wired for A4, then honed
  *                with the red cut lines to what the blades actually do:
- *                    across  A 15.45 + 90.5 + B 9.5 + 90.5 + C 9.95 = 215.9
- *                    down    D 6.4 + 4(63) + 3(3) + H 12          = 279.4
+ *                    across  A 15.45 + 91 + B 9 + 90.5 + C 9.95 = 215.9
+ *                    down    D 5.9 + 4(63) + 3(3.2) + H 11.9   = 279.4
  *
  * CUT PIECES MUST BE 8, NOT 10. At a 63 mm card length five rows need more than
  * Letter (279.4) OR A4 (297) — the machine was left set to ten, so after the
@@ -143,56 +143,50 @@ export const TEMPLATE_COL_CUT_GAP_MM = TEMPLATE_COL_GAP_MM + 2 * LAYOUT_BLEED_MM
 export const TEMPLATE_BLADE_INNER_MM = TEMPLATE_COL_CUT_GAP_MM / 2;                 // 6.5
 export const TEMPLATE_BLADE_OUTER_MM = TEMPLATE_BLADE_INNER_MM + MACHINE_CARD_W_MM; // 95.5
 
-/** THE BLADES AS THEY ARE, from the red cut lines over three sheets:
+/** THE BLADES AS THEY ARE — the four slitting blades on a Letter sheet, from
+ *  its left edge, honed with the red cut lines over six sheets:
  *
- *    cut to 13 / 89   full red on BOTH inner edges, thin on both outer
- *    cut to 11 / 89   ~1 mm red down every LEFT edge, none on the right
- *    moved 1 mm left  ~1 mm red down every RIGHT edge, none on the left
+ *    cut to 13 / 89      full red on BOTH inner edges, thin on both outer
+ *    cut to 11 / 89      ~1 mm red down every LEFT edge, none on the right
+ *    moved 1 mm left     ~1 mm red down every RIGHT edge, none on the left
+ *    cut to 90 / 10      ~0.5 red down every RIGHT edge
+ *    cut to 90.5 / 9.5   a thin line down the LEFT column's inner edge only
  *
- *  The last two are the tell. A shift moves red from one side to the other
- *  only if the card is being cut WIDER than the cell — the blades bracket
- *  90, not the panel's 89 — and with the card 90 the inner pair are 10 apart:
- *  ±5 and ±95 from the set's centre, clean numbers, and the template's
- *  "10.00 mm" is this gap. The panel's 89 is nominal; the machine cuts what
- *  its blades are set to. Hardware, measured once, does not move with the
- *  sheet. The Letter Test's cell is therefore 90 x 63 (`cellWMm`); the shop's
- *  `letter` template keeps its 89. */
-export const MACHINE_CARD_W_AS_CUT_MM = 90.5;
-export const MACHINE_COL_GAP_MM = 9.5;
-export const BLADE_INNER_MM = MACHINE_COL_GAP_MM / 2;                      // 4.75
-export const BLADE_OUTER_MM = BLADE_INNER_MM + MACHINE_CARD_W_AS_CUT_MM;   // 95.25
-/* 90.5 / 9.5, from 90 / 10: the sheet cut at 90 came back with ~0.5 of red
-   down every RIGHT edge and none down the left. Three sheets in a row have
-   put the LEFT blades exactly on 15.45 and 115.45 (red there only when the
-   line was moved off them), so the right-edge red is the card wider still,
-   not the set moved: both right blades another half a millimetre out. */
+ *  The second and third are the tell: a shift moves red from one side to the
+ *  other only if the card is cut WIDER than the cell. The left blades have
+ *  sat exactly on 15.45 and 115.45 from the third sheet on (red there only
+ *  when a line was moved off them); the right blades grew as the width was
+ *  chased — and the last sheet showed the two pairs are NOT the same width.
+ *  Blades are mounted one by one, so they need not be: left pair 91, right
+ *  pair 90.5, 9 between. So the four positions are simply recorded as
+ *  measured and everything else falls out of them. The panel's 89 is
+ *  nominal; the machine cuts what its blades are set to. Hardware, and it
+ *  does not move with the sheet — lock rails both sides (owner: "placement
+ *  is not an issue"). The shop's `letter` template keeps its 89. */
+export const LETTER_BLADES_MM = [15.45, 106.45, 115.45, 205.95] as const;
+/** The two cards across as the blades cut them — left column, right column. */
+export const MACHINE_CARD_W_AS_CUT_MM = [
+  LETTER_BLADES_MM[1] - LETTER_BLADES_MM[0], LETTER_BLADES_MM[3] - LETTER_BLADES_MM[2],
+] as const;                                                                // 91, 90.5
+export const MACHINE_COL_GAP_MM = LETTER_BLADES_MM[2] - LETTER_BLADES_MM[1];   // 9
+/** A on the Letter Test: the first blade. */
+export const LETTER_TEST_MARGIN_X_MM = LETTER_BLADES_MM[0];                    // 15.45
 
-/** WHERE THE BLADE SET ACTUALLY SITS against a Letter sheet the shop centres
- *  by hand: 3 mm to the RIGHT of centre. Measured off the first cut of this
- *  template — the left column came out with 1.5 mm of white on its INNER edge
- *  and the right column's inner cut landed 3 mm into its art, with no white on
- *  either outer edge. Only a whole-set shift does that: the gap is 13 as drawn,
- *  the blades are just 3 mm over. A carries the offset and C gives it up.
- *  (The earlier `letter` sheet, 5 mm of white on the outer right, is the same
- *  shift plus the 5 mm the wrong B accounted for.) This is a lateral
- *  registration, the one thing a test cut IS for — not a pitch. */
-export const BLADE_OFFSET_MM = 2.75;
-/* Whatever keeps A at 15.45 — the left blades are pinned there by three
-   sheets — as the measured card width grows: A = 107.95 − BLADE_OUTER + this.
-   (The sheet cut at 3 had red down every LEFT edge, the one at 2 red down
-   every RIGHT edge, both ~1 mm: the 90-wide card straddling an 89 cell.) The
-   sheet is held by lock rails on both sides (owner: "placement is not an
-   issue"), so this is the machine, not the feed. */
-
-/** THE FIRST CUT AS IT LANDS: the panel says Front len 7.6, the blade lands
- *  0.7 earlier. Same sheet, same red lines: ~0.7 mm of red along the TOP of
- *  all eight cards, none along the bottoms — every row early by the same
- *  amount, so the pitch is right and it is the leading-edge reference that is
- *  off. (The panel's "Frontal comp" would do the same thing on the machine.) */
-export const FRONT_OFFSET_MM = -1.2;
-export const MACHINE_FRONT_AS_CUT_MM = MACHINE_FRONT_MM + FRONT_OFFSET_MM;   // 6.4
-/* −1.2, from −0.7: the sheet cut at 6.9 still had ~0.5 of red along every
-   TOP and none along the bottoms. */
+/** THE FEED AS IT LANDS: the panel says Front len 7.6 and Groove 3; the blade
+ *  lands at 5.9 and steps 66.2. Read off the red lines on a sheet cut at
+ *  6.4 / 66: 0.5 of red along the TOP of row 1, thinner on rows 2 and 3, none
+ *  on row 4 — and then red along the BOTTOM of row 4 only. Tops shrinking
+ *  down the sheet while a bottom appears at the end is a pitch a fraction
+ *  longer than the file's: 0.5 − 0.2r on the tops, −0.5 + 0.2r on the
+ *  bottoms, which is 66.2 a row from 5.9. (7.6 → 6.9 → 6.4 before that were
+ *  the same thing read as a shift, the pitch error being under what a photo
+ *  shows.) The panel's "Frontal comp" and "Groove len comp" would do the
+ *  same on the machine. This is NOT the drift-chasing the rule below forbids:
+ *  that measured the art against the cut and fed the difference back as a
+ *  gutter; this reads a signature that only a pitch can make. */
+export const FRONT_OFFSET_MM = -1.7;
+export const MACHINE_FRONT_AS_CUT_MM = MACHINE_FRONT_MM + FRONT_OFFSET_MM;   // 5.9
+export const MACHINE_GROOVE_AS_CUT_MM = 3.2;                                 // pitch 66.2
 
 /** OUTER bleed — how far the art's edge is carried past the cuts on the
  *  OUTSIDE of the block, where there is no neighbour to meet and nothing but
@@ -291,13 +285,16 @@ interface SheetSpec {
   centred?: boolean;
   /** Turn registration marks on for this sheet by default. */
   regTest?: boolean;
-  /** Paint every cut line in red, full width, ON TOP of the art — the test
-   *  stock's diagnostic, hard-coded (owner): a cut sheet then shows where the
-   *  file put each cut against where the blade went. */
+  /** Paint every cut line in red, full width, ON TOP of the art — the honing
+   *  diagnostic: a cut sheet then shows where the file put each cut against
+   *  where the blade went. It honed the Letter Test over six sheets and is
+   *  now OFF (owner: "remove the red at this point"); the caller can ask for
+   *  it again with `showCuts` if the machine is ever re-bladed. */
   showCuts?: boolean;
   /** The card ACROSS as this stock's blades cut it, where it differs from the
-   *  panel's figure. The cell is what the blade does, not what the panel says. */
-  cellWMm?: number;
+   *  panel's figure — one figure, or one per column, since the two blade pairs
+   *  need not match. The cell is what the blade does, not what the panel says. */
+  cellWMm?: number | readonly [number, number];
   /** This stock's own gutters, where they differ from the shop template. */
   template?: DivinityCardTemplate;
 }
@@ -322,26 +319,24 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
      them at 12.45 / 101.45 / 114.45 / 203.45 — so B is 13, not 3, and A = C =
      12.45. (`centred` gets exactly that: the block is 191 wide.)
 
-     Then, off test cuts with the red lines on: the blades cut the card 90.5
-     wide, the inner pair are MACHINE_COL_GAP_MM apart, and the set sits
-     BLADE_OFFSET_MM right of centre — so the cuts fall at 15.45 / 105.95 /
-     115.45 / 205.95: A 15.45, cell 90.5, B 9.5, C 9.95.
+     Then, off test cuts with the red lines on, the four blades are simply
+     where they are — LETTER_BLADES_MM, 15.45 / 106.45 / 115.45 / 205.95 —
+     so A 15.45, the cells 91 and 90.5, B 9, C 9.95.
 
      Down, the leading edge is the reference so the sheet's length does not
-     matter: the first cut lands FRONT_OFFSET_MM before the panel's Front len
-     (6.4, red lines again) and the rows step the panel's Groove — 66 a row,
-     which the cut stacks confirmed. The template's 6 is NOT this machine (see
-     TEMPLATE_ROW_CUT_GAP_MM).
+     matter: the first cut lands at 5.9 and the rows step 66.2 (red lines
+     again — see MACHINE_GROOVE_AS_CUT_MM). The template's 6 is NOT this
+     machine (see TEMPLATE_ROW_CUT_GAP_MM).
 
      No mark. Frontal mode indexes off the leading edge, and the owner's word is
      that the bar is not needed; the marks stay available on the switch. It is a
      separate stock so the `letter` template is never disturbed. */
   letterreg: { wMm: LETTER_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false,
-               regTest: false, showCuts: true, cellWMm: MACHINE_CARD_W_AS_CUT_MM,
-               template: { marginXMm: LETTER_W_MM / 2 - BLADE_OUTER_MM + BLADE_OFFSET_MM,
+               regTest: false, showCuts: false, cellWMm: MACHINE_CARD_W_AS_CUT_MM,
+               template: { marginXMm: LETTER_TEST_MARGIN_X_MM,
                            gutterXMm: MACHINE_COL_GAP_MM, marginTopMm: MACHINE_FRONT_AS_CUT_MM,
-                           gutterEMm: MACHINE_GROOVE_MM, gutterFMm: MACHINE_GROOVE_MM,
-                           gutterGMm: MACHINE_GROOVE_MM } },
+                           gutterEMm: MACHINE_GROOVE_AS_CUT_MM, gutterFMm: MACHINE_GROOVE_AS_CUT_MM,
+                           gutterGMm: MACHINE_GROOVE_AS_CUT_MM } },
   /* 11 x 17 comes out PORTRAIT — 279.4 x 431.8 — with the two blocks and the
      cut between them turned a quarter turn onto it. The cards keep exactly the
      orientation they have on a Letter sheet relative to the block; it is the
@@ -354,10 +349,9 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
   a3:      { wMm: A3_W_MM,      hMm: A3_H_MM,     blockWMm: A4_W_MM,     doubled: true, rotated: true },
 };
 
-/** Where the Letter Test's first cut falls from the sheet edge: the outer blade
- *  is BLADE_OUTER_MM off the centre line, Letter's centre is at 107.95, and
- *  the set sits BLADE_OFFSET_MM to the right of that. */
-export const LETTER_TEST_MARGIN_X_MM = LETTER_W_MM / 2 - BLADE_OUTER_MM + BLADE_OFFSET_MM;   // 15.45
+/** The cell width of each column: one figure for both, or one each. */
+const cellWidths = (w: number | readonly [number, number] | undefined): number[] =>
+  Array.isArray(w) ? [...w] : Array<number>(COLS_N).fill((w as number | undefined) ?? PLACED_W_MM);
 
 /** Every gap a stock starts from, A B D E F G, before the operator types over
  *  any of them. The panel shows these as the field defaults and the reset
@@ -366,7 +360,7 @@ export function sheetDefaults(sheet: DivinityCardSheet = 'letter'): Required<Div
   const spec = SHEETS[sheet] ?? SHEETS.letter;
   const t = spec.template ?? {};
   const gX = t.gutterXMm ?? DEF_GUTTER_X_MM;
-  const blockW = COLS_N * (spec.cellWMm ?? PLACED_W_MM) + (COLS_N - 1) * gX;
+  const blockW = cellWidths(spec.cellWMm).reduce((a, b) => a + b, 0) + (COLS_N - 1) * gX;
   return {
     marginXMm: t.marginXMm ?? (spec.centred ? (spec.blockWMm - blockW) / 2 : DEF_MARGIN_X_MM),
     gutterXMm: gX,
@@ -390,8 +384,9 @@ export interface DivinityCardFit {
   marginXMm: number; marginTopMm: number; marginBottomMm: number; marginRightMm: number;
   /** B as set. */
   gutterXMm: number;
-  /** The cell this stock cuts, across and down. */
-  cellWMm: number; cellHMm: number;
+  /** The cell this stock cuts, across and down — and across per column, since
+   *  the two blade pairs need not be the same width. */
+  cellWMm: number; cellWsMm: number[]; cellHMm: number;
   /** The block itself — the cards plus the gutters between them. Reported so a
    *  caller can work back from C or H to A or D without restating the sums. */
   blockWMm: number; blockHMm: number;
@@ -427,8 +422,8 @@ export function fitDivinityCards(
 
   /* The block's own size never moves — it is COLS cards plus the gutters. What
      the settings decide is where on the sheet it sits. */
-  const cellW = spec.cellWMm ?? PLACED_W_MM;
-  const blockW = COLS * cellW + (COLS - 1) * gX;
+  const cellWs = cellWidths(spec.cellWMm);
+  const blockW = cellWs.reduce((a, b) => a + b, 0) + (COLS - 1) * gX;
   const blockH = ROWS * PLACED_H_MM + rowGaps[0] + rowGaps[1] + rowGaps[2];
 
   /* On the centred stock A falls out of the block rather than being read off
@@ -456,11 +451,11 @@ export function fitDivinityCards(
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         out.push({
-          xMm: originXMm + mX + c * (cellW + gX),
+          xMm: originXMm + mX + cellWs.slice(0, c).reduce((a, b) => a + b, 0) + c * gX,
           /* Rows are numbered from the TOP of the sheet, the way a spec sheet
              reads, but PDF y runs up — so row 0 is the highest y. */
           yMm: spec.hMm - rowTop(r) - PLACED_H_MM,
-          wMm: cellW, hMm: PLACED_H_MM,
+          wMm: cellWs[c]!, hMm: PLACED_H_MM,
         });
       }
     }
@@ -475,7 +470,7 @@ export function fitDivinityCards(
     n: (spec.doubled ? 2 : 1) * COLS * ROWS,
     marginXMm: mX, marginTopMm: mTop, marginBottomMm: mBot,
     marginRightMm: spec.blockWMm - mX - blockW, gutterXMm: gX,
-    cellWMm: cellW, cellHMm: PLACED_H_MM,
+    cellWMm: cellWs[0]!, cellWsMm: cellWs, cellHMm: PLACED_H_MM,
     blockWMm: blockW, blockHMm: blockH,
     rowGapsMm: rowGaps,
     cutXMm: spec.doubled ? [spec.blockWMm] : [],

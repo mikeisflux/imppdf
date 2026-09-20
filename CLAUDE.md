@@ -77,8 +77,9 @@ by explicit owner instruction — do not "fix" it to combine pages.
   designed otherwise, and default image fit is CONTAIN (never crop/stretch).
   EXCEPTION (owner): **Divinity Trading Cards** is 2×4 and STRETCHES the art.
   **The cell is the card AS THE BLADES CUT IT** — 89 × 63 off the 2102-F's
-  panel on the shop's `letter` template, **90.5 × 63 on the Letter Test** where
-  the red cut lines showed the blades bracketing 90.5 (see below). Near enough a
+  panel on the shop's `letter` template, **91 / 90.5 × 63 on the Letter Test**
+  (left column / right column) where the red cut lines showed where the four
+  blades actually are (see below). Near enough a
   2.5 × 3.5" card (88.9 × 63.5) either way, but the machine's figure governs
   because the machine is what cuts — and the blade governs over the panel. **The art is stretched to the manufacturer's
   LAYOUT SIZE, 92 × 66 (`LAYOUT_*`), and to NOTHING ELSE, EVER.** Their template
@@ -94,8 +95,8 @@ by explicit owner instruction — do not "fix" it to combine pages.
   `OUTER_BLEED_MM` (8), clamped to the paper there** — a separate draw of the
   outermost `STREAK_MM` sliver, so a card border just comes out wider if an
   blade lands a little out. It does not move or rescale the art. Between two
-  cards the same carry runs to the MIDDLE of the gap from each side (3.25 mm
-  each into the Letter Test's 9.5 mm column gap), so a lateral shift up to half the
+  cards the same carry runs to the MIDDLE of the gap from each side (3 mm
+  each into the Letter Test's 9 mm column gap), so a lateral shift up to half the
   gap shows no white on any card; where the gap is only the 3 mm groove the
   layout boxes already meet and there is nothing to carry.
   EXCEPTION (owner): **30-Up Proof Labels** defaults to 1×1-overriding 3×10 AND
@@ -134,50 +135,63 @@ by explicit owner instruction — do not "fix" it to combine pages.
   (`BLADE_OFFSET_MM`, measured off the first test cut of this template: 1.5 mm
   of white on the left column's inner edge, the right column's inner cut 3 mm
   into its art, nothing on either outer edge — only a whole-set shift does
-  that). **Then the blades cut the card 90.5 WIDE, not the panel's 89, and
-  the inner pair are 9.5 apart** (`MACHINE_CARD_W_AS_CUT_MM`,
-  `MACHINE_COL_GAP_MM`; blades `BLADE_INNER_MM` ±4.75 / `BLADE_OUTER_MM`
-  ±95.25 from the set's centre, the drawing's ±6.5 / ±95.5 kept as
-  `TEMPLATE_BLADE_*`). The tell, off the 1 mm
+  that). **Then the blades cut the cards WIDER than the panel's 89, and the
+  two pairs are not the same width** — the drawing's ±6.5 / ±95.5 is kept as
+  `TEMPLATE_BLADE_*`, and the blades as they ARE on a Letter sheet are simply
+  recorded: **`LETTER_BLADES_MM` = 15.45 / 106.45 / 115.45 / 205.95**, from
+  which the cells (91, 90.5 — `MACHINE_CARD_W_AS_CUT_MM`, per column via
+  `cellWMm`), the gap (9, `MACHINE_COL_GAP_MM`) and A (15.45) fall out. The tell, off the 1 mm
   red lines: a sheet had ~1 mm of red down every LEFT edge; the block was
   moved 1 mm left; the next sheet had ~1 mm of red down every RIGHT edge. A
   shift cannot do that — only a card cut wider than the cell can — so the
   Letter Test's cell is the card as cut (`cellWMm` on the stock; `letter`
   keeps 89). Three sheets then pinned the LEFT blades exactly on 15.45 and
   115.45 (red there only when a line was moved off them), so a hair of red
-  down the RIGHT edges alone is the card wider still, never a shift: **90.5,
-  gap 9.5**, and `BLADE_OFFSET_MM` (2.75) is simply whatever keeps A on the
-  left blades as the width grows. So **A = 15.45, cell 90.5, B = 9.5, C =
-  9.95** (`LETTER_TEST_MARGIN_X_MM`); the layout box is the cell + 1.5,
-  93.5 × 66 here. Lateral registration and blade spacing
+  down a RIGHT edge alone is that card wider still, never a shift — and when
+  it stayed on the LEFT column's inner edge only, the two pairs differed.
+  Blades are mounted one by one; they need not match. So **A = 15.45, cells
+  91 and 90.5, B = 9, C = 9.95** (`LETTER_TEST_MARGIN_X_MM` is the first
+  blade); each layout box is its cell + 1.5, 94 × 66 and 93.5 × 66. Lateral registration and blade spacing
   are hardware, and a test cut with the red lines on is exactly how they are
   measured; a pitch is not. **The sheet is held by lock rails on both sides —
   placement is NOT a variable** (owner), so every red edge is the machine and
   goes straight into the file.
-  Down, the leading edge is the reference: **D is 6.4** — the panel's Front len
-  7.6 plus `FRONT_OFFSET_MM` −1.2, the red lines showing ~0.7 and then another
-  ~0.5 along the TOP of all eight cards and none along the bottoms (every row
-  early by the same amount: reference, not pitch) — and **E = F = G = the panel's Groove 3, pitch
-  66** — NOT the template's 6. A sheet cut at 69 came back with the white
-  growing row by row (none / 1.5 / 3 / 3 plus a sliver of the card above),
-  which is 3 mm of pitch error compounding; the old "68.5" measurement that
-  seemed to back the 6 was drift, exactly as the rule below says. H falls out
-  at 12.
+  Down, the leading edge is the reference: **D is 5.9 and E = F = G = 3.2,
+  pitch 66.2** (`MACHINE_FRONT_AS_CUT_MM`, `MACHINE_GROOVE_AS_CUT_MM`) — not
+  the panel's 7.6 / 3 / 66 and NOT the template's 6. The red lines on a sheet
+  cut at 6.4 / 66 showed 0.5 along the TOP of row 1, thinner on rows 2 and 3,
+  none on row 4, and then red along the BOTTOM of row 4 only: tops shrinking
+  down the sheet while a bottom appears at the end is the signature of a
+  pitch a fraction LONGER than the file's (0.5 − 0.2r on the tops, −0.5 +
+  0.2r on the bottoms) — 66.2 a row from 5.9. The three earlier moves of D
+  (7.6 → 6.9 → 6.4) were that same thing read as a shift. A sheet cut at the
+  template's 69 had come back with the white growing 1.5 / 3 / 3-plus-a-sliver
+  down the rows, 3 mm of pitch error compounding the other way. H falls out at
+  11.9. The red-line signature is a pitch MEASUREMENT and is allowed; what the
+  rule below forbids is measuring the art against the cut and feeding the
+  difference back as a gutter, which chases drift.
   **No mark** (owner: "not needed") — the machine runs frontal and the bar is
-  OFF on every stock; it stays on the switch. **Every cut line is painted as a
-  1 mm RED band (`CUT_LINE_MM`, `showCuts`) over the art, full width/height
-  like the blade, hard-coded on this stock (owner). The band lies entirely
-  OUTSIDE the cell with its inner edge ON the cut line** — so a blade on the
-  line leaves NO red on the card, red left on a card is the blade landing
-  outside the line by exactly that width (past 1 mm the carried art edge shows
-  beyond it), and art missing off an edge is it landing inside. (Centred on
-  the line it left 1.5 on every edge of a perfect cut, which had to be
-  subtracted by eye; 3 wide it only said "some" once the error was under a
-  millimetre — owner: "shrink the red down to 1mm and let's hone it in".)
+  OFF on every stock; it stays on the switch. **The RED CUT LINES
+  (`CUT_LINE_MM` 1 mm, `showCuts`) are the honing diagnostic and are now OFF
+  on every stock** (owner, once honed: "remove the red at this point … as good
+  as we can get it"); `imposeDivinityCards({ showCuts: true })` brings them
+  back if the machine is ever re-bladed. How they read: a band just outside
+  the cell with its inner edge ON the cut line, full width/height like the
+  blade, drawn over the art — so a blade on the line leaves NO red on the
+  card, red left on a card is the blade landing outside the line by exactly
+  that width (past 1 mm the carried art edge shows beyond it), and art
+  missing off an edge is it landing inside. (Centred on the line it left 1.5
+  on every edge of a perfect cut, which had to be subtracted by eye; 3 wide
+  it only said "some" once the error was under a millimetre.)
   **Honing rule: read the red, put it in.** With the lock rails the sheet
   cannot move, so a red edge is the machine: red down a LEFT edge on every
   card = take that off A (and D for a TOP edge); red down a RIGHT edge = add
-  it; red on BOTH sides of a card = the card is cut wider than the cell. Each stock carries its OWN
+  it; red on BOTH sides of a card, or the red changing sides after a move =
+  the card is cut wider than the cell; red on one column's edge only = that
+  pair of blades differs from the other; red on the TOPS shrinking down the
+  sheet with a BOTTOM appearing on the last row = the pitch is longer than
+  the file's (and the mirror image, shorter). Stop at half a millimetre —
+  that is blade mounting tolerance, and the carried edge covers it. Each stock carries its OWN
   template (`sheetDefaults`), the step stores no gutters, and switching stocks
   clears anything typed — storing one stock's numbers in the step is what made
   the Letter Test open on Letter's 17.45. The `letter` template (A 17.45 / B 3 /
@@ -188,8 +202,9 @@ by explicit owner instruction — do not "fix" it to combine pages.
   the head must clear that. Bar length, depth, inset and feed edge are settable.
 - **The cutter steps ONE CONSTANT PITCH and the file must step the same.** It is
   a slitter: it advances card-length + gutter per row and repeats, so E, F and G
-  have to be equal and equal to the panel's Groove (3) — on BOTH stocks; the
-  manufacturer's template draws 6 and this machine does not cut 6. Unequal row
+  have to be equal — the panel's Groove (3) on `letter`, the 3.2 the red lines
+  measured on the Letter Test; the manufacturer's template draws 6 and this
+  machine does not cut 6. Unequal row
   gutters cannot describe what it does and the disagreement COMPOUNDS — a file
   stepping 65.5 / 66.2 / 66.2 against a machine stepping 68.5 put the blade
   7.6 mm into the art by row 4. The panel warns when the three differ.
@@ -209,8 +224,9 @@ by explicit owner instruction — do not "fix" it to combine pages.
       all four "comp" offsets +0.000; Cut pieces 0010
   **The panel does not know where its own slitting blades are** — that is
   hardware, and the manufacturer's template is the drawing of it (see the
-  Letter Test above): the card 90.5 wide as cut against the panel's 89, 13 mm
-  between the inner pair as drawn and 9.5 as cut, never the groove. Do NOT
+  Letter Test above): the cards 91 and 90.5 wide as cut against the panel's
+  89, 13 mm between the inner pair as drawn and 9 as cut, never the groove;
+  and the feed lands at 5.9 and steps 66.2 against the panel's 7.6 and 66. Do NOT
   measure its output and feed that back in — that measures the drift between
   file and machine, not the machine.
 - **`Cut pieces` on the panel is 10 and cannot be changed.** At a 63 mm card five
