@@ -7,6 +7,7 @@ import {
   DEF_MARGIN_X_MM, DEF_MARGIN_TOP_MM, DEF_GUTTER_X_MM,
   DEF_GUTTER_E_MM, DEF_GUTTER_F_MM, DEF_GUTTER_G_MM,
   PLACED_W_MM as CELL_W, PLACED_H_MM as CELL_H,
+  LAYOUT_W_MM, LAYOUT_L_MM, LAYOUT_BLEED_MM,
 } from '@/lib/imposition-toolkit/fit/divinity-cards';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
@@ -2985,9 +2986,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
         Upload <b>one card</b> and it fills the sheet. A standard <b>2.5 × 3.5&quot;</b> card
-        lying <b>sideways</b>, <b>2 mm over</b> on each dimension — every one of the <b>8</b>
-        is <b>{round2(CELL_W)} × {round2(CELL_H)} mm</b>, with the art <b>stretched</b> to fill
-        it. Pick the stock below to match what is in the tray.
+        lying <b>sideways</b>. Every one of the <b>8</b> is cut at
+        <b> {round2(CELL_W)} × {round2(CELL_H)} mm</b> — the cutter&apos;s own programmed card —
+        with the art <b>stretched</b> to the manufacturer&apos;s layout size of
+        <b> {round2(LAYOUT_W_MM)} × {round2(LAYOUT_L_MM)}</b>. Pick the stock below to match
+        what is in the tray.
       </div>
 
       <Section label="// SHEET" help="The stock in the tray. Letter is 8.5 x 11; A4 is 17.6 mm TALLER, which is why an A4 file run on Letter paper loses the top row.">
@@ -3089,10 +3092,12 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           exactly what the machine steps — <b>{round2(CELL_H + DEF_GUTTER_E_MM)}</b> mm a row,
           the same every row. C and H are the remainder — C <b>{round2(effC)}</b> and
           H <b>{round2(FIT.marginBottomMm)}</b>.
-          <br /><b>There is no bleed</b> and nothing is drawn outside a cell, so every number
-          here is the <b>white paper you can measure</b> on the sheet. Making the card bigger
-          grows the <b>cell</b> and takes the difference back out of these gutters, which is
-          what keeps the cards in the same positions.
+          <br />Every number here places a <b>cut</b>, and they come off the cutter&apos;s own
+          panel — Front len, Card len, Groove len. The art is then laid at the manufacturer&apos;s
+          <b> layout size, {round2(LAYOUT_W_MM)} × {round2(LAYOUT_L_MM)}</b>, which is the card
+          plus the groove: it runs <b>{round2(LAYOUT_BLEED_MM)}</b> past every cut, so two
+          neighbours meet in the middle of the groove, it fills with ink, and the blade cuts
+          through artwork however it drifts. That is drawn outside the cells and moves no cut.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
             onClick={() => up({ marginXMm: DEF_MARGIN_X_MM, marginTopMm: DEF_MARGIN_TOP_MM,
               gutterXMm: DEF_GUTTER_X_MM, gutterEMm: DEF_GUTTER_E_MM,
