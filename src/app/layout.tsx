@@ -54,7 +54,9 @@ export const metadata: Metadata = {
     title: `${siteName} — press sheets from PDFs, in your browser`,
     description: seoDescription,
   },
-  icons: { icon: '/favicon.svg' },
+  // Icons come from the app/icon.svg, app/favicon.ico and app/apple-icon.tsx
+  // file conventions: Next links them with a content hash, so a changed icon
+  // is never stuck behind a browser's cached copy of the old URL.
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
