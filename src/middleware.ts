@@ -95,5 +95,5 @@ export async function middleware(req: NextRequest) {
 
 // Skip static assets and the SEO files so crawlers fetch them freely.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.svg|og.png|robots.txt|sitemap.xml).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon|og.png|robots.txt|sitemap.xml).*)'],
 };

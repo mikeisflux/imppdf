@@ -52,7 +52,7 @@ export function organizationData() {
     '@id': `${siteUrl}/#organization`,
     name: siteName,
     url: siteUrl,
-    logo: { '@type': 'ImageObject', url: `${siteUrl}/favicon.svg` },
+    logo: { '@type': 'ImageObject', url: `${siteUrl}/apple-icon`, width: 180, height: 180 },
     image: `${siteUrl}/opengraph-image`,
     description: seoDescription,
     telephone: siteContact.phoneE164,
