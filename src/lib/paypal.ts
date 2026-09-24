@@ -54,7 +54,7 @@ export async function getSubscription(id: string): Promise<PayPalSubscription> {
 
 // Enforce one active subscription per user: cancel every OTHER live PayPal
 // subscription so a customer who checked out more than once isn't charged twice.
-// Best-effort — a PayPal cancel failure still marks the row cancelled locally so
+// Best-effort — a PayPal cancel failure still marks the row canceled locally so
 // the UI is consistent, and the webhook will reconcile the real state later.
 export async function enforceSingleSubscription(userId: number, keepPaypalId: string): Promise<number> {
   const { otherLiveSubscriptions, markSubscriptionStatus } = await import('./subscriptions');
@@ -94,7 +94,7 @@ export async function cancelSubscription(id: string, reason = 'User requested ca
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ reason }),
   });
-  // 204 = success. PayPal returns 422 if already cancelled — treat as success.
+  // 204 = success. PayPal returns 422 if already canceled — treat as success.
   if (!res.ok && res.status !== 422) {
     throw new Error(`PayPal cancel failed: ${res.status}`);
   }

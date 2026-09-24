@@ -2,8 +2,8 @@
    ImpositionPDF — the marketing site.
 
    The idea is the press sheet itself: warm paper, ink, crop-mark ticks at the
-   corners of things, one accent used the way a printer uses a spot colour, and
-   a CMYK colour bar where a press sheet would carry one. Type does the work —
+   corners of things, one accent used the way a printer uses a spot color, and
+   a CMYK color bar where a press sheet would carry one. Type does the work —
    Fraunces for the lines that carry a page, Inter for reading, JetBrains Mono
    for the numbers. Scoped to .site-paper so the editor keeps its own chrome.
    ───────────────────────────────────────────────────────────────────────────── */
@@ -50,7 +50,7 @@
 
 .site-paper ::selection { background: var(--ink); color: var(--paper); }
 
-/* The document itself takes the paper colour so overscroll and the gap above
+/* The document itself takes the paper color so overscroll and the gap above
    the sticky header never show the editor's dark backdrop. */
 html:has(.site-paper), html:has(.site-paper) body { background: #f4f1ea; }
 
@@ -297,7 +297,7 @@ html:has(.site-paper), html:has(.site-paper) body { background: #f4f1ea; }
 .faq-a { padding: 0 0 24px; color: var(--ink-2); font-size: 16px; line-height: 1.65; max-width: 40em; }
 @media (max-width: 860px) { .faq { grid-template-columns: 1fr; gap: 28px; } .faq-side { position: static; } }
 
-/* Catalogue + link columns */
+/* Catalog + link columns */
 .seo-section { border-top: 1px solid var(--line-strong); padding-top: 64px; }
 .seo-title { font-size: clamp(30px, 3.6vw, 44px); margin: 8px 0 16px; }
 .seo-copy { max-width: 46em; font-size: 16.5px; line-height: 1.7; margin-bottom: 44px; color: var(--ink-2); }

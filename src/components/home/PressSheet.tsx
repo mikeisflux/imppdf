@@ -1,6 +1,6 @@
 // The hero's picture is the product's own output: a Letter sheet imposed 2 × 4
 // with the geometry the shop actually cuts on — cells, bleed, crop marks in the
-// margins, a colour bar and a slug line — drawn straight from the fit module so
+// margins, a color bar and a slug line — drawn straight from the fit module so
 // it can never drift from what the editor produces.
 import { fitDivinityCards, LAYOUT_BLEED_MM } from '@/lib/imposition-toolkit/fit/divinity-cards';
 
@@ -22,7 +22,7 @@ export function PressSheet() {
       className="press-sheet"
       viewBox={`-6 -6 ${W + 12} ${H + 12}`}
       role="img"
-      aria-label={`A Letter sheet imposed two by four: eight cards with bleed, crop marks, a colour bar and a slug line`}
+      aria-label={`A Letter sheet imposed two by four: eight cards with bleed, crop marks, a color bar and a slug line`}
       style={{ ['--ps-travel' as string]: `${lastCut - firstCut}px` }}
     >
       <rect x="0" y="0" width={W} height={H} fill="#fff" />
@@ -69,7 +69,7 @@ export function PressSheet() {
         </g>
       ))}
 
-      {/* colour bar and slug line in the foot */}
+      {/* color bar and slug line in the foot */}
       <g transform={`translate(${fit.marginXMm} ${H - fit.marginBottomMm / 2 - 2.2})`}>
         {BAR.map((c, i) => <rect key={i} x={i * 5.2} y="0" width="4.6" height="4.4" fill={c} />)}
       </g>

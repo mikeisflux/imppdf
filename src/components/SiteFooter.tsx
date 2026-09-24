@@ -10,7 +10,7 @@ const COLS: { title: string; cats: Tool['category'][] }[] = [
   { title: 'Pages & advanced', cats: ['pages', 'advanced'] },
 ];
 
-// The colour bar a press sheet carries in its margin: C, M, Y, K at 100 / 75 /
+// The color bar a press sheet carries in its margin: C, M, Y, K at 100 / 75 /
 // 50 / 25 %. Purely a signature here — but a correct one.
 const BAR = ['#00b4e6', '#40c7ec', '#80d9f2', '#bfecf9', '#e6007e', '#ec40a0', '#f280bf', '#f9bfdf',
   '#ffd400', '#ffdf40', '#ffea80', '#fff4bf', '#14120f', '#4f4d4a', '#8a8886', '#c5c3c0'];

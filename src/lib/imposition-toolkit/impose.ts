@@ -3531,7 +3531,7 @@ export function blackSwathKeepMask(
   const protect = opts?.protect ?? null;
   const keep = new Uint8Array(w * h).fill(255);
   // Coarse analysis grid — "large swath" doesn't need per-pixel connectivity,
-  // and this keeps the labelling cheap on a 9-megapixel panel.
+  // and this keeps the labeling cheap on a 9-megapixel panel.
   const step = Math.max(1, opts?.step ?? (Math.round(Math.min(w, h) / 512) || 1));
   const gw = Math.ceil(w / step), gh = Math.ceil(h / step);
   const dark = new Uint8Array(gw * gh);
@@ -4649,7 +4649,7 @@ export interface DivinityCardOptions {
    *  so it is a switch, set by cutting one sheet and looking at it. */
   spinBacks?: boolean;
   /* ── Where the block sits on the sheet. The CELL is always a true 2.5 x 3.5"
-     card; these only move it. Centred by default, because a block pinned close
+     card; these only move it. Centered by default, because a block pinned close
      to the head lands inside the press's unprintable margin — the PDF is
      correct and the sheet still comes off with the top row clipped. ──────── */
   /** A — sheet edge to the first cut line. */ marginXMm?: number;
@@ -4696,7 +4696,7 @@ export interface DivinityCardOptions {
 
 /** White paper left all the way round the sheet when the black background is
  *  on. Not zero: a flood run right to the sheet edge is what makes a digital
- *  press band and pick, and most will not image the last millimetre anyway. */
+ *  press band and pick, and most will not image the last millimeter anyway. */
 export const BLACK_BORDER_MM = 1.5;
 
 export async function imposeDivinityCards(
@@ -4794,9 +4794,9 @@ export async function imposeDivinityCards(
 
        PAST the layout box the art's outermost sliver is drawn OUT: across the
        margin to OUTER_BLEED_MM (or as far as the paper goes) where there is
-       no neighbour, and to the MIDDLE of the gap where there is one, so the
+       no neighbor, and to the MIDDLE of the gap where there is one, so the
        two cards' carries meet there. That is registration tolerance for a
-       hand-fed sheet: a blade that lands a few millimetres off still lands
+       hand-fed sheet: a blade that lands a few millimeters off still lands
        in ink on both sides of the cut, and a card border just comes out a
        shade wider rather than white. The art itself is not moved or rescaled
        by it — the sliver is a separate draw of the same page, scaled so
@@ -4875,7 +4875,7 @@ export async function imposeDivinityCards(
      with the black background on there is only a 1.5 mm white border — a mark
      inset further than that would otherwise be black ink on a black flood and
      completely invisible. The pad is the mark plus REG_PAD_MM all round. */
-  /* 1.5, not more: on the centred test sheet there is 8 mm of paper above the
+  /* 1.5, not more: on the centered test sheet there is 8 mm of paper above the
      block, and inset 1.5 + a 5 mm mark + this pad comes to exactly 8. Any wider
      and the white pad would be drawn over the top row of cards. */
   const REG_PAD_MM = 1.5;
@@ -5080,7 +5080,7 @@ export async function imposeDivinityCards(
     const line = (x1: number, y1: number, x2: number, y2: number) =>
       pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w0, color: markColor });
     /* Marks live OUTSIDE the cards, in the sheet margins only. Every card edge
-       is shared with its neighbour across a 3 mm gutter, so a mark long enough
+       is shared with its neighbor across a 3 mm gutter, so a mark long enough
        to be useful in the gutter would run onto the card next to it. Ruling the
        lines off the sheet edges instead gives the guillotine the same cut. */
     const xs = new Set<number>(), ys = new Set<number>();
@@ -5679,7 +5679,7 @@ export async function addBraille(bytes: Uint8Array, opts: BrailleOptions): Promi
 
 // ── Nesting (Stickers): bin-packing + optional true-shape ───────────────────
 // Packs the source pages (which may be different sizes = different stickers)
-// onto sheets or a roll, minimising waste. Bounding-box mode uses a skyline
+// onto sheets or a roll, minimizing waste. Bounding-box mode uses a skyline
 // bottom-left packer with optional 90° rotation. True-shape mode rasterizes each
 // item's alpha outline (via pdf.js) and packs into each other's negative space.
 

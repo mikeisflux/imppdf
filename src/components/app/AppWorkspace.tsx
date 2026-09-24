@@ -161,6 +161,7 @@ export function AppWorkspace() {
       />
 
       {modal && (
+        <div className="pe pe-float">
         <div className="app-modal-backdrop" onClick={() => setModal(null)}>
           <div className="app-modal card" onClick={(e) => e.stopPropagation()}>
             <h2>{modal === 'limit' ? 'Download Limit Reached' : 'Cooldown in progress'}</h2>
@@ -171,7 +172,7 @@ export function AppWorkspace() {
                 : ` Your next one unlocks when the timer ends — or go Pro to skip the ${ent?.cooldownHours}h cooldown.`}
             </p>
             {cdText && (
-              <p style={{ marginTop: 12, fontFamily: 'ui-monospace, monospace', fontSize: 14 }}>
+              <p style={{ marginTop: 12, fontFamily: 'var(--font-mono)', fontSize: 14 }}>
                 ⏱ Next free download: <b>{cdText}</b>
               </p>
             )}
@@ -181,10 +182,11 @@ export function AppWorkspace() {
             </div>
             {ent && !ent.authenticated && (
               <p className="muted" style={{ marginTop: 14, fontSize: 13 }}>
-                Already Pro? <Link href="/login" style={{ color: 'var(--brand)' }}>Sign in</Link> to unlock.
+                Already Pro? <Link href="/login">Sign in</Link> to unlock.
               </p>
             )}
           </div>
+        </div>
         </div>
       )}
     </>

@@ -84,7 +84,7 @@ export function PlanPanel({
           )}
           {subscription?.status === 'ACTIVE' && (
             <button className="btn btn-ghost btn-plain" onClick={cancel} disabled={cancelling || changing}>
-              {cancelling ? 'Cancelling…' : 'Cancel subscription'}
+              {cancelling ? 'Canceling…' : 'Cancel subscription'}
             </button>
           )}
         </div>

@@ -142,7 +142,7 @@ export function MockPiece({ cell, id }: { cell: Cell; id: string }) {
   );
 }
 
-// ── Realistic book/magazine page content (for booklets & signatures) ──────────
+// ── Realiztic book/magazine page content (for booklets & signatures) ──────────
 function lighten(hex: string, amt: number): string {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
@@ -157,7 +157,7 @@ function darken(hex: string, amt: number): string {
 }
 
 export type PageKind = 'cover' | 'text' | 'image' | 'dark';
-/** A realistic document page: background, header, body text lines, an image
+/** A realiztic document page: background, header, body text lines, an image
  *  block, optional cover branding and a page number. Rotated 180° for the top
  *  row of a signature, matching how imposed pages sit on the sheet. */
 export function DocPage({ cell, id, kind, brand, tagline, palette, pageNum, rot }: {
@@ -198,7 +198,7 @@ export function DocPage({ cell, id, kind, brand, tagline, palette, pageNum, rot 
         </>
       )}
       {pageNum != null && (
-        <text x={c.x + c.w - pad * 0.5} y={c.y + c.h - pad * 0.4} textAnchor="end" fontFamily="ui-monospace" fontSize={Math.min(9, c.w / 18)} fill={ink} opacity={0.55}>{pageNum}</text>
+        <text x={c.x + c.w - pad * 0.5} y={c.y + c.h - pad * 0.4} textAnchor="end" fontFamily="var(--font-mono), ui-monospace, monospace" fontSize={Math.min(9, c.w / 18)} fill={ink} opacity={0.55}>{pageNum}</text>
       )}
     </g>
   );
@@ -209,8 +209,8 @@ export function DiagramPiece({ cell, n }: { cell: Cell; n: number }) {
   const c = cell;
   return (
     <g transform={c.rot ? `rotate(180 ${c.x + c.w / 2} ${c.y + c.h / 2})` : undefined}>
-      <rect x={c.x} y={c.y} width={c.w} height={c.h} fill="none" stroke="#7b6cf6" strokeWidth={1} strokeDasharray="4 3" />
-      <text x={c.x + c.w / 2} y={c.y + c.h / 2 + 5} textAnchor="middle" fontFamily="ui-monospace" fontSize={Math.min(15, c.h / 3)} fill="#4c4a85" fontWeight={700}>{n}</text>
+      <rect x={c.x} y={c.y} width={c.w} height={c.h} fill="none" stroke="#ff4f1f" strokeWidth={1} strokeDasharray="4 3" />
+      <text x={c.x + c.w / 2} y={c.y + c.h / 2 + 5} textAnchor="middle" fontFamily="var(--font-mono), ui-monospace, monospace" fontSize={Math.min(15, c.h / 3)} fill="#14120f" fontWeight={700}>{n}</text>
     </g>
   );
 }
@@ -262,7 +262,7 @@ export interface MarkOpts {
 function NumberStamps({ cells }: { cells: Cell[] }) {
   return <>{cells.map((c, i) => (
     <text key={i} x={c.x + c.w - c.w * 0.06} y={c.y + c.h - c.h * 0.08} textAnchor="end"
-      fontFamily="ui-monospace" fontWeight={700} fontSize={Math.min(11, c.h / 3.2)} fill="#ffffffdd">No. {i + 1}</text>
+      fontFamily="var(--font-mono), ui-monospace, monospace" fontWeight={700} fontSize={Math.min(11, c.h / 3.2)} fill="#ffffffdd">No. {i + 1}</text>
   ))}</>;
 }
 
@@ -274,8 +274,8 @@ function RoundPieces({ cells, mode, id }: { cells: Cell[]; mode: 'diagram' | 'ex
     return <g key={i}>
       <clipPath id={clip}><circle cx={cx} cy={cy} r={r} /></clipPath>
       {mode === 'example' && <g clipPath={`url(#${clip})`}><MockPiece cell={{ x: cx - r, y: cy - r, w: 2 * r, h: 2 * r }} id={id} /></g>}
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#7b6cf6" strokeWidth={1} strokeDasharray="4 3" />
-      {mode === 'diagram' && <text x={cx} y={cy + 5} textAnchor="middle" fontFamily="ui-monospace" fontSize={Math.min(15, r / 1.6)} fill="#4c4a85" fontWeight={700}>{i + 1}</text>}
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#ff4f1f" strokeWidth={1} strokeDasharray="4 3" />
+      {mode === 'diagram' && <text x={cx} y={cy + 5} textAnchor="middle" fontFamily="var(--font-mono), ui-monospace, monospace" fontSize={Math.min(15, r / 1.6)} fill="#14120f" fontWeight={700}>{i + 1}</text>}
     </g>;
   })}</>;
 }
@@ -318,7 +318,7 @@ export function single(id: string, o: MarkOpts = {}) {
 }
 
 const PAGE_CYCLE: PageKind[] = ['cover', 'image', 'text', 'dark'];
-/** Book/magazine signature: cols×rows realistic pages with page numbers, a
+/** Book/magazine signature: cols×rows realiztic pages with page numbers, a
  *  colorbar and marks, top row imposed upside-down. Matches the reference's
  *  saddle-stitch / signature previews. */
 export function signature(id: string, o: MarkOpts & { cols?: number; rows?: number; saddle?: boolean } = {}) {

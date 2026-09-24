@@ -203,11 +203,11 @@ export const HERO_LAYOUT_CHIPS = [
 // Job cards on the homepage ("One tool, most of the jobs on the board").
 // Each one is a job as it arrives at the counter, and the tool that does it.
 export const USE_CASES = [
-  { title: 'A 24-page programme by Friday', blurb: 'Drop the pages in, choose saddle stitch, and the sheets come out with the signatures in order and creep worked in, ready to fold and staple.', link: 'Booklet imposition', href: '/tools/booklet' },
-  { title: 'Five hundred numbered tickets', blurb: 'Load a CSV, place one ticket design, and get serialised sheets with a QR code on every stub and stacks that cut in sequence.', link: 'Variable data', href: '/tools/variable-data' },
+  { title: 'A 24-page program by Friday', blurb: 'Drop the pages in, choose saddle stitch, and the sheets come out with the signatures in order and creep worked in, ready to fold and staple.', link: 'Booklet imposition', href: '/tools/booklet' },
+  { title: 'Five hundred numbered tickets', blurb: 'Load a CSV, place one ticket design, and get serialized sheets with a QR code on every stub and stacks that cut in sequence.', link: 'Variable data', href: '/tools/variable-data' },
   { title: 'A sheet of die-cut labels', blurb: 'Repeat one label to fill the sheet at exact gaps, then add the cut contour and registration the cutter wants.', link: 'Step and repeat', href: '/tools/step-and-repeat' },
   { title: 'Business cards, ten up', blurb: 'Set the card size and bleed, gang them onto 12 × 18 or SRA3, and send the sheet to the guillotine with its cut marks.', link: 'Card sheets', href: '/tools/business-cards' },
-  { title: 'A perfect-bound catalogue', blurb: 'Signatures with the spine allowance already worked out, for a squared-back binder rather than a stapler.', link: 'Perfect binding', href: '/tools/perfect-bound-book' },
+  { title: 'A perfect-bound catalog', blurb: 'Signatures with the spine allowance already worked out, for a squared-back binder rather than a stapler.', link: 'Perfect binding', href: '/tools/perfect-bound-book' },
   { title: 'A wall poster on an office printer', blurb: 'Tile a large-format file across Letter or A4 sheets with overlap and alignment marks, trim and tape.', link: 'Tiled posters', href: '/tools/tiled-poster' },
 ];
 
@@ -215,10 +215,10 @@ export const USE_CASES = [
 export const WHY_CARDS = [
   { title: 'Built for the press sheet, not the screen', blurb: 'Booklet signatures with creep, N-up grids, step and repeat, cut and stack, gang sheets, dielines and tiled posters: layouts that exist because a press, a folder and a guillotine exist.' },
   { title: 'Your files stay on your machine', blurb: 'Every page is read, imposed and written back by your own browser. There is no upload step and no server that ever sees a customer’s job.' },
-  { title: 'Nothing to install, nothing to license', blurb: 'Open a tab on Windows, macOS, Linux or a Chromebook. No plug-in, no dongle, no per-seat licence, and no account needed to try it.' },
-  { title: 'Marks the bindery can use', blurb: 'Crop, bleed, fold, collating, lay and registration marks, colour bars and slug lines, placed in the margins where they belong so nothing prints on the piece next door.' },
-  { title: 'Preflight before you commit paper', blurb: 'Low resolution, the wrong colour space, missing bleed, unembedded fonts, hairlines and page counts that will not fold — flagged while the sheet is still on screen.' },
-  { title: 'Numbers, names and codes from a spreadsheet', blurb: 'Serialised tickets, badges, coupons and labels from a CSV, a barcode or QR code on each record, and cut-and-stack ordering so the stacks come off the cutter in sequence.' },
+  { title: 'Nothing to install, nothing to license', blurb: 'Open a tab on Windows, macOS, Linux or a Chromebook. No plug-in, no dongle, no per-seat license, and no account needed to try it.' },
+  { title: 'Marks the bindery can use', blurb: 'Crop, bleed, fold, collating, lay and registration marks, color bars and slug lines, placed in the margins where they belong so nothing prints on the piece next door.' },
+  { title: 'Preflight before you commit paper', blurb: 'Low resolution, the wrong color space, missing bleed, unembedded fonts, hairlines and page counts that will not fold — flagged while the sheet is still on screen.' },
+  { title: 'Numbers, names and codes from a spreadsheet', blurb: 'Serialized tickets, badges, coupons and labels from a CSV, a barcode or QR code on each record, and cut-and-stack ordering so the stacks come off the cutter in sequence.' },
 ];
 
 // Homepage FAQ. Written from how the product actually behaves — see the
@@ -228,11 +228,11 @@ export const FAQ = [
   { q: 'So what is the sign-in for?', a: 'Plans and download limits only. The free plan can use every tool; Pro lifts the cooldown between downloads and adds API access. Neither involves your documents.' },
   { q: 'What kinds of layout can it produce?', a: 'Saddle-stitched and perfect-bound signatures, N-up grids, step and repeat, cut and stack, gang sheets, folded brochures, tiled posters, box and folder dielines, and per-cell custom impositions where the die dictates the positions.' },
   { q: 'How does it deal with creep?', a: 'For folded work it shifts each nested spread inward by the paper thickness you give it, so the outer margins stay even after the booklet is trimmed.' },
-  { q: 'Can I set my own sheet size, margins and gutters?', a: 'Yes. There are presets for the common stocks, and every dimension on the sheet — margins, gutters, bleed, mark length and offset — is a field you can type into, in millimetres or inches.' },
-  { q: 'Which marks can it add?', a: 'Crop and bleed marks, registration targets, cutter and fold marks, collating and gathering marks for the bindery, OMR marks, lay marks, colour bars, running headers and footers, slug lines, and cut-contour spot colours for die cutting.' },
-  { q: 'Will it warn me if the file is not ready to print?', a: 'The preflight tool reports image resolution, colour space, missing bleed, fonts that are not embedded, hairlines below the minimum width, overprint settings and page counts that cannot be folded.' },
+  { q: 'Can I set my own sheet size, margins and gutters?', a: 'Yes. There are presets for the common stocks, and every dimension on the sheet — margins, gutters, bleed, mark length and offset — is a field you can type into, in millimeters or inches.' },
+  { q: 'Which marks can it add?', a: 'Crop and bleed marks, registration targets, cutter and fold marks, collating and gathering marks for the bindery, OMR marks, lay marks, color bars, running headers and footers, slug lines, and cut-contour spot colors for die cutting.' },
+  { q: 'Will it warn me if the file is not ready to print?', a: 'The preflight tool reports image resolution, color space, missing bleed, fonts that are not embedded, hairlines below the minimum width, overprint settings and page counts that cannot be folded.' },
   { q: 'Can it number tickets or put names on badges?', a: 'Yes. The variable-data tools take a CSV or spreadsheet and place one record per piece — serial numbers, names, seat numbers — with a QR, Code 128, DataMatrix or EAN-13 code if you want one.' },
-  { q: 'Does it produce anything my cutter or MIS can read?', a: 'It can write a CIP4 JDF job ticket alongside the sheet, and it can put cut lines on a named spot colour for cutting tables and plotters.' },
+  { q: 'Does it produce anything my cutter or MIS can read?', a: 'It can write a CIP4 JDF job ticket alongside the sheet, and it can put cut lines on a named spot color for cutting tables and plotters.' },
   { q: 'Do I need Acrobat, InDesign or a plug-in?', a: 'No. It is a complete tool on its own. If you have a PDF and a browser, you have everything it needs.' },
   { q: 'What can I bring in?', a: 'PDFs first of all; also JPEG and PNG images for photo and card layouts, and CSV or Excel files for variable data.' },
   { q: 'Is there a limit on pages or file size?', a: 'Only your device’s memory, since the work happens there. Multi-hundred-page books are fine on an ordinary laptop; very large scanned files may be slow.' },
@@ -243,7 +243,7 @@ export const FAQ = [
 // Guides shown on the homepage and /guide.
 export const GUIDES = [
   { title: 'Reading a folded dummy', blurb: 'Fold a blank sheet, number the pages, unfold it. The quickest way to see why an imposed sheet looks scrambled and where creep pushes the inner pages.' },
-  { title: 'Bleed, trim and safe area in millimetres', blurb: 'How far to extend the art, how far to keep type back from the cut, and why 3 mm is the usual answer to both.' },
+  { title: 'Bleed, trim and safe area in millimeters', blurb: 'How far to extend the art, how far to keep type back from the cut, and why 3 mm is the usual answer to both.' },
   { title: 'Gutters for a slitter versus a guillotine', blurb: 'A slitting cutter steps one constant pitch; a guillotine cuts wherever you set the back gauge. The sheet has to be built for the machine you own.' },
   { title: 'Choosing a signature size', blurb: 'Four, eight, sixteen or thirty-two pages per sheet, and what each choice costs in paper, folding time and binder capacity.' },
   { title: 'Duplex settings that do not flip your backs', blurb: 'Long-edge or short-edge, mirrored back sheets, and the one test sheet that settles it for good.' },

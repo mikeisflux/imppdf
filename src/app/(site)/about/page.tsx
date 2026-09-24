@@ -24,14 +24,14 @@ export default function AboutPage() {
         It takes a finished PDF and lays its pages out on a press sheet: saddle-stitched and
         perfect-bound signatures, N-up grids, step and repeat, cut and stack, gang sheets, folded
         brochures, tiled posters and dielines. It adds the marks the bindery needs, checks the file
-        for the problems a RIP will choke on, and can serialise tickets, badges and labels from a
+        for the problems a RIP will choke on, and can serialize tickets, badges and labels from a
         spreadsheet.
       </Section>
 
       <Section title="What it does not do">
-        It does not edit your pages. The words, pictures and colours in the document are placed,
+        It does not edit your pages. The words, pictures and colors in the document are placed,
         turned and repeated exactly as they arrived. Anything that changes the content — beyond
-        colour conversion you ask for explicitly — is somebody else’s job.
+        color conversion you ask for explicitly — is somebody else’s job.
       </Section>
 
       <Section title="Where your file goes">

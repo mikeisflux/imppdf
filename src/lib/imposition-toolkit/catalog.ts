@@ -187,7 +187,7 @@ export const TEMPLATES: TemplateDef[] = [
   { id: "t144-gift-vouchers-qr-code", name: "Gift Vouchers (QR Code)", industry: "Variable Data", toolId: "coupons", specs: "Gift vouchers with unique QR redemption codes, 2-up on A4." },
   { id: "t145-loyalty-cards-code-128", name: "Loyalty Cards (Code 128)", industry: "Variable Data", toolId: "coupons", specs: "Loyalty/membership cards with unique Code 128 barcodes, 10-up on Letter." },
   { id: "t146-parking-permits-qr-code", name: "Parking Permits (QR Code)", industry: "Variable Data", toolId: "hangtag", specs: "Parking permits with unique QR validation codes, 4-up on Letter.", preset: { nup: { sheetWIn: 8.5, sheetHIn: 11, addMarks: true } } },
-  { id: "t147-product-labels-ean-13", name: "Product Labels (EAN-13)", industry: "Variable Data", toolId: "tickets", specs: "EAN-13 retail barcodes from CSV, 12-up on A4 for product labelling." },
+  { id: "t147-product-labels-ean-13", name: "Product Labels (EAN-13)", industry: "Variable Data", toolId: "tickets", specs: "EAN-13 retail barcodes from CSV, 12-up on A4 for product labeling." },
   { id: "t148-raffle-tickets-numbered", name: "Raffle Tickets (Numbered)", industry: "Variable Data", toolId: "raffle", specs: "Code 128 barcode raffle tickets from CSV, 4-up on Letter." },
   { id: "t149-shipping-labels-code-128", name: "Shipping Labels (Code 128)", industry: "Variable Data", toolId: "tickets", specs: "Shipping labels with unique Code 128 barcodes, 10-up on Letter." },
   { id: "t150-wristbands-qr-code", name: "Wristbands (QR Code)", industry: "Variable Data", toolId: "coupons", specs: "Event wristbands with unique QR codes, 8-up on Letter." },

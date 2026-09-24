@@ -3,7 +3,7 @@ import { template, sizedGrid } from '../kit';
 export default template({
   id: 'vd-product-ean13',
   name: "Product Labels (EAN-13)",
-  desc: 'EAN-13 retail barcodes from CSV, 12-up on A4 for product labelling.',
+  desc: 'EAN-13 retail barcodes from CSV, 12-up on A4 for product labeling.',
   category: 'Variable Data',
   sheetWIn: 8.5,
   sheetHIn: 11,

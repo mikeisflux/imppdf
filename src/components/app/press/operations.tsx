@@ -138,7 +138,7 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'comic', label: 'Comic Book', icon: 'spreads', tip: 'Saddle-stitch a single-issue comic: 2-up per side on tabloid, pages centered for duplex registration.' },
     { id: 'magazine', label: 'Magazine', icon: 'booklet', tip: 'Saddle-stitch or signature-bound magazine on large sheets with press marks.' },
     { id: 'catalog', label: 'Catalog', icon: 'booklet', tip: 'Saddle-stitch a square/product catalog booklet.' },
-    { id: 'program', label: 'Program', icon: 'booklet', tip: 'Saddle-stitch an A5 event/theatre program booklet.' },
+    { id: 'program', label: 'Program', icon: 'booklet', tip: 'Saddle-stitch an A5 event/theater program booklet.' },
     { id: 'notebook', label: 'Notebook', icon: 'booklet', tip: 'Saddle-stitch an A5 pocket notebook.' },
     { id: 'hymnal', label: 'Hymnal', icon: 'booklet', tip: 'Perfect-bind an A5 hymnal / songbook.' },
     { id: 'trifold', label: 'Tri-Fold', icon: 'columns', tip: 'Impose a tri-fold brochure flat (6 panels) with fold marks.' },

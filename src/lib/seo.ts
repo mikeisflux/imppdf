@@ -30,7 +30,7 @@ export const faqs: { q: string; a: string }[] = [
   { q: `Where does ${siteName} process my file?`, a: 'On your own computer, inside the browser tab. Pages are placed and the new PDF is written locally; nothing is uploaded.' },
   { q: `Is ${siteName} free to use?`, a: 'Every tool is available on the free plan. A Pro subscription lifts the cooldown between downloads and adds API access.' },
   { q: 'What layouts can it produce?', a: 'Saddle-stitched and perfect-bound signatures, N-up grids, step and repeat, cut and stack, gang sheets, folded brochures, tiled posters, dielines and per-cell custom impositions.' },
-  { q: 'Which finishing marks can it add?', a: 'Crop, bleed, fold, collating, lay and registration marks, colour bars, slug lines and cut-contour spot colours, all placed in the sheet margins.' },
+  { q: 'Which finishing marks can it add?', a: 'Crop, bleed, fold, collating, lay and registration marks, color bars, slug lines and cut-contour spot colors, all placed in the sheet margins.' },
   { q: 'Do I need Acrobat or a plug-in?', a: 'No. It runs on its own in any current browser on Windows, macOS, Linux or ChromeOS.' },
 ];
 

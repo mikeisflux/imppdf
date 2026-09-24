@@ -6,7 +6,7 @@ const TOPICS = [
   { value: 'support', label: 'Support / help' },
   { value: 'enterprise', label: 'Enterprise / team licensing' },
   { value: 'billing', label: 'Billing' },
-  { value: 'general', label: 'General enquiry' },
+  { value: 'general', label: 'General inquiry' },
 ];
 
 export function ContactForm({ defaultTopic = 'general' }: { defaultTopic?: string }) {

@@ -216,7 +216,7 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'prooflabel':
       // 30-up proof labels, measured from the shop's 8.5x11in30up template:
       // 2.625 x 1" labels, 3 cols x 10 rows, column pitch 2.7431" (0.1181"
-      // gutter), row pitch 1" (no gutter). Centring the block reproduces the
+      // gutter), row pitch 1" (no gutter). Centering the block reproduces the
       // template's margins (0.194" sides, 0.5" top/bottom) within 0.004".
       // This tool is DESIGNED to gang 30-up, so it overrides the usual 1x1
       // default. Marks are OFF: the stock is die-cut, and mark clearance would

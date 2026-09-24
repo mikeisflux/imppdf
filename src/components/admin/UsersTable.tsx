@@ -11,7 +11,7 @@ export interface AdminUser {
 const SUB_OPTIONS = [
   { value: '', label: 'Subscription…' },
   { value: 'ACTIVE', label: 'Grant lifetime Pro' },
-  { value: 'CANCELLED', label: 'Mark cancelled' },
+  { value: 'CANCELLED', label: 'Mark canceled' },
   { value: 'SUSPENDED', label: 'Mark suspended' },
   { value: 'EXPIRED', label: 'Mark expired' },
   { value: 'none', label: 'Remove subscription' },

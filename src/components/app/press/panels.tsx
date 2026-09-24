@@ -63,7 +63,7 @@ export function Section({ label, help, children }: { label: string; help?: strin
     </div>
   );
 }
-const Tick = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L19 6" /></svg>;
+const Tick = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L19 6" /></svg>;
 export function Check({ label, sub, checked, onChange, icon }: { label: React.ReactNode; sub?: string; checked: boolean; onChange: (v: boolean) => void; icon?: IconName }) {
   return (
     <>
@@ -710,7 +710,7 @@ function ZinePanel(p: PanelProps) {
             </label>
             <NumRaw value={s.guideWeights?.[k] ?? 1} onValue={(v) => setGw(k, v)} w={56} />
             <span className="pe-label-sm">pt</span>
-            <span className="pe-zine-guide-swatch" style={{ background: k === 'fold' ? '#7b6cf6' : '#f59e0b' }} />
+            <span className="pe-zine-guide-swatch" style={{ background: k === 'fold' ? 'var(--pe-accent)' : 'var(--pe-warn)' }} />
           </div>
         ))}
       </Section>
@@ -1281,7 +1281,7 @@ function PdfToolsPanel({ s, up }: PanelProps) {
         <>
           <span className="pe-label-sm">Password (leave blank for restriction-only files)</span>
           <input className="pe-input" type="password" style={{ margin: '5px 0 10px' }} value={s.password ?? ''} onChange={(e) => up({ password: e.target.value })} />
-          <div className="pe-note">Removes encryption you are authorised to remove — with the password via qpdf, or directly for permission-flag-only files.</div>
+          <div className="pe-note">Removes encryption you are authorized to remove — with the password via qpdf, or directly for permission-flag-only files.</div>
         </>
       )}
       {s.op === 'repair' && (
@@ -2978,7 +2978,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
   const MM = 25.4 / 72;
   const src = pageSizes[Math.max(0, Math.min(pageSizes.length - 1, (s.page ?? 1) - 1))];
   const wMm = src ? src.wPt * MM : 0, hMm = src ? src.hPt * MM : 0;
-  // Judged on aspect, not exact size, so a card with a millimetre of slop still
+  // Judged on aspect, not exact size, so a card with a millimeter of slop still
   // reads as correct — same rule the engine uses to decide the quarter turn.
   const ratio = wMm && hMm ? Math.max(wMm, hMm) / Math.min(wMm, hMm) : 0;
   const wanted = 88.9 / 63.5;   // a 2.5 x 3.5 card, either way round
@@ -3011,7 +3011,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
             <div style={{ marginTop: 4 }}>
               <b>The manufacturer&apos;s template, converted and honed.</b> Their A4 drawing puts the
               cuts at 9.5 / 98.5 / 111.5 / 200.5 — the blades sit <b>±6.5</b> and <b>±95.5</b> from
-              the machine&apos;s centre line and never move. A Letter sheet centred on that same
+              the machine&apos;s center line and never move. A Letter sheet centered on that same
               line would meet them at 12.45 / 101.45 / 114.45 / 203.45. The test cuts with the red
               lines then put the four blades where they actually are on a Letter sheet —
               <b> {LETTER_BLADES_MM.map(round2).join(' / ')}</b> — so A is
@@ -3041,7 +3041,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         </div>
       </Section>
 
-      <Section label="// GUTTERS" help="Every gap on the sheet, in millimetres. A and B place the columns, D and E F G place the rows; C and H are what is left over.">
+      <Section label="// GUTTERS" help="Every gap on the sheet, in millimeters. A and B place the columns, D and E F G place the rows; C and H are what is left over.">
         {([
           /* IN LETTER ORDER, A to H — the order the sheet is lettered and the
              order the operator reads a ruler across it, then down it. C and H
@@ -3075,7 +3075,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         {(() => {
           /* A slitter advances ONE pitch per row and repeats it. Unequal row
              gutters cannot describe that, and the disagreement compounds — by
-             row 4 the blade is millimetres into the art. Worth shouting about:
+             row 4 the blade is millimeters into the art. Worth shouting about:
              this is exactly the fault that made every cut stack come out wrong. */
           const [e, f, g] = FIT.rowGapsMm;
           if (Math.abs(e - f) < 1e-9 && Math.abs(f - g) < 1e-9) return null;
@@ -3105,7 +3105,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
           {' '}{round2(FIT.cellWMm + 2 * LAYOUT_BLEED_MM)} × {round2(FIT.cellHMm + 2 * LAYOUT_BLEED_MM)} here —
           so it runs the same past every cut on every card and each card is cropped identically. Past that the art&apos;s edge is carried on —
           across the margin outside the block, to the middle of the gap between cards — so a
-          blade a few millimetres off still lands in ink on both sides of the cut. None of it
+          blade a few millimeters off still lands in ink on both sides of the cut. None of it
           moves a cut.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }}
             onClick={() => up({ ...untyped })}>
@@ -3212,11 +3212,11 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
               </div>
               {shape === 'bar' ? (
                 <div className="pe-note" style={{ marginTop: 10, lineHeight: 1.7 }}>
-                  Bar <b>{round2(s.regBarLenMm ?? 50)} × {round2(depth)}</b>, centred on the <b>{edge}</b> edge,
+                  Bar <b>{round2(s.regBarLenMm ?? 50)} × {round2(depth)}</b>, centered on the <b>{edge}</b> edge,
                   <b> {round2(inset)}</b> mm in. With its white pad that occupies the first{' '}
                   <b>{round2(needs)}</b> mm, and that edge has <b>{round2(feedMargin)}</b>.
                   {' '}{needs > feedMargin + 1e-9
-                    ? <b style={{ color: 'var(--pe-warn, #e0a45f)' }}>Not enough — the pad would print over the
+                    ? <b style={{ color: 'var(--pe-warn)' }}>Not enough — the pad would print over the
                         first row. Grow that margin, or shrink the bar.</b>
                     : <>Fits, with {round2(feedMargin - needs)} mm to spare.</>}
                   <br />Off by default on every stock: the 2102-F runs <b>frontal</b> and indexes off
@@ -3234,7 +3234,7 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         })()}
       </Section>
 
-      <Section label="// MARKS" help="Cut marks are ruled off the sheet edges rather than into the gutters, so nothing can print on a neighbouring card.">
+      <Section label="// MARKS" help="Cut marks are ruled off the sheet edges rather than into the gutters, so nothing can print on a neighboring card.">
         <Check icon="crop" label="Cut marks" sub="At every card edge, in the sheet margins, plus the half-sheet cut on A3"
           checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />
       </Section>

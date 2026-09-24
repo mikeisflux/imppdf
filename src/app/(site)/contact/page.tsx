@@ -4,7 +4,7 @@ import { siteContact } from '@/lib/config';
 
 export const metadata = pageMetadata({
   title: 'Contact',
-  description: 'Get in touch with ImpositionPDF — support, enterprise licensing and general enquiries. Call or send a message.',
+  description: 'Get in touch with ImpositionPDF — support, enterprise licensing and general inquiries. Call or send a message.',
   path: '/contact',
 });
 
@@ -29,7 +29,7 @@ export default function ContactPage() {
         <ContactForm />
       </div>
       <p className="muted" style={{ marginTop: 20, fontSize: 14 }}>
-        This form is protected by reCAPTCHA. We only use your email to reply to your enquiry.
+        This form is protected by reCAPTCHA. We only use your email to reply to your inquiry.
       </p>
     </div>
   );

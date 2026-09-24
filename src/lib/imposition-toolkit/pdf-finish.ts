@@ -213,7 +213,7 @@ export async function finalizePdfForExport(
     }
   } catch { /* an odd Info dict is not worth failing an export over */ }
 
-  /* NORMALISE THE PAGE BOXES — the single biggest cause of "the right size in
+  /* NORMALIZE THE PAGE BOXES — the single biggest cause of "the right size in
      the PDF, the wrong size on the RIP".
 
      A viewer honors the CropBox. A RIP images the MediaBox. When the two

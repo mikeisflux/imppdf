@@ -406,7 +406,7 @@ export const LIBRARY: LibCategory[] = [
       [S('datamerge', { cols: 2, rows: 3, cellWIn: 4, cellHIn: 3, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true }), S('barcode', { symbology: 'code128' })]),
     e('vd-asset-dm', 'Asset Tags (DataMatrix)', "Compact DataMatrix asset tags, 10-up on Letter for inventory tracking.",
       [S('datamerge', { cols: 3, rows: 8, cellWIn: 2, cellHIn: 1, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true }), S('barcode', { symbology: 'datamatrix' })]),
-    e('vd-product-ean13', 'Product Labels (EAN-13)', "EAN-13 retail barcodes from CSV, 12-up on A4 for product labelling.",
+    e('vd-product-ean13', 'Product Labels (EAN-13)', "EAN-13 retail barcodes from CSV, 12-up on A4 for product labeling.",
       [S('datamerge', { cols: 2, rows: 5, cellWIn: 3, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true }), S('barcode', { symbology: 'ean13' })]),
     e('vd-gift-qr', 'Gift Vouchers (QR Code)', "Gift vouchers with unique QR redemption codes, 2-up on A4.",
       [S('datamerge', { cols: 2, rows: 4, cellWIn: 4, cellHIn: 2, sheetWIn: 8.5, sheetHIn: 11, addMarks: true, centerMarks: true }), S('barcode', { symbology: 'qr' })]),

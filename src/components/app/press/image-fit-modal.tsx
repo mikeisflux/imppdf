@@ -98,7 +98,7 @@ export function ImageFitModal({ thumbs, index = 0, cellWIn, cellHIn, values, fal
             <img src={thumb} alt="" draggable={false}
               style={{ position: 'absolute', left, top, width: iw, height: ih, userSelect: 'none' }} />
             {/* trim frame overlay */}
-            <div style={{ position: 'absolute', inset: 0, boxShadow: '0 0 0 1px rgba(124,108,246,0.9) inset', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', inset: 0, boxShadow: '0 0 0 1px rgba(255,79,31,0.9) inset', pointerEvents: 'none' }} />
           </div>
         </div>
         <div className="pe-row" style={{ gap: 8, marginBottom: 8 }}>

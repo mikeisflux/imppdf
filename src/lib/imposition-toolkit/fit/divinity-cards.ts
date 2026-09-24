@@ -91,7 +91,7 @@ const COLS_N = 2, ROWS_N = 4;
 
 /** The cell IS the machine's card: 89 wide, 63 in the feed direction. Near
  *  enough a 2.5 x 3.5" card (88.9 x 63.5) that the difference is the panel
- *  rounding to whole millimetres — but the MACHINE'S figure is the one that
+ *  rounding to whole millimeters — but the MACHINE'S figure is the one that
  *  governs, because the machine is what does the cutting. */
 export const MACHINE_CARD_W_MM = 89;
 export const MACHINE_CARD_L_MM = 63;
@@ -100,7 +100,7 @@ export const MACHINE_GROOVE_MM = 3;
 /** Front len on the panel. */
 export const MACHINE_FRONT_MM = 7.6;
 
-/* ── THE MANUFACTURER'S TEMPLATE, an A4 drawn to the millimetre and captioned:
+/* ── THE MANUFACTURER'S TEMPLATE, an A4 drawn to the millimeter and captioned:
 
        "虚线是切卡机的刀的位置，实际排版不需要的。卡片尺寸89X63，排版尺寸是92X66"
        "The dashed line is where the card cutter's blade goes — don't include it
@@ -137,8 +137,8 @@ export const TEMPLATE_ROW_CUT_GAP_MM = 6;
 /** Between the CUT lines across: the layout gap plus a bleed on each side. */
 export const TEMPLATE_COL_CUT_GAP_MM = TEMPLATE_COL_GAP_MM + 2 * LAYOUT_BLEED_MM;   // 13
 
-/** THE BLADES AS DRAWN, either side of the machine's centre line: A4 is 210
- *  wide, the first cut is 8 + 1.5 in, so it sits 105 − 9.5 = 95.5 from centre;
+/** THE BLADES AS DRAWN, either side of the machine's center line: A4 is 210
+ *  wide, the first cut is 8 + 1.5 in, so it sits 105 − 9.5 = 95.5 from center;
  *  the inner pair straddle the 13 mm gap at ±6.5. */
 export const TEMPLATE_BLADE_INNER_MM = TEMPLATE_COL_CUT_GAP_MM / 2;                 // 6.5
 export const TEMPLATE_BLADE_OUTER_MM = TEMPLATE_BLADE_INNER_MM + MACHINE_CARD_W_MM; // 95.5
@@ -189,9 +189,9 @@ export const MACHINE_FRONT_AS_CUT_MM = MACHINE_FRONT_MM + FRONT_OFFSET_MM;   // 
 export const MACHINE_GROOVE_AS_CUT_MM = 3.2;                                 // pitch 66.2
 
 /** OUTER bleed — how far the art's edge is carried past the cuts on the
- *  OUTSIDE of the block, where there is no neighbour to meet and nothing but
- *  margin beyond. It is registration tolerance for a sheet centred by hand: an
- *  outer blade that lands a couple of millimetres out still lands in ink.
+ *  OUTSIDE of the block, where there is no neighbor to meet and nothing but
+ *  margin beyond. It is registration tolerance for a sheet centered by hand: an
+ *  outer blade that lands a couple of millimeters out still lands in ink.
  *  Between two cards the same carry runs to the MIDDLE of the gap from each
  *  side, so a lateral shift up to half the gap shows no white anywhere.
  *
@@ -211,7 +211,7 @@ export const SEAM_MM = 0.3;
 
 /* ── The shop's original hand-measured template. Letter no longer uses it (see
    LETTER_TEMPLATE); A4 and A3 still start from it, never having been honed on
-   this machine. Nothing here is centred, derived from a rule, or clever: the
+   this machine. Nothing here is centered, derived from a rule, or clever: the
    operator has a ruler and the machine, and inferring this instead of exposing
    it produced twenty rounds of wrong sheets.
 
@@ -286,9 +286,9 @@ interface SheetSpec {
    *  landscape frame — A, B, C, D and the cells are unchanged — and only the
    *  page the caller draws onto is portrait. */
   rotated?: boolean;
-  /** Centre the block ACROSS instead of using the measured A. The machine's
-   *  blades are symmetric about its centre line, so a sheet centred in it wants
-   *  its block centred too — a typed A still wins. */
+  /** Center the block ACROSS instead of using the measured A. The machine's
+   *  blades are symmetric about its center line, so a sheet centered in it wants
+   *  its block centered too — a typed A still wins. */
   centred?: boolean;
   /** Turn registration marks on for this sheet by default. */
   regTest?: boolean;
@@ -308,10 +308,10 @@ interface SheetSpec {
 /** Width of that red cut line. It lies entirely OUTSIDE the cell — its inner
  *  edge IS the cut line — so a blade on the line leaves no red on the card at
  *  all, and any red that does come through is the overshoot, exact width.
- *  (Centred on the line it left 1.5 on every edge of a perfect cut, which had
+ *  (Centered on the line it left 1.5 on every edge of a perfect cut, which had
  *  to be subtracted by eye before the sheet could be read.)
  *  1, down from 3 (owner, "shrink the red down to 1mm and let's hone it in"):
- *  once the error is under a millimetre a wide band only says "some", and a
+ *  once the error is under a millimeter a wide band only says "some", and a
  *  narrow one that is either there or not is the finer gauge. Past 1 mm the
  *  art's carried edge shows beyond the red, which still reads as "over". */
 export const CUT_LINE_MM = 1;
@@ -327,7 +327,7 @@ const SHEETS: Record<DivinityCardSheet, SheetSpec> = {
 
      Across, the blades are hardware and never move: on A4 the template puts the
      cuts at 9.5 / 98.5 / 111.5 / 200.5, which is ±6.5 and ±95.5 either side of
-     the machine's centre line. A Letter sheet centred on that same line meets
+     the machine's center line. A Letter sheet centered on that same line meets
      them at 12.45 / 101.45 / 114.45 / 203.45 — so B is 13, not 3, and A = C =
      12.45. (`centred` gets exactly that: the block is 191 wide.)
 
@@ -437,10 +437,10 @@ export function fitDivinityCards(
   const blockW = cellWs.reduce((a, b) => a + b, 0) + (COLS - 1) * gX;
   const blockH = ROWS * PLACED_H_MM + rowGaps[0] + rowGaps[1] + rowGaps[2];
 
-  /* On the centred stock A falls out of the block rather than being read off
+  /* On the centered stock A falls out of the block rather than being read off
      the machine — but a typed value still wins, so the operator can nudge it
-     after a test cut. The centring has to use THIS fit's B, not the default's,
-     or a typed B would push the block off centre. */
+     after a test cut. The centering has to use THIS fit's B, not the default's,
+     or a typed B would push the block off center. */
   const mX = t.marginXMm ?? (spec.centred ? (spec.blockWMm - blockW) / 2 : defs.marginXMm);
   const mTop = t.marginTopMm ?? defs.marginTopMm;
   /* C and H are the leftovers, not settings — they cannot be, because A, the

@@ -131,7 +131,7 @@ export default function HomePage() {
           <div className="sec-head reveal">
             <div className="sec-n eyebrow" style={{ marginBottom: 0 }}>04 — The tools</div>
             <h2>Pick the layout, not the software.</h2>
-            <p>Ninety-odd tools in one editor, each one there because a real job needed it. The full catalogue is in the footer and in the editor itself.</p>
+            <p>Ninety-odd tools in one editor, each one there because a real job needed it. The full catalog is in the footer and in the editor itself.</p>
           </div>
           {GALLERY_SECTIONS.map((cat) => (
             <GallerySection key={cat} cat={cat} />
@@ -180,16 +180,16 @@ export default function HomePage() {
 
       <Faq />
 
-      {/* Catalogue by category */}
+      {/* Catalog by category */}
       <section className="section-sm seo-section">
         <div className="container">
-          <div className="eyebrow">The whole catalogue</div>
+          <div className="eyebrow">The whole catalog</div>
           <h2 className="seo-title">Ninety-odd tools, one editor.</h2>
           <p className="seo-copy">
             ImpositionPDF started as the in-house prepress tool of a small print shop and grew one
             job at a time: a booklet that would not fold right, a run of tickets that needed
             numbering, a sheet of cards for a cutter that steps a fixed pitch. Every tool in the
-            catalogue exists because a real job needed it. All of them run in the browser, on your
+            catalog exists because a real job needed it. All of them run in the browser, on your
             own machine, on a PDF that never has to be uploaded.
           </p>
           <div className="seo-cols">

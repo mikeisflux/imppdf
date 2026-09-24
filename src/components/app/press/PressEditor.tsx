@@ -43,7 +43,12 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
   // records the consumption. When it returns false the host shows its paywall.
   gateExport?: () => boolean;
 }) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  // Paper by default (the site's theme); the toggle is remembered.
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  useEffect(() => {
+    try { const t = localStorage.getItem('pp_theme'); if (t === 'dark' || t === 'light') setTheme(t); } catch { /* private mode */ }
+  }, []);
+  useEffect(() => { try { localStorage.setItem('pp_theme', theme); } catch { /* full */ } }, [theme]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [steps, setSteps, history] = useHistory<WorkflowStep[]>(() => {
     const op = findOp(initialOp ?? null);
@@ -423,7 +428,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
     <div className={`pe ${theme === 'dark' ? 'pe-dark' : ''}`}>
       {/* App bar */}
       <div className="pe-appbar">
-        <a className="pe-brand" href="/" title="Back to home" style={{ textDecoration: 'none', color: 'inherit' }}><span className="pe-brand-mark"><Ic name="gridview" size={15} /></span>ImpositionPDF</a>
+        <a className="pe-brand" href="/" title="Back to home" style={{ textDecoration: 'none', color: 'inherit' }}><span className="pe-brand-mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden><rect x="6" y="6" width="12" height="12" fill="currentColor" /><path d="M6 1v3M18 1v3M6 20v3M18 20v3M1 6h3M20 6h3M1 18h3M20 18h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg></span>ImpositionPDF</a>
         <div style={{ position: 'relative' }}>
           <button className="pe-filemenu" onClick={() => setMenu(menu === 'file' ? null : 'file')}>File <Ic name="chevron" size={14} /></button>
           {menu === 'file' && (
@@ -580,7 +585,7 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
           {!file ? (
             <div className={`pe-drop ${drag ? 'pe-dragging' : ''}`}>
               <Ic name="download" size={40} />
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--pe-ink)' }}>Drop a PDF to start</div>
+              <div className="pe-drop-title">Drop a PDF to start</div>
               <div style={{ fontSize: 13 }}>Processed locally — nothing is uploaded.</div>
               <button className="pe-drop-btn" onClick={() => inputRef.current?.click()}>Choose PDF</button>
             </div>
