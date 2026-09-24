@@ -24,10 +24,9 @@ export function Reviews() {
       <div className="container">
         <div className="section-head">
           <span className="pill-badge">✦ Reviews</span>
-          <h2 style={{ marginTop: 16 }}>Loved by prepress and print teams</h2>
+          <h2 style={{ marginTop: 16 }}>What people say</h2>
           <p>
-            Designers, copy centers and print shops who moved to ImpositionPDF from Quite
-            Imposing, pdfsnake, Imposition Wizard and other desktop imposers.
+            From the counters, studios and prepress desks that use it.
           </p>
           <div className="reviews-agg">
             <Stars n={5} /> <strong>4.8</strong> <span className="muted">/5 · 21 reviews</span>

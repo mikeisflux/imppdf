@@ -5,7 +5,7 @@ import { pageMetadata } from '@/lib/seo';
 
 export const metadata = pageMetadata({
   title: 'Guides',
-  description: 'Step-by-step imposition and prepress tutorials — booklets, N-up, step & repeat, bleed, crop marks and more, all done in your browser.',
+  description: 'Short, practical notes on the parts of prepress that go wrong most often: folding, trimming, backing up, creep, and getting a file past the RIP.',
   path: '/guide',
 });
 
@@ -13,9 +13,10 @@ export default function GuidePage() {
   return (
     <div className="container" style={{ padding: '64px 24px 40px' }}>
       <div className="eyebrow">Guides</div>
-      <h1 style={{ fontSize: 'clamp(32px,4.4vw,46px)', marginBottom: 14 }}>Imposition &amp; prepress guides</h1>
+      <h1 style={{ fontSize: 'clamp(32px,4.4vw,46px)', marginBottom: 14 }}>Notes from the shop floor</h1>
       <p className="muted" style={{ fontSize: 17, maxWidth: 620, marginBottom: 34 }}>
-        Step-by-step tutorials and comparisons to help you impose, fold and print with confidence.
+        Short, practical pieces on the parts of prepress that go wrong most often — folding,
+        trimming, backing up and getting a file past the RIP — written from jobs that went wrong first.
       </p>
 
       <div className="grid-3">

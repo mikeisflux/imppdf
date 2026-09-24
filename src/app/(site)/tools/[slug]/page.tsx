@@ -17,8 +17,8 @@ export async function generateMetadata(
   const { slug } = await params;
   const tool = findTool(slug);
   if (!tool) return { title: 'Tool not found' };
-  const title = `${tool.name} — free online imposition`;
-  const description = `${tool.name}: ${tool.blurb} Runs entirely in your browser, nothing uploaded.`;
+  const title = `${tool.name} — in your browser, nothing uploaded`;
+  const description = `${tool.name}: ${tool.blurb} Laid out by your own browser from a PDF that stays on your device.`;
   const url = `${siteUrl}/tools/${tool.slug}`;
   return {
     title,
@@ -69,9 +69,9 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
           )}
 
           <ul className="plan-features" style={{ marginBottom: 26 }}>
-            <li><IconCheck width={16} height={16} /> Runs 100% in your browser — files never uploaded</li>
-            <li><IconCheck width={16} height={16} /> Print-ready output with marks and bleed</li>
-            <li><IconCheck width={16} height={16} /> Works on any modern browser, no install</li>
+            <li><IconCheck width={16} height={16} /> Imposed by your own browser; the file never leaves your device</li>
+            <li><IconCheck width={16} height={16} /> Bleed and finishing marks placed in the sheet margins</li>
+            <li><IconCheck width={16} height={16} /> Any current browser on any desktop system; nothing to install</li>
           </ul>
 
           <div className="row wrap">

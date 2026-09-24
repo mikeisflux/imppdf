@@ -39,18 +39,18 @@ export function Hero() {
     <section className="hero">
       <div className="container">
         <div className="hero-badge">
-          <span className="pill-badge"><IconSparkle width={15} height={15} className="spark" /> Browser-based imposition &amp; prepress</span>
+          <span className="pill-badge"><IconSparkle width={15} height={15} className="spark" /> Imposition and prepress, entirely on your own machine</span>
         </div>
 
         <h1 className="hero-title">
-          Impose, mark up &amp; export
+          Lay out the press sheet
           <br />
-          <span className="gradient-text">print-ready PDFs</span>
+          <span className="gradient-text">in your browser</span>
         </h1>
 
         <p className="hero-sub">
-          Booklets, N-up, step and repeat, and variable data, all built right in your
-          browser. Your files never get uploaded. Sign in once and start in seconds.
+          Booklets, N-up, step and repeat, gang sheets, tiled posters and numbered tickets,
+          imposed by your own computer from a PDF you never have to upload.
         </p>
 
         <div className="hero-features">
@@ -73,12 +73,12 @@ export function Hero() {
           <input ref={inputRef} type="file" hidden accept=".pdf,image/*,.csv,.xlsx" onChange={openApp} />
           <div className="hero-drop-icon"><IconUpload width={22} height={22} /></div>
           <div className="hero-drop-text">
-            <strong>Drop files here or click to select</strong>
-            <span>PDF, images, CSV and Excel. Files stay on your device.</span>
+            <strong>Drop a PDF here to start</strong>
+            <span>PDF, JPEG, PNG, CSV or Excel. It opens in this tab and goes no further.</span>
           </div>
           <div className="hero-drop-actions">
-            <span className="btn btn-primary"><IconUpload width={16} height={16} /> Upload a File</span>
-            <span className="btn btn-ghost">Select Folder</span>
+            <span className="btn btn-primary"><IconUpload width={16} height={16} /> Choose a file</span>
+            <span className="btn btn-ghost">Choose a folder</span>
           </div>
         </div>
 
@@ -98,16 +98,16 @@ export function Hero() {
         </div>
 
         <div className="hero-trust">
-          <div className="hero-trust-text">Trusted by print and design teams</div>
+          <div className="hero-trust-text">Made in a working print shop</div>
           <div className="hero-trust-pill">
-            <span className="dot" /> We respect your privacy. Files are processed locally on your device.
+            <span className="dot" /> No upload, no install, and no account needed to try it.
           </div>
         </div>
 
-        <Link href="/app" className="hero-ai" aria-label="Open the imposition app">
+        <Link href="/app" className="hero-ai" aria-label="Open the imposition editor">
           <span className="hero-ai-orb" />
           <span className="hero-ai-label">Open editor</span>
-          <span className="hero-ai-input">Build a custom imposition</span>
+          <span className="hero-ai-input">Set up a custom sheet</span>
           <span className="hero-ai-send"><IconArrow width={16} height={16} /></span>
         </Link>
       </div>

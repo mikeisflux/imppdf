@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { siteName, siteUrl, siteContact } from './config';
 
 export const seoDescription =
-  'Free browser-based PDF imposition & prepress software. Impose booklets, N-up, step & repeat, gang sheets, business cards, comics and trade paperbacks with crop marks, bleed and registration — all in your browser, nothing uploaded.';
+  'ImpositionPDF lays out print-ready press sheets in your browser: booklets, N-up, step and repeat, gang sheets, tiled posters, numbered tickets and dielines, with bleed, crop and registration marks. The file is imposed on your own device and never uploaded.';
 
 // Search terms + competitor names we want to rank against.
 export const seoKeywords: string[] = [
@@ -27,11 +27,11 @@ export const seoKeywords: string[] = [
 // Common questions — rendered as FAQPage structured data on the home page so
 // Google can show an expandable FAQ rich result.
 export const faqs: { q: string; a: string }[] = [
-  { q: `Is ${siteName} free?`, a: `Yes. ${siteName} runs entirely in your browser and is free to use, with a Pro subscription for higher download limits and API access.` },
-  { q: 'Do my PDFs get uploaded?', a: 'No. Imposition happens locally in your browser — your files never leave your device.' },
-  { q: 'What imposition can it do?', a: 'Booklets and saddle-stitch, perfect-bound trade paperbacks, comics, N-up and step-and-repeat, gang sheets, cut-and-stack, business cards, postcards, labels, hang tags and more — with crop, bleed and registration marks.' },
-  { q: `Is ${siteName} an alternative to Imposition Wizard, Montax Imposer or Quite Imposing?`, a: `Yes — ${siteName} is a free, browser-based alternative that covers the same booklet, N-up, step-and-repeat and gang-sheet imposition workflows with no install.` },
-  { q: 'Can I add crop and registration marks?', a: 'Yes. Every layout tool can add crop marks, bleed and registration/cutter marks, and you can add a dedicated Cutter Marks step for die-cutting.' },
+  { q: `Where does ${siteName} process my file?`, a: 'On your own computer, inside the browser tab. Pages are placed and the new PDF is written locally; nothing is uploaded.' },
+  { q: `Is ${siteName} free to use?`, a: 'Every tool is available on the free plan. A Pro subscription lifts the cooldown between downloads and adds API access.' },
+  { q: 'What layouts can it produce?', a: 'Saddle-stitched and perfect-bound signatures, N-up grids, step and repeat, cut and stack, gang sheets, folded brochures, tiled posters, dielines and per-cell custom impositions.' },
+  { q: 'Which finishing marks can it add?', a: 'Crop, bleed, fold, collating, lay and registration marks, colour bars, slug lines and cut-contour spot colours, all placed in the sheet margins.' },
+  { q: 'Do I need Acrobat or a plug-in?', a: 'No. It runs on its own in any current browser on Windows, macOS, Linux or ChromeOS.' },
 ];
 
 export function faqStructuredData() {
@@ -94,7 +94,7 @@ export function softwareAppData() {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
-      description: 'Free tier with unlimited in-browser imposition; Pro subscription for higher limits.',
+      description: 'Every tool on the free plan; Pro lifts the download cooldown and adds API access.',
     },
     featureList: [
       'Booklet & saddle-stitch imposition', 'Perfect-bound / trade paperback', 'N-up & step-and-repeat',

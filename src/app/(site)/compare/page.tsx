@@ -23,8 +23,9 @@ export default function CompareIndex() {
       <div className="eyebrow">Comparisons</div>
       <h1 style={{ fontSize: 'clamp(30px,4.2vw,46px)', marginBottom: 14 }}>{siteName} vs the alternatives</h1>
       <p className="muted" style={{ fontSize: 18, maxWidth: 720, marginBottom: 32 }}>
-        Weighing up imposition tools? Here&rsquo;s an honest, side-by-side look at how {siteName} —
-        free and entirely in your browser — compares to the leading desktop apps, Acrobat plugins and prepress suites.
+        What each of these tools is, what it is good at, and where doing the same job in a browser
+        tab — on your own machine, with nothing uploaded — differs from it. Fair to both sides, and
+        kept current as the products change.
       </p>
       <div className="gallery-grid">
         {COMPETITORS.map((c) => (

@@ -200,64 +200,54 @@ export const HERO_LAYOUT_CHIPS = [
   'Color Convert', 'Merge PDF', 'Split PDF', 'Compress PDF', 'Repair PDF',
 ];
 
-// Audience cards ("Built for every print job").
+// Job cards on the homepage ("One tool, most of the jobs on the board").
+// Each one is a job as it arrives at the counter, and the tool that does it.
 export const USE_CASES = [
-  { icon: '🖨️', title: 'Print shops & copy centers', blurb: 'Impose booklets, N-up sheets and gang runs for any digital or offset press, with crop marks and creep handled automatically.', link: 'Imposition software', href: '/tools/standard-sizes' },
-  { icon: '🎟️', title: 'Event & venue organizers', blurb: 'Print numbered, QR-coded tickets, passes and wristbands straight from a spreadsheet with variable data printing.', link: 'Ticket printing', href: '/tools/variable-data' },
-  { icon: '🧾', title: 'Label & sticker printers', blurb: 'Step-and-repeat one label across the whole sheet with exact gaps and cut marks, ready to die-cut.', link: 'Step & repeat', href: '/tools/step-and-repeat' },
-  { icon: '🎨', title: 'Design & marketing studios', blurb: 'Gang business cards, flyers and brochures many-up on a single sheet, trimmed clean and ready for the press.', link: 'Card imposition', href: '/tools/business-cards' },
-  { icon: '🎓', title: 'Schools, churches & clubs', blurb: 'Turn programs, newsletters and orders of service into saddle-stitch booklets that fold and staple in the right order.', link: 'Booklet imposition', href: '/tools/booklet' },
-  { icon: '📖', title: 'Zine & indie publishers', blurb: 'Fold an 8-page mini-zine from a single sheet. The pages reorder themselves, so one print, one fold and one cut is all it takes.', link: 'Make a zine', href: '/tools/zine' },
+  { icon: '🗞️', title: 'A 24-page programme by Friday', blurb: 'Drop the pages in, choose saddle stitch, and the sheets come out with the signatures in order and creep worked in, ready to fold and staple.', link: 'Booklet imposition', href: '/tools/booklet' },
+  { icon: '🎟️', title: 'Five hundred numbered tickets', blurb: 'Load a CSV, place one ticket design, and get serialised sheets with a QR code on every stub and stacks that cut in sequence.', link: 'Variable data', href: '/tools/variable-data' },
+  { icon: '🏷️', title: 'A sheet of die-cut labels', blurb: 'Repeat one label to fill the sheet at exact gaps, then add the cut contour and registration the cutter wants.', link: 'Step and repeat', href: '/tools/step-and-repeat' },
+  { icon: '💳', title: 'Business cards, ten up', blurb: 'Set the card size and bleed, gang them onto 12 × 18 or SRA3, and send the sheet to the guillotine with its cut marks.', link: 'Card sheets', href: '/tools/business-cards' },
+  { icon: '📚', title: 'A perfect-bound catalogue', blurb: 'Signatures with the spine allowance already worked out, for a squared-back binder rather than a stapler.', link: 'Perfect binding', href: '/tools/perfect-bound-book' },
+  { icon: '🖼️', title: 'A wall poster on an office printer', blurb: 'Tile a large-format file across Letter or A4 sheets with overlap and alignment marks, trim and tape.', link: 'Tiled posters', href: '/tools/tiled-poster' },
 ];
 
-// "Why print pros choose ImpositionPDF" feature cards.
+// The six things worth knowing before you open it ("Built the way a press room works").
 export const WHY_CARDS = [
-  { icon: '🖨️', title: 'Real imposition, not PDF editing', blurb: "Saddle-stitch and perfect-bound booklets, n-up, step and repeat, cut and stack and gang sheets: the print layouts generic PDF tools can't do." },
-  { icon: '🔒', title: 'Private by design', blurb: 'Files never leave your device. Every page is imposed locally in your browser, with nothing uploaded to a server.' },
-  { icon: '🗔', title: 'No install, any browser', blurb: 'Open it on Mac, Windows, Linux or ChromeOS and start imposing instantly. No downloads, no plug-ins, no account required.' },
-  { icon: '✂️', title: 'Print-ready in one click', blurb: 'Add bleed, crop, cut and registration marks automatically, so every job trims clean and goes straight to press.' },
-  { icon: '🎨', title: 'Accurate CMYK color', blurb: 'Convert RGB to CMYK with real ICC profiles, soft-proofing and gamut warnings, so what you proof is what prints.' },
-  { icon: '📐', title: 'Every standard size', blurb: '19 presets including Letter, A4, Tabloid, SRA3 and business cards, or enter any custom sheet size.' },
+  { icon: '🧭', title: 'Built for the press sheet, not the screen', blurb: 'Booklet signatures with creep, N-up grids, step and repeat, cut and stack, gang sheets, dielines and tiled posters: layouts that exist because a press, a folder and a guillotine exist.' },
+  { icon: '🔒', title: 'Your files stay on your machine', blurb: 'Every page is read, imposed and written back by your own browser. There is no upload step and no server that ever sees a customer’s job.' },
+  { icon: '🌐', title: 'Nothing to install, nothing to license', blurb: 'Open a tab on Windows, macOS, Linux or a Chromebook. No plug-in, no dongle, no per-seat licence, and no account needed to try it.' },
+  { icon: '✂️', title: 'Marks the bindery can use', blurb: 'Crop, bleed, fold, collating, lay and registration marks, colour bars and slug lines, placed in the margins where they belong so nothing prints on the piece next door.' },
+  { icon: '🔍', title: 'Preflight before you commit paper', blurb: 'Low resolution, the wrong colour space, missing bleed, unembedded fonts, hairlines and page counts that will not fold — flagged while the sheet is still on screen.' },
+  { icon: '🧾', title: 'Numbers, names and codes from a spreadsheet', blurb: 'Serialised tickets, badges, coupons and labels from a CSV, a barcode or QR code on each record, and cut-and-stack ordering so the stacks come off the cutter in sequence.' },
 ];
 
-// FAQ (homepage accordion).
+// Homepage FAQ. Written from how the product actually behaves — see the
+// tools above and the plugin — not from a list of search phrases.
 export const FAQ = [
-  { q: 'What is PDF imposition?', a: 'Imposition is arranging a document’s individual pages onto a larger press sheet in the exact order and position a printer needs, so that after printing, folding and cutting, the pages end up in the right sequence.' },
-  { q: 'Is ImpositionPDF an imposition program?', a: 'Yes. ImpositionPDF is browser-based imposition software: booklets, N-up, step-and-repeat, cut-and-stack, gang sheets, dielines and prepress marks — all running locally in your browser.' },
-  { q: 'What does it mean to impose a PDF?', a: 'To impose a PDF is to place its pages onto a press sheet with the correct rotation, order, margins, gutters and marks so the printed sheet folds and trims into a finished product.' },
-  { q: 'How do I impose a PDF?', a: 'Open ImpositionPDF, drop in your PDF, pick a layout (booklet, N-up, step & repeat…), set the sheet size, margins, bleed and marks, preview the result and export a print-ready PDF.' },
-  { q: 'Can I impose a PDF online for free?', a: 'Yes. The free tier lets you use every tool in the browser. Pro removes download cooldowns for unlimited output.' },
-  { q: "What's the difference between imposition and prepress?", a: 'Prepress is everything that prepares a file for printing — color conversion, preflight, marks, trapping. Imposition is the specific prepress step of laying pages out on the press sheet.' },
-  { q: 'What is a printing signature?', a: 'A signature is a single sheet printed with multiple pages that, once folded, forms a section of a book — commonly 4, 8, 16 or 32 pages.' },
-  { q: 'What is the best free imposition software?', a: 'ImpositionPDF is a strong free, browser-based option: no install, no per-seat license, and files never leave your device.' },
-  { q: 'What is step-and-repeat printing?', a: 'Step-and-repeat places one design many times across a sheet with precise spacing and cut marks — ideal for business cards, labels and stickers.' },
-  { q: 'Is ImpositionPDF a good Fiery Impose or Quite Imposing alternative?', a: 'Yes. ImpositionPDF does booklets, N-up and step-and-repeat in the browser without the per-seat license cost of desktop imposers.' },
-  { q: 'How do I add bleed and crop marks to a PDF?', a: 'Use the Bleed & Crop Marks tool: set your bleed amount and mark length, and ImpositionPDF adds trim, bleed and crop marks around every page.' },
-  { q: 'How do I put multiple PDF pages on one sheet (N-up)?', a: 'Use the N-up / Grid tool: choose rows and columns, sheet size, gutters and margins, and ImpositionPDF arranges the pages onto each sheet.' },
-  { q: 'How do I make a booklet from a PDF?', a: 'Use the Booklet tool. It reorders pages into saddle-stitch or perfect-bound signatures with automatic creep compensation.' },
-  { q: 'How do I impose business cards for printing?', a: 'Use Business Cards / Step & Repeat: set the card size and bleed, and gang many cards per sheet with cut marks.' },
-  { q: 'Does ImpositionPDF do variable data printing (VDP)?', a: 'Yes. Upload a CSV and ImpositionPDF serializes tickets, vouchers, badges and labels — including a scannable QR code per record.' },
-  { q: 'What is cut-and-stack imposition?', a: 'Cut-and-stack lays out sequential numbers so that after printing, cutting and stacking, each stack is in consecutive order — used for numbered tickets and cards.' },
-  { q: 'What is the Expert grid for?', a: 'The Expert Grid gives full manual control over rows, columns, gutters, margins and per-cell placement for bespoke impositions.' },
-  { q: 'Can I run preflight checks on my PDF?', a: 'Yes. The Preflight Inspector checks resolution, color space, bleed, fonts, overprint and minimum line width before output.' },
-  { q: 'Does ImpositionPDF export JDF or cut files?', a: 'Yes. JDF / CIP4 export emits a CIP4 JDF 1.4 job ticket for your MIS or cutter workflow, and the Die Lines tool adds cut-contour spot toolpaths.' },
-  { q: 'Can I impose a PDF without Adobe Acrobat or InDesign?', a: 'Yes — ImpositionPDF runs entirely in your browser, no Adobe software required.' },
-  { q: 'How many pages should a booklet PDF have?', a: 'Saddle-stitch booklets need a page count divisible by 4. ImpositionPDF pads with blanks automatically if needed.' },
-  { q: 'Who is ImpositionPDF for?', a: 'Print shops, copy centers, designers, prepress operators, publishers, packaging and label printers — anyone preparing files for print.' },
-  { q: 'How does the browser-based tool work?', a: 'ImpositionPDF reads your file with the browser File API, imposes it in memory with pdf-lib, and hands back a downloadable PDF — nothing is uploaded.' },
-  { q: 'Is my file uploaded anywhere?', a: 'No. All processing is local to your browser. There is no server component that touches your document contents.' },
-  { q: 'What file types and sizes are supported?', a: 'PDF is the primary input; images and CSV are supported for photo layouts and variable data. Large files are handled in-browser subject to your device memory.' },
-  { q: 'Do I need Adobe Acrobat or any install?', a: 'No install of any kind. ImpositionPDF works in any modern browser on any operating system.' },
+  { q: 'Where does the imposition actually happen?', a: 'In the browser tab you have open. The PDF is parsed, the pages are placed and the new file is written by code running on your own computer. Nothing is sent anywhere to be processed.' },
+  { q: 'So what is the sign-in for?', a: 'Plans and download limits only. The free plan can use every tool; Pro lifts the cooldown between downloads and adds API access. Neither involves your documents.' },
+  { q: 'What kinds of layout can it produce?', a: 'Saddle-stitched and perfect-bound signatures, N-up grids, step and repeat, cut and stack, gang sheets, folded brochures, tiled posters, box and folder dielines, and per-cell custom impositions where the die dictates the positions.' },
+  { q: 'How does it deal with creep?', a: 'For folded work it shifts each nested spread inward by the paper thickness you give it, so the outer margins stay even after the booklet is trimmed.' },
+  { q: 'Can I set my own sheet size, margins and gutters?', a: 'Yes. There are presets for the common stocks, and every dimension on the sheet — margins, gutters, bleed, mark length and offset — is a field you can type into, in millimetres or inches.' },
+  { q: 'Which marks can it add?', a: 'Crop and bleed marks, registration targets, cutter and fold marks, collating and gathering marks for the bindery, OMR marks, lay marks, colour bars, running headers and footers, slug lines, and cut-contour spot colours for die cutting.' },
+  { q: 'Will it warn me if the file is not ready to print?', a: 'The preflight tool reports image resolution, colour space, missing bleed, fonts that are not embedded, hairlines below the minimum width, overprint settings and page counts that cannot be folded.' },
+  { q: 'Can it number tickets or put names on badges?', a: 'Yes. The variable-data tools take a CSV or spreadsheet and place one record per piece — serial numbers, names, seat numbers — with a QR, Code 128, DataMatrix or EAN-13 code if you want one.' },
+  { q: 'Does it produce anything my cutter or MIS can read?', a: 'It can write a CIP4 JDF job ticket alongside the sheet, and it can put cut lines on a named spot colour for cutting tables and plotters.' },
+  { q: 'Do I need Acrobat, InDesign or a plug-in?', a: 'No. It is a complete tool on its own. If you have a PDF and a browser, you have everything it needs.' },
+  { q: 'What can I bring in?', a: 'PDFs first of all; also JPEG and PNG images for photo and card layouts, and CSV or Excel files for variable data.' },
+  { q: 'Is there a limit on pages or file size?', a: 'Only your device’s memory, since the work happens there. Multi-hundred-page books are fine on an ordinary laptop; very large scanned files may be slow.' },
+  { q: 'Which browsers and systems does it run on?', a: 'Any current Chrome, Edge, Firefox or Safari, on Windows, macOS, Linux or ChromeOS. There is nothing to download.' },
+  { q: 'My booklet came out with pages upside down or out of order. Whose fault is that?', a: 'Almost always the duplex setting on the printer — long-edge versus short-edge flip. Print one test sheet, check the backs, and switch the setting rather than the file.' },
 ];
 
-// Guides (homepage "Popular imposition & prepress guides").
+// Guides shown on the homepage and /guide.
 export const GUIDES = [
-  { title: 'Prepress signature planning', blurb: 'Choose 4, 8, 16 or 32-page signatures and lay out books that fold and bind correctly.' },
-  { title: 'N-up printing guide', blurb: 'Place 2, 4 or 8 pages on a single sheet to save paper, with predictable spacing and marks.' },
-  { title: 'Free imposition software', blurb: 'Compare the best free, online imposition tools for booklets, N-up layouts and prepress.' },
-  { title: 'Best imposition software 2026', blurb: 'See how the top imposition tools compare for print shops and digital printing.' },
-  { title: 'Fix Acrobat booklet printing', blurb: 'Solve upside-down pages, wrong page order and duplex problems when printing booklets.' },
-  { title: 'Fiery Impose alternative', blurb: 'Do booklets, N-up and step-and-repeat in your browser, without the per-seat license cost.' },
+  { title: 'Reading a folded dummy', blurb: 'Fold a blank sheet, number the pages, unfold it. The quickest way to see why an imposed sheet looks scrambled and where creep pushes the inner pages.' },
+  { title: 'Bleed, trim and safe area in millimetres', blurb: 'How far to extend the art, how far to keep type back from the cut, and why 3 mm is the usual answer to both.' },
+  { title: 'Gutters for a slitter versus a guillotine', blurb: 'A slitting cutter steps one constant pitch; a guillotine cuts wherever you set the back gauge. The sheet has to be built for the machine you own.' },
+  { title: 'Choosing a signature size', blurb: 'Four, eight, sixteen or thirty-two pages per sheet, and what each choice costs in paper, folding time and binder capacity.' },
+  { title: 'Duplex settings that do not flip your backs', blurb: 'Long-edge or short-edge, mirrored back sheets, and the one test sheet that settles it for good.' },
+  { title: 'Getting a PDF ready for a RIP', blurb: 'Embedded fonts, CMYK with an output intent, hairlines, overprint, and the handful of checks worth running before a plate is made.' },
 ];
 
 // Reviews (homepage testimonials).
@@ -273,21 +263,16 @@ export const REVIEWS = [
   { stars: 5, body: 'Odd trim sizes and mixed orientations are where most tools give up. The custom impose grid let me place each cell exactly where the die needed it. Nothing else I tried could do it.', name: 'Viktor Petrov', role: 'Packaging & dieline specialist' },
 ];
 
-// Footer "COMPARE & ALTERNATIVES" links.
+// Comparison pages, by competitor name. Each has a real page at /compare/<slug>
+// (see lib/compare.ts); the labels are matched to it by name.
 export const COMPARE_LINKS = [
-  'ImpositionPDF vs Quite Imposing Plus', 'ImpositionPDF vs PDF Snake', 'ImpositionPDF vs Fiery Impose',
-  'ImpositionPDF vs Montax Imposer', 'ImpositionPDF vs Imposition Studio', 'Quite Imposing alternative',
-  'PDFsnake alternative', 'Montax Imposer alternative', 'Imposition Wizard alternative',
-  'Imposer Pro alternative', 'imPRESS Studio alternative', 'DevaliPI alternative',
-  'Sejda N-up alternative', 'Online2PDF booklet alternative', 'PDF24 pages-per-sheet alternative',
-  'Quark imposition alternative', 'InBooklet alternative', 'BookletCreator alternative',
+  'Imposition Wizard', 'Quite Imposing', 'Montax Imposer', 'Kodak Preps', 'PDFsam', 'callas pdfToolbox',
 ];
 
-// Footer "POPULAR GUIDES" links.
+// Further guide topics, listed on the homepage and /guide.
 export const POPULAR_GUIDE_LINKS = [
-  'Best imposition software 2026', 'Best prepress software 2026', 'Imposition software for PDF',
-  'Free imposition software', 'How to impose a PDF for printing', 'How to print a booklet from PDF',
-  'N-up printing guide', 'Step & repeat printing guide', 'Gang run imposition guide',
-  'Main prepress software options', 'Color management for print', 'How to tile large-format prints',
-  'Creep compensation explained', 'JDF / CIP4 cutting workflow',
+  'Saddle stitch or perfect binding?', 'How creep compensation works', 'N-up sheets that trim clean',
+  'Step and repeat for labels and stickers', 'Numbering tickets from a spreadsheet',
+  'Cut-and-stack ordering explained', 'Tiling a poster across small sheets',
+  'Registration for two-sided work', 'Reading a preflight report', 'JDF job tickets for the cutter',
 ];

@@ -24,10 +24,10 @@ export default function OpengraphImage() {
           <div style={{ fontSize: 44, fontWeight: 800 }}>{siteName}</div>
         </div>
         <div style={{ fontSize: 68, fontWeight: 800, lineHeight: 1.05, letterSpacing: -1.5 }}>
-          Free online PDF imposition & prepress
+          Press sheets from PDFs, in your browser
         </div>
         <div style={{ fontSize: 30, marginTop: 28, color: '#c9c4ef', maxWidth: 900 }}>
-          Booklets · N-up · step &amp; repeat · gang sheets · comics · trade paperbacks — crop marks, bleed &amp; registration, all in your browser.
+          Booklets · N-up · step &amp; repeat · gang sheets · tiled posters · numbered tickets — imposed on your own machine, nothing uploaded.
         </div>
       </div>
     ),

@@ -7,7 +7,7 @@ import { Analytics } from '@/components/Analytics';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: `${siteName} — Free online PDF imposition & prepress software`,
+    default: `${siteName} — press sheets from PDFs, in your browser`,
     template: `%s · ${siteName}`,
   },
   description: seoDescription,
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName,
-    title: `${siteName} — Free online PDF imposition software`,
+    title: `${siteName} — press sheets from PDFs, in your browser`,
     description: seoDescription,
     url: siteUrl,
     locale: 'en_US',
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${siteName} — Free online PDF imposition software`,
+    title: `${siteName} — press sheets from PDFs, in your browser`,
     description: seoDescription,
   },
   icons: { icon: '/favicon.svg' },
