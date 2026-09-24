@@ -55,11 +55,11 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
         <span>{CATEGORY_LABEL[tool.category]}</span>
       </div>
 
-      <div className="grid-2" style={{ alignItems: 'center', gap: 40 }}>
+      <div className="tool-hero">
         <div>
           <div className="eyebrow">{CATEGORY_LABEL[tool.category]}</div>
-          <h1 style={{ fontSize: 'clamp(32px,4.4vw,48px)', marginBottom: 16 }}>{tool.name}</h1>
-          <p className="muted" style={{ fontSize: 18, marginBottom: 24 }}>{tool.blurb}</p>
+          <h1>{tool.name}</h1>
+          <p className="lede">{tool.blurb}</p>
 
           {!tool.inPlugin && (
             <div className="form-note" style={{ marginBottom: 18 }}>
@@ -80,8 +80,8 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
           </div>
         </div>
 
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <div className="gallery-thumb" style={{ aspectRatio: '4 / 3' }}>
+        <div className="tool-figure">
+          <div className="gallery-thumb">
             <ToolMockup slug={tool.slug} category={tool.category} />
           </div>
         </div>
@@ -89,7 +89,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
 
       {related.length > 0 && (
         <div className="section">
-          <h2 style={{ fontSize: 24, marginBottom: 22 }}>Related tools</h2>
+          <h3 className="gallery-block-title">Related tools <small>{CATEGORY_LABEL[tool.category]}</small></h3>
           <div className="gallery-grid">
             {related.map((t) => (
               <Link key={t.slug} href={toolAppHref(t.slug)} className="gallery-card card">

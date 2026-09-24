@@ -10,13 +10,15 @@ export const metadata = pageMetadata({
 
 export default function ContactPage() {
   return (
-    <div className="container" style={{ maxWidth: 760, padding: '64px 24px 90px' }}>
+    <div className="container" style={{ maxWidth: 780, paddingBottom: 90 }}>
+      <div className="page-hero">
       <div className="eyebrow">Contact</div>
-      <h1 style={{ fontSize: 'clamp(30px,4vw,42px)', marginBottom: 14 }}>Get in touch</h1>
-      <p className="muted" style={{ fontSize: 17, marginBottom: 34, maxWidth: 560 }}>
+      <h1>Talk to a person.</h1>
+      <p className="lede">
         Questions about imposition, Pro billing, or team licensing? Send a message and it
         reaches us directly — every submission is delivered by email and logged securely.
       </p>
+      </div>
       <p className="muted" style={{ fontSize: 16, marginBottom: 28 }}>
         Prefer to talk? Call us at{' '}
         <a href={siteContact.phoneHref} style={{ color: 'var(--brand, #6d5efc)', fontWeight: 600 }}>

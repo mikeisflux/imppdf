@@ -41,13 +41,15 @@ export default async function PricingPage() {
   ];
 
   return (
-    <div className="container" style={{ padding: '64px 24px 40px' }}>
+    <div className="container">
+      <div className="page-hero">
       <div className="eyebrow">Pricing</div>
-      <h1 style={{ fontSize: 'clamp(32px,4.4vw,46px)', marginBottom: 14 }}>Start free, upgrade when you need more</h1>
-      <p className="muted" style={{ fontSize: 17, maxWidth: 620, marginBottom: 12 }}>
+      <h1>Free to use. Pro when the downloads pile up.</h1>
+      <p className="lede">
         Use the full app free in your browser. Upgrade to Pro for unlimited, cooldown-free
         downloads. Plans are billed in {pricing.currency} and processed securely by PayPal.
       </p>
+      </div>
 
       {/* Plans */}
       <div className="plan-grid" style={{ marginTop: 34 }}>

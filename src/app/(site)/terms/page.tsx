@@ -8,9 +8,12 @@ export const metadata = pageMetadata({
 
 export default function TermsPage() {
   return (
-    <div className="container" style={{ maxWidth: 780, padding: '64px 24px 40px' }}>
-      <h1 style={{ fontSize: 'clamp(30px,4vw,42px)', marginBottom: 8 }}>Terms of Service</h1>
-      <p className="muted" style={{ marginBottom: 30 }}>Last updated 2026</p>
+    <div className="container" style={{ maxWidth: 820, paddingBottom: 60 }}>
+      <div className="page-hero">
+        <div className="eyebrow">Terms of Service · updated 2026</div>
+        <h1>Terms of Service</h1>
+        <p className="lede">The short version: use it for lawful printing, verify a sheet before you run it, and cancel whenever you like.</p>
+      </div>
 
       {[
         ['Service', 'ImpositionPDF provides browser-based PDF imposition and prepress tools. The tool arranges and transforms existing PDF pages; it does not edit document content.'],
@@ -22,9 +25,9 @@ export default function TermsPage() {
         ['Disclaimer', 'The service is provided “as is”. Always verify imposed output before committing to a print run. We are not liable for print costs arising from files exported through the tool.'],
         ['Changes', 'We may update these terms from time to time. Continued use of the service constitutes acceptance of the updated terms.'],
       ].map(([t, b]) => (
-        <div key={t} style={{ marginBottom: 26 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 8 }}>{t}</h2>
-          <p className="muted" style={{ lineHeight: 1.7 }}>{b}</p>
+        <div key={t} className="legal-row">
+          <h2>{t}</h2>
+          <p>{b}</p>
         </div>
       ))}
     </div>

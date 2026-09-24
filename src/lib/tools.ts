@@ -203,22 +203,22 @@ export const HERO_LAYOUT_CHIPS = [
 // Job cards on the homepage ("One tool, most of the jobs on the board").
 // Each one is a job as it arrives at the counter, and the tool that does it.
 export const USE_CASES = [
-  { icon: '🗞️', title: 'A 24-page programme by Friday', blurb: 'Drop the pages in, choose saddle stitch, and the sheets come out with the signatures in order and creep worked in, ready to fold and staple.', link: 'Booklet imposition', href: '/tools/booklet' },
-  { icon: '🎟️', title: 'Five hundred numbered tickets', blurb: 'Load a CSV, place one ticket design, and get serialised sheets with a QR code on every stub and stacks that cut in sequence.', link: 'Variable data', href: '/tools/variable-data' },
-  { icon: '🏷️', title: 'A sheet of die-cut labels', blurb: 'Repeat one label to fill the sheet at exact gaps, then add the cut contour and registration the cutter wants.', link: 'Step and repeat', href: '/tools/step-and-repeat' },
-  { icon: '💳', title: 'Business cards, ten up', blurb: 'Set the card size and bleed, gang them onto 12 × 18 or SRA3, and send the sheet to the guillotine with its cut marks.', link: 'Card sheets', href: '/tools/business-cards' },
-  { icon: '📚', title: 'A perfect-bound catalogue', blurb: 'Signatures with the spine allowance already worked out, for a squared-back binder rather than a stapler.', link: 'Perfect binding', href: '/tools/perfect-bound-book' },
-  { icon: '🖼️', title: 'A wall poster on an office printer', blurb: 'Tile a large-format file across Letter or A4 sheets with overlap and alignment marks, trim and tape.', link: 'Tiled posters', href: '/tools/tiled-poster' },
+  { title: 'A 24-page programme by Friday', blurb: 'Drop the pages in, choose saddle stitch, and the sheets come out with the signatures in order and creep worked in, ready to fold and staple.', link: 'Booklet imposition', href: '/tools/booklet' },
+  { title: 'Five hundred numbered tickets', blurb: 'Load a CSV, place one ticket design, and get serialised sheets with a QR code on every stub and stacks that cut in sequence.', link: 'Variable data', href: '/tools/variable-data' },
+  { title: 'A sheet of die-cut labels', blurb: 'Repeat one label to fill the sheet at exact gaps, then add the cut contour and registration the cutter wants.', link: 'Step and repeat', href: '/tools/step-and-repeat' },
+  { title: 'Business cards, ten up', blurb: 'Set the card size and bleed, gang them onto 12 × 18 or SRA3, and send the sheet to the guillotine with its cut marks.', link: 'Card sheets', href: '/tools/business-cards' },
+  { title: 'A perfect-bound catalogue', blurb: 'Signatures with the spine allowance already worked out, for a squared-back binder rather than a stapler.', link: 'Perfect binding', href: '/tools/perfect-bound-book' },
+  { title: 'A wall poster on an office printer', blurb: 'Tile a large-format file across Letter or A4 sheets with overlap and alignment marks, trim and tape.', link: 'Tiled posters', href: '/tools/tiled-poster' },
 ];
 
 // The six things worth knowing before you open it ("Built the way a press room works").
 export const WHY_CARDS = [
-  { icon: '🧭', title: 'Built for the press sheet, not the screen', blurb: 'Booklet signatures with creep, N-up grids, step and repeat, cut and stack, gang sheets, dielines and tiled posters: layouts that exist because a press, a folder and a guillotine exist.' },
-  { icon: '🔒', title: 'Your files stay on your machine', blurb: 'Every page is read, imposed and written back by your own browser. There is no upload step and no server that ever sees a customer’s job.' },
-  { icon: '🌐', title: 'Nothing to install, nothing to license', blurb: 'Open a tab on Windows, macOS, Linux or a Chromebook. No plug-in, no dongle, no per-seat licence, and no account needed to try it.' },
-  { icon: '✂️', title: 'Marks the bindery can use', blurb: 'Crop, bleed, fold, collating, lay and registration marks, colour bars and slug lines, placed in the margins where they belong so nothing prints on the piece next door.' },
-  { icon: '🔍', title: 'Preflight before you commit paper', blurb: 'Low resolution, the wrong colour space, missing bleed, unembedded fonts, hairlines and page counts that will not fold — flagged while the sheet is still on screen.' },
-  { icon: '🧾', title: 'Numbers, names and codes from a spreadsheet', blurb: 'Serialised tickets, badges, coupons and labels from a CSV, a barcode or QR code on each record, and cut-and-stack ordering so the stacks come off the cutter in sequence.' },
+  { title: 'Built for the press sheet, not the screen', blurb: 'Booklet signatures with creep, N-up grids, step and repeat, cut and stack, gang sheets, dielines and tiled posters: layouts that exist because a press, a folder and a guillotine exist.' },
+  { title: 'Your files stay on your machine', blurb: 'Every page is read, imposed and written back by your own browser. There is no upload step and no server that ever sees a customer’s job.' },
+  { title: 'Nothing to install, nothing to license', blurb: 'Open a tab on Windows, macOS, Linux or a Chromebook. No plug-in, no dongle, no per-seat licence, and no account needed to try it.' },
+  { title: 'Marks the bindery can use', blurb: 'Crop, bleed, fold, collating, lay and registration marks, colour bars and slug lines, placed in the margins where they belong so nothing prints on the piece next door.' },
+  { title: 'Preflight before you commit paper', blurb: 'Low resolution, the wrong colour space, missing bleed, unembedded fonts, hairlines and page counts that will not fold — flagged while the sheet is still on screen.' },
+  { title: 'Numbers, names and codes from a spreadsheet', blurb: 'Serialised tickets, badges, coupons and labels from a CSV, a barcode or QR code on each record, and cut-and-stack ordering so the stacks come off the cutter in sequence.' },
 ];
 
 // Homepage FAQ. Written from how the product actually behaves — see the
@@ -248,19 +248,6 @@ export const GUIDES = [
   { title: 'Choosing a signature size', blurb: 'Four, eight, sixteen or thirty-two pages per sheet, and what each choice costs in paper, folding time and binder capacity.' },
   { title: 'Duplex settings that do not flip your backs', blurb: 'Long-edge or short-edge, mirrored back sheets, and the one test sheet that settles it for good.' },
   { title: 'Getting a PDF ready for a RIP', blurb: 'Embedded fonts, CMYK with an output intent, hairlines, overprint, and the handful of checks worth running before a plate is made.' },
-];
-
-// Reviews (homepage testimonials).
-export const REVIEWS = [
-  { stars: 5, body: "Our shop used to keep one seat of desktop imposition software just for booklets. We cancelled it. ImpositionPDF handles the saddle-stitch and N-up jobs in the browser and the whole counter team can use it.", name: 'Greg Halstead', role: 'Owner, neighborhood copy shop' },
-  { stars: 5, body: "I lay out comic and manga interiors and the page order always tripped up the printer. Now I drop one PDF, pick right-to-left, and the signatures come out correct the first time.", name: 'Priya Nair', role: 'Indie comics publisher' },
-  { stars: 4, body: 'Ganging business cards used to mean fighting with a template. I set the card size and bleed, it fills the sheet with cut marks, and I send it straight to the cutter. Wish it remembered my presets.', name: 'Marcus Feldt', role: 'Trade printer' },
-  { stars: 5, body: "The live preview is the whole thing for me. I can see creep and bleed problems before I burn a plate instead of after. It has genuinely saved us reprints.", name: 'Elena Vasquez', role: 'Prepress operator' },
-  { stars: 5, body: 'We run a small sticker business and step-and-repeat plus cut contours used to need an Illustrator script. Drop the art, set the grid, done — it paid for itself the first week.', name: 'Tunde Bakare', role: 'Sticker & label maker' },
-  { stars: 5, body: "Perfect-bound signatures with the spine creep handled automatically is exactly what our catalog work needed. No account required to test it either, which is how it got past our IT.", name: 'Johanna Krause', role: 'Production manager, book printer' },
-  { stars: 4, body: 'I do a lot of quick flyers and postcards N-up on 12×18. Set rows and columns, add registration marks, export. Fast and predictable. Would love more paper-size presets.', name: 'Sam O’Doherty', role: 'Quick-print operator' },
-  { stars: 5, body: 'Runs on my laptop, my shop PC, even a Chromebook, and the files never leave the machine — that mattered for a couple of confidential jobs. Same key works for the API too.', name: 'Naomi Sotelo', role: 'Freelance designer' },
-  { stars: 5, body: 'Odd trim sizes and mixed orientations are where most tools give up. The custom impose grid let me place each cell exactly where the die needed it. Nothing else I tried could do it.', name: 'Viktor Petrov', role: 'Packaging & dieline specialist' },
 ];
 
 // Comparison pages, by competitor name. Each has a real page at /compare/<slug>

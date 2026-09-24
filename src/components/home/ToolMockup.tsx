@@ -2,9 +2,9 @@
 // with sensible per-category fallbacks so every tool has a distinctive thumbnail.
 import type { ToolCategory } from '@/lib/tools';
 
-const SHEET = { fill: '#f6f6f8', stroke: '#e2e2e8' };
-const LINE = '#d8d8e0';
-const ACCENT = '#7c5cff';
+const SHEET = { fill: '#ffffff', stroke: '#d6d0c2' };
+const LINE = '#d6d0c2';
+const ACCENT = '#ff4f1f';
 
 function Frame({ children }: { children: React.ReactNode }) {
   return (
@@ -54,7 +54,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
           {Array.from({ length: 3 }).map((_, r) =>
             Array.from({ length: 4 }).map((_, c) => (
               <rect key={`${r}-${c}`} x={40 + c * 32} y={24 + r * 36} width={26} height={30} rx={3}
-                fill="#ececf1" stroke="#dcdce4" />
+                fill="#f4f1ea" stroke="#d6d0c2" />
             )),
           )}
         </Frame>
@@ -66,10 +66,10 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
           <line x1="100" y1="24" x2="100" y2="126" stroke={ACCENT} strokeWidth="1.5" strokeDasharray="4 4" />
           {[0, 1, 2].map((r) => (
             <g key={r}>
-              <rect x="54" y={30 + r * 32} width="34" height="24" rx="3" fill="#ececf1" stroke="#dcdce4" />
-              <text x="71" y={46 + r * 32} fontSize="11" fill="#9a9aa5" textAnchor="middle">{r + 1}</text>
-              <rect x="112" y={30 + r * 32} width="34" height="24" rx="3" fill="#ececf1" stroke="#dcdce4" />
-              <text x="129" y={46 + r * 32} fontSize="11" fill="#9a9aa5" textAnchor="middle">{r + 4}</text>
+              <rect x="54" y={30 + r * 32} width="34" height="24" rx="3" fill="#f4f1ea" stroke="#d6d0c2" />
+              <text x="71" y={46 + r * 32} fontSize="11" fill="#948e82" textAnchor="middle">{r + 1}</text>
+              <rect x="112" y={30 + r * 32} width="34" height="24" rx="3" fill="#f4f1ea" stroke="#d6d0c2" />
+              <text x="129" y={46 + r * 32} fontSize="11" fill="#948e82" textAnchor="middle">{r + 4}</text>
             </g>
           ))}
         </Frame>
@@ -83,10 +83,10 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
           {[0, 1].map((r) =>
             [0, 1].map((c) => (
               <g key={`${r}-${c}`}>
-                <rect x={40 + c * 66} y={30 + r * 52} width={52} height={38} rx={4} fill="#fff" stroke="#dcdce4" />
+                <rect x={40 + c * 66} y={30 + r * 52} width={52} height={38} rx={4} fill="#fff" stroke="#d6d0c2" />
                 <rect x={46 + c * 66} y={36 + r * 52} width={18} height={5} rx={2} fill={ACCENT} opacity="0.6" />
                 <rect x={46 + c * 66} y={46 + r * 52} width={30} height={3} rx={1.5} fill={LINE} />
-                <rect x={72 + c * 66} y={50 + r * 52} width={14} height={14} rx={2} fill="#2a2a30" />
+                <rect x={72 + c * 66} y={50 + r * 52} width={14} height={14} rx={2} fill="#14120f" />
               </g>
             )),
           )}
@@ -103,7 +103,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
               const active = r === 2 && c === 2;
               return (
                 <rect key={`${r}-${c}`} x={40 + c * 18} y={44 + r * 20} width={14} height={16} rx={2}
-                  fill={active ? ACCENT : '#ececf1'} stroke="#dcdce4" />
+                  fill={active ? ACCENT : '#f4f1ea'} stroke="#d6d0c2" />
               );
             }),
           )}
@@ -112,7 +112,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
     case 'tiled-poster':
       return (
         <Frame>
-          <rect x="55" y="30" width="90" height="90" rx="3" fill="#f0eefb" stroke={ACCENT} strokeOpacity="0.5" strokeDasharray="4 3" />
+          <rect x="55" y="30" width="90" height="90" rx="3" fill="#fff1eb" stroke={ACCENT} strokeOpacity="0.5" strokeDasharray="4 3" />
           <line x1="100" y1="30" x2="100" y2="120" stroke={ACCENT} strokeWidth="1.2" strokeDasharray="3 3" />
           <line x1="55" y1="75" x2="145" y2="75" stroke={ACCENT} strokeWidth="1.2" strokeDasharray="3 3" />
         </Frame>
@@ -120,7 +120,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
     case 'packaging-dieline':
       return (
         <Frame>
-          <g stroke={ACCENT} strokeOpacity="0.55" strokeDasharray="4 3" fill="#f2f0fb">
+          <g stroke={ACCENT} strokeOpacity="0.55" strokeDasharray="4 3" fill="#fff1eb">
             <rect x="82" y="40" width="36" height="36" />
             <rect x="46" y="40" width="36" height="36" />
             <rect x="118" y="40" width="36" height="36" />
@@ -153,7 +153,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
         <Frame>
           <rect x="40" y="24" width="120" height="102" rx="3" fill={SHEET.fill} stroke={SHEET.stroke} />
           {[[40, 24], [160, 24], [40, 126], [160, 126]].map(([x, y], i) => (
-            <g key={i} stroke="#2a2a30" strokeWidth="1">
+            <g key={i} stroke="#14120f" strokeWidth="1">
               <line x1={x - 8} y1={y} x2={x + 8} y2={y} />
               <line x1={x} y1={y - 8} x2={x} y2={y + 8} />
             </g>
@@ -169,7 +169,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
           <line x1="100" y1="20" x2="100" y2="130" stroke={ACCENT} strokeWidth="1" strokeDasharray="4 3" />
           <line x1="40" y1="75" x2="160" y2="75" stroke={ACCENT} strokeWidth="1" strokeDasharray="4 3" />
           {[[100, 22], [100, 128], [42, 75], [158, 75]].map(([x, y], i) => (
-            <g key={i}><circle cx={x} cy={y} r="5" fill="#1a1a2e" /><circle cx={x} cy={y} r="2" fill="#fff" /></g>
+            <g key={i}><circle cx={x} cy={y} r="5" fill="#14120f" /><circle cx={x} cy={y} r="2" fill="#fff" /></g>
           ))}
         </Frame>
       );
@@ -180,7 +180,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
           <rect x="46" y="20" width="108" height="110" rx="4" fill={SHEET.fill} stroke={SHEET.stroke} />
           {textLines(58, 36, 70, 7)}
           <g>
-            {['#22d3ee', '#f472b6', '#facc15', '#1a1a1a'].map((c, i) => (
+            {['#00b4e6', '#e6007e', '#ffd400', '#14120f'].map((c, i) => (
               <rect key={i} x={110 + i * 11} y={112} width={10} height={10} fill={c} />
             ))}
           </g>
@@ -190,12 +190,12 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
       return (
         <Frame>
           <rect x="34" y="18" width="132" height="114" rx="5" fill={SHEET.fill} stroke={SHEET.stroke} />
-          <text x="46" y="36" fontSize="8" fontFamily="monospace" fill="#2a2a30" fontWeight="700">PREFLIGHT REPORT</text>
-          <rect x="120" y="28" width="38" height="12" rx="6" fill="#fde68a" />
+          <text x="46" y="36" fontSize="8" fontFamily="monospace" fill="#14120f" fontWeight="700">PREFLIGHT REPORT</text>
+          <rect x="120" y="28" width="38" height="12" rx="6" fill="#fff3bf" />
           {['Resolution', 'Color space', 'Bleed', 'Fonts', 'Overprint'].map((t, i) => (
             <g key={t}>
-              <circle cx="50" cy={54 + i * 15} r="3.5" fill={i === 2 ? '#f59e0b' : '#cbd5e1'} />
-              <text x="60" y={57 + i * 15} fontSize="7.5" fill="#6d6d7a" fontFamily="monospace">{t}</text>
+              <circle cx="50" cy={54 + i * 15} r="3.5" fill={i === 2 ? '#ff4f1f' : '#d6d0c2'} />
+              <text x="60" y={57 + i * 15} fontSize="7.5" fill="#6f6a60" fontFamily="monospace">{t}</text>
             </g>
           ))}
         </Frame>
@@ -206,10 +206,10 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
         <Frame>
           <rect x="60" y="30" width="90" height="54" rx="4" fill="#fff" stroke={SHEET.stroke} transform="rotate(6 100 55)" />
           <rect x="50" y="52" width="100" height="60" rx="4" fill="#fff" stroke={SHEET.stroke} />
-          <text x="60" y="70" fontSize="8" fontFamily="monospace" fill="#2a2a30" letterSpacing="1">ADMIT ONE</text>
-          <text x="132" y="70" fontSize="8" fontFamily="monospace" fill="#2a2a30">#00480</text>
+          <text x="60" y="70" fontSize="8" fontFamily="monospace" fill="#14120f" letterSpacing="1">ADMIT ONE</text>
+          <text x="132" y="70" fontSize="8" fontFamily="monospace" fill="#14120f">#00480</text>
           {Array.from({ length: 22 }).map((_, i) => (
-            <rect key={i} x={60 + i * 3.6} y={84} width={i % 3 ? 1.6 : 2.6} height={18} fill="#1a1a1a" />
+            <rect key={i} x={60 + i * 3.6} y={84} width={i % 3 ? 1.6 : 2.6} height={18} fill="#14120f" />
           ))}
         </Frame>
       );
@@ -287,8 +287,8 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
           <rect x="34" y="20" width="132" height="110" rx="5" fill={SHEET.fill} stroke={SHEET.stroke} />
           {[1, 2, 3, 4].map((n, i) => (
             <g key={n}>
-              <rect x={48 + i * 27} y="60" width="22" height="26" rx="3" fill="#ececf1" stroke="#dcdce4" />
-              <text x={59 + i * 27} y="77" fontSize="11" fill="#9a9aa5" textAnchor="middle">{n}</text>
+              <rect x={48 + i * 27} y="60" width="22" height="26" rx="3" fill="#f4f1ea" stroke="#d6d0c2" />
+              <text x={59 + i * 27} y="77" fontSize="11" fill="#948e82" textAnchor="middle">{n}</text>
             </g>
           ))}
           <text x="100" y="104" fontSize="8" fill={ACCENT} textAnchor="middle" fontFamily="monospace" letterSpacing="2">SHUFFLE</text>
@@ -298,7 +298,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
       return (
         <Frame>
           <rect x="40" y="20" width="120" height="110" rx="5" fill={SHEET.fill} stroke={SHEET.stroke} />
-          <rect x="86" y="62" width="28" height="26" rx="3" fill="#c9c9d2" />
+          <rect x="86" y="62" width="28" height="26" rx="3" fill="#d6d0c2" />
           <g fill={ACCENT}>
             <path d="M100 34 l6 8 h-12 z" /><path d="M100 116 l6 -8 h-12 z" />
             <path d="M52 75 l8 6 v-12 z" /><path d="M148 75 l-8 6 v-12 z" />
@@ -309,10 +309,10 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
       return (
         <Frame>
           <rect x="40" y="24" width="120" height="102" rx="5" fill={SHEET.fill} stroke={SHEET.stroke} />
-          <text x="52" y="42" fontSize="8" fontFamily="monospace" fill="#2a2a30" fontWeight="700">LAYERS</text>
+          <text x="52" y="42" fontSize="8" fontFamily="monospace" fill="#14120f" fontWeight="700">LAYERS</text>
           {[true, false, true, false].map((on, i) => (
             <g key={i}>
-              <rect x="52" y={52 + i * 16} width="18" height="10" rx="5" fill={on ? ACCENT : '#d8d8e0'} />
+              <rect x="52" y={52 + i * 16} width="18" height="10" rx="5" fill={on ? ACCENT : '#d6d0c2'} />
               <circle cx={on ? 65 : 57} cy={57 + i * 16} r="4" fill="#fff" />
               <rect x="78" y={54 + i * 16} width="70" height="6" rx="3" fill={LINE} />
             </g>
@@ -324,9 +324,9 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
         <Frame>
           <rect x="46" y="18" width="108" height="114" rx="5" fill={SHEET.fill} stroke={SHEET.stroke} />
           <text x="56" y="34" fontSize="8" fontFamily="monospace" fill={ACCENT} fontWeight="700">JDF</text>
-          <text x="150" y="34" fontSize="7" fontFamily="monospace" fill="#9a9aa5" textAnchor="end">job-0480.jdf</text>
+          <text x="150" y="34" fontSize="7" fontFamily="monospace" fill="#948e82" textAnchor="end">job-0480.jdf</text>
           {['Quantity', 'Stock', 'Trim size', 'Sides', 'Binding', 'Bleed'].map((t, i) => (
-            <text key={t} x="56" y={52 + i * 13} fontSize="7" fontFamily="monospace" fill="#6d6d7a">{t}</text>
+            <text key={t} x="56" y={52 + i * 13} fontSize="7" fontFamily="monospace" fill="#6f6a60">{t}</text>
           ))}
         </Frame>
       );
@@ -334,10 +334,10 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
       return (
         <Frame>
           <rect x="40" y="22" width="120" height="106" rx="5" fill={SHEET.fill} stroke={SHEET.stroke} />
-          <text x="52" y="40" fontSize="7.5" fontFamily="monospace" fill="#2a2a30" fontWeight="700">BATCH · 4 FILES</text>
+          <text x="52" y="40" fontSize="7.5" fontFamily="monospace" fill="#14120f" fontWeight="700">BATCH · 4 FILES</text>
           {[0, 1, 2, 3].map((i) => (
             <g key={i}>
-              <rect x="52" y={50 + i * 16} width="10" height="10" rx="2" fill="#e2e2e8" />
+              <rect x="52" y={50 + i * 16} width="10" height="10" rx="2" fill="#e1dccd" />
               <rect x="68" y={53 + i * 16} width={i === 3 ? 40 : 78} height="4" rx="2" fill={i < 2 ? ACCENT : LINE} />
             </g>
           ))}
@@ -349,7 +349,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
           <rect x="34" y="20" width="132" height="110" rx="5" fill={SHEET.fill} stroke={SHEET.stroke} />
           {[0, 1, 2].map((i) => (
             <rect key={i} x="44" y={30 + i * 26} width="22" height="22" rx="3"
-              fill={i === 1 ? '#fff' : '#ececf1'} stroke={i === 1 ? ACCENT : '#dcdce4'} strokeWidth={i === 1 ? 1.6 : 1} />
+              fill={i === 1 ? '#fff' : '#f4f1ea'} stroke={i === 1 ? ACCENT : '#d6d0c2'} strokeWidth={i === 1 ? 1.6 : 1} />
           ))}
           <rect x="78" y="34" width="76" height="90" rx="3" fill="#fff" stroke={SHEET.stroke} />
           <rect x="132" y="112" width="18" height="8" rx="2" fill={ACCENT} opacity="0.2" />
@@ -364,7 +364,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
             <rect x="30" y="18" width="140" height="114" rx="5" fill={SHEET.fill} stroke={SHEET.stroke} />
             {[0, 1].map((r) =>
               [0, 1, 2].map((c) => (
-                <rect key={`${r}-${c}`} x={42 + c * 42} y={30 + r * 52} width={34} height={40} rx={3} fill="#fff" stroke="#dcdce4" />
+                <rect key={`${r}-${c}`} x={42 + c * 42} y={30 + r * 52} width={34} height={40} rx={3} fill="#fff" stroke="#d6d0c2" />
               )),
             )}
           </Frame>
@@ -375,7 +375,7 @@ export function ToolMockup({ slug, category }: { slug: string; category: ToolCat
           <Frame>
             <rect x="46" y="20" width="108" height="110" rx="4" fill={SHEET.fill} stroke={SHEET.stroke} />
             {[[46, 20], [154, 20], [46, 130], [154, 130]].map(([x, y], i) => (
-              <g key={i} stroke="#2a2a30" strokeWidth="1">
+              <g key={i} stroke="#14120f" strokeWidth="1">
                 <line x1={x - 7} y1={y} x2={x + 7} y2={y} /><line x1={x} y1={y - 7} x2={x} y2={y + 7} />
               </g>
             ))}

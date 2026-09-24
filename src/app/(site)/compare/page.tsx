@@ -19,14 +19,16 @@ export const metadata: Metadata = {
 
 export default function CompareIndex() {
   return (
-    <div className="container" style={{ padding: '56px 24px 40px' }}>
+    <div className="container">
+      <div className="page-hero">
       <div className="eyebrow">Comparisons</div>
-      <h1 style={{ fontSize: 'clamp(30px,4.2vw,46px)', marginBottom: 14 }}>{siteName} vs the alternatives</h1>
-      <p className="muted" style={{ fontSize: 18, maxWidth: 720, marginBottom: 32 }}>
+      <h1>{siteName} against the alternatives.</h1>
+      <p className="lede">
         What each of these tools is, what it is good at, and where doing the same job in a browser
         tab — on your own machine, with nothing uploaded — differs from it. Fair to both sides, and
         kept current as the products change.
       </p>
+      </div>
       <div className="gallery-grid">
         {COMPETITORS.map((c) => (
           <Link key={c.slug} href={`/compare/${c.slug}`} className="gallery-card card" style={{ padding: 20 }}>

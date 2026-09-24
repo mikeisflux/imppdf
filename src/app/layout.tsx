@@ -1,8 +1,19 @@
 import type { Metadata } from 'next';
+import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { siteName, siteUrl } from '@/lib/config';
 import { seoDescription, seoKeywords, siteGraph } from '@/lib/seo';
 import { Analytics } from '@/components/Analytics';
+
+// Three faces, each with a job: Fraunces for the words that carry the page,
+// Inter for everything read at length, JetBrains Mono for the numbers a
+// printer actually cares about (215.9 × 279.4, 5.9 / 66.2, 1.5 mm).
+const fraunces = Fraunces({
+  subsets: ['latin'], style: ['normal', 'italic'], axes: ['opsz', 'SOFT'],
+  variable: '--font-fraunces', display: 'swap',
+});
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
+const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jbmono', display: 'swap' });
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -48,7 +59,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${fraunces.variable} ${inter.variable} ${mono.variable}`}>
       <head>
         <script
           type="application/ld+json"

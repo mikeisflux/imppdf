@@ -9,13 +9,16 @@ export const metadata = pageMetadata({
 
 export default function AboutPage() {
   return (
-    <div className="container" style={{ maxWidth: 780, padding: '64px 24px 40px' }}>
-      <h1 style={{ fontSize: 'clamp(32px,4.4vw,46px)', marginBottom: 18 }}>About ImpositionPDF</h1>
-      <p className="muted" style={{ fontSize: 18, marginBottom: 34 }}>
+    <div className="container" style={{ maxWidth: 820 }}>
+      <div className="page-hero">
+      <div className="eyebrow">About</div>
+      <h1>Made in a working print shop.</h1>
+      <p className="lede">
         ImpositionPDF began as the prepress tool of a small print shop that needed booklets to
         fold right, tickets to number themselves and card sheets to line up with the cutter it
         actually owned. It grew one job at a time, and it still does.
       </p>
+      </div>
 
       <Section title="What it does">
         It takes a finished PDF and lays its pages out on a press sheet: saddle-stitched and
@@ -57,8 +60,8 @@ export default function AboutPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 30 }}>
-      <h2 style={{ fontSize: 21, marginBottom: 10 }}>{title}</h2>
-      <p className="muted" style={{ fontSize: 15.5, lineHeight: 1.7 }}>{children}</p>
+      <h2 style={{ fontSize: 28, marginBottom: 10 }}>{title}</h2>
+      <p style={{ fontSize: 16.5, lineHeight: 1.7, color: 'var(--ink-2)' }}>{children}</p>
     </div>
   );
 }

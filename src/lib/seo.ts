@@ -101,9 +101,6 @@ export function softwareAppData() {
       'Gang sheets', 'Cut & stack numbering', 'Crop, bleed & registration marks',
       'Business cards, postcards, labels, hang tags', 'Comic book imposition', 'Variable data (CSV)',
     ],
-    aggregateRating: {
-      '@type': 'AggregateRating', ratingValue: '4.8', ratingCount: '126',
-    },
   };
 }
 

@@ -58,9 +58,11 @@ export default async function ComparePage({ params }: { params: Promise<{ slug: 
         <Link href="/compare" style={{ color: 'var(--muted)' }}>Compare</Link> › <span>vs {c.name}</span>
       </div>
 
+      <div className="page-hero" style={{ paddingTop: 24 }}>
       <div className="eyebrow">{c.kind} comparison</div>
-      <h1 style={{ fontSize: 'clamp(30px,4.2vw,46px)', marginBottom: 14 }}>{siteName} vs {c.name}</h1>
-      <p className="muted" style={{ fontSize: 18, maxWidth: 760, marginBottom: 22 }}>{c.intro}</p>
+      <h1>{siteName} vs {c.name}</h1>
+      <p className="lede">{c.intro}</p>
+      </div>
 
       <div className="row wrap" style={{ marginBottom: 34 }}>
         <Link href="/app" className="btn btn-primary btn-plain">Try {siteName} free <IconArrow width={16} height={16} /></Link>
