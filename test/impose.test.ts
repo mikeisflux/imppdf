@@ -232,22 +232,45 @@ test('replicateFill: rotates the image 90° when that packs more, output still o
   assert.equal(await pageCount(out), 1);
 });
 
-test('imposeDivinityBox: builds the 300×572mm flat with panels + white spot', async () => {
+test('imposeDivinityBox: builds the 300×575mm flat with panels + white spot', async () => {
   const { imposeDivinityBox } = await import('../src/lib/imposition-toolkit/impose.ts');
   const panel = (w: number, h: number) => pdfOf(1, w * 72 / 25.4, h * 72 / 25.4);
   const out = await imposeDivinityBox({
-    a: { bytes: await panel(306, 46.5) },
-    b: { bytes: await panel(306, 215) },
-    c: { bytes: await panel(306, 48) },
-    d: { bytes: await panel(306, 204) },
+    a: { bytes: await panel(306, 45) },
+    b: { bytes: await panel(306, 210) },
+    c: { bytes: await panel(306, 45) },
+    d: { bytes: await panel(306, 210) },
     whiteUnder: true, varnish: true, foldMarks: true,
   });
   const doc = await PDFDocument.load(out);
   assert.equal(doc.getPageCount(), 1);
   const s = doc.getPage(0).getSize();
-  // 306 mm wide: 300 trim + 3 mm bleed left+right (New_Box_Full template).
+  // 306 mm wide: 300 trim + 3 mm bleed left+right; 575 tall, no top/bottom bleed.
   assert.ok(Math.abs(s.width - 306 * 72 / 25.4) < 0.6, `sheet width 306mm (${s.width})`);
-  assert.ok(Math.abs(s.height - 572 * 72 / 25.4) < 0.6, `sheet height 572mm (${s.height})`);
+  assert.ok(Math.abs(s.height - 575 * 72 / 25.4) < 0.6, `sheet height 575mm (${s.height})`);
+});
+
+test('Divinity Box: panels 45/210/45/210/45 with 5 mm hard breaks that carry no art', async () => {
+  const { DIVINITY_BOX_PANELS, DIVINITY_BOX_BREAKS_MM, DIVINITY_BOX_SHEET_MM } = await import('../src/lib/imposition-toolkit/impose.ts');
+  assert.equal(DIVINITY_BOX_SHEET_MM.wMm, 306);
+  assert.equal(DIVINITY_BOX_SHEET_MM.hMm, 575);
+  // The spec, top = 0: A 0-45, B 50-260, C 265-310, D 315-525, E 530-575.
+  assert.deepEqual(DIVINITY_BOX_PANELS.map((p) => [p.topMm, p.topMm + p.hMm]), [[0, 45], [50, 260], [265, 310], [315, 525]]);
+  // Every break is exactly 5 mm and starts where the panel above ends.
+  assert.deepEqual(DIVINITY_BOX_BREAKS_MM, [
+    { topMm: 45, hMm: 5 }, { topMm: 260, hMm: 5 }, { topMm: 310, hMm: 5 }, { topMm: 525, hMm: 5 },
+  ]);
+  // No panel overlaps any break, and panel E (530-575) has no art at all.
+  for (const p of DIVINITY_BOX_PANELS) {
+    for (const b of DIVINITY_BOX_BREAKS_MM) {
+      const overlap = Math.min(p.topMm + p.hMm, b.topMm + b.hMm) - Math.max(p.topMm, b.topMm);
+      assert.ok(overlap <= 0, `panel ${p.label} reaches into the break at ${b.topMm}`);
+    }
+    assert.ok(p.topMm + p.hMm <= 525, `panel ${p.label} reaches panel E`);
+  }
+  // Panel A starts at the sheet edge and the last break ends where E begins.
+  assert.equal(DIVINITY_BOX_PANELS[0].topMm, 0);
+  assert.equal(525 + 5, 530);
 });
 
 test('chokePlane: white under-base pulls in by r px from every edge (choke trap)', () => {

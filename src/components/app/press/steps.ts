@@ -248,8 +248,8 @@ export function defaultSettings(type: StepType): StepSettings {
       // the art's native size with margins/marks reserved — never assumed.
       return { ...nupPreset({ sheetWIn: 12, sheetHIn: 18, cellWIn: 6.88, cellHIn: 10.5, bleedMode: 'fixed' }), replicate: true };
     case 'divinitybox':
-      // Fixed 306×572 mm box flat (trim 300 + 3 mm bleed L+R) with four
-      // printable panels (A–D). Each panel
+      // Fixed 306×575 mm box flat (trim 300 + 3 mm bleed L+R) with four
+      // printable panels (A–D) and 5 mm hard no-art breaks. Each panel
       // takes its own uploaded art; a white under-base (W1) prints behind every
       // panel because the box is black, with optional gloss varnish (V1).
       // foldMarks default OFF: this is a borderless, zero-bleed box — no crop,

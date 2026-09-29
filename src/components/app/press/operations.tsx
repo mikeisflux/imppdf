@@ -178,7 +178,7 @@ export const OP_GROUPS: OpGroup[] = [
   { label: '// PACKAGING', ops: [
     { id: 'boxcarton', label: 'Box / Carton', icon: 'cuttermarks', tip: 'Folding-carton die flat positioned for die-cutting.' },
     { id: 'presfolder', label: 'Presentation Folder', icon: 'folder', tip: 'Presentation folder die flat with pocket and glue tabs.' },
-    { id: 'divinitybox', label: 'Divinity Box', icon: 'divinityBoxIc', tip: 'The 300×572 mm box flat: upload art for panels A–D, with a white under-base (W1) and optional varnish (V1) spot layer for printing on black stock.' },
+    { id: 'divinitybox', label: 'Divinity Box', icon: 'divinityBoxIc', tip: 'The 300×575 mm box flat: upload art for panels A–D, with a white under-base (W1) and optional varnish (V1) spot layer for printing on black stock.' },
   ] },
   { label: '// ADVANCED', ops: [
     { id: 'preflight', label: 'PDF Preflight', icon: 'preflight', tip: 'Inspect page geometry, boxes and warnings before you impose.' },

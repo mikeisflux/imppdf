@@ -3475,24 +3475,22 @@ export async function addWhiteVarnish(bytes: Uint8Array, opts: WhiteVarnishOptio
   return doc.save();
 }
 
-// ── Divinity Box (fixed 300×572 mm flat, panels A–D + white/varnish spots) ──
-// The full flat box layout from the New_Box template: full-width panels stacked
-// top→bottom with 3 mm no-print fold gaps between them. Panel E is a no-print
-// glue tab. Each printable panel takes its own uploaded artwork. Because the box
+// ── Divinity Box (fixed 300×575 mm flat, panels A–D + white/varnish spots) ──
+// The full flat box layout: full-width panels stacked top→bottom with 5 mm
+// HARD no-print breaks between them. Panel E is a no-print glue tab. Each printable panel takes its own uploaded artwork. Because the box
 // is printed on black stock, a white under-base (spot "W1") goes behind every
 // panel, with an optional gloss varnish (spot "V1") on top.
 
-// Sheet per the owner's New_Box_Full template (2026-07): 306 × 572 mm INCLUDING
-// 3 mm bleed on the LEFT and RIGHT only (trim 300 × 572; no top/bottom bleed).
-// Artwork spans the full 306 so the side trim cuts through ink.
+// Sheet (owner spec, 2026-09-29): 306 × 575 mm INCLUDING 3 mm bleed on the
+// LEFT and RIGHT only (trim 300 × 575; no top/bottom bleed anywhere). Artwork
+// spans the full 306 so the side trim cuts through ink.
 const DBOX_TRIM_W_MM = 300, DBOX_BLEED_MM = 3;
-const DBOX_SHEET_W_MM = DBOX_TRIM_W_MM + 2 * DBOX_BLEED_MM, DBOX_SHEET_H_MM = 572;
-// Fold zones (owner spec, 2026-07-21): each fold is 5 mm WIDE, centered at
-// these positions (mm from the top, top = 0). Zones: 45-50, 257.5-262.5,
-// 307.5-312.5, 522.5-527.5. Sections between zones carry 3 mm bleed
-// top+bottom INTO the zones (adjacent bleeds overlap ~1 mm at each fold
-// center — the TIFF composite is a UNION, opaque pixels only).
-const DBOX_FOLDS_MM = [47.5, 260, 310, 525];
+const DBOX_SHEET_W_MM = DBOX_TRIM_W_MM + 2 * DBOX_BLEED_MM, DBOX_SHEET_H_MM = 575;
+// Panels 45 / 210 / 45 / 210 / 45 with 5 mm HARD BREAKS between them — NO ART
+// in a break, ever. Breaks: 45-50, 260-265, 310-315, 525-530 (mm from the
+// top, top = 0); the fold ticks sit on their centers.
+const DBOX_BREAK_MM = 5;
+const DBOX_FOLDS_MM = [47.5, 262.5, 312.5, 527.5];
 // CHOKE: the white under-base is pulled IN this many pixels from every art edge
 // so slight press misregistration never shows a white halo past the printed art
 // on the black box. (A "choke" = underprint shrunk relative to the art it sits
@@ -3629,17 +3627,25 @@ export function chokePlane(src: Uint8Array, w: number, h: number, r: number): Ui
 // top/bottom bleed. Panel E (bottom flap) is no-print and never drawn.
 // W1/V1 mirror each panel's artwork alpha (see spot-plate rules above).
 //
-// SECTIONS (owner spec, 2026-07-21, supersedes the press-compensation
-// experiments): faces A 0-45, B 50-257.5, C 262.5-307.5, D 312.5-522.5,
-// E 527.5-572 (no-print). Art = section + 3 mm bleed top AND bottom into the
-// 5 mm fold zones (A's top is the sheet edge — no bleed above 0). Left/right
-// bleed remains 3 mm via the full 306 mm width.
+// SECTIONS (owner spec, 2026-09-29, supersedes the 572 mm sheet and its bleed
+// into the fold zones): A 0-45, B 50-260, C 265-310, D 315-525, E 530-575
+// (no-print). The art is EXACTLY the section — the 5 mm breaks between
+// sections are hard and carry NO ART: every panel is clipped to its own
+// rectangle on the vector PDF and rendered into a panel-sized canvas on the
+// raster outputs, so nothing can land in a break. Left/right bleed remains
+// 3 mm via the full 306 mm width.
 export const DIVINITY_BOX_PANELS = [
-  { key: 'a', label: 'A', topMm: 0,     hMm: 48,    wMm: DBOX_SHEET_W_MM },
-  { key: 'b', label: 'B', topMm: 47,    hMm: 213.5, wMm: DBOX_SHEET_W_MM },
-  { key: 'c', label: 'C', topMm: 259.5, hMm: 51,    wMm: DBOX_SHEET_W_MM },
-  { key: 'd', label: 'D', topMm: 309.5, hMm: 216,   wMm: DBOX_SHEET_W_MM },
+  { key: 'a', label: 'A', topMm: 0,   hMm: 45,  wMm: DBOX_SHEET_W_MM },
+  { key: 'b', label: 'B', topMm: 50,  hMm: 210, wMm: DBOX_SHEET_W_MM },
+  { key: 'c', label: 'C', topMm: 265, hMm: 45,  wMm: DBOX_SHEET_W_MM },
+  { key: 'd', label: 'D', topMm: 315, hMm: 210, wMm: DBOX_SHEET_W_MM },
 ] as const;
+// The no-print breaks between the panels (mm from the top), for the checks.
+// Every printable panel is followed by one (the last sits between D and E).
+export const DIVINITY_BOX_BREAKS_MM = DIVINITY_BOX_PANELS.map((p) => ({
+  topMm: p.topMm + p.hMm, hMm: DBOX_BREAK_MM,
+}));
+export const DIVINITY_BOX_SHEET_MM = { wMm: DBOX_SHEET_W_MM, hMm: DBOX_SHEET_H_MM } as const;
 
 export interface DivinityBoxArt { bytes: Uint8Array; page?: number }
 export interface DivinityBoxOptions {
@@ -3698,13 +3704,11 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
       const s = fit === 'cover' ? Math.max(cellW / sz.width, cellH / sz.height) : Math.min(cellW / sz.width, cellH / sz.height);
       dw = sz.width * s; dh = sz.height * s; dx = cellX + (cellW - dw) / 2; dy = cellY + (cellH - dh) / 2;
     }
-    if (fit === 'cover' && (dw > cellW + 0.5 || dh > cellH + 0.5)) {
-      pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(cellX, cellY, cellW, cellH), PL.clip(), PL.endPath());
-      pg.drawPage(emb, { x: dx, y: dy, width: dw, height: dh });
-      pg.pushOperators(PL.popGraphicsState());
-    } else {
-      pg.drawPage(emb, { x: dx, y: dy, width: dw, height: dh });
-    }
+    // Always clipped to the panel: the breaks between panels are hard no-print
+    // zones, so nothing of the art — cover overflow or otherwise — may cross.
+    pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(cellX, cellY, cellW, cellH), PL.clip(), PL.endPath());
+    pg.drawPage(emb, { x: dx, y: dy, width: dw, height: dh });
+    pg.pushOperators(PL.popGraphicsState());
   }
 
   // Spot separations. White "W1" under each panel (prepended → behind the art);
@@ -3723,7 +3727,7 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
   if (opts.whiteUnder !== false && placedPanels.length) fillRect('W1', { r: 1, g: 1, b: 1 }, true, chokePt);
   if (opts.varnish && placedPanels.length) fillRect('V1', { r: 0.85, g: 0.86, b: 0.92 }, false);
 
-  // Fold ticks in the no-print gaps (short edge ticks; never over artwork).
+  // Fold ticks on the break centers (short edge ticks; never over artwork).
   if (opts.foldMarks !== false) {
     const tick = 0.22 * PT, w = 0.5;
     for (const f of DBOX_FOLDS_MM) {
@@ -3834,9 +3838,9 @@ async function composeDivinityBox(
           const k = keepMask[yy * pwPx + xx]!;
           if (k < 255) aByte = Math.round((aByte * k) / 255);
         }
-        // UNION compositing: only pixels with ink write. Panels' 3 mm top/bottom
-        // bleeds overlap ~1 mm inside the 5 mm fold zones — a transparent edge
-        // of a later panel must never erase the neighbor's bleed underneath.
+        // UNION compositing: only pixels with ink write. The panels no longer
+        // touch (5 mm hard breaks), but a transparent pixel must still never
+        // erase anything underneath.
         if (aByte === 0) continue;
         // RGB straight from the artwork (channels 0,1,2 = R,G,B).
         buf[si] = img[pi]!;
