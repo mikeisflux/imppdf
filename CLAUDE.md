@@ -45,14 +45,14 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    subject so a black costume can't be read as background. Within a
    qualifying swath it is a smooth luminance RAMP (full at ≤10, none at
    ≥34), never a hard threshold, so edges stay anti-aliased.
-7. **Geometry (owner spec, 2026-09-29, supersedes the 572 mm sheet and its
+7. **Geometry (owner spec, 2026-09-30, supersedes the 572 mm sheet and its
    bleed into the fold zones): sheet 306 × 575 mm = trim 300 × 575 + 3 mm
-   bleed LEFT+RIGHT only. Panels 45 / 210 / 45 / 210 / 45 with 5 mm HARD
-   BREAKS between them that carry NO ART** → breaks 45–50, 260–265, 310–315,
-   525–530 (top = 0); fold ticks sit on their centers 47.5 / 262.5 / 312.5 /
-   527.5. Sections: A 0–45, B 50–260, C 265–310, D 315–525, E 530–575
-   no-print. **The art is exactly the section — no top/bottom bleed
-   anywhere.** The vector PDF clips every panel to its rectangle whatever
+   bleed LEFT+RIGHT only. A 2 mm no-art OFFSET at the top, then panels
+   45 / 210 / 45 / 208 / 45 with 5 mm HARD BREAKS between them that carry
+   NO ART** → offset 0–2, breaks 47–52, 262–267, 312–317, 525–530 (top = 0);
+   fold ticks sit on the break centers 49.5 / 264.5 / 314.5 / 527.5.
+   Sections: A 2–47, B 52–262, C 267–312, D 317–525, E 530–575 no-print.
+   **The art is exactly the section — no top/bottom bleed anywhere.** The vector PDF clips every panel to its rectangle whatever
    the fit; the raster outputs render each panel into a panel-sized canvas;
    so nothing can land in a break (`DIVINITY_BOX_BREAKS_MM`, tested). No
    crop, cut, registration, or fold marks on the artwork. Fold ticks

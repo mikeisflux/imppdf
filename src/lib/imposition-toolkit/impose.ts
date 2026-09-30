@@ -3481,16 +3481,18 @@ export async function addWhiteVarnish(bytes: Uint8Array, opts: WhiteVarnishOptio
 // is printed on black stock, a white under-base (spot "W1") goes behind every
 // panel, with an optional gloss varnish (spot "V1") on top.
 
-// Sheet (owner spec, 2026-09-29): 306 × 575 mm INCLUDING 3 mm bleed on the
+// Sheet (owner spec, 2026-09-30): 306 × 575 mm INCLUDING 3 mm bleed on the
 // LEFT and RIGHT only (trim 300 × 575; no top/bottom bleed anywhere). Artwork
 // spans the full 306 so the side trim cuts through ink.
 const DBOX_TRIM_W_MM = 300, DBOX_BLEED_MM = 3;
 const DBOX_SHEET_W_MM = DBOX_TRIM_W_MM + 2 * DBOX_BLEED_MM, DBOX_SHEET_H_MM = 575;
-// Panels 45 / 210 / 45 / 210 / 45 with 5 mm HARD BREAKS between them — NO ART
-// in a break, ever. Breaks: 45-50, 260-265, 310-315, 525-530 (mm from the
-// top, top = 0); the fold ticks sit on their centers.
+// A 2 mm no-art OFFSET at the top, then panels 45 / 210 / 45 / 208 / 45 with
+// 5 mm HARD BREAKS between them — NO ART in the offset or a break, ever.
+// Breaks: 47-52, 262-267, 312-317, 525-530 (mm from the top, top = 0); the
+// fold ticks sit on their centers.
+const DBOX_TOP_OFFSET_MM = 2;
 const DBOX_BREAK_MM = 5;
-const DBOX_FOLDS_MM = [47.5, 262.5, 312.5, 527.5];
+const DBOX_FOLDS_MM = [49.5, 264.5, 314.5, 527.5];
 // CHOKE: the white under-base is pulled IN this many pixels from every art edge
 // so slight press misregistration never shows a white halo past the printed art
 // on the black box. (A "choke" = underprint shrunk relative to the art it sits
@@ -3627,25 +3629,25 @@ export function chokePlane(src: Uint8Array, w: number, h: number, r: number): Ui
 // top/bottom bleed. Panel E (bottom flap) is no-print and never drawn.
 // W1/V1 mirror each panel's artwork alpha (see spot-plate rules above).
 //
-// SECTIONS (owner spec, 2026-09-29, supersedes the 572 mm sheet and its bleed
-// into the fold zones): A 0-45, B 50-260, C 265-310, D 315-525, E 530-575
-// (no-print). The art is EXACTLY the section — the 5 mm breaks between
-// sections are hard and carry NO ART: every panel is clipped to its own
-// rectangle on the vector PDF and rendered into a panel-sized canvas on the
-// raster outputs, so nothing can land in a break. Left/right bleed remains
-// 3 mm via the full 306 mm width.
+// SECTIONS (owner spec, 2026-09-30, supersedes the 572 mm sheet and its bleed
+// into the fold zones): top offset 0-2 (no art), A 2-47, B 52-262, C 267-312,
+// D 317-525, E 530-575 (no-print). The art is EXACTLY the section — the top
+// offset and the 5 mm breaks between sections are hard and carry NO ART:
+// every panel is clipped to its own rectangle on the vector PDF and rendered
+// into a panel-sized canvas on the raster outputs, so nothing can land in a
+// break. Left/right bleed remains 3 mm via the full 306 mm width.
 export const DIVINITY_BOX_PANELS = [
-  { key: 'a', label: 'A', topMm: 0,   hMm: 45,  wMm: DBOX_SHEET_W_MM },
-  { key: 'b', label: 'B', topMm: 50,  hMm: 210, wMm: DBOX_SHEET_W_MM },
-  { key: 'c', label: 'C', topMm: 265, hMm: 45,  wMm: DBOX_SHEET_W_MM },
-  { key: 'd', label: 'D', topMm: 315, hMm: 210, wMm: DBOX_SHEET_W_MM },
+  { key: 'a', label: 'A', topMm: DBOX_TOP_OFFSET_MM, hMm: 45,  wMm: DBOX_SHEET_W_MM },
+  { key: 'b', label: 'B', topMm: 52,  hMm: 210, wMm: DBOX_SHEET_W_MM },
+  { key: 'c', label: 'C', topMm: 267, hMm: 45,  wMm: DBOX_SHEET_W_MM },
+  { key: 'd', label: 'D', topMm: 317, hMm: 208, wMm: DBOX_SHEET_W_MM },
 ] as const;
 // The no-print breaks between the panels (mm from the top), for the checks.
 // Every printable panel is followed by one (the last sits between D and E).
 export const DIVINITY_BOX_BREAKS_MM = DIVINITY_BOX_PANELS.map((p) => ({
   topMm: p.topMm + p.hMm, hMm: DBOX_BREAK_MM,
 }));
-export const DIVINITY_BOX_SHEET_MM = { wMm: DBOX_SHEET_W_MM, hMm: DBOX_SHEET_H_MM } as const;
+export const DIVINITY_BOX_SHEET_MM = { wMm: DBOX_SHEET_W_MM, hMm: DBOX_SHEET_H_MM, topOffsetMm: DBOX_TOP_OFFSET_MM } as const;
 
 export interface DivinityBoxArt { bytes: Uint8Array; page?: number }
 export interface DivinityBoxOptions {

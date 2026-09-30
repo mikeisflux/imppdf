@@ -239,7 +239,7 @@ test('imposeDivinityBox: builds the 300×575mm flat with panels + white spot', a
     a: { bytes: await panel(306, 45) },
     b: { bytes: await panel(306, 210) },
     c: { bytes: await panel(306, 45) },
-    d: { bytes: await panel(306, 210) },
+    d: { bytes: await panel(306, 208) },
     whiteUnder: true, varnish: true, foldMarks: true,
   });
   const doc = await PDFDocument.load(out);
@@ -250,15 +250,16 @@ test('imposeDivinityBox: builds the 300×575mm flat with panels + white spot', a
   assert.ok(Math.abs(s.height - 575 * 72 / 25.4) < 0.6, `sheet height 575mm (${s.height})`);
 });
 
-test('Divinity Box: panels 45/210/45/210/45 with 5 mm hard breaks that carry no art', async () => {
+test('Divinity Box: 2 mm top offset, panels 45/210/45/208/45, 5 mm hard breaks that carry no art', async () => {
   const { DIVINITY_BOX_PANELS, DIVINITY_BOX_BREAKS_MM, DIVINITY_BOX_SHEET_MM } = await import('../src/lib/imposition-toolkit/impose.ts');
   assert.equal(DIVINITY_BOX_SHEET_MM.wMm, 306);
   assert.equal(DIVINITY_BOX_SHEET_MM.hMm, 575);
-  // The spec, top = 0: A 0-45, B 50-260, C 265-310, D 315-525, E 530-575.
-  assert.deepEqual(DIVINITY_BOX_PANELS.map((p) => [p.topMm, p.topMm + p.hMm]), [[0, 45], [50, 260], [265, 310], [315, 525]]);
+  assert.equal(DIVINITY_BOX_SHEET_MM.topOffsetMm, 2);
+  // The spec, top = 0: offset 0-2, A 2-47, B 52-262, C 267-312, D 317-525, E 530-575.
+  assert.deepEqual(DIVINITY_BOX_PANELS.map((p) => [p.topMm, p.topMm + p.hMm]), [[2, 47], [52, 262], [267, 312], [317, 525]]);
   // Every break is exactly 5 mm and starts where the panel above ends.
   assert.deepEqual(DIVINITY_BOX_BREAKS_MM, [
-    { topMm: 45, hMm: 5 }, { topMm: 260, hMm: 5 }, { topMm: 310, hMm: 5 }, { topMm: 525, hMm: 5 },
+    { topMm: 47, hMm: 5 }, { topMm: 262, hMm: 5 }, { topMm: 312, hMm: 5 }, { topMm: 525, hMm: 5 },
   ]);
   // No panel overlaps any break, and panel E (530-575) has no art at all.
   for (const p of DIVINITY_BOX_PANELS) {
@@ -268,9 +269,9 @@ test('Divinity Box: panels 45/210/45/210/45 with 5 mm hard breaks that carry no 
     }
     assert.ok(p.topMm + p.hMm <= 525, `panel ${p.label} reaches panel E`);
   }
-  // Panel A starts at the sheet edge and the last break ends where E begins.
-  assert.equal(DIVINITY_BOX_PANELS[0].topMm, 0);
-  assert.equal(525 + 5, 530);
+  // Panel A starts below the 2 mm offset and the last break ends where E begins.
+  assert.equal(DIVINITY_BOX_PANELS[0].topMm, 2);
+  assert.equal(DIVINITY_BOX_BREAKS_MM[3]!.topMm + DIVINITY_BOX_BREAKS_MM[3]!.hMm, 530);
 });
 
 test('chokePlane: white under-base pulls in by r px from every edge (choke trap)', () => {

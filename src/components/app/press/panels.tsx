@@ -942,7 +942,7 @@ function DivinityBoxPanel(p: PanelProps) {
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        Full flat box layout — <b>306 × 575 mm</b> incl. 3&nbsp;mm bleed left+right (trim 300 × 575, 1:1). Panels 45 / 210 / 45 / 210 / 45 with <b>5 mm hard breaks</b> between them that carry no art. Upload artwork for each printable panel below; art spans the full width so the side trims cut through ink.
+        Full flat box layout — <b>306 × 575 mm</b> incl. 3&nbsp;mm bleed left+right (trim 300 × 575, 1:1). A 2 mm offset at the top, then panels 45 / 210 / 45 / 208 / 45 with <b>5 mm hard breaks</b> between them; the offset and the breaks carry no art. Upload artwork for each printable panel below; art spans the full width so the side trims cut through ink.
         Because the box is black, a white under-base (spot <b>W1</b>) prints behind every panel; add gloss varnish (spot <b>V1</b>) if you need it.
       </div>
       <Section label="// PANELS" help="Each panel takes its own artwork (PDF or image), placed at its exact size on the flat and clipped to it — nothing prints in the 5 mm breaks. Panel E is a no-print glue tab.">
@@ -991,7 +991,7 @@ function DivinityBoxPanel(p: PanelProps) {
           </>
         )}
       </Section>
-      <Section label="// MARKS" help="Off by default — no marks touch the artwork. Enable only if your finisher wants tiny fold ticks on the break centers (47.5 / 262.5 / 312.5 / 527.5 mm).">
+      <Section label="// MARKS" help="Off by default — no marks touch the artwork. Enable only if your finisher wants tiny fold ticks on the break centers (49.5 / 264.5 / 314.5 / 527.5 mm).">
         <Check icon="foldmarks" label="Fold ticks (off = no marks at all)" sub="Tiny guides in the panel gaps only — never over the art" checked={!!s.foldMarks} onChange={(v) => up({ foldMarks: v })} />
       </Section>
       <DivinityBoxTiffExport s={s} up={up} />
