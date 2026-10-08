@@ -349,3 +349,71 @@ html:has(.site-paper), html:has(.site-paper) body { background: #f4f1ea; }
 .legal-row h2 { font-size: 21px; margin: 0; }
 .legal-row p { color: var(--ink-2); font-size: 16px; line-height: 1.7; }
 @media (max-width: 640px) { .legal-row { grid-template-columns: 1fr; gap: 8px; } }
+
+/* ── Auth, account and admin on the paper system ─────────────────────────── */
+.site-paper.auth-wrap { background: var(--paper); min-height: 100vh; }
+.site-paper .auth-card { max-width: 440px; padding: 36px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 6px; box-shadow: 0 30px 60px -40px rgba(20,18,15,0.35); }
+.site-paper .auth-title { font-size: 32px; margin-bottom: 8px; }
+.site-paper .auth-subtitle { font-size: 15px; line-height: 1.5; margin-bottom: 24px; }
+.site-paper .auth-alt a, .site-paper .auth-foot a:hover, .site-paper .field-link { color: var(--accent); font-weight: 600; }
+.site-paper .field label { color: var(--ink); font-size: 13.5px; }
+.site-paper .field-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+.site-paper .field-head label { margin-bottom: 0; }
+.site-paper .field-link { font-size: 13px; }
+.site-paper .form-note { color: var(--muted); }
+.site-paper .form-error { background: rgba(216, 52, 28, 0.08); border-color: rgba(216, 52, 28, 0.35); color: #b02a14; }
+.site-paper .form-success { background: rgba(31, 143, 78, 0.08); border-color: rgba(31, 143, 78, 0.35); color: #176b3a; }
+.site-paper .badge { font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em; }
+.site-paper .badge-green { background: rgba(31, 143, 78, 0.12); color: #176b3a; }
+.site-paper .badge-red   { background: rgba(216, 52, 28, 0.10); color: #b02a14; }
+.site-paper .badge-gray  { background: var(--paper-2); color: var(--ink-2); }
+.site-paper .badge-brand { background: var(--ink); color: var(--paper); }
+.site-paper .usage-pill.pro { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+/* Account */
+.site-paper .dash-head h1 { font-size: clamp(34px, 4vw, 48px); }
+.site-paper .panel h2 { font-size: 24px; }
+.site-paper .kv { border-color: var(--line); }
+.site-paper .kv .k { color: var(--muted); }
+.site-paper .key-row { border-color: var(--line); }
+.site-paper .key-mono { color: var(--ink-2); }
+.site-paper .key-reveal { background: #fff; border-color: var(--ink); color: var(--ink); }
+
+/* Admin */
+.site-paper.admin-shell { background: var(--paper); }
+.site-paper .admin-side { background: var(--paper-2); border-right: 1px solid var(--line-strong); }
+.site-paper .admin-tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--paper); background: var(--ink); border: 1px solid var(--ink); border-radius: 3px; }
+.site-paper .admin-nav a { color: var(--ink-2); border-radius: 4px; }
+.site-paper .admin-nav a:hover { background: var(--paper); color: var(--ink); }
+.site-paper .admin-badge-count { background: var(--accent); color: #fff; }
+.site-paper .admin-side-foot { border-color: var(--line); }
+.site-paper .admin-side-link { color: var(--ink-2); }
+.site-paper .admin-side-link:hover { color: var(--accent); }
+.site-paper .admin-main h1 { font-size: clamp(32px, 3.6vw, 44px); margin-bottom: 8px; }
+.site-paper .admin-main h2 { font-size: 22px; }
+.site-paper .admin-page-sub { color: var(--muted); font-size: 16px; }
+.site-paper .stat-card .n { font-family: var(--font-display); font-weight: 450; font-size: 40px; letter-spacing: -0.02em; }
+.site-paper .stat-card .l { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.site-paper .admin-table th, .site-paper .admin-table td { border-color: var(--line); }
+.site-paper .admin-table th { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
+.site-paper .admin-table tr:hover td { background: var(--paper-2); }
+.site-paper .admin-select { background: #fff; border-color: var(--line); color: var(--ink); border-radius: 4px; }
+.site-paper .admin-btn-sm { padding: 6px 12px; font-size: 12.5px; }
+.site-paper .setting-row { border-color: var(--line); }
+.site-paper .setting-label { color: var(--ink); }
+.site-paper .setting-value { color: var(--ink-2); }
+.site-paper .setting-flash.ok { color: #176b3a; }
+.site-paper .setting-flash.err { color: #b02a14; }
+.site-paper .skip-link { background: var(--ink); color: var(--paper); }
+
+/* Contact inbox: selectable headers, a copy button on the address */
+.contact-card { margin-bottom: 10px; padding: 0; }
+.contact-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 14px 16px; user-select: text; }
+.contact-toggle { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink); font: inherit; font-weight: 600; font-size: 14.5px; text-align: left; }
+.contact-toggle:hover .contact-subject { color: var(--accent); }
+.contact-chev { color: var(--muted); font-size: 11px; width: 10px; }
+.contact-from { font-size: 13px; margin-top: 3px; padding-left: 16px; user-select: text; cursor: text; }
+.contact-email { color: var(--ink); user-select: all; }
+.contact-copy { margin-left: 8px; background: none; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; font: inherit; font-size: 11px; color: var(--muted); cursor: pointer; }
+.contact-copy:hover { border-color: var(--ink); color: var(--ink); }
+.contact-body { padding: 0 16px 16px 32px; border-top: 1px solid var(--line); color: var(--ink-2); }

@@ -1,3 +1,4 @@
+import '@/components/site/site.css';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentAdmin } from '@/lib/auth';
@@ -15,13 +16,15 @@ const NAV = [
   { href: '/admin/settings', label: 'Settings' },
 ];
 
+// The admin wears the site's paper theme: same tokens, same type, a sidebar
+// ruled off in ink.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const admin = await getCurrentAdmin();
   if (!admin) redirect('/admin/login');
   const newContacts = countNewContacts();
 
   return (
-    <div className="admin-shell">
+    <div className="site-paper admin-shell">
       <aside className="admin-side">
         <div className="admin-side-top">
           <Logo size={22} />

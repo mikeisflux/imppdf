@@ -1,3 +1,4 @@
+import '@/components/site/site.css';
 import { redirect } from 'next/navigation';
 import { Logo } from '@/components/Logo';
 import { LoginForm } from '@/components/forms/LoginForm';
@@ -10,7 +11,7 @@ export default async function AdminLoginPage() {
   const admin = await getCurrentAdmin();
   if (admin) redirect('/admin');
   return (
-    <div className="auth-wrap">
+    <div className="site-paper auth-wrap">
       <div className="auth-top"><Logo /></div>
       <div className="auth-card card">
         <LoginForm admin next="/admin" />

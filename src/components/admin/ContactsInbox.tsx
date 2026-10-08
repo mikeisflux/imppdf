@@ -9,6 +9,7 @@ export interface AdminContact {
 export function ContactsInbox({ messages: initial }: { messages: AdminContact[] }) {
   const [messages, setMessages] = useState(initial);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [copied, setCopied] = useState<number | null>(null);
 
   async function setStatus(id: number, status: AdminContact['status']) {
     await fetch(`/api/admin/contacts/${id}`, {
@@ -24,30 +25,45 @@ export function ContactsInbox({ messages: initial }: { messages: AdminContact[] 
     if (next !== null && m.status === 'new') setStatus(m.id, 'read');
   }
 
+  function copyEmail(m: AdminContact) {
+    navigator.clipboard?.writeText(m.email).then(() => {
+      setCopied(m.id);
+      setTimeout(() => setCopied((c) => (c === m.id ? null : c)), 1500);
+    }).catch(() => {});
+  }
+
   if (messages.length === 0) return <p className="muted">No messages yet.</p>;
 
   return (
     <div>
       {messages.map((m) => (
-        <div key={m.id} className="card" style={{ marginBottom: 10, padding: 0, opacity: m.status === 'archived' ? 0.6 : 1 }}>
-          <button onClick={() => toggle(m)}
-            style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 16, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', color: 'var(--ink)' }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 14.5 }}>
+        <div key={m.id} className="card contact-card" style={{ opacity: m.status === 'archived' ? 0.6 : 1 }}>
+          {/* The header is a plain row, not a button, so the name and address
+              can be selected and copied like any other text. Only the subject
+              line and the chevron toggle the message open. */}
+          <div className="contact-head">
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <button type="button" className="contact-toggle" onClick={() => toggle(m)} aria-expanded={openId === m.id}>
+                <span className="contact-chev" aria-hidden>{openId === m.id ? '▾' : '▸'}</span>
                 {m.status === 'new' && <span className="badge badge-brand" style={{ marginRight: 8 }}>new</span>}
-                {m.subject || '(no subject)'}
+                <span className="contact-subject">{m.subject || '(no subject)'}</span>
                 <span className="muted" style={{ fontWeight: 400 }}> · {m.topic || 'general'}</span>
+              </button>
+              <div className="contact-from muted">
+                {m.name} &lt;<span className="contact-email">{m.email}</span>&gt;
+                <button type="button" className="contact-copy" onClick={() => copyEmail(m)} title="Copy email address">
+                  {copied === m.id ? 'copied' : 'copy'}
+                </button>
               </div>
-              <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{m.name} &lt;{m.email}&gt;</div>
             </div>
             <div className="muted" style={{ fontSize: 12.5, flex: 'none' }}>
               {new Date(m.created_at).toLocaleString()}
               {!m.emailed && <span className="badge badge-red" style={{ marginLeft: 8 }}>not emailed</span>}
             </div>
-          </button>
+          </div>
           {openId === m.id && (
-            <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border-soft)' }}>
-              <p style={{ whiteSpace: 'pre-wrap', margin: '14px 0', fontSize: 14.5, color: 'var(--ink-2)' }}>{m.message}</p>
+            <div className="contact-body">
+              <p style={{ whiteSpace: 'pre-wrap', margin: '14px 0', fontSize: 14.5 }}>{m.message}</p>
               <div className="admin-actions">
                 <a className="btn btn-primary btn-plain admin-btn-sm" href={`mailto:${m.email}?subject=Re: ${encodeURIComponent(m.subject || 'Your message')}`}>Reply by email</a>
                 {m.status !== 'archived'

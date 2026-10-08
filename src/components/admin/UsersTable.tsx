@@ -213,20 +213,20 @@ export function UsersTable({ users: initial }: { users: AdminUser[] }) {
                       {resetFor === u.id ? 'Close' : 'Password'}
                     </button>
                     <button className="btn btn-ghost btn-plain admin-btn-sm"
-                      style={{ color: '#ef4444' }} onClick={() => removeUser(u)}>
+                      style={{ color: 'var(--accent, #ef4444)' }} onClick={() => removeUser(u)}>
                       Delete
                     </button>
                   </div>
 
                   {resetFor === u.id && (
-                    <div style={{ marginTop: 10, padding: 10, border: '1px solid var(--border, #333)', borderRadius: 8 }}>
+                    <div style={{ marginTop: 10, padding: 10, border: '1px solid var(--border, #333)', borderRadius: 4 }}>
                       <div className="admin-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
                         {/* type="text" on purpose: an admin setting a password
                             for someone else needs to READ it to pass it on, and
                             masking it only invites a typo they cannot see. */}
                         <input
                           className="admin-select" type="text" autoComplete="off" spellCheck={false}
-                          style={{ minWidth: 260, fontFamily: 'ui-monospace, monospace' }}
+                          style={{ minWidth: 260, fontFamily: 'var(--font-mono)' }}
                           placeholder="Type a password, or generate one"
                           value={newPw}
                           onChange={(e) => { setNewPw(e.target.value); setResetMsg(''); }}
