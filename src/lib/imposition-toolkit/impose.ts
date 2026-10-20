@@ -5152,8 +5152,13 @@ export async function imposeDivinityCards(
 
 export interface BusinessCardOptions {
   sheet?: import('./fit/a4-business-cards.ts').BusinessCardSheet;
-  /** 1-based page of the uploaded file for the FRONT; the back is page 2 when
-   *  the file has one. */
+  /** Separate FRONT and BACK artwork (PDF bytes; images are converted by the
+   *  panel). Either overrides the working file: the front replaces its page
+   *  `page`, the back replaces its page `backPage`. */
+  front?: Uint8Array | null;
+  back?: Uint8Array | null;
+  /** 1-based page of the working file for the FRONT; the back is page 2 when
+   *  the file has one and no separate back is given. */
   page?: number;
   backPage?: number;
   backs?: boolean;
@@ -5181,19 +5186,38 @@ export async function imposeBusinessCards(
   });
   const mm = (v: number) => v * PT_PER_MM;
 
-  const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const out = await PDFDocument.create();
+  /* FRONT and BACK can each be their own upload. With neither, the working
+     file supplies both: its page `page` and, when it has one, its page
+     `backPage`. A separate front still lets the working file's page 2 stand
+     as the back, and a separate back still lets the working file be the
+     front — so the shop can load fronts and backs as two files, or one. */
+  const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
   const srcPages = src.getPages();
   const frontIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.page ?? 1))) - 1;
-  const frontPage = srcPages[frontIdx];
-  if (!frontPage) return out.save();
   const backIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.backPage ?? 2))) - 1;
-  const wantBacks = opts.backs !== false && srcPages.length > 1 && backIdx !== frontIdx;
-  const backPage = wantBacks ? srcPages[backIdx]! : null;
-  const embeds = await out.embedPages(backPage ? [frontPage, backPage] : [frontPage]);
-  const front = embeds[0];
-  if (!front) return out.save();
-  const back = backPage ? embeds[1] : null;
+  const docs: import('pdf-lib').PDFDocument[] = [src];
+  let frontPage = srcPages[frontIdx] ?? null;
+  if (opts.front?.length) {
+    const fd = await PDFDocument.load(opts.front.slice(), { ignoreEncryption: true });
+    docs.push(fd); frontPage = fd.getPages()[0] ?? frontPage;
+  }
+  if (!frontPage) return out.save();
+  let backPage: typeof frontPage | null = null;
+  if (opts.backs !== false) {
+    if (opts.back?.length) {
+      const bd = await PDFDocument.load(opts.back.slice(), { ignoreEncryption: true });
+      docs.push(bd); backPage = bd.getPages()[0] ?? null;
+    } else if (!opts.front?.length && srcPages.length > 1 && backIdx !== frontIdx) {
+      backPage = srcPages[backIdx]!;
+    } else if (opts.front?.length && srcPages.length > 1) {
+      /* A separate front over a two-page working file: its page 2 is the back. */
+      backPage = srcPages[Math.min(srcPages.length - 1, Math.max(1, backIdx))] ?? null;
+    }
+  }
+  const front = await out.embedPage(frontPage);
+  const back = backPage ? await out.embedPage(backPage) : null;
+  void docs;
 
   /* The cell lies across (90 x 54). Portrait art gets the quarter turn so it
      lies the cell's way; landscape art is left alone. */

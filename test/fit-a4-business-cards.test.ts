@@ -98,3 +98,28 @@ test('imposeBusinessCards: A4 one page in, one sheet out; doubled stocks stand u
   const two = await PDFDocument.load(await imposeBusinessCards(await card.save(), { sheet: 'a4' }));
   assert.equal(two.getPageCount(), 2);
 });
+
+test('imposeBusinessCards: separate front and back uploads make a fronts sheet and a backs sheet', async () => {
+  const { imposeBusinessCards } = await import('../src/lib/imposition-toolkit/impose.ts');
+  const mk = async (r: number, g: number, b: number, w = 93, h = 57) => {
+    const d = await PDFDocument.create();
+    const p = d.addPage([w * PT_PER_MM, h * PT_PER_MM]);
+    p.drawRectangle({ x: 0, y: 0, width: w * PT_PER_MM, height: h * PT_PER_MM, color: rgb(r, g, b) });
+    return d.save();
+  };
+  const front = await mk(0.2, 0.3, 0.8), back = await mk(0.9, 0.8, 0.6);
+  // Working file is the front; back comes from its own upload.
+  const two = await PDFDocument.load(await imposeBusinessCards(front, { sheet: 'a4', back }));
+  assert.equal(two.getPageCount(), 2);
+  // Both as uploads over an unrelated one-page working file.
+  const other = await mk(0, 0, 0, 50, 50);
+  const both = await PDFDocument.load(await imposeBusinessCards(other, { sheet: 'tabloid', front, back }));
+  assert.equal(both.getPageCount(), 2);
+  assert.ok(both.getPage(1).getSize().height > both.getPage(1).getSize().width, 'backs sheet portrait too');
+  // Backs switched off: one sheet even with a back supplied.
+  const one = await PDFDocument.load(await imposeBusinessCards(front, { sheet: 'a4', back, backs: false }));
+  assert.equal(one.getPageCount(), 1);
+  // A front upload and a one-page working file: no back to be had, one sheet.
+  const solo = await PDFDocument.load(await imposeBusinessCards(other, { sheet: 'a4', front }));
+  assert.equal(solo.getPageCount(), 1);
+});

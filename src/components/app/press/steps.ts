@@ -165,7 +165,7 @@ export function defaultSettings(type: StepType): StepSettings {
          93 x 57 layout boxes, 3 mm grooves, centered on A4. Doubled onto A3
          (20) and 11 x 17 (two Letter halves of 8). No gutters are stored:
          an untyped gap takes the template's figure for the stock. */
-      return { sheet: 'a4', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false, addMarks: true };
+      return { sheet: 'a4', front: null, back: null, page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false, addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
@@ -627,8 +627,10 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
       }); break;
       case 'a4bizcards': {
         const { imposeBusinessCards } = await import('@/lib/imposition-toolkit/impose');
+        const art = (v: { bytes?: Uint8Array } | null | undefined) => (v?.bytes ? v.bytes : null);
         b = await imposeBusinessCards(b, {
           sheet: ['a4', 'a3', 'letter', 'tabloid'].includes(s.sheet) ? s.sheet : 'a4',
+          front: art(s.front), back: art(s.back),
           page: s.page ?? 1, backPage: s.backPage ?? 2, backs: s.backs !== false,
           flip: s.flip === 'short' ? 'short' : 'long', spinBacks: !!s.spinBacks,
           marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,

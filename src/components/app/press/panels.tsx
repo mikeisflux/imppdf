@@ -3255,7 +3255,35 @@ const BC_SHEET_LABEL: Record<string, string> = {
 };
 const BC_DOUBLED = new Set(['a3', 'tabloid']);
 
-function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
+function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource, sourceBytes }: PanelProps) {
+  /* FRONT and BACK as two uploads. Either can be a PDF or an image; images are
+     wrapped in a PDF page at their pixel size. A front upload arms the editor
+     (the tool builds from its own art and does not need the working file).
+     Self-heal: a job reopened with art attached but nothing armed would
+     otherwise sit on "Drop a PDF to start". */
+  const armed = useRef(false);
+  useEffect(() => {
+    if (armed.current || sourceBytes) return;
+    const first = ((s.front ?? s.back) as { bytes?: Uint8Array } | null)?.bytes;
+    if (first) { armed.current = true; onLoadSource?.(new Uint8Array(first), 'business-cards'); }
+  }, [sourceBytes, s, onLoadSource]);
+  const pickArt = (key: 'front' | 'back') => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/pdf,image/*';
+    inp.onchange = async () => {
+      const f = inp.files?.[0]; if (!f) return;
+      let bytes = new Uint8Array(await f.arrayBuffer());
+      if (f.type.startsWith('image/')) {
+        const { imageToPdf } = await import('@/lib/imposition-toolkit/impose');
+        bytes = new Uint8Array(await imageToPdf(bytes, f.type));
+      }
+      up({ [key]: { name: f.name, bytes } });
+      if (!sourceBytes) onLoadSource?.(new Uint8Array(bytes), 'business-cards');
+    };
+    inp.click();
+  };
+  const frontArt = s.front as { name: string } | null | undefined;
+  const backArt = s.back as { name: string } | null | undefined;
   const SHEET = (['a4', 'a3', 'letter', 'tabloid'].includes(s.sheet) ? s.sheet : 'a4') as BusinessCardSheet;
   const FIT = fitBusinessCards(SHEET, {
     marginXMm: s.marginXMm, marginTopMm: s.marginTopMm, gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
@@ -3284,6 +3312,22 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         Export the card at {BC_LAYOUT_W_MM} × {BC_LAYOUT_H_MM} with bleed, or at {BC_CARD_W_MM} × {BC_CARD_H_MM} trim —
         either is fitted to the layout box without distortion.
       </div>
+
+      <Section label="// ARTWORK" help="Front and back as two files (PDF or image), each the card at 93 x 57 with bleed or 90 x 54 trim. With no uploads, the working file is used: page 1 is the front and page 2, if there is one, the back.">
+        {([['front', 'Front', frontArt], ['back', 'Back', backArt]] as const).map(([key, label, art]) => (
+          <div key={key} className="pe-gang-job">
+            <div className="pe-row" style={{ marginBottom: 6 }}>
+              <span className="pe-gang-thumb"><b style={{ fontSize: 12 }}>{label[0]}</b></span>
+              <span className="pe-label" style={{ flex: 1 }}>{label}
+                <span className="pe-label-sm"> · {key === 'front' ? 'page 1 of the working file if empty' : 'page 2 of the working file if empty'}</span></span>
+              {art && <button className="pe-iconbtn" aria-label={`Remove ${label} art`} title="Remove" onClick={() => up({ [key]: null })}><Ic name="trash" size={14} /></button>}
+            </div>
+            {art
+              ? <div className="pe-note" style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ {art.name} <button className="pe-chipbtn" style={{ marginLeft: 8 }} onClick={() => pickArt(key)}>Replace</button></div>
+              : <button className="pe-btn" onClick={() => pickArt(key)}>Upload {label.toLowerCase()}…</button>}
+          </div>
+        ))}
+      </Section>
 
       <Section label="// SHEET" help="The stock in the tray. A4 is the template as drawn. A3 and 11 x 17 carry two blocks and are cut in half first; each half then runs through the cutter on its own.">
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -3354,8 +3398,9 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
         ) : <div className="pe-note">Add the card artwork to check its size.</div>}
       </Section>
 
-      <Section label="// BACKS" help="Page 2 of the file becomes a sheet of backs, mirrored to land behind the fronts.">
-        <Check icon="flip" label="Print backs from page 2" checked={s.backs !== false} onChange={(v) => up({ backs: v })} />
+      <Section label="// BACKS" help="The Back upload (or page 2 of the working file) becomes a sheet of backs, mirrored to land behind the fronts.">
+        <Check icon="flip" label="Print a backs sheet" sub={backArt ? `From ${backArt.name}` : 'From page 2 of the working file, when it has one'}
+          checked={s.backs !== false} onChange={(v) => up({ backs: v })} />
         <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
           <span className="pe-label" style={{ flex: '1 0 100%' }}>Duplex flip<span className="pe-label-sm"> · how the press turns the sheet</span></span>
           {([['long', 'Long edge'], ['short', 'Short edge']] as const).map(([id, label]) => (
