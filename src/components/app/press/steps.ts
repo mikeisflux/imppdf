@@ -32,7 +32,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair' | 'mediafix' | 'divinitycards';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair' | 'mediafix' | 'divinitycards' | 'a4bizcards';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -160,6 +160,12 @@ export function defaultSettings(type: StepType): StepSettings {
          the test stock open on another stock's margins. */
       return { sheet: 'letter', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false,
         blackBg: false, addMarks: true };
+    case 'a4bizcards':
+      /* The manufacturer's 10-up business card template: 90 x 54 cards in
+         93 x 57 layout boxes, 3 mm grooves, centered on A4. Doubled onto A3
+         (20) and 11 x 17 (two Letter halves of 8). No gutters are stored:
+         an untyped gap takes the template's figure for the stock. */
+      return { sheet: 'a4', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false, addMarks: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
@@ -619,6 +625,18 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         mediaWIn: s.mediaWIn ?? 0, mediaHIn: s.mediaHIn ?? 0, mediaOrient: s.mediaOrient ?? 'auto',
         creaseLabels: s.creaseLabels !== false, creaseLabelPt: s.creaseLabelPt ?? 4,
       }); break;
+      case 'a4bizcards': {
+        const { imposeBusinessCards } = await import('@/lib/imposition-toolkit/impose');
+        b = await imposeBusinessCards(b, {
+          sheet: ['a4', 'a3', 'letter', 'tabloid'].includes(s.sheet) ? s.sheet : 'a4',
+          page: s.page ?? 1, backPage: s.backPage ?? 2, backs: s.backs !== false,
+          flip: s.flip === 'short' ? 'short' : 'long', spinBacks: !!s.spinBacks,
+          marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
+          gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
+          addMarks: s.addMarks !== false,
+        });
+        break;
+      }
       case 'divinitycards': {
         const { imposeDivinityCards } = await import('@/lib/imposition-toolkit/impose');
         b = await imposeDivinityCards(b, {

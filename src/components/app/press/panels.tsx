@@ -6,6 +6,10 @@ import {
   fitDivinityCards, sheetDefaults, type DivinityCardSheet, CUT_LINE_MM, LETTER_BLADES_MM,
   LAYOUT_W_MM, LAYOUT_L_MM, LAYOUT_BLEED_MM,
 } from '@/lib/imposition-toolkit/fit/divinity-cards';
+import {
+  fitBusinessCards, sheetDefaults as bcSheetDefaults, type BusinessCardSheet,
+  BC_BLEED_MM, BC_LAYOUT_W_MM, BC_LAYOUT_H_MM, BC_CARD_W_MM, BC_CARD_H_MM,
+} from '@/lib/imposition-toolkit/fit/a4-business-cards';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
 import { ImageFitModal } from './image-fit-modal';
@@ -3242,11 +3246,141 @@ function DivinityCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps
   );
 }
 
+/* A4 Business Card Cutter — the manufacturer's 10-up template. The geometry is
+ * the template's (fit/a4-business-cards.ts); the one real decision is the stock,
+ * and the gutters are there to nudge the cuts after a test sheet. */
+const BC_SHEET_LABEL: Record<string, string> = {
+  a4: '210 × 297 mm (A4)', a3: '297 × 420 mm (A3 portrait, two A4s)',
+  letter: '215.9 × 279.4 mm (8.5 × 11")', tabloid: '279.4 × 431.8 mm (11 × 17 portrait, two Letters)',
+};
+const BC_DOUBLED = new Set(['a3', 'tabloid']);
+
+function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0 }: PanelProps) {
+  const SHEET = (['a4', 'a3', 'letter', 'tabloid'].includes(s.sheet) ? s.sheet : 'a4') as BusinessCardSheet;
+  const FIT = fitBusinessCards(SHEET, {
+    marginXMm: s.marginXMm, marginTopMm: s.marginTopMm, gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
+  });
+  const DEFS = bcSheetDefaults(SHEET);
+  const untyped = { marginXMm: undefined, marginTopMm: undefined, gutterXMm: undefined, gutterYMm: undefined };
+  /* C is the remainder of the BLOCK's sheet (a half, on the doubled stocks):
+     A + block + C = that width. Typing C slides the block; nothing resizes. */
+  const blockSheetW = FIT.cutXMm.length ? FIT.cutXMm[0]! : FIT.sheetWMm;
+  const setC = (v: number) => up({ marginXMm: round2(blockSheetW - FIT.blockWMm - v) });
+  const setH = (v: number) => up({ marginTopMm: round2(FIT.sheetHMm - FIT.blockHMm - v) });
+
+  const MM = 25.4 / 72;
+  const src = pageSizes[Math.max(0, Math.min(pageSizes.length - 1, (s.page ?? 1) - 1))];
+  const wMm = src ? src.wPt * MM : 0, hMm = src ? src.hPt * MM : 0;
+  const ratio = wMm && hMm ? Math.max(wMm, hMm) / Math.min(wMm, hMm) : 0;
+  const wantedTrim = BC_CARD_W_MM / BC_CARD_H_MM, wantedLayout = BC_LAYOUT_W_MM / BC_LAYOUT_H_MM;
+  const off = ratio ? Math.min(Math.abs(ratio - wantedTrim) / wantedTrim, Math.abs(ratio - wantedLayout) / wantedLayout) : 0;
+
+  return (
+    <>
+      <div className="pe-note" style={{ marginBottom: 12 }}>
+        The card cutter&apos;s own template. Upload <b>one card</b> and it fills the sheet:
+        <b> {BC_CARD_W_MM} × {BC_CARD_H_MM} mm</b> cards in <b>{BC_LAYOUT_W_MM} × {BC_LAYOUT_H_MM}</b> layout boxes
+        ({BC_BLEED_MM} mm past every cut), two columns, <b>3 mm</b> grooves, the block centered.
+        Export the card at {BC_LAYOUT_W_MM} × {BC_LAYOUT_H_MM} with bleed, or at {BC_CARD_W_MM} × {BC_CARD_H_MM} trim —
+        either is fitted to the layout box without distortion.
+      </div>
+
+      <Section label="// SHEET" help="The stock in the tray. A4 is the template as drawn. A3 and 11 x 17 carry two blocks and are cut in half first; each half then runs through the cutter on its own.">
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {([['a4', 'A4', '10 cards'], ['a3', 'A3', '20 cards'],
+             ['letter', 'Letter', '8 cards'], ['tabloid', '11 × 17', '16 cards']] as const).map(([id, label, sub]) => (
+            <button key={id} className="pe-btn" style={pickStyle(SHEET === id)}
+              onClick={() => up({ sheet: id, ...untyped })}>{label} · {sub}</button>
+          ))}
+        </div>
+        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
+          <div>Sheet <b>{BC_SHEET_LABEL[SHEET]}</b> — <b>{FIT.n} cards</b>,
+            {' '}{BC_DOUBLED.has(SHEET) ? `two blocks of 2 × ${FIT.rows}` : `2 × ${FIT.rows}`}</div>
+          {BC_DOUBLED.has(SHEET) && (
+            <div>Cut <b>across</b> at <b>{round2(FIT.cutXMm[0] ?? 0)} mm</b> from the foot first; each half is
+              then a {SHEET === 'a3' ? 'A4' : 'Letter'} sheet carrying the same template. The cut is marked on both edges.
+              The page is stood up rather than re-laid, so no card moves in its cell.</div>
+          )}
+          {(SHEET === 'letter' || SHEET === 'tabloid') && (
+            <div style={{ marginTop: 4 }}>A Letter sheet is 279.4 tall and the five-row block is 282 of cards alone, so
+              Letter takes <b>four rows</b>. Same cards, same grooves, centered on the sheet — the side margin
+              comes out {round2(DEFS.marginXMm)} instead of A4&apos;s 13.5 because Letter is 5.9 wider.</div>
+          )}
+        </div>
+      </Section>
+
+      <Section label="// GUTTERS" help="Every gap on the sheet, in millimeters. A and B place the columns, D and the row gutter place the rows; C and H are what is left over.">
+        {([
+          ['A', 'Left edge to card', round2(FIT.marginXMm), (v: number) => up({ marginXMm: v })],
+          ['B', 'Between the columns', round2(FIT.gutterXMm), (v: number) => up({ gutterXMm: v })],
+          ['C', 'Card to right edge', round2(FIT.marginRightMm), setC],
+          ['D', 'Head to row 1', round2(FIT.marginTopMm), (v: number) => up({ marginTopMm: v })],
+          ['Row gutter', `Between rows, every row`, round2(FIT.gutterYMm), (v: number) => up({ gutterYMm: v })],
+          ['H', `Row ${FIT.rows} to foot`, round2(FIT.marginBottomMm), setH],
+        ] as const).map(([tag, what, value, set]) => (
+          <div key={tag} className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+            <span className="pe-label" style={{ flex: 1 }}>{tag}<span className="pe-label-sm"> · {what}</span></span>
+            <NumRaw value={value} onValue={set} w={70} />
+          </div>
+        ))}
+        <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.7 }}>
+          <b>A {round2(DEFS.marginXMm)} · B {round2(DEFS.gutterXMm)} · D {round2(DEFS.marginTopMm)} ·
+          rows {round2(DEFS.gutterYMm)}</b> is the template on this stock: the cutter steps
+          <b> {round2(FIT.cellHMm + FIT.gutterYMm)}</b> mm a row, the same every row. One row gutter,
+          because a slitter steps one constant pitch. Every number here places a <b>cut</b>; the art is
+          laid at the layout size and never moves one.
+          {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }} onClick={() => up({ ...untyped })}>
+            Reset to the template</button>
+        </div>
+      </Section>
+
+      <Section label="// CARD" help="Which page of the uploaded file is the card. Portrait art is turned a quarter turn to lie in the cell.">
+        {pageCount > 1 && (
+          <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <span className="pe-label" style={{ flex: 1 }}>Page<span className="pe-label-sm"> · of {pageCount}</span></span>
+            <NumRaw value={s.page ?? 1} onValue={(v) => up({ page: Math.max(1, Math.min(pageCount, Math.round(v))) })} w={70} />
+          </div>
+        )}
+        {src ? (
+          <div className="pe-note" style={{ lineHeight: 1.7 }}>
+            <div>Your card measures <b>{wMm.toFixed(1)} × {hMm.toFixed(1)} mm</b></div>
+            {off > 0.02 && (
+              <div className="pe-gang-warn" style={{ marginTop: 6 }}>
+                ⚠ That is not a {BC_CARD_W_MM} × {BC_CARD_H_MM} card (or {BC_LAYOUT_W_MM} × {BC_LAYOUT_H_MM} with bleed).
+                It will be scaled to cover the layout box and the overflow trimmed.
+              </div>
+            )}
+          </div>
+        ) : <div className="pe-note">Add the card artwork to check its size.</div>}
+      </Section>
+
+      <Section label="// BACKS" help="Page 2 of the file becomes a sheet of backs, mirrored to land behind the fronts.">
+        <Check icon="flip" label="Print backs from page 2" checked={s.backs !== false} onChange={(v) => up({ backs: v })} />
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          <span className="pe-label" style={{ flex: '1 0 100%' }}>Duplex flip<span className="pe-label-sm"> · how the press turns the sheet</span></span>
+          {([['long', 'Long edge'], ['short', 'Short edge']] as const).map(([id, label]) => (
+            <button key={id} className="pe-btn" style={pickStyle((s.flip ?? 'long') === id)} onClick={() => up({ flip: id })}>{label}</button>
+          ))}
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <Check icon="rotate" label="Spin backs 180°" checked={!!s.spinBacks} onChange={(v) => up({ spinBacks: v })} />
+        </div>
+      </Section>
+
+      <Section label="// MARKS" help="Cut marks are ruled off the sheet edges, never into the 3 mm grooves, so nothing prints on a neighboring card.">
+        <Check icon="crop" label="Cut marks" sub="At every card edge in the sheet margins, plus the half-sheet cut on A3 and 11 × 17"
+          checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />
+      </Section>
+    </>
+  );
+}
+
 export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
   if (type === 'pdfrepair') return <PdfRepairPanel {...props} />;
   if (type === 'mediafix') return <MediaFixPanel {...props} />;
   if (type === 'divinitycards') return <DivinityCardsPanel {...props} />;
+  if (type === 'a4bizcards') return <BusinessCardsPanel {...props} />;
   if (type === 'raisedmetal') return <RaisedMetalPanel {...props} />;
   if (type === 'pbcover') return <PerfectCoverPanel {...props} />;
   if (type === 'removebg') return <RemoveBgPanel {...props} />;

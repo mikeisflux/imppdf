@@ -15,6 +15,7 @@ const PLUGIN_TO_PRESS_OP: Record<string, string> = {
   postcard: 'grid', labels: 'grid', flipbook: 'grid',
   business: 'cards', trading: 'cards', stickers: 'cards', steprepeat: 'cards',
   bookmark: 'cards', hangtag: 'cards', coasters: 'cards', complimentslip: 'cards',
+  a4bizcards: 'a4bizcards',
   cutstack: 'cutstack', shuffle: 'shuffle', rotate: 'rotate', flip: 'flip',
   merge: 'merge', split: 'split',
   repair: 'pdfrepair',

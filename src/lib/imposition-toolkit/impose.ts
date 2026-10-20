@@ -5135,6 +5135,212 @@ export async function imposeDivinityCards(
   return out.save();
 }
 
+/* ── A4 Business Card Cutter ────────────────────────────────────────────────
+
+   The manufacturer's 10-up business card template: two columns of five 90 x 54
+   cards in 93 x 57 layout boxes, centered on an A4, with the block doubled onto
+   A3 (two A4s, 20 cards) and onto 11 x 17 (two Letter halves of 2 x 4, 16
+   cards). Geometry and the row counts live in fit/a4-business-cards.ts.
+
+   The art is laid at the LAYOUT size — the cell plus 1.5 on every side — so the
+   cut takes the same 1.5 off every edge of every card. A card exported WITH
+   that bleed (93 x 57) maps onto the box exactly; a trim-size card (90 x 54) is
+   scaled up by the same 3.3% on both axes to fill it. Either way the aspect is
+   kept: the art is COVER-fitted to the box and clipped, never stretched.
+   Outside the block, the art's edge is carried across the margin so a blade a
+   little out still lands in ink; between cards the boxes already meet. */
+
+export interface BusinessCardOptions {
+  sheet?: import('./fit/a4-business-cards.ts').BusinessCardSheet;
+  /** 1-based page of the uploaded file for the FRONT; the back is page 2 when
+   *  the file has one. */
+  page?: number;
+  backPage?: number;
+  backs?: boolean;
+  /** How the press turns the sheet. The back is mirrored about this axis. */
+  flip?: 'long' | 'short';
+  /** Half-turn the back art within its cell. */
+  spinBacks?: boolean;
+  marginXMm?: number; marginTopMm?: number; gutterXMm?: number; gutterYMm?: number;
+  /** Cut marks in the margins plus the half-sheet cut on a doubled stock. */
+  addMarks?: boolean;
+  markLenMm?: number; markOffMm?: number; markWeightPt?: number;
+}
+
+export async function imposeBusinessCards(
+  bytes: Uint8Array, opts: BusinessCardOptions = {},
+): Promise<Uint8Array> {
+  const PL = await import('pdf-lib');
+  const { PDFDocument, rgb, degrees } = PL;
+  const { fitBusinessCards, PT_PER_MM, BC_BLEED_MM, BC_OUTER_BLEED_MM, BC_STREAK_MM, BC_SEAM_MM } =
+    await import('./fit/a4-business-cards.ts');
+
+  const fit = fitBusinessCards(opts.sheet ?? 'a4', {
+    marginXMm: opts.marginXMm, marginTopMm: opts.marginTopMm,
+    gutterXMm: opts.gutterXMm, gutterYMm: opts.gutterYMm,
+  });
+  const mm = (v: number) => v * PT_PER_MM;
+
+  const src = await PDFDocument.load(bytes.slice(), { ignoreEncryption: true });
+  const out = await PDFDocument.create();
+  const srcPages = src.getPages();
+  const frontIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.page ?? 1))) - 1;
+  const frontPage = srcPages[frontIdx];
+  if (!frontPage) return out.save();
+  const backIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.backPage ?? 2))) - 1;
+  const wantBacks = opts.backs !== false && srcPages.length > 1 && backIdx !== frontIdx;
+  const backPage = wantBacks ? srcPages[backIdx]! : null;
+  const embeds = await out.embedPages(backPage ? [frontPage, backPage] : [frontPage]);
+  const front = embeds[0];
+  if (!front) return out.save();
+  const back = backPage ? embeds[1] : null;
+
+  /* The cell lies across (90 x 54). Portrait art gets the quarter turn so it
+     lies the cell's way; landscape art is left alone. */
+  const cellPortrait = fit.cellHMm >= fit.cellWMm;
+  const needsTurn = (c: { width: number; height: number }) => (c.height >= c.width) !== cellPortrait;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const drawSheet = (pg: any, card: any, deg: 0 | 90 | 180 | 270, cells: typeof fit.cells) => {
+    const turn = deg === 90 || deg === 270;
+    const artW = turn ? card.height : card.width;
+    const artH = turn ? card.width : card.height;
+    /* Draw the whole card page onto the box (x, y, dw, dh), clipped to
+       (cx, cy, cw, ch). Rotation sweeps the box away from the placement point,
+       so the anchor is the corner it sweeps from. */
+    const place = (x: number, y: number, dw: number, dh: number,
+                   cx: number, cy: number, cw: number, ch: number) => {
+      const sx = dw / artW, sy = dh / artH;
+      const w = card.width * (turn ? sy : sx), h = card.height * (turn ? sx : sy);
+      pg.pushOperators(PL.pushGraphicsState(), PL.rectangle(cx, cy, cw, ch), PL.clip(), PL.endPath());
+      if (deg === 90) pg.drawPage(card, { x: x + dw, y, width: w, height: h, rotate: degrees(90) });
+      else if (deg === 270) pg.drawPage(card, { x, y: y + dh, width: w, height: h, rotate: degrees(-90) });
+      else if (deg === 180) pg.drawPage(card, { x: x + dw, y: y + dh, width: w, height: h, rotate: degrees(180) });
+      else pg.drawPage(card, { x, y, width: dw, height: dh });
+      pg.pushOperators(PL.popGraphicsState());
+    };
+
+    const L = mm(BC_BLEED_MM), S = mm(BC_STREAK_MM), E = mm(BC_SEAM_MM);
+    const spanY = (c: typeof cells[number], d: typeof c) => d.yMm < c.yMm + c.hMm && d.yMm + d.hMm > c.yMm;
+    const spanX = (c: typeof cells[number], d: typeof c) => d.xMm < c.xMm + c.wMm && d.xMm + d.wMm > c.xMm;
+    const nearest = (gaps: number[]) => gaps.filter((g) => g >= 0).reduce((a, b) => Math.min(a, b), Infinity);
+    /* How far past the layout box the edge is carried on one side: to the
+       middle of the gap where there is a neighbor (nothing, when the boxes
+       already meet), to BC_OUTER_BLEED_MM or the paper's edge where there is not. */
+    const reach = (gapMm: number, roomMm: number) => mm(Math.max(0, -BC_BLEED_MM
+      + (Number.isFinite(gapMm) ? Math.min(gapMm / 2, BC_OUTER_BLEED_MM) : Math.min(BC_OUTER_BLEED_MM, roomMm))));
+    type Span = { b0: number; bl: number; c0: number; cl: number };
+    /* One axis: the strip below the drawn art, the art itself, the strip
+       above. Strips are grown SEAM_MM into the art and past their far end so
+       every join is covered by paint, and the edge sliver is laid across the
+       whole grown slot. */
+    const axis = (a0: number, al: number, lo: number, hi: number, sheet: number): Span[] => {
+      const lo2 = Math.max(lo, E) + 2 * E, hi2 = Math.max(hi, E) + 2 * E;
+      const onSheet = (c0: number, cl: number): [number, number] => {
+        const x0 = Math.max(0, c0), x1 = Math.min(sheet, c0 + cl);
+        return [x0, x1 - x0];
+      };
+      const loStart = a0 + E - lo2, hiEnd = a0 + al - E + hi2;
+      const [lc0, lcl] = onSheet(loStart, lo2);
+      const [hc0, hcl] = onSheet(a0 + al - E, hi2);
+      return [
+        { b0: loStart, bl: al * lo2 / S, c0: lc0, cl: lcl },
+        { b0: a0, bl: al, c0: a0, cl: al },
+        { b0: hiEnd - al * hi2 / S, bl: al * hi2 / S, c0: hc0, cl: hcl },
+      ];
+    };
+    const geometry = cells.map((c) => {
+      /* The layout box, then the art COVER-fitted to it: the drawn rect keeps
+         the art's aspect and is at least the box on both axes, centered. */
+      const bx = mm(c.xMm) - L, by = mm(c.yMm) - L;
+      const bw = mm(c.wMm) + 2 * L, bh = mm(c.hMm) + 2 * L;
+      const s = Math.max(bw / artW, bh / artH);
+      const aw = artW * s, ah = artH * s;
+      const ax = bx + (bw - aw) / 2, ay = by + (bh - ah) / 2;
+      const besideY = cells.filter((d) => d !== c && spanY(c, d));
+      const besideX = cells.filter((d) => d !== c && spanX(c, d));
+      const outL = reach(nearest(besideY.map((d) => c.xMm - (d.xMm + d.wMm))), c.xMm);
+      const outR = reach(nearest(besideY.map((d) => d.xMm - (c.xMm + c.wMm))), fit.sheetWMm - (c.xMm + c.wMm));
+      const outB = reach(nearest(besideX.map((d) => c.yMm - (d.yMm + d.hMm))), c.yMm);
+      const outT = reach(nearest(besideX.map((d) => d.yMm - (c.yMm + c.hMm))), fit.sheetHMm - (c.yMm + c.hMm));
+      /* The strips carry the art's edge outward from the BOX edge; the box
+         clip is the layout box, and the drawn rect is the cover rect, so the
+         art shown inside the box is cropped to it, not squeezed. */
+      const xs = axis(bx, bw, outL, outR, mm(fit.sheetWMm));
+      const ys = axis(by, bh, outB, outT, mm(fit.sheetHMm));
+      return { xs, ys, art: { ax, ay, aw, ah } };
+    });
+    for (const g of geometry) g.xs.forEach((X, i) => g.ys.forEach((Y, j) => {
+      if (i === 1 && j === 1) return;
+      if (X.cl <= 0 || Y.cl <= 0) return;
+      place(X.b0, Y.b0, X.bl, Y.bl, X.c0, Y.c0, X.cl, Y.cl);
+    }));
+    for (const g of geometry) {
+      const X = g.xs[1]!, Y = g.ys[1]!;
+      place(g.art.ax, g.art.ay, g.art.aw, g.art.ah, X.c0, Y.c0, X.cl, Y.cl);
+    }
+  };
+
+  /* Backs mirror about the duplex flip's axis, in the layout frame: a long-edge
+     flip of a portrait page mirrors across; on the stood-up doubled page, page x
+     is layout y, so there a long-edge flip mirrors each block top to bottom. */
+  const spun = opts.spinBacks === true;
+  const spinFront = spun && !backPage;
+  const frontTurn = (((needsTurn(front) ? 90 : 0) + (spinFront ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
+  const flipLong = (opts.flip ?? 'long') === 'long';
+  const mirrorAcross = fit.rotated ? !flipLong : flipLong;
+  const mirrored = fit.cells.map((c) => mirrorAcross
+    ? { ...c, xMm: fit.sheetWMm - (c.xMm + c.wMm) }
+    : { ...c, yMm: fit.sheetHMm - (c.yMm + c.hMm) });
+
+  /* THE PAGE STANDS UP on the doubled stocks: one matrix before any drawing,
+     baked into the content, never a /Rotate. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const newSheet = () => {
+    const pg = out.addPage([mm(fit.pageWMm), mm(fit.pageHMm)]);
+    if (fit.rotated) pg.pushOperators(PL.concatTransformationMatrix(0, 1, -1, 0, mm(fit.pageWMm), 0));
+    return pg;
+  };
+
+  const pages = [newSheet()];
+  const frontCells = spinFront ? mirrored : fit.cells;
+  drawSheet(pages[0], front, frontTurn, frontCells);
+  const cellsFor = [frontCells];
+  if (back) {
+    const baseBack: 0 | 90 | 180 | 270 = needsTurn(back)
+      ? (mirrorAcross ? 270 : 90)
+      : (mirrorAcross ? 0 : 180);
+    const backTurn = ((baseBack + (spun ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
+    const bp = newSheet();
+    drawSheet(bp, back, backTurn, mirrored);
+    pages.push(bp);
+    cellsFor.push(mirrored);
+  }
+
+  pages.forEach((pg, pi) => { if (opts.addMarks !== false) {
+    const len = mm(opts.markLenMm ?? 3), off = mm(opts.markOffMm ?? 1.5);
+    const w0 = opts.markWeightPt ?? 0.25;
+    const line = (x1: number, y1: number, x2: number, y2: number) =>
+      pg.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: w0, color: rgb(0, 0, 0) });
+    /* In the sheet margins only — every gutter is 3 mm, too narrow for a mark
+       that would not run onto the neighbor. */
+    const xs = new Set<number>(), ys = new Set<number>();
+    for (const c of cellsFor[pi]!) {
+      xs.add(mm(c.xMm)); xs.add(mm(c.xMm + c.wMm));
+      ys.add(mm(c.yMm)); ys.add(mm(c.yMm + c.hMm));
+    }
+    const sheetH = mm(fit.sheetHMm), sheetW = mm(fit.sheetWMm);
+    for (const x of xs) { line(x, 0, x, len); line(x, sheetH, x, sheetH - len); }
+    for (const y of ys) { line(0, y, len, y); line(sheetW, y, sheetW - len, y); }
+    for (const cx of fit.cutXMm) {
+      line(mm(cx), 0, mm(cx), len + off); line(mm(cx), sheetH, mm(cx), sheetH - len - off);
+    }
+  } });
+
+  await carryColorContext(src, out);
+  return out.save();
+}
+
 /* ── Media Size Fix ─────────────────────────────────────────────────────────
 
    Put a FINISHED file onto the sheet it actually prints on, and center it there
