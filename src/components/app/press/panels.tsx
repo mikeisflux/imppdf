@@ -3342,17 +3342,25 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
           ))}
         </div>
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
-          <div>Sheet <b>{BC_SHEET_LABEL[SHEET]}</b> — <b>{FIT.n} cards</b>,
-            {' '}{BC_DOUBLED.has(SHEET) ? `two blocks of 2 × ${FIT.rows}` : `2 × ${FIT.rows}`}</div>
+          <div>Sheet <b>{BC_SHEET_LABEL[SHEET]}</b> — <b>{FIT.n} whole cards</b>,
+            {' '}{BC_DOUBLED.has(SHEET) ? `two blocks of 2 × ${FIT.wholeRows}` : `2 × ${FIT.wholeRows}`}
+            {FIT.wholeRows < FIT.rows && <> (the A4 layout&apos;s row {FIT.wholeRows + 1} would run off the foot, so it is not printed)</>}</div>
           {BC_DOUBLED.has(SHEET) && (
             <div>Cut <b>across</b> at <b>{round2(FIT.cutXMm[0] ?? 0)} mm</b> from the foot first; each half is
               then a {SHEET === 'a3' ? 'A4' : 'Letter'} sheet carrying the same template. The cut is marked on both edges.
               The page is stood up rather than re-laid, so no card moves in its cell.</div>
           )}
           {(SHEET === 'letter' || SHEET === 'tabloid') && (
-            <div style={{ marginTop: 4 }}>A Letter sheet is 279.4 tall and the five-row block is 282 of cards alone, so
-              Letter takes <b>four rows</b>. Same cards, same grooves, centered on the sheet — the side margin
-              comes out {round2(DEFS.marginXMm)} instead of A4&apos;s 13.5 because Letter is 5.9 wider.</div>
+            <div style={{ marginTop: 4 }}>
+              <b>Letter in a machine programmed for A4.</b> The cards are laid out <b>exactly as on A4</b>, hung
+              from the <b>top edge</b>: first cut at <b>7.5</b>, then every <b>57</b>. The cross-cut indexes off the
+              leading edge and knows nothing about the sheet&apos;s length, so nothing is centered down the sheet:
+              four rows are whole, and the fifth would run off the foot so it is <b>not printed</b> — that end of
+              the sheet stays blank. Across, the slitting blades sit either side of the machine&apos;s center line and
+              the rails center the sheet, so A comes out {round2(DEFS.marginXMm)} instead of 13.5 (Letter is 5.9
+              wider). <b>Feed the head edge in first</b> — the end with the 7.5 margin, which the cut marks
+              show{SHEET === 'tabloid' ? '; on the stood-up 11 × 17 page that is the left edge of each half' : ''}.
+            </div>
           )}
         </div>
       </Section>
@@ -3373,9 +3381,12 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
         ))}
         <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.7 }}>
           <b>A {round2(DEFS.marginXMm)} · B {round2(DEFS.gutterXMm)} · D {round2(DEFS.marginTopMm)} ·
-          rows {round2(DEFS.gutterYMm)}</b> is the template on this stock: the cutter steps
+          rows {round2(DEFS.gutterYMm)}</b> is the template on this stock: D is the program&apos;s Front len
+          from the leading edge on every stock, and the cutter steps
           <b> {round2(FIT.cellHMm + FIT.gutterYMm)}</b> mm a row, the same every row. One row gutter,
-          because a slitter steps one constant pitch. Every number here places a <b>cut</b>; the art is
+          because a slitter steps one constant pitch. If a red-line test shows the first cut landing short
+          and the rows drifting, that is the machine (the trading cards measured 1.7 short and 0.2 long a
+          row on this cutter) — put the measured D and gutter in here. Every number here places a <b>cut</b>; the art is
           laid at the layout size and never moves one.
           {' '}<button className="pe-chipbtn" style={{ marginLeft: 6 }} onClick={() => up({ ...untyped })}>
             Reset to the template</button>
@@ -3402,14 +3413,13 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
         ) : <div className="pe-note">Add the card artwork to check its size.</div>}
       </Section>
 
-      <Section label="// BACKS" help="The Back upload (or page 2 of the working file) becomes a sheet of backs, mirrored to land behind the fronts.">
+      <Section label="// BACKS" help="The Back upload (or page 2 of the working file) becomes a sheet of backs, mirrored across to land behind the fronts. The rows stay hung from the leading edge, so the sheet must turn over about its long edge.">
         <Check icon="flip" label="Print a backs sheet" sub={backArt ? `From ${backArt.name}` : 'From page 2 of the working file, when it has one'}
           checked={s.backs !== false} onChange={(v) => up({ backs: v })} />
-        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-          <span className="pe-label" style={{ flex: '1 0 100%' }}>Duplex flip<span className="pe-label-sm"> · how the press turns the sheet</span></span>
-          {([['long', 'Long edge'], ['short', 'Short edge']] as const).map(([id, label]) => (
-            <button key={id} className="pe-btn" style={pickStyle((s.flip ?? 'long') === id)} onClick={() => up({ flip: id })}>{label}</button>
-          ))}
+        <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
+          Set the press to a <b>{BC_DOUBLED.has(SHEET) ? 'SHORT-edge' : 'LONG-edge'} flip</b> for this stock.
+          The rows are cut from the leading edge on both sides, so they must not move between front and back;
+          only the columns mirror.{BC_DOUBLED.has(SHEET) ? ' On the stood-up page the long edge of the layout is the page\u2019s short edge.' : ''}
         </div>
         <div style={{ marginTop: 8 }}>
           <Check icon="rotate" label="Spin backs 180°" checked={!!s.spinBacks} onChange={(v) => up({ spinBacks: v })} />

@@ -5162,8 +5162,6 @@ export interface BusinessCardOptions {
   page?: number;
   backPage?: number;
   backs?: boolean;
-  /** How the press turns the sheet. The back is mirrored about this axis. */
-  flip?: 'long' | 'short';
   /** Half-turn the back art within its cell. */
   spinBacks?: boolean;
   marginXMm?: number; marginTopMm?: number; gutterXMm?: number; gutterYMm?: number;
@@ -5312,17 +5310,17 @@ export async function imposeBusinessCards(
     }
   };
 
-  /* Backs mirror about the duplex flip's axis, in the layout frame: a long-edge
-     flip of a portrait page mirrors across; on the stood-up doubled page, page x
-     is layout y, so there a long-edge flip mirrors each block top to bottom. */
+  /* BACKS MIRROR ACROSS ONLY. The rows are hung from the leading edge at the
+     cross-cut program's figures, and a back sheet is cut the same way from
+     ITS leading edge — so the rows must not move, and the sheet turns over
+     about the layout's long edge. That is the press's long-edge flip on A4
+     and Letter, and its SHORT-edge flip on the stood-up doubled page, where
+     page y is layout x. The panel says which. */
   const spun = opts.spinBacks === true;
   const spinFront = spun && !backPage;
   const frontTurn = (((needsTurn(front) ? 90 : 0) + (spinFront ? 180 : 0)) % 360) as 0 | 90 | 180 | 270;
-  const flipLong = (opts.flip ?? 'long') === 'long';
-  const mirrorAcross = fit.rotated ? !flipLong : flipLong;
-  const mirrored = fit.cells.map((c) => mirrorAcross
-    ? { ...c, xMm: fit.sheetWMm - (c.xMm + c.wMm) }
-    : { ...c, yMm: fit.sheetHMm - (c.yMm + c.hMm) });
+  const mirrorAcross = true;
+  const mirrored = fit.cells.map((c) => ({ ...c, xMm: fit.sheetWMm - (c.xMm + c.wMm) }));
 
   /* THE PAGE STANDS UP on the doubled stocks: one matrix before any drawing,
      baked into the content, never a /Rotate. */
@@ -5358,7 +5356,9 @@ export async function imposeBusinessCards(
     const xs = new Set<number>(), ys = new Set<number>();
     for (const c of cellsFor[pi]!) {
       xs.add(mm(c.xMm)); xs.add(mm(c.xMm + c.wMm));
-      ys.add(mm(c.yMm)); ys.add(mm(c.yMm + c.hMm));
+      /* A row that runs off the foot has no edge to mark there. */
+      if (c.yMm >= 0) ys.add(mm(c.yMm));
+      if (c.yMm + c.hMm >= 0) ys.add(mm(c.yMm + c.hMm));
     }
     const sheetH = mm(fit.sheetHMm), sheetW = mm(fit.sheetWMm);
     for (const x of xs) { line(x, 0, x, len); line(x, sheetH, x, sheetH - len); }

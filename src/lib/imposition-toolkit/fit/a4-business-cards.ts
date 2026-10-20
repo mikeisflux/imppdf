@@ -18,11 +18,32 @@
  *   11 x 17   two LETTER halves, 431.8 x 279.4 stood up to 279.4 x 431.8,
  *             cut at 215.9                                                — 16
  *
- * A Letter half is 279.4 tall and the five-row block is 282 of cards alone, so
- * a Letter half takes FOUR rows (the sixteen on an 11 x 17 are 2 x 8). The
- * template is otherwise unchanged on it: same cards, bleed and groove, the
- * block centered on the half, so each half cuts on the A4 program with a
- * slightly wider edge margin (the sheet is 5.9 wider than A4).
+ * THE MACHINE IS PROGRAMMED FOR A4 AND THE SHEET IN IT MAY NOT BE (owner:
+ * Letter halves off an 11 x 17). The two passes reference the sheet
+ * differently, and the template has to follow each:
+ *
+ *   ACROSS (pass 1, the slitting blades): fixed hardware either side of the
+ *   machine's center line, and the lock rails center the sheet on it. So the
+ *   block is CENTERED across whatever the sheet is — 13.5 from the edge on
+ *   A4, 16.45 on Letter (5.9 wider). Blade positions are measured with the
+ *   red cut lines, never assumed.
+ *
+ *   DOWN (pass 2, the programmed cross-cut): the machine indexes off the
+ *   LEADING EDGE — Front len 7.5, then card + groove every 57 — and knows
+ *   nothing about the sheet's length. So the rows sit at those distances from
+ *   the head on EVERY stock, never centered: the A4 layout, lined up with the
+ *   top edge, and WHATEVER WOULD FALL OFF THE BOTTOM IS NOT PRINTED AT ALL
+ *   (owner: "don't even put the image there"). On a Letter half (279.4) four
+ *   rows are whole; the fifth would start at 235.5 and end at 289.5, so it is
+ *   left off and the 46.9 at the tail is blank. Centering the block on Letter
+ *   (what the A4 drawing looks like) put every row 27 mm from the blade.
+ *   FEED THE HEAD EDGE IN FIRST: the end with the 7.5 mm margin, which the
+ *   cut marks show.
+ *
+ *   BACKS therefore mirror ACROSS only — the rows must stay at the program's
+ *   distances from the back sheet's own leading edge, so the sheet turns over
+ *   about its long edge (the layout's). On the stood-up doubled page that is
+ *   the press's SHORT-edge flip, because page y is layout x there.
  *
  * THE CUTTER STEPS ONE CONSTANT PITCH, so there is a single row gutter here,
  * not one per row. The gutters place the CUTS; the art is laid at the layout
@@ -40,6 +61,10 @@ export const BC_LAYOUT_W_MM = BC_CARD_W_MM + 2 * BC_BLEED_MM;   // 93
 export const BC_LAYOUT_H_MM = BC_CARD_H_MM + 2 * BC_BLEED_MM;   // 57
 /** The groove between adjacent cards — two bleeds, so the layout boxes touch. */
 export const BC_GROOVE_MM = 2 * BC_BLEED_MM;                    // 3
+/** The cross-cut program's Front len: leading edge to the first cut. The
+ *  template's 6 mm to the first layout box plus the 1.5 bleed. The same on
+ *  every stock, because the machine indexes off the edge, not the sheet. */
+export const BC_FRONT_MM = 6 + BC_BLEED_MM;                     // 7.5
 /** Past the layout box the art's edge is carried outward across the margin
  *  to this far (or the paper's edge), as registration tolerance. */
 export const BC_OUTER_BLEED_MM = 8;
@@ -66,33 +91,45 @@ export interface BusinessCardTemplate {
   /** The one row gutter, repeated every row. */ gutterYMm?: number;
 }
 
+/** The A4 program's rows — laid on every stock. */
+export const BC_ROWS = 5;
+
 interface SheetSpec {
-  wMm: number; hMm: number; blockWMm: number; blockHMm: number; rows: number;
+  wMm: number; hMm: number; blockWMm: number;
   doubled: boolean; rotated?: boolean;
 }
 
 const SHEETS: Record<BusinessCardSheet, SheetSpec> = {
-  a4:      { wMm: A4_W_MM, hMm: A4_H_MM, blockWMm: A4_W_MM, blockHMm: A4_H_MM, rows: 5, doubled: false },
-  a3:      { wMm: A3_W_MM, hMm: A3_H_MM, blockWMm: A4_W_MM, blockHMm: A4_H_MM, rows: 5, doubled: true, rotated: true },
-  letter:  { wMm: LETTER_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, blockHMm: LETTER_H_MM, rows: 4, doubled: false },
-  tabloid: { wMm: TABLOID_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, blockHMm: LETTER_H_MM, rows: 4, doubled: true, rotated: true },
+  a4:      { wMm: A4_W_MM, hMm: A4_H_MM, blockWMm: A4_W_MM, doubled: false },
+  a3:      { wMm: A3_W_MM, hMm: A3_H_MM, blockWMm: A4_W_MM, doubled: true, rotated: true },
+  letter:  { wMm: LETTER_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: false },
+  tabloid: { wMm: TABLOID_W_MM, hMm: LETTER_H_MM, blockWMm: LETTER_W_MM, doubled: true, rotated: true },
 };
 
-/** Rows of cards in one block on this stock. */
-export function rowsFor(sheet: BusinessCardSheet): number {
-  return (SHEETS[sheet] ?? SHEETS.a4).rows;
+/** Rows laid in one block: always the A4 program's five. */
+export function rowsFor(_sheet: BusinessCardSheet): number { return BC_ROWS; }
+
+/** Rows that are WHOLE on this stock, from the head at the program's figures. */
+export function wholeRowsFor(sheet: BusinessCardSheet, t: BusinessCardTemplate = {}): number {
+  const spec = SHEETS[sheet] ?? SHEETS.a4;
+  const d = sheetDefaults(sheet);
+  const mTop = t.marginTopMm ?? d.marginTopMm, gY = t.gutterYMm ?? d.gutterYMm;
+  let n = 0;
+  while (n < BC_ROWS && mTop + (n + 1) * BC_CARD_H_MM + n * gY <= spec.hMm + 1e-6) n++;
+  return n;
 }
 
-/** The template's own figures for a stock: the block of cards centered on the
- *  block's sheet, with the groove between them. */
+/** The template's own figures for a stock: the block CENTERED ACROSS (the
+ *  slitting blades sit either side of the machine's center line), and the
+ *  rows FROM THE LEADING EDGE at the program's Front len (the cross-cut
+ *  indexes off the edge). On A4 both come out as the drawing: 13.5 / 7.5. */
 export function sheetDefaults(sheet: BusinessCardSheet = 'a4'): Required<BusinessCardTemplate> {
   const spec = SHEETS[sheet] ?? SHEETS.a4;
   const blockW = BC_COLS * BC_CARD_W_MM + (BC_COLS - 1) * BC_GROOVE_MM;
-  const blockH = spec.rows * BC_CARD_H_MM + (spec.rows - 1) * BC_GROOVE_MM;
   return {
     marginXMm: (spec.blockWMm - blockW) / 2,
     gutterXMm: BC_GROOVE_MM,
-    marginTopMm: (spec.blockHMm - blockH) / 2,
+    marginTopMm: BC_FRONT_MM,
     gutterYMm: BC_GROOVE_MM,
   };
 }
@@ -101,9 +138,12 @@ export interface CardRectMm { xMm: number; yMm: number; wMm: number; hMm: number
 
 export interface BusinessCardFit {
   sheetWMm: number; sheetHMm: number;
-  /** Every card, origin BOTTOM-LEFT (PDF), in the LAYOUT frame. */
+  /** Every card that is WHOLE on the sheet, origin BOTTOM-LEFT (PDF), in the
+   *  LAYOUT frame. A row of the program that would run off the foot is not
+   *  laid at all. */
   cells: CardRectMm[];
-  n: number; cols: number; rows: number;
+  /** Whole cards on the sheet; cols; rows laid (5) and rows whole. */
+  n: number; cols: number; rows: number; wholeRows: number;
   marginXMm: number; marginTopMm: number; marginBottomMm: number; marginRightMm: number;
   gutterXMm: number; gutterYMm: number;
   cellWMm: number; cellHMm: number;
@@ -121,17 +161,19 @@ export function fitBusinessCards(
   const defs = sheetDefaults(sheet);
   const gX = t.gutterXMm ?? defs.gutterXMm;
   const gY = t.gutterYMm ?? defs.gutterYMm;
+  const whole = wholeRowsFor(sheet, t);
   const blockW = BC_COLS * BC_CARD_W_MM + (BC_COLS - 1) * gX;
-  const blockH = spec.rows * BC_CARD_H_MM + (spec.rows - 1) * gY;
-  /* A typed A or D wins; otherwise the block is centered on its sheet, which
-     is exactly the template's 13.5 / 7.5. */
-  const mX = t.marginXMm ?? (spec.blockWMm - blockW) / 2;
-  const mTop = t.marginTopMm ?? (spec.blockHMm - blockH) / 2;
+  /* The block that is ON the sheet: the whole rows. H is measured to it. */
+  const blockH = whole * BC_CARD_H_MM + Math.max(0, whole - 1) * gY;
+  /* A typed A or D wins; otherwise A centers the block across and D is the
+     program's Front len from the leading edge — see the header. */
+  const mX = t.marginXMm ?? defs.marginXMm;
+  const mTop = t.marginTopMm ?? defs.marginTopMm;
   const mBot = spec.hMm - mTop - blockH;
 
   const blockCells = (originXMm: number): CardRectMm[] => {
     const out: CardRectMm[] = [];
-    for (let r = 0; r < spec.rows; r++) {
+    for (let r = 0; r < whole; r++) {
       for (let c = 0; c < BC_COLS; c++) {
         out.push({
           xMm: originXMm + mX + c * (BC_CARD_W_MM + gX),
@@ -147,7 +189,7 @@ export function fitBusinessCards(
   return {
     sheetWMm: spec.wMm, sheetHMm: spec.hMm,
     cells: spec.doubled ? [...blockCells(0), ...blockCells(spec.blockWMm)] : blockCells(0),
-    n: (spec.doubled ? 2 : 1) * BC_COLS * spec.rows, cols: BC_COLS, rows: spec.rows,
+    n: (spec.doubled ? 2 : 1) * BC_COLS * whole, cols: BC_COLS, rows: BC_ROWS, wholeRows: whole,
     marginXMm: mX, marginTopMm: mTop, marginBottomMm: mBot,
     marginRightMm: spec.blockWMm - mX - blockW,
     gutterXMm: gX, gutterYMm: gY,

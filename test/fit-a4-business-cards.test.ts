@@ -55,19 +55,36 @@ test('A3 is two A4 blocks side by side, stood up portrait, cut at 210', () => {
   }
 });
 
-test('11 x 17 is two Letter halves of 2 x 4 (five rows do not fit 279.4), cut at 215.9', () => {
-  assert.equal(rowsFor('letter'), 4);
+test('11 x 17 is two Letter halves: the A4 layout hung from the top, row 5 off the foot, cut at 215.9', () => {
+  assert.equal(rowsFor('letter'), 5);
   assert.ok(5 * 54 + 4 * 3 > 279.4, 'the 10-up block is taller than a Letter half');
   const f = fitBusinessCards('tabloid');
-  assert.equal(f.n, 16); assert.ok(f.rotated);
+  assert.equal(f.n, 16); assert.equal(f.wholeRows, 4); assert.ok(f.rotated);
   assert.ok(close(f.pageWMm, 279.4, 0.01)); assert.ok(close(f.pageHMm, 431.8, 0.01));
   assert.ok(close(f.cutXMm[0]!, 215.9, 0.01));
   const d = sheetDefaults('letter');
-  // Same template, centered on the half: (215.9 - 183) / 2 across, (279.4 - 225) / 2 down.
+  // Across: centered on the half, (215.9 - 183) / 2 — the slitting blades sit
+  // either side of the machine's center line and the rails center the sheet.
   assert.ok(close(d.marginXMm, (215.9 - 183) / 2, 0.01));
-  assert.ok(close(d.marginTopMm, (279.4 - 225) / 2, 0.01));
+  // Down: NOT centered. The cross-cut indexes off the leading edge at the A4
+  // program, so the first cut is at 7.5 on Letter exactly as on A4, the rows
+  // step 57, and the leftover (46.9) all goes to the tail.
+  assert.ok(close(d.marginTopMm, 7.5, 0.01));
   assert.equal(d.gutterXMm, 3); assert.equal(d.gutterYMm, 3);
-  // Every cell lies within its own half.
+  const letter = fitBusinessCards('letter');
+  // EXACTLY the A4 layout from the top edge, and the fifth row — which would
+  // start at 235.5 and end at 289.5 > 279.4 — is NOT laid (owner: "don't even
+  // put the image there").
+  const tops = [...new Set(letter.cells.map((c) => 279.4 - (c.yMm + c.hMm)))].sort((a, b) => a - b);
+  assert.deepEqual(tops.map((v) => Math.round(v * 100) / 100), [7.5, 64.5, 121.5, 178.5]);
+  assert.equal(letter.cells.length, 8); assert.equal(letter.n, 8); assert.equal(letter.wholeRows, 4);
+  for (const c of letter.cells) assert.ok(c.yMm >= 0, 'every laid card is wholly on the sheet');
+  assert.ok(close(letter.marginBottomMm, 279.4 - 7.5 - 225, 0.01), 'H is the blank tail, 46.9');
+  // The A4 rows are at the same distances from the head — same program, same cuts.
+  const a4tops = [...new Set(fitBusinessCards('a4').cells.map((c) => 297 - (c.yMm + c.hMm)))].sort((a, b) => a - b);
+  assert.deepEqual(a4tops.slice(0, 4).map((v) => Math.round(v * 100) / 100), tops.map((v) => Math.round(v * 100) / 100));
+  // Every cell lies within its own half across.
+  assert.equal(f.cells.length, 16);
   for (const c of f.cells.slice(0, 8)) assert.ok(c.xMm + c.wMm <= 215.9 + 1e-9);
   for (const c of f.cells.slice(8)) assert.ok(c.xMm >= 215.9 - 1e-9);
 });
