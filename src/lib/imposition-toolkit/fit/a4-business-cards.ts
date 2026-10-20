@@ -46,6 +46,10 @@ export const BC_OUTER_BLEED_MM = 8;
 export const BC_STREAK_MM = 0.5;
 export const BC_SEAM_MM = 0.3;
 export const BC_COLS = 2;
+/** The red cut-line band for honing: 1 mm, lying entirely OUTSIDE the cell
+ *  with its inner edge ON the cut, so a blade on the line leaves no red on
+ *  the card and any red that shows is the overshoot, exact width. */
+export const BC_CUT_LINE_MM = 1;
 
 export const A4_W_MM = 210, A4_H_MM = 297;
 export const A3_W_MM = 420, A3_H_MM = 297;

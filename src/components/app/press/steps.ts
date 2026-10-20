@@ -635,7 +635,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           flip: s.flip === 'short' ? 'short' : 'long', spinBacks: !!s.spinBacks,
           marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
           gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
-          addMarks: s.addMarks !== false,
+          addMarks: s.addMarks !== false, showCuts: !!s.showCuts,
         });
         break;
       }

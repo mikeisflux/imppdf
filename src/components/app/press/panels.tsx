@@ -3419,6 +3419,11 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
       <Section label="// MARKS" help="Cut marks are ruled off the sheet edges, never into the 3 mm grooves, so nothing prints on a neighboring card.">
         <Check icon="crop" label="Cut marks" sub="At every card edge in the sheet margins, plus the half-sheet cut on A3 and 11 × 17"
           checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />
+        <div style={{ marginTop: 8 }}>
+          <Check icon="crop" label="Red cut lines (test sheet)"
+            sub="A 1 mm red band on every cut, just outside the card, over the art. Cut one sheet and read it: no red on a card means the blade is on the line; red down an edge means it landed outside by that much; art missing off an edge means inside."
+            checked={!!s.showCuts} onChange={(v) => up({ showCuts: v })} />
+        </div>
       </Section>
     </>
   );

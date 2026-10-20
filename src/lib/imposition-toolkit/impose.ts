@@ -5170,6 +5170,9 @@ export interface BusinessCardOptions {
   /** Cut marks in the margins plus the half-sheet cut on a doubled stock. */
   addMarks?: boolean;
   markLenMm?: number; markOffMm?: number; markWeightPt?: number;
+  /** Paint every cut line in red, 1 mm, just outside the cell, over the art —
+   *  the honing diagnostic (see the trading cards). Off by default. */
+  showCuts?: boolean;
 }
 
 export async function imposeBusinessCards(
@@ -5177,7 +5180,7 @@ export async function imposeBusinessCards(
 ): Promise<Uint8Array> {
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, degrees } = PL;
-  const { fitBusinessCards, PT_PER_MM, BC_BLEED_MM, BC_OUTER_BLEED_MM, BC_STREAK_MM, BC_SEAM_MM } =
+  const { fitBusinessCards, PT_PER_MM, BC_BLEED_MM, BC_OUTER_BLEED_MM, BC_STREAK_MM, BC_SEAM_MM, BC_CUT_LINE_MM } =
     await import('./fit/a4-business-cards.ts');
 
   const fit = fitBusinessCards(opts.sheet ?? 'a4', {
@@ -5363,6 +5366,27 @@ export async function imposeBusinessCards(
     for (const cx of fit.cutXMm) {
       line(mm(cx), 0, mm(cx), len + off); line(mm(cx), sheetH, mm(cx), sheetH - len - off);
     }
+  } });
+
+  /* THE RED CUT LINES, over the art, full width or height like the blade and
+     entirely outside the cell. Read: no red on a card = the blade is on the
+     line; red down an edge = the blade landed outside the line by that width;
+     art missing off an edge = it landed inside. */
+  pages.forEach((pg, pi) => { if (opts.showCuts === true) {
+    const bands = new Set<string>();
+    const k = (v: number) => Math.round(v * 1e6) / 1e6;
+    for (const c of cellsFor[pi]!) {
+      bands.add(`x,${k(c.xMm - BC_CUT_LINE_MM)}`); bands.add(`x,${k(c.xMm + c.wMm)}`);
+      bands.add(`y,${k(c.yMm - BC_CUT_LINE_MM)}`); bands.add(`y,${k(c.yMm + c.hMm)}`);
+    }
+    const band = mm(BC_CUT_LINE_MM);
+    pg.pushOperators(PL.pushGraphicsState(), PL.setFillingColor(rgb(1, 0, 0)));
+    for (const b of bands) {
+      const [ax, at] = b.split(',');
+      if (ax === 'x') pg.pushOperators(PL.rectangle(mm(Number(at)), 0, band, mm(fit.sheetHMm)), PL.fill());
+      else pg.pushOperators(PL.rectangle(0, mm(Number(at)), mm(fit.sheetWMm), band), PL.fill());
+    }
+    pg.pushOperators(PL.popGraphicsState());
   } });
 
   await carryColorContext(src, out);
