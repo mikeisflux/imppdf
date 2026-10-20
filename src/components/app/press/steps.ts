@@ -161,11 +161,12 @@ export function defaultSettings(type: StepType): StepSettings {
       return { sheet: 'letter', page: 1, backPage: 2, backs: true, flip: 'long', spinBacks: false,
         blackBg: false, addMarks: true };
     case 'a4bizcards':
-      /* The manufacturer's 10-up business card template: 90 x 54 cards in
-         93 x 57 layout boxes, 3 mm grooves, centered on A4. Doubled onto A3
-         (20) and 11 x 17 (two Letter halves of 8). No gutters are stored:
-         an untyped gap takes the template's figure for the stock. */
-      return { sheet: 'a4', front: null, back: null, page: 1, backPage: 2, backs: true, spinBacks: false, addMarks: true };
+      /* The card cutter's namecard template: 89 x 54 cards in 92 x 57 file
+         boxes, cuts 10 apart across and 6 apart down, tiled from the top
+         edge with the 10 x 3 mark; centered across. Doubled onto A3 (20) and
+         11 x 17 (two Letter halves of 8). No gutters are stored: an untyped
+         gap takes the template's figure for the stock. */
+      return { sheet: 'a4', front: null, back: null, page: 1, backPage: 2, backs: true, spinBacks: false, addMarks: true, regMark: true };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
@@ -634,7 +635,8 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           page: s.page ?? 1, backPage: s.backPage ?? 2, backs: s.backs !== false,
           spinBacks: !!s.spinBacks,
           marginXMm: s.marginXMm, marginTopMm: s.marginTopMm,
-          gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
+          gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm, cardWMm: s.cardWMm,
+          regMark: s.regMark !== false, regMarkInsetMm: s.regMarkInsetMm,
           addMarks: s.addMarks !== false, showCuts: !!s.showCuts,
         });
         break;

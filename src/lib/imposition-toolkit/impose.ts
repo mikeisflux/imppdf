@@ -5137,15 +5137,16 @@ export async function imposeDivinityCards(
 
 /* ── A4 Business Card Cutter ────────────────────────────────────────────────
 
-   The manufacturer's 10-up business card template: two columns of five 90 x 54
-   cards in 93 x 57 layout boxes, centered on an A4, with the block doubled onto
-   A3 (two A4s, 20 cards) and onto 11 x 17 (two Letter halves of 2 x 4, 16
+   The card cutter's "namecard" template: two columns of five 89 x 54 cards in
+   92 x 57 file boxes, centered across an A4 and tiled from its top edge, with
+   a 10 x 3 mark at the top for the machine's eye; the block doubled onto A3
+   (two A4s, 20 cards) and onto 11 x 17 (two Letter halves of 2 x 4, 16
    cards). Geometry and the row counts live in fit/a4-business-cards.ts.
 
-   The art is laid at the LAYOUT size — the cell plus 1.5 on every side — so the
+   The art is laid at the FILE size — the cell plus 1.5 on every side — so the
    cut takes the same 1.5 off every edge of every card. A card exported WITH
-   that bleed (93 x 57) maps onto the box exactly; a trim-size card (90 x 54) is
-   scaled up by the same 3.3% on both axes to fill it. Either way the aspect is
+   that bleed (92 x 57) maps onto the box exactly; a trim-size card (89 x 54) is
+   scaled up by the same 3.4% on both axes to fill it. Either way the aspect is
    kept: the art is COVER-fitted to the box and clipped, never stretched.
    Outside the block, the art's edge is carried across the margin so a blade a
    little out still lands in ink; between cards the boxes already meet. */
@@ -5165,6 +5166,12 @@ export interface BusinessCardOptions {
   /** Half-turn the back art within its cell. */
   spinBacks?: boolean;
   marginXMm?: number; marginTopMm?: number; gutterXMm?: number; gutterYMm?: number;
+  /** Card width as the machine is set up: 85, 89 (default) or 90. */
+  cardWMm?: number;
+  /** The 10 x 3 black bar at the top, centered in the column gap, that the
+   *  machine's eye indexes off. Part of the template — default ON. */
+  regMark?: boolean;
+  regMarkInsetMm?: number;
   /** Cut marks in the margins plus the half-sheet cut on a doubled stock. */
   addMarks?: boolean;
   markLenMm?: number; markOffMm?: number; markWeightPt?: number;
@@ -5178,12 +5185,12 @@ export async function imposeBusinessCards(
 ): Promise<Uint8Array> {
   const PL = await import('pdf-lib');
   const { PDFDocument, rgb, degrees } = PL;
-  const { fitBusinessCards, PT_PER_MM, BC_BLEED_MM, BC_OUTER_BLEED_MM, BC_STREAK_MM, BC_SEAM_MM, BC_CUT_LINE_MM } =
-    await import('./fit/a4-business-cards.ts');
+  const { fitBusinessCards, PT_PER_MM, BC_BLEED_MM, BC_OUTER_BLEED_MM, BC_STREAK_MM, BC_SEAM_MM, BC_CUT_LINE_MM,
+    BC_MARK_W_MM, BC_MARK_H_MM, BC_MARK_INSET_MM } = await import('./fit/a4-business-cards.ts');
 
   const fit = fitBusinessCards(opts.sheet ?? 'a4', {
     marginXMm: opts.marginXMm, marginTopMm: opts.marginTopMm,
-    gutterXMm: opts.gutterXMm, gutterYMm: opts.gutterYMm,
+    gutterXMm: opts.gutterXMm, gutterYMm: opts.gutterYMm, cardWMm: opts.cardWMm,
   });
   const mm = (v: number) => v * PT_PER_MM;
 
@@ -5365,6 +5372,21 @@ export async function imposeBusinessCards(
     for (const y of ys) { line(0, y, len, y); line(sheetW, y, sheetW - len, y); }
     for (const cx of fit.cutXMm) {
       line(mm(cx), 0, mm(cx), len + off); line(mm(cx), sheetH, mm(cx), sheetH - len - off);
+    }
+  } });
+
+  /* THE MARK, last so nothing lands on it: a black bar at the head of each
+     block, centered in its column gap, the bar's leading edge inset from the
+     sheet edge. The eye sees paper, then black, and indexes every cut from
+     that step. On the backs sheet the gap mirrors onto itself, so it is in the
+     same place. */
+  pages.forEach((pg) => { if (opts.regMark !== false) {
+    const inset = Math.max(0, opts.regMarkInsetMm ?? BC_MARK_INSET_MM);
+    for (const mx of fit.markXMm) {
+      pg.drawRectangle({
+        x: mm(mx - BC_MARK_W_MM / 2), y: mm(fit.sheetHMm - inset - BC_MARK_H_MM),
+        width: mm(BC_MARK_W_MM), height: mm(BC_MARK_H_MM), color: rgb(0, 0, 0),
+      });
     }
   } });
 

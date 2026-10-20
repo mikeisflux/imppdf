@@ -8,7 +8,7 @@ import {
 } from '@/lib/imposition-toolkit/fit/divinity-cards';
 import {
   fitBusinessCards, sheetDefaults as bcSheetDefaults, type BusinessCardSheet,
-  BC_BLEED_MM, BC_LAYOUT_W_MM, BC_LAYOUT_H_MM, BC_CARD_W_MM, BC_CARD_H_MM,
+  BC_BLEED_MM, BC_CARD_W_MM, BC_CARD_H_MM, BC_CARD_WIDTHS_MM, BC_MARK_W_MM, BC_MARK_H_MM, BC_MARK_INSET_MM,
 } from '@/lib/imposition-toolkit/fit/a4-business-cards';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
 import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
@@ -3285,10 +3285,12 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
   const frontArt = s.front as { name: string } | null | undefined;
   const backArt = s.back as { name: string } | null | undefined;
   const SHEET = (['a4', 'a3', 'letter', 'tabloid'].includes(s.sheet) ? s.sheet : 'a4') as BusinessCardSheet;
+  const CARD_W = (BC_CARD_WIDTHS_MM as readonly number[]).includes(s.cardWMm) ? (s.cardWMm as number) : BC_CARD_W_MM;
   const FIT = fitBusinessCards(SHEET, {
-    marginXMm: s.marginXMm, marginTopMm: s.marginTopMm, gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm,
+    marginXMm: s.marginXMm, marginTopMm: s.marginTopMm, gutterXMm: s.gutterXMm, gutterYMm: s.gutterYMm, cardWMm: CARD_W,
   });
-  const DEFS = bcSheetDefaults(SHEET);
+  const DEFS = bcSheetDefaults(SHEET, CARD_W);
+  const LAYOUT_W = CARD_W + 2 * BC_BLEED_MM, LAYOUT_H = BC_CARD_H_MM + 2 * BC_BLEED_MM;
   const untyped = { marginXMm: undefined, marginTopMm: undefined, gutterXMm: undefined, gutterYMm: undefined };
   /* C is the remainder of the BLOCK's sheet (a half, on the doubled stocks):
      A + block + C = that width. Typing C slides the block; nothing resizes. */
@@ -3300,23 +3302,30 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
   const src = pageSizes[Math.max(0, Math.min(pageSizes.length - 1, (s.page ?? 1) - 1))];
   const wMm = src ? src.wPt * MM : 0, hMm = src ? src.hPt * MM : 0;
   const ratio = wMm && hMm ? Math.max(wMm, hMm) / Math.min(wMm, hMm) : 0;
-  const wantedTrim = BC_CARD_W_MM / BC_CARD_H_MM, wantedLayout = BC_LAYOUT_W_MM / BC_LAYOUT_H_MM;
+  const wantedTrim = CARD_W / BC_CARD_H_MM, wantedLayout = LAYOUT_W / LAYOUT_H;
   const off = ratio ? Math.min(Math.abs(ratio - wantedTrim) / wantedTrim, Math.abs(ratio - wantedLayout) / wantedLayout) : 0;
 
   return (
     <>
       <div className="pe-note" style={{ marginBottom: 12 }}>
-        The card cutter&apos;s own template. Upload <b>one card</b> and it fills the sheet:
-        <b> {BC_CARD_W_MM} × {BC_CARD_H_MM} mm</b> cards in <b>{BC_LAYOUT_W_MM} × {BC_LAYOUT_H_MM}</b> layout boxes
-        ({BC_BLEED_MM} mm past every cut), two columns, <b>3 mm</b> grooves, the block centered.
-        Export the card at {BC_LAYOUT_W_MM} × {BC_LAYOUT_H_MM} with bleed, or at {BC_CARD_W_MM} × {BC_CARD_H_MM} trim —
-        either is fitted to the layout box without distortion.
+        The card cutter&apos;s own namecard template. Upload <b>one card</b> and it fills the sheet:
+        <b> {CARD_W} × {BC_CARD_H_MM} mm</b> cards in <b>{LAYOUT_W} × {LAYOUT_H}</b> file boxes
+        ({BC_BLEED_MM} mm past every cut), two columns <b>10</b> apart, rows <b>6</b> apart, centered across and
+        tiled from the <b>top edge</b>, with the <b>{BC_MARK_W_MM} × {BC_MARK_H_MM}</b> mark at the top for the eye.
+        Export the card at {LAYOUT_W} × {LAYOUT_H} with bleed, or at {CARD_W} × {BC_CARD_H_MM} trim —
+        either is fitted to the file box without distortion.
       </div>
 
       <Section label="// ARTWORK" help="One PDF with the front on page 1 and the back on page 2 does both sides — drop it into the editor or into the Front slot. Or give the front and the back as two files (PDF or image). Each card is 93 x 57 with bleed or 90 x 54 trim.">
         <div className="pe-note" style={{ marginBottom: 8 }}>
           A <b>two-page PDF</b> (front, then back) is all you need, in the editor or in the Front slot.
           The Back slot is for a back that comes as its own file.
+        </div>
+        <div className="pe-row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          <span className="pe-label" style={{ flex: '1 0 100%' }}>Card width<span className="pe-label-sm"> · as the machine is set up (85 / 89 / 90) × 54</span></span>
+          {BC_CARD_WIDTHS_MM.map((w) => (
+            <button key={w} className="pe-btn" style={pickStyle(CARD_W === w)} onClick={() => up({ cardWMm: w, ...untyped })}>{w} × 54</button>
+          ))}
         </div>
         {([['front', 'Front', frontArt], ['back', 'Back', backArt]] as const).map(([key, label, art]) => (
           <div key={key} className="pe-gang-job">
@@ -3342,7 +3351,7 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
           ))}
         </div>
         <div className="pe-note" style={{ marginTop: 8, lineHeight: 1.7 }}>
-          <div>Sheet <b>{BC_SHEET_LABEL[SHEET]}</b> — <b>{FIT.n} whole cards</b>,
+          <div>Sheet <b>{BC_SHEET_LABEL[SHEET]}</b> — <b>{FIT.n} cards</b>,
             {' '}{BC_DOUBLED.has(SHEET) ? `two blocks of 2 × ${FIT.wholeRows}` : `2 × ${FIT.wholeRows}`}
             {FIT.wholeRows < FIT.rows && <> (the A4 layout&apos;s row {FIT.wholeRows + 1} would run off the foot, so it is not printed)</>}</div>
           {BC_DOUBLED.has(SHEET) && (
@@ -3353,13 +3362,14 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
           {(SHEET === 'letter' || SHEET === 'tabloid') && (
             <div style={{ marginTop: 4 }}>
               <b>Letter in a machine programmed for A4.</b> The cards are laid out <b>exactly as on A4</b>, hung
-              from the <b>top edge</b>: first cut at <b>7.5</b>, then every <b>57</b>. The cross-cut indexes off the
-              leading edge and knows nothing about the sheet&apos;s length, so nothing is centered down the sheet:
-              four rows are whole, and the fifth would run off the foot so it is <b>not printed</b> — that end of
-              the sheet stays blank. Across, the slitting blades sit either side of the machine&apos;s center line and
-              the rails center the sheet, so A comes out {round2(DEFS.marginXMm)} instead of 13.5 (Letter is 5.9
-              wider). <b>Feed the head edge in first</b> — the end with the 7.5 margin, which the cut marks
-              show{SHEET === 'tabloid' ? '; on the stood-up 11 × 17 page that is the left edge of each half' : ''}.
+              from the <b>top edge</b>: first cut at <b>{round2(DEFS.marginTopMm)}</b>, then every
+              <b> {round2(BC_CARD_H_MM + DEFS.gutterYMm)}</b>. The machine indexes off the mark and the leading edge and
+              knows nothing about the sheet&apos;s length, so nothing is centered down the sheet: four rows are
+              whole, and the fifth would run off the foot so it is <b>not printed</b> — that end of the sheet
+              stays blank. Across, the slitting blades sit either side of the machine&apos;s center line and the
+              rails center the sheet, so A comes out {round2(DEFS.marginXMm)} instead of A4&apos;s
+              {' '}{round2((210 - FIT.blockWMm) / 2)} (Letter is 5.9 wider). <b>Feed the head edge in first</b> — the
+              end with the mark{SHEET === 'tabloid' ? '; on the stood-up 11 × 17 page that is the left edge of each half' : ''}.
             </div>
           )}
         </div>
@@ -3381,8 +3391,8 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
         ))}
         <div className="pe-note" style={{ marginTop: 12, lineHeight: 1.7 }}>
           <b>A {round2(DEFS.marginXMm)} · B {round2(DEFS.gutterXMm)} · D {round2(DEFS.marginTopMm)} ·
-          rows {round2(DEFS.gutterYMm)}</b> is the template on this stock: D is the program&apos;s Front len
-          from the leading edge on every stock, and the cutter steps
+          rows {round2(DEFS.gutterYMm)}</b> is the template on this stock: the file boxes tile from the top
+          edge (D is the 1.5 bleed) on every stock, and the cutter steps
           <b> {round2(FIT.cellHMm + FIT.gutterYMm)}</b> mm a row, the same every row. One row gutter,
           because a slitter steps one constant pitch. If a red-line test shows the first cut landing short
           and the rows drifting, that is the machine (the trading cards measured 1.7 short and 0.2 long a
@@ -3405,7 +3415,7 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
             <div>Your card measures <b>{wMm.toFixed(1)} × {hMm.toFixed(1)} mm</b></div>
             {off > 0.02 && (
               <div className="pe-gang-warn" style={{ marginTop: 6 }}>
-                ⚠ That is not a {BC_CARD_W_MM} × {BC_CARD_H_MM} card (or {BC_LAYOUT_W_MM} × {BC_LAYOUT_H_MM} with bleed).
+                ⚠ That is not a {CARD_W} × {BC_CARD_H_MM} card (or {LAYOUT_W} × {LAYOUT_H} with bleed).
                 It will be scaled to cover the layout box and the overflow trimmed.
               </div>
             )}
@@ -3426,9 +3436,20 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
         </div>
       </Section>
 
-      <Section label="// MARKS" help="Cut marks are ruled off the sheet edges, never into the 3 mm grooves, so nothing prints on a neighboring card.">
-        <Check icon="crop" label="Cut marks" sub="At every card edge in the sheet margins, plus the half-sheet cut on A3 and 11 × 17"
-          checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />
+      <Section label="// MARKS" help="The template's mark for the machine's eye, plus cut marks ruled off the sheet edges, never into the gutters, so nothing prints on a neighboring card.">
+        <Check icon="crop" label={`Mark for the eye (${BC_MARK_W_MM} × ${BC_MARK_H_MM} mm bar)`}
+          sub="At the top, centered in the column gap, as the template draws it — the eye sees paper then black and indexes every cut off that step"
+          checked={s.regMark !== false} onChange={(v) => up({ regMark: v })} />
+        {s.regMark !== false && (
+          <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+            <span className="pe-label" style={{ flex: 1 }}>Mark inset<span className="pe-label-sm"> · top edge to the bar, mm</span></span>
+            <NumRaw value={s.regMarkInsetMm ?? BC_MARK_INSET_MM} onValue={(v) => up({ regMarkInsetMm: v })} w={70} />
+          </div>
+        )}
+        <div style={{ marginTop: 8 }}>
+          <Check icon="crop" label="Cut marks" sub="At every card edge in the sheet margins, plus the half-sheet cut on A3 and 11 × 17"
+            checked={s.addMarks !== false} onChange={(v) => up({ addMarks: v })} />
+        </div>
         <div style={{ marginTop: 8 }}>
           <Check icon="crop" label="Red cut lines (test sheet)"
             sub="A 1 mm red band on every cut, just outside the card, over the art. Cut one sheet and read it: no red on a card means the blade is on the line; red down an edge means it landed outside by that much; art missing off an edge means inside."

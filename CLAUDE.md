@@ -247,6 +247,24 @@ by explicit owner instruction — do not "fix" it to combine pages.
   rows need 334.6 mm, over Letter (279.4) AND over A4 (297), so after the eight
   that fit the machine hunts for a fifth row that cannot exist on any sheet it
   takes. It does not harm the eight — do not try to "fix" it in the file.
+- **A4 Business Card Cutter** (`fit/a4-business-cards.ts`) is the card
+  cutter's NAMECARD template (its manual, page 16), a different machine from
+  the 2102-F: 89 × 54 cards in 92 × 57 file boxes (1.5 bleed), two columns
+  with the cards 10 apart (cuts 11 / 100 / 110 / 199 on A4), five rows with
+  the cards 6 apart and the file boxes TILING THE SHEET FROM THE TOP EDGE
+  (5 × 57 + 4 × 3 = 297: first cut 1.5, pitch 60), and a 10 × 3 black mark at
+  the top centered in the column gap for the machine's eye (default ON; the
+  85 / 89 / 90 widths the machine takes are selectable). ACROSS the block is
+  CENTERED on whatever sheet is in the machine (the slit blades sit either
+  side of its center line and the rails center the sheet). DOWN it is NEVER
+  centered: the machine indexes off the leading edge and the A4 program, so
+  on a Letter half off an 11 × 17 the rows sit exactly where they do on A4,
+  hung from the top edge, and the row that would run off the foot is NOT
+  PRINTED AT ALL (owner) — four rows on Letter, blank tail. Backs mirror
+  ACROSS only (rows must stay at the program's distances from the back's own
+  leading edge), so the press flip is long-edge on A4/Letter and SHORT-edge
+  on the stood-up A3/11 × 17; the tool offers no flip choice. Red cut lines
+  are on a switch for honing, same reading as the trading cards.
 - Never assume how many items fit a sheet: always run the fit calculation
   accounting for margins, gutters, crop marks, and bleed before placing.
 - If rotating an item 90° lets more fit, rotate it.

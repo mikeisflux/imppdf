@@ -66,7 +66,7 @@ export const TOOLS: Tool[] = [
   { slug: 'flip-book', name: 'Flip Book', blurb: 'Frame-grid flip books.', category: 'make', engine: 'nup', inPlugin: true, cta: 'Make a flip book' },
   { slug: 'business-cards', name: 'Business Cards', blurb: 'Gang multiple cards per sheet.', category: 'make', engine: 'nup', inPlugin: true, featured: true, cta: 'Impose cards' },
   { slug: 'trading-cards', name: 'Trading Cards', blurb: '9-up trading card sheets.', category: 'make', engine: 'nup', inPlugin: true, cta: 'Make trading cards' },
-  { slug: 'a4-business-card-cutter', name: 'A4 Business Card Cutter', blurb: '10-up 90 × 54 cards on the card cutter\u2019s own A4 template; doubled on A3 and 11 × 17.', category: 'make', engine: 'nup', inPlugin: true, cta: 'Cut business cards' },
+  { slug: 'a4-business-card-cutter', name: 'A4 Business Card Cutter', blurb: '10-up 89 × 54 cards on the card cutter\u2019s own A4 template; doubled on A3 and 11 × 17.', category: 'make', engine: 'nup', inPlugin: true, cta: 'Cut business cards' },
   { slug: 'stickers', name: 'Stickers', blurb: 'Die-cut sticker sheets, ganged up.', category: 'make', engine: 'nup', inPlugin: true, featured: true, cta: 'Make stickers' },
   { slug: 'step-and-repeat', name: 'Step & Repeat', blurb: 'One design, repeated across the sheet.', category: 'make', engine: 'nup', inPlugin: true, featured: true, cta: 'Step & repeat' },
   { slug: 'calendar', name: 'Calendar', blurb: 'Build print-ready calendar layouts.', category: 'make', engine: 'calendar', inPlugin: true, featured: true, cta: 'Make a calendar' },
