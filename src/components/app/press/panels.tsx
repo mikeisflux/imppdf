@@ -3313,13 +3313,17 @@ function BusinessCardsPanel({ s, up, pageSizes = [], pageCount = 0, onLoadSource
         either is fitted to the layout box without distortion.
       </div>
 
-      <Section label="// ARTWORK" help="Front and back as two files (PDF or image), each the card at 93 x 57 with bleed or 90 x 54 trim. With no uploads, the working file is used: page 1 is the front and page 2, if there is one, the back.">
+      <Section label="// ARTWORK" help="One PDF with the front on page 1 and the back on page 2 does both sides — drop it into the editor or into the Front slot. Or give the front and the back as two files (PDF or image). Each card is 93 x 57 with bleed or 90 x 54 trim.">
+        <div className="pe-note" style={{ marginBottom: 8 }}>
+          A <b>two-page PDF</b> (front, then back) is all you need, in the editor or in the Front slot.
+          The Back slot is for a back that comes as its own file.
+        </div>
         {([['front', 'Front', frontArt], ['back', 'Back', backArt]] as const).map(([key, label, art]) => (
           <div key={key} className="pe-gang-job">
             <div className="pe-row" style={{ marginBottom: 6 }}>
               <span className="pe-gang-thumb"><b style={{ fontSize: 12 }}>{label[0]}</b></span>
               <span className="pe-label" style={{ flex: 1 }}>{label}
-                <span className="pe-label-sm"> · {key === 'front' ? 'page 1 of the working file if empty' : 'page 2 of the working file if empty'}</span></span>
+                <span className="pe-label-sm"> · {key === 'front' ? 'or the working file' : 'or page 2 of the front'}</span></span>
               {art && <button className="pe-iconbtn" aria-label={`Remove ${label} art`} title="Remove" onClick={() => up({ [key]: null })}><Ic name="trash" size={14} /></button>}
             </div>
             {art

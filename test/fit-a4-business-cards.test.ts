@@ -123,3 +123,29 @@ test('imposeBusinessCards: separate front and back uploads make a fronts sheet a
   const solo = await PDFDocument.load(await imposeBusinessCards(other, { sheet: 'a4', front }));
   assert.equal(solo.getPageCount(), 1);
 });
+
+test('imposeBusinessCards: a two-page PDF carries front and back, wherever it is loaded', async () => {
+  const { imposeBusinessCards } = await import('../src/lib/imposition-toolkit/impose.ts');
+  const twoPage = await (async () => {
+    const d = await PDFDocument.create();
+    for (const c of [rgb(0.2, 0.3, 0.8), rgb(0.9, 0.8, 0.6)]) {
+      const p = d.addPage([93 * PT_PER_MM, 57 * PT_PER_MM]);
+      p.drawRectangle({ x: 0, y: 0, width: 93 * PT_PER_MM, height: 57 * PT_PER_MM, color: c });
+    }
+    return d.save();
+  })();
+  const onePage = await (async () => {
+    const d = await PDFDocument.create();
+    const p = d.addPage([50 * PT_PER_MM, 50 * PT_PER_MM]);
+    p.drawRectangle({ x: 0, y: 0, width: 50 * PT_PER_MM, height: 50 * PT_PER_MM, color: rgb(0, 0, 0) });
+    return d.save();
+  })();
+  // As the working file.
+  assert.equal((await PDFDocument.load(await imposeBusinessCards(twoPage, { sheet: 'a4' }))).getPageCount(), 2);
+  // In the Front slot, over an unrelated one-page working file.
+  assert.equal((await PDFDocument.load(await imposeBusinessCards(onePage, { sheet: 'a4', front: twoPage }))).getPageCount(), 2);
+  // In the Front slot with a separate Back: the Back upload wins, still two sheets.
+  assert.equal((await PDFDocument.load(await imposeBusinessCards(onePage, { sheet: 'a3', front: twoPage, back: onePage }))).getPageCount(), 2);
+  // Backs off: one sheet.
+  assert.equal((await PDFDocument.load(await imposeBusinessCards(twoPage, { sheet: 'a4', backs: false }))).getPageCount(), 1);
+});

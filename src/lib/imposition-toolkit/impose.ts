@@ -5196,28 +5196,32 @@ export async function imposeBusinessCards(
   const srcPages = src.getPages();
   const frontIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.page ?? 1))) - 1;
   const backIdx = Math.min(srcPages.length, Math.max(1, Math.round(opts.backPage ?? 2))) - 1;
-  const docs: import('pdf-lib').PDFDocument[] = [src];
-  let frontPage = srcPages[frontIdx] ?? null;
+  /* A MULTI-PAGE FILE CARRIES BOTH SIDES. Wherever the front comes from — the
+     Front slot or the working file — if that file has a second page, that
+     page is the back, unless a separate Back upload says otherwise. */
+  let frontDocPages = srcPages;
   if (opts.front?.length) {
     const fd = await PDFDocument.load(opts.front.slice(), { ignoreEncryption: true });
-    docs.push(fd); frontPage = fd.getPages()[0] ?? frontPage;
+    frontDocPages = fd.getPages();
   }
+  const fIdx = Math.min(frontDocPages.length, Math.max(1, Math.round(opts.page ?? 1))) - 1;
+  const frontPage = frontDocPages[fIdx] ?? null;
   if (!frontPage) return out.save();
   let backPage: typeof frontPage | null = null;
   if (opts.backs !== false) {
     if (opts.back?.length) {
       const bd = await PDFDocument.load(opts.back.slice(), { ignoreEncryption: true });
-      docs.push(bd); backPage = bd.getPages()[0] ?? null;
-    } else if (!opts.front?.length && srcPages.length > 1 && backIdx !== frontIdx) {
+      backPage = bd.getPages()[0] ?? null;
+    } else if (frontDocPages.length > 1) {
+      const bIdx = Math.min(frontDocPages.length, Math.max(1, Math.round(opts.backPage ?? 2))) - 1;
+      if (bIdx !== fIdx) backPage = frontDocPages[bIdx]!;
+    } else if (opts.front?.length && srcPages.length > 1 && backIdx !== frontIdx) {
+      /* A one-page front over a two-page working file: that file's page 2. */
       backPage = srcPages[backIdx]!;
-    } else if (opts.front?.length && srcPages.length > 1) {
-      /* A separate front over a two-page working file: its page 2 is the back. */
-      backPage = srcPages[Math.min(srcPages.length - 1, Math.max(1, backIdx))] ?? null;
     }
   }
   const front = await out.embedPage(frontPage);
   const back = backPage ? await out.embedPage(backPage) : null;
-  void docs;
 
   /* The cell lies across (90 x 54). Portrait art gets the quarter turn so it
      lies the cell's way; landscape art is left alone. */
