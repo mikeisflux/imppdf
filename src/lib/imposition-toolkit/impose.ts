@@ -3666,6 +3666,12 @@ export interface DivinityBoxOptions {
   /** Resolution of the W1/V1 plates in the LAYOUT PDF (default 150). The TIFF
    *  and the proof take their own `dpi`. */
   spotDpi?: number;
+  /** Build the W1/V1 plates into the layout PDF. Default true. The editor
+   *  passes false for its live PREVIEW: the plates need the full compositor
+   *  (pdf.js renders, the knockout, the subject segmentation), which is far
+   *  too slow to run on every keystroke and invisible in the preview anyway —
+   *  white under the art on white paper. Export always builds them. */
+  spotPlates?: boolean;
 }
 
 export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8Array> {
@@ -3725,7 +3731,7 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
   // panel; invariant 5 says ink only where the art has ink.) The compositor
   // needs pdf.js and a canvas; where there is none (tests), the plates are
   // simply omitted rather than flooded.
-  if ((opts.whiteUnder !== false || opts.varnish) && placedPanels.length) {
+  if (opts.spotPlates !== false && (opts.whiteUnder !== false || opts.varnish) && placedPanels.length) {
     let plate: Awaited<ReturnType<typeof composeDivinityBox>> | null = null;
     try { plate = await composeDivinityBox(opts, opts.spotDpi ?? 150); } catch { plate = null; }
     if (plate) {

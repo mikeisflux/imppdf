@@ -698,6 +698,12 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           a: art(s.a), b: art(s.b), c: art(s.c), d: art(s.d),
           fit: (s.fit ?? 'cover') as 'cover' | 'contain' | 'stretch',
           whiteUnder: s.whiteUnder !== false, varnish: !!s.varnish, foldMarks: s.foldMarks !== false,
+          /* The W1/V1 plates come from the full compositor (renders, knockout,
+             subject segmentation) — export only; the live preview skips them.
+             Same knockout settings as the TIFF so the plates agree. */
+          spotPlates: forExport,
+          knockoutBlack: s.knockoutBlack !== false, knockoutMinAreaFrac: s.knockoutMinAreaFrac ?? 0.02,
+          protectSubject: s.protectSubject !== false,
         });
         break;
       }
