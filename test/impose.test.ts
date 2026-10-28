@@ -657,3 +657,39 @@ test('blackSwathKeepMask light mode: a white background goes, a small white high
   const dark = blackSwathKeepMask(rgba, w, h, { minAreaFrac: 0.02, step: 1 });
   assert.equal(dark[10 * w + 10], 255);
 });
+
+test('blackSwathKeepMask: grain in a black background does not speckle the knockout', async () => {
+  const { blackSwathKeepMask, boxMeanPlane } = await import('../src/lib/imposition-toolkit/impose.ts');
+  // boxMeanPlane: a flat plane stays flat, a lone bright pixel spreads to its window mean.
+  const flat = new Uint8Array(50 * 50).fill(20);
+  assert.deepEqual(Array.from(boxMeanPlane(flat, 50, 50, 4).subarray(0, 5)), [20, 20, 20, 20, 20]);
+  const w = 400, h = 300;
+  const rgba = new Uint8Array(w * h * 4);
+  let seed = 3; const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4;
+    const subject = x >= 150 && x < 250 && y >= 80 && y < 220;
+    // background: mean 22 (inside the ramp) with ±6 grain — a scanned/JPEG black
+    const v = subject ? 200 : Math.max(0, Math.min(255, Math.round(22 + (rnd() - 0.5) * 12)));
+    rgba[i] = v; rgba[i + 1] = v; rgba[i + 2] = v; rgba[i + 3] = 255;
+  }
+  // smoothPx 8 = the default for a 300 dpi panel (short side 2480 px / 300).
+  const keep = blackSwathKeepMask(rgba, w, h, { minAreaFrac: 0.02, step: 1, smoothPx: 8 });
+  // Background: a ramp value near the mean (22 → keep ≈ 128), and NOT speckled.
+  let diff = 0, n = 0, sum = 0;
+  for (let y = 20; y < 60; y++) for (let x = 20; x < 120; x++) { const k = keep[y * w + x]!, k2 = keep[y * w + x + 1]!; diff += Math.abs(k - k2); sum += k; n++; }
+  const meanK = sum / n, meanNeighborDelta = diff / n;
+  assert.ok(meanK > 100 && meanK < 160, `ramp about the mean luminance, got ${meanK}`);
+  assert.ok(meanNeighborDelta < 3, `no speckle: neighbor delta ${meanNeighborDelta}`);
+  // Raw per-pixel reading of the same grain WOULD speckle (what the print showed).
+  const raw = blackSwathKeepMask(rgba, w, h, { minAreaFrac: 0.02, step: 1, smoothPx: 0 });
+  let rdiff = 0;
+  for (let y = 20; y < 60; y++) for (let x = 20; x < 120; x++) rdiff += Math.abs(raw[y * w + x]! - raw[y * w + x + 1]!);
+  assert.ok(rdiff / n > 20, `unsmoothed reading speckles: ${rdiff / n}`);
+  // The subject prints in full, including its edge pixel.
+  assert.equal(keep[150 * w + 150], 255);
+  assert.equal(keep[150 * w + 200], 255);
+  // Just outside the subject the smoothed luminance rises, so those swath
+  // pixels print MORE (keep higher than the open background), never less.
+  assert.ok(keep[150 * w + 148]! >= meanK - 5, 'edge of the swath beside the subject keeps ink');
+});

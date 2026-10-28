@@ -3531,7 +3531,7 @@ const DBOX_KO_NONE = 34;   // ≈13% — at/above this the art prints normally
 // left to print.
 export function blackSwathKeepMask(
   rgba: Uint8ClampedArray | Uint8Array, w: number, h: number,
-  opts?: { minAreaFrac?: number; full?: number; none?: number; protect?: Uint8Array | null; step?: number; light?: boolean },
+  opts?: { minAreaFrac?: number; full?: number; none?: number; protect?: Uint8Array | null; step?: number; light?: boolean; smoothPx?: number },
 ): Uint8Array {
   const full = opts?.full ?? DBOX_KO_FULL, none = opts?.none ?? DBOX_KO_NONE;
   const minAreaFrac = opts?.minAreaFrac ?? 0.02;          // ≥2% of the panel
@@ -3541,6 +3541,18 @@ export function blackSwathKeepMask(
     const l = 0.299 * rgba[i]! + 0.587 * rgba[i + 1]! + 0.114 * rgba[i + 2]!;
     return light ? 255 - l : l;
   };
+  // The ramp reads a LOCALLY SMOOTHED luminance, never the raw pixel. A photo's
+  // black background carries ±5-10 levels of grain and JPEG noise; the ramp
+  // spans only 24 levels (full→none), so read per pixel it multiplies that
+  // noise ten-fold into the alpha — and alpha is what the color, W1 and V1
+  // all print from. The result on press was a speckled, banded image
+  // ("grainy and liney"). Averaging the luminance over ~0.7 mm (radius
+  // `smoothPx`, default 1/300 of the panel's short side: 8 px at 300 dpi)
+  // takes the grain out while the swath's own edge stays a soft ramp. Near
+  // the subject the smoothed luminance RISES (bright neighbors), so the few
+  // swath pixels along its edge print rather than knock out — a hair of the
+  // black stays, which is the safe side; the subject never loses ink.
+  const smoothPx = Math.max(0, Math.round(opts?.smoothPx ?? (Math.min(w, h) / 300)));
   const keep = new Uint8Array(w * h).fill(255);
   // Coarse analysis grid — "large swath" doesn't need per-pixel connectivity,
   // and this keeps the labeling cheap on a 9-megapixel panel.
@@ -3578,6 +3590,11 @@ export function blackSwathKeepMask(
   const minCells = (minAreaFrac * w * h) / (step * step);
   const big = areas.map((a) => a >= minCells);
   if (!big.some(Boolean)) return keep;                     // no swath — nothing to do
+  // Smoothed luminance plane (separable box mean, radius smoothPx, windows
+  // clamped at the panel edge). Transparent pixels contribute nothing.
+  const lumPlane = new Uint8Array(w * h);
+  for (let idx = 0, i = 0; idx < w * h; idx++, i += 4) lumPlane[idx] = rgba[i + 3]! <= 4 ? 255 : Math.round(lumOf(i));
+  const smooth = smoothPx > 0 ? boxMeanPlane(lumPlane, w, h, smoothPx) : lumPlane;
   // Apply the luminance ramp, but only inside a big region.
   for (let y = 0; y < h; y++) {
     const gy = Math.min(gh - 1, (y / step) | 0);
@@ -3588,7 +3605,7 @@ export function blackSwathKeepMask(
       const idx = y * w + x, i = idx * 4;
       if (rgba[i + 3]! <= 4) continue;
       if (protect && protect[idx]! >= 128) continue;
-      const lum = lumOf(i);
+      const lum = smooth[idx]!;
       if (lum >= none) continue;
       const k = lum <= full ? 0 : (lum - full) / (none - full);
       const scaled = Math.round(k * 255);
@@ -3607,6 +3624,36 @@ export function blackKnockoutAlpha(
   if (lum >= none) return a;                           // light enough — print it
   if (lum <= full) return 0;                           // substrate black — no ink
   return Math.round(a * ((lum - full) / (none - full)));
+}
+
+// Mean of a single-channel 8-bit plane over a (2r+1)² window (separable box
+// filter, running sums, window clamped at the edges so the border is the mean
+// of what is there). Used to read the knockout ramp off smoothed luminance.
+export function boxMeanPlane(src: Uint8Array, w: number, h: number, r: number): Uint8Array {
+  if (r <= 0) return src;
+  const tmp = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let sum = 0, cnt = 0;
+    for (let k = 0; k <= Math.min(w - 1, r); k++) { sum += src[row + k]!; cnt++; }
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = sum / cnt;
+      const add = x + r + 1, drop = x - r;
+      if (add < w) { sum += src[row + add]!; cnt++; }
+      if (drop >= 0) { sum -= src[row + drop]!; cnt--; }
+    }
+  }
+  const out = new Uint8Array(w * h);
+  const colSum = new Float64Array(w), colCnt = new Int32Array(w);
+  for (let k = 0; k <= Math.min(h - 1, r); k++) for (let x = 0; x < w; x++) { colSum[x] += tmp[k * w + x]!; colCnt[x]++; }
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) out[row + x] = Math.round(colSum[x]! / colCnt[x]!);
+    const add = y + r + 1, drop = y - r;
+    if (add < h) for (let x = 0; x < w; x++) { colSum[x] += tmp[add * w + x]!; colCnt[x]++; }
+    if (drop >= 0) for (let x = 0; x < w; x++) { colSum[x] -= tmp[drop * w + x]!; colCnt[x]--; }
+  }
+  return out;
 }
 
 // Erode a single-channel 8-bit plane by `r` px (separable min filter). Any pixel

@@ -44,7 +44,12 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    NEVER knocked out; MobileSAM (`subjectMask`) additionally shields the
    subject so a black costume can't be read as background. Within a
    qualifying swath it is a smooth luminance RAMP (full at ≤10, none at
-   ≥34), never a hard threshold, so edges stay anti-aliased. The owner's
+   ≥34), never a hard threshold, so edges stay anti-aliased — and the ramp
+   reads a LOCALLY SMOOTHED luminance (`boxMeanPlane`, radius `smoothPx`,
+   default 1/300 of the panel's short side ≈ 0.7 mm), never the raw pixel:
+   a photo's black carries ±5-10 levels of grain and the 24-level ramp
+   multiplied it ten-fold into the alpha, which printed as a speckled,
+   banded image ("grainy and liney"). Never read the ramp per pixel. The owner's
    second exception is the PER-PANEL **"White background is transparent"**
    switch (`whiteBg`, default OFF): an upload that sits on a flat white page
    is knocked out by the same machinery with the luminance mirrored
