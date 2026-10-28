@@ -962,6 +962,14 @@ function DivinityBoxPanel(p: PanelProps) {
               {art
                 ? <div className="pe-note" style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ {art.name} <button className="pe-chipbtn" style={{ marginLeft: 8 }} onClick={() => pickArt(panel.key)}>Replace</button></div>
                 : <button className="pe-btn" onClick={() => pickArt(panel.key)}>Upload panel {panel.label}…</button>}
+              {art && (
+                <div style={{ marginTop: 8 }}>
+                  <Check icon="droplet" label="White background is transparent"
+                    sub="Knock the open white expanse out like a black one — no white, varnish or color there, the box shows. Small white areas and the subject keep printing."
+                    checked={!!(s.whiteBg as Record<string, boolean> | undefined)?.[panel.key]}
+                    onChange={(v) => up({ whiteBg: { ...((s.whiteBg as Record<string, boolean>) ?? {}), [panel.key]: v } })} />
+                </div>
+              )}
             </div>
           );
         })}
@@ -1019,6 +1027,7 @@ function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSet
         fit: (s.fit ?? 'cover') as 'cover' | 'contain' | 'stretch',
         whiteUnder: s.whiteUnder !== false, varnish: !!s.varnish, knockoutBlack: s.knockoutBlack !== false,
         knockoutMinAreaFrac: s.knockoutMinAreaFrac ?? 0.02, protectSubject: s.protectSubject !== false, dpi,
+        whiteBg: s.whiteBg ?? {},
       });
       downloadFile(tiff, 'divinity-box.tif', 'image/tiff');
     } catch (e) { setErr(e instanceof Error ? e.message : 'TIFF export failed.'); }
@@ -1037,7 +1046,7 @@ function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSet
         fit: (s.fit ?? 'cover') as 'cover' | 'contain' | 'stretch',
         whiteUnder: s.whiteUnder !== false, varnish: !!s.varnish, knockoutBlack: s.knockoutBlack !== false,
         knockoutMinAreaFrac: s.knockoutMinAreaFrac ?? 0.02, protectSubject: s.protectSubject !== false,
-        foldMarks: !!s.foldMarks, dpi: s.proofDpi ?? 150,
+        foldMarks: !!s.foldMarks, dpi: s.proofDpi ?? 150, whiteBg: s.whiteBg ?? {},
       });
       downloadPdf(pdf, 'divinity-box-proof.pdf');
     } catch (e) { setErr(e instanceof Error ? e.message : 'Proof export failed.'); }
@@ -1062,7 +1071,7 @@ function DivinityBoxTiffExport({ s, up }: { s: StepSettings; up: (patch: StepSet
         <button className="pe-btn" onClick={downloadProof} disabled={busy || !hasArt}>{busy ? 'Rendering…' : 'Download Proof PDF'}</button>
       </div>
       <div className="pe-note" style={{ marginTop: 8 }}>
-        The proof carries <b>real W1/V1 separation plates</b> built by the same compositor as the TIFF, so the knockout, the artwork&apos;s own transparency and the 3&nbsp;px white choke all show up when you check separations. (The step&apos;s own PDF output stays vector for fast previewing; its spots are panel rectangles, not the real plates.)
+        The proof carries <b>real W1/V1 separation plates</b> built by the same compositor as the TIFF, so the knockout, the artwork&apos;s own transparency and the 3&nbsp;px white choke all show up when you check separations. (The step&apos;s own PDF stays a fast vector preview while you work; on export it carries the same real plates.)
       </div>
       <div className="pe-note" style={{ marginTop: 8 }}>
         Channels, in order: <b>R G B + transparency + W1 + V1</b> — 8-bit RGB with an alpha and the white/varnish spots, no compression, interleaved. (RGB, not CMYK, so it opens.) Transparency is respected everywhere: any area with no art — an empty panel, the gaps, around a logo — stays transparent and prints nothing, so the black box shows through. White & varnish follow the artwork, choked <b>3&nbsp;px</b> so no white halo shows past the art.

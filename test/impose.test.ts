@@ -636,3 +636,24 @@ test('orientSubjectMask: a mask holding the corners is the background, so flip i
   const held = orientSubjectMask(Uint8Array.from(cornerHugger), w, h);
   assert.deepEqual(Array.from(held), Array.from(cornerHugger), 'one corner does not trigger a flip');
 });
+
+test('blackSwathKeepMask light mode: a white background goes, a small white highlight and the subject stay', async () => {
+  const { blackSwathKeepMask } = await import('../src/lib/imposition-toolkit/impose.ts');
+  const w = 200, h = 200;
+  const rgba = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4;
+    const inSubject = x >= 60 && x < 140 && y >= 60 && y < 140;           // a mid-gray block
+    const highlight = x >= 95 && x < 105 && y >= 95 && y < 105;           // a tiny white glint on it
+    const v = inSubject && !highlight ? 120 : 255;
+    rgba[i] = v; rgba[i + 1] = v; rgba[i + 2] = v; rgba[i + 3] = 255;
+  }
+  const keep = blackSwathKeepMask(rgba, w, h, { light: true, minAreaFrac: 0.02, step: 1 });
+  assert.equal(keep[10 * w + 10], 0, 'open white background knocked out');
+  assert.equal(keep[190 * w + 190], 0, 'open white background knocked out (far corner)');
+  assert.equal(keep[100 * w + 70], 255, 'the subject prints');
+  assert.equal(keep[100 * w + 100], 255, 'a small white highlight inside the subject still prints (area < 2%)');
+  // Without light mode the same image is untouched (nothing is black).
+  const dark = blackSwathKeepMask(rgba, w, h, { minAreaFrac: 0.02, step: 1 });
+  assert.equal(dark[10 * w + 10], 255);
+});

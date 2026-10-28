@@ -44,7 +44,14 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    NEVER knocked out; MobileSAM (`subjectMask`) additionally shields the
    subject so a black costume can't be read as background. Within a
    qualifying swath it is a smooth luminance RAMP (full at ≤10, none at
-   ≥34), never a hard threshold, so edges stay anti-aliased.
+   ≥34), never a hard threshold, so edges stay anti-aliased. The owner's
+   second exception is the PER-PANEL **"White background is transparent"**
+   switch (`whiteBg`, default OFF): an upload that sits on a flat white page
+   is knocked out by the same machinery with the luminance mirrored
+   (`light: true` — full at ≥245, none at ≤221), same large-swath rule,
+   same subject protection, so the open white expanse gets no color, no W1
+   and no V1 and the box shows through, while a small white highlight or a
+   white shirt on the subject still prints. Never make it global or default.
 7. **Geometry (owner spec, 2026-09-30, supersedes the 572 mm sheet and its
    bleed into the fold zones): sheet 306 × 575 mm = trim 300 × 575 + 3 mm
    bleed LEFT+RIGHT only. A 2 mm no-art OFFSET at the top, then panels

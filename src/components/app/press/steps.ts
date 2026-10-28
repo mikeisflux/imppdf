@@ -703,7 +703,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
              Same knockout settings as the TIFF so the plates agree. */
           spotPlates: forExport,
           knockoutBlack: s.knockoutBlack !== false, knockoutMinAreaFrac: s.knockoutMinAreaFrac ?? 0.02,
-          protectSubject: s.protectSubject !== false,
+          protectSubject: s.protectSubject !== false, whiteBg: s.whiteBg ?? {},
         });
         break;
       }

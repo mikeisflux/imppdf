@@ -3522,13 +3522,25 @@ const DBOX_KO_NONE = 34;   // ≈13% — at/above this the art prints normally
 // Returns per-pixel KEEP strength (255 = print normally, 0 = knock out), so the
 // swath's own edges still ramp softly instead of stair-stepping.
 // `protect` (0..255 subject coverage, e.g. from MobileSAM) is never knocked out.
+//
+// `light: true` runs the same thing on WHITE instead of black — for a panel
+// whose art sits on a white background that should read as transparent
+// (owner). Luminance is simply mirrored (255 − lum), so a big open white
+// expanse is knocked out with the same ramp and the same large-swath rule,
+// and a white highlight on the subject, or any small bounded white area, is
+// left to print.
 export function blackSwathKeepMask(
   rgba: Uint8ClampedArray | Uint8Array, w: number, h: number,
-  opts?: { minAreaFrac?: number; full?: number; none?: number; protect?: Uint8Array | null; step?: number },
+  opts?: { minAreaFrac?: number; full?: number; none?: number; protect?: Uint8Array | null; step?: number; light?: boolean },
 ): Uint8Array {
   const full = opts?.full ?? DBOX_KO_FULL, none = opts?.none ?? DBOX_KO_NONE;
   const minAreaFrac = opts?.minAreaFrac ?? 0.02;          // ≥2% of the panel
   const protect = opts?.protect ?? null;
+  const light = opts?.light === true;
+  const lumOf = (i: number) => {
+    const l = 0.299 * rgba[i]! + 0.587 * rgba[i + 1]! + 0.114 * rgba[i + 2]!;
+    return light ? 255 - l : l;
+  };
   const keep = new Uint8Array(w * h).fill(255);
   // Coarse analysis grid — "large swath" doesn't need per-pixel connectivity,
   // and this keeps the labeling cheap on a 9-megapixel panel.
@@ -3541,8 +3553,7 @@ export function blackSwathKeepMask(
       const i = (y * w + x) * 4;
       if (rgba[i + 3]! <= 4) continue;                     // already transparent
       if (protect && protect[y * w + x]! >= 128) continue; // subject — hands off
-      const lum = 0.299 * rgba[i]! + 0.587 * rgba[i + 1]! + 0.114 * rgba[i + 2]!;
-      if (lum < none) dark[gy * gw + gx] = 1;
+      if (lumOf(i) < none) dark[gy * gw + gx] = 1;
     }
   }
   // Label connected dark regions (4-connectivity, iterative flood fill).
@@ -3577,7 +3588,7 @@ export function blackSwathKeepMask(
       const idx = y * w + x, i = idx * 4;
       if (rgba[i + 3]! <= 4) continue;
       if (protect && protect[idx]! >= 128) continue;
-      const lum = 0.299 * rgba[i]! + 0.587 * rgba[i + 1]! + 0.114 * rgba[i + 2]!;
+      const lum = lumOf(i);
       if (lum >= none) continue;
       const k = lum <= full ? 0 : (lum - full) / (none - full);
       const scaled = Math.round(k * 255);
@@ -3661,6 +3672,11 @@ export interface DivinityBoxOptions {
   knockoutBlack?: boolean;
   knockoutMinAreaFrac?: number;   // how big a black region must be (default 0.02 = 2% of the panel)
   protectSubject?: boolean;       // use MobileSAM to shield the subject (default ON when models are installed)
+  /** Per panel: the art sits on a WHITE background that should read as
+   *  transparent. A large open white expanse is knocked out the same way a
+   *  black one is (same ramp, same large-swath rule, subject protected), so
+   *  no white, no varnish and no color land there and the black box shows. */
+  whiteBg?: Partial<Record<'a' | 'b' | 'c' | 'd', boolean>>;
   varnish?: boolean;       // spot "V1" gloss varnish wherever the art prints, unchoked (default false)
   foldMarks?: boolean;     // fold ticks in the no-print gaps (default true)
   /** Resolution of the W1/V1 plates in the LAYOUT PDF (default 150). The TIFF
@@ -3768,7 +3784,7 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
 // PDF. Returns interleaved R,G,B,A,W1,V1 at `dpi` with the spots as INK LEVEL
 // (255 = full ink) — the TIFF inverts them to Photoshop spot polarity, the PDF
 // uses them as Separation tints directly.
-async function composeDivinityBox(
+export async function composeDivinityBox(
   opts: DivinityBoxOptions, dpi: number,
 ): Promise<{ W: number; H: number; spp: number; buf: Uint8Array }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3819,15 +3835,23 @@ async function composeDivinityBox(
       const tx = Math.round(-(vp.width - pwPx) / 2), ty = Math.round(-(vp.height - phPx) / 2);
       await page.render({ canvasContext: pctx, viewport: vp, transform: [1, 0, 0, 1, tx, ty], background: 'rgba(0,0,0,0)' }).promise;
       img = pctx.getImageData(0, 0, pwPx, phPx).data;
-      if (opts.knockoutBlack !== false) {
+      const whiteBg = opts.whiteBg?.[panel.key] === true;
+      if (opts.knockoutBlack !== false || whiteBg) {
         // Protect the subject first when the segmentation models are deployed,
-        // so a character's black costume is never mistaken for a background
-        // swath. Without them we still only knock out large regions.
+        // so a character's black costume (or white shirt) is never mistaken
+        // for a background swath. Without them we still only knock out large
+        // regions.
         const protect = opts.protectSubject === false ? null
           : await subjectMask(pc, pwPx, phPx, img, `dbox:${panel.key}:${pwPx}x${phPx}`);
-        keepMask = blackSwathKeepMask(img, pwPx, phPx, {
-          minAreaFrac: opts.knockoutMinAreaFrac ?? 0.02, protect,
-        });
+        const minAreaFrac = opts.knockoutMinAreaFrac ?? 0.02;
+        if (opts.knockoutBlack !== false) keepMask = blackSwathKeepMask(img, pwPx, phPx, { minAreaFrac, protect });
+        if (whiteBg) {
+          // The white background: knocked out like a black swath, luminance
+          // mirrored. Combined with the black keep as a minimum so both go.
+          const wk = blackSwathKeepMask(img, pwPx, phPx, { minAreaFrac, protect, light: true });
+          if (!keepMask) keepMask = wk;
+          else for (let i = 0; i < wk.length; i++) if (wk[i]! < keepMask[i]!) keepMask[i] = wk[i]!;
+        }
       }
     } catch { continue; }
 
