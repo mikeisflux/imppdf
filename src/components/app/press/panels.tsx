@@ -975,7 +975,7 @@ function DivinityBoxPanel(p: PanelProps) {
       </Section>
       <Section label="// SPOT LAYERS" help="Named spot separations the RIP reads. W1 = white under-base (behind each panel); V1 = gloss varnish (on top).">
         <Check icon="droplet" label="White under-base (W1)" sub="Prints white behind every panel — required on black stock" checked={s.whiteUnder !== false} onChange={(v) => up({ whiteUnder: v })} />
-        <Check icon="droplet" label="Gloss varnish (V1)" sub="Spot gloss over each panel" checked={!!s.varnish} onChange={(v) => up({ varnish: v })} />
+        <Check icon="droplet" label="Gloss varnish (V1)" sub="Wherever the art prints, at full extent — the sealant over the image. Not choked; nothing on empty panel, gaps or flap" checked={!!s.varnish} onChange={(v) => up({ varnish: v })} />
       </Section>
       <Section label="// BLACK KNOCKOUT" help="Large open expanses of black need no ink on a black box: knocking them out lets the substrate show through, saves white and color, and reads deeper than black printed over a white base. ONLY big swaths qualify — blacks on the character, line art and bounded background elements are left alone.">
         <Check icon="droplet" label="Knock large black areas out of the plate" sub="Big black expanses print as bare box — no color, no W1, no V1" checked={s.knockoutBlack !== false} onChange={(v) => up({ knockoutBlack: v })} />

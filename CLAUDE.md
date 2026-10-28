@@ -59,7 +59,14 @@ Breaking any of them produces files the RIP rejects or prints wrong.
    default OFF.
 8. **The white plate is choked 3 px** (`DBOX_WHITE_CHOKE_PX`) inside the art
    edges so misregistration never shows a white halo. Color/alpha keep full
-   extent.
+   extent, **and so does the varnish: V1 is NEVER choked** — it is the
+   sealant over the print and must reach its edge (owner: "choking the
+   white is fine, not the varnish"). **Every output carries REAL plates:**
+   the TIFF, the proof PDF and the layout PDF all take W1/V1 from the same
+   compositor (`composeDivinityBox`, drawn into the PDFs as Separation
+   images by `drawDivinitySpotPlate`). The layout PDF once flooded W1/V1 as
+   panel rectangles — never again; where no canvas exists the plates are
+   omitted, not flooded.
 9. **Rasterize each panel with a SINGLE direct pdf.js render into the
    panel-sized canvas (centering transform).** Never render-then-drawImage-crop:
    that flattens alpha to opaque in some canvas engines and floods W1 white.

@@ -3479,7 +3479,7 @@ export async function addWhiteVarnish(bytes: Uint8Array, opts: WhiteVarnishOptio
 // The full flat box layout: full-width panels stacked top→bottom with 5 mm
 // HARD no-print breaks between them. Panel E is a no-print glue tab. Each printable panel takes its own uploaded artwork. Because the box
 // is printed on black stock, a white under-base (spot "W1") goes behind every
-// panel, with an optional gloss varnish (spot "V1") on top.
+// panel, with an optional gloss varnish (spot "V1") over the print as a sealant.
 
 // Sheet (owner spec, 2026-09-30): 306 × 575 mm INCLUDING 3 mm bleed on the
 // LEFT and RIGHT only (trim 300 × 575; no top/bottom bleed anywhere). Artwork
@@ -3661,8 +3661,11 @@ export interface DivinityBoxOptions {
   knockoutBlack?: boolean;
   knockoutMinAreaFrac?: number;   // how big a black region must be (default 0.02 = 2% of the panel)
   protectSubject?: boolean;       // use MobileSAM to shield the subject (default ON when models are installed)
-  varnish?: boolean;       // spot "V1" gloss varnish on top of each panel (default false)
+  varnish?: boolean;       // spot "V1" gloss varnish wherever the art prints, unchoked (default false)
   foldMarks?: boolean;     // fold ticks in the no-print gaps (default true)
+  /** Resolution of the W1/V1 plates in the LAYOUT PDF (default 150). The TIFF
+   *  and the proof take their own `dpi`. */
+  spotDpi?: number;
 }
 
 export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8Array> {
@@ -3713,21 +3716,24 @@ export async function imposeDivinityBox(opts: DivinityBoxOptions): Promise<Uint8
     pg.pushOperators(PL.popGraphicsState());
   }
 
-  // Spot separations. White "W1" under each panel (prepended → behind the art);
-  // varnish "V1" on top of each panel (appended → above the art).
-  const F = (n: number) => n.toFixed(3);
-  const cache: SepCache = new Map();
-  const fillRect = (spot: string, preview: { r: number; g: number; b: number }, under: boolean, insetPt = 0) => {
-    const resName = ensureSeparation(PL, out, pg, spot, preview, cache);
-    const body = placedPanels
-      .map((r) => `${F(r.x + insetPt)} ${F(r.y + insetPt)} ${F(Math.max(0, r.w - 2 * insetPt))} ${F(Math.max(0, r.h - 2 * insetPt))} re`)
-      .join('\n');
-    addContentStream(PL, out.context, pg, `\nq\n/${resName} cs\n1 scn\n${body}\nf\nQ\n`, under);
-  };
-  // White under-base choked inward (see DBOX_WHITE_CHOKE_PX): 3 px @ 300 dpi ≈ 0.72 pt.
-  const chokePt = (DBOX_WHITE_CHOKE_PX / 300) * 72;
-  if (opts.whiteUnder !== false && placedPanels.length) fillRect('W1', { r: 1, g: 1, b: 1 }, true, chokePt);
-  if (opts.varnish && placedPanels.length) fillRect('V1', { r: 0.85, g: 0.86, b: 0.92 }, false);
+  // Spot separations: REAL plates, never panel rectangles. W1 and V1 come from
+  // the same compositor as the TIFF — W1 is the art's alpha, choked; V1 is
+  // the art's alpha at full extent, the sealant over the print — drawn as
+  // Separation images over the sheet, W1 prepended beneath the art and V1
+  // appended above it.
+  // (A rectangle flood put white and varnish over every empty part of a
+  // panel; invariant 5 says ink only where the art has ink.) The compositor
+  // needs pdf.js and a canvas; where there is none (tests), the plates are
+  // simply omitted rather than flooded.
+  if ((opts.whiteUnder !== false || opts.varnish) && placedPanels.length) {
+    let plate: Awaited<ReturnType<typeof composeDivinityBox>> | null = null;
+    try { plate = await composeDivinityBox(opts, opts.spotDpi ?? 150); } catch { plate = null; }
+    if (plate) {
+      const cache: SepCache = new Map();
+      if (opts.whiteUnder !== false) await drawDivinitySpotPlate(PL, out, pg, cache, plate, 4, 'W1', { r: 1, g: 1, b: 1 }, true, sheetW, sheetH);
+      if (opts.varnish) await drawDivinitySpotPlate(PL, out, pg, cache, plate, 5, 'V1', { r: 0.85, g: 0.86, b: 0.92 }, false, sheetW, sheetH);
+    }
+  }
 
   // Fold ticks on the break centers (short edge ticks; never over artwork).
   if (opts.foldMarks !== false) {
@@ -3859,6 +3865,9 @@ async function composeDivinityBox(
         // the RIP's job (density/Percent/layers), not the file's. Stored as
         // INK LEVEL here (255 = full ink); INVERTED to Photoshop spot-channel
         // polarity (0/black = 100% ink) in one pass at the end.
+        // THE VARNISH IS WHEREVER THE PRINT IS, AT FULL EXTENT: it is the
+        // sealant over the printed image, so it is NOT choked (owner: "choking
+        // the white is fine, not the varnish"). Only W1 pulls in, below.
         const spotInk = aByte;
         if (opts.whiteUnder !== false) buf[si + 4] = spotInk;
         if (opts.varnish) buf[si + 5] = spotInk;
@@ -3868,8 +3877,9 @@ async function composeDivinityBox(
 
   // Choke the white under-base (W1, channel 4) inward by DBOX_WHITE_CHOKE_PX so
   // no white halo shows past the art. Runs on INK LEVEL (bright = ink), before
-  // the polarity inversion below. Color (RGB) and transparency (A) keep full
-  // extent — only the white plate pulls in.
+  // the polarity inversion below. Color (RGB), transparency (A) AND THE
+  // VARNISH (V1) keep full extent — only the white plate pulls in. The
+  // varnish is the sealant over the print and has to reach its edge.
   if (opts.whiteUnder !== false && DBOX_WHITE_CHOKE_PX > 0) {
     const plane = new Uint8Array(W * H);
     for (let i = 0, p = 4; i < W * H; i++, p += spp) plane[i] = buf[p]!;
@@ -4145,19 +4155,25 @@ export async function removeBackground(bytes: Uint8Array, opts?: RemoveBackgroun
 // up in the proof instead of the old solid panel rectangles. Rasterized by
 // nature (a spot plate that follows artwork alpha cannot be vector), so this is
 // a separate deliverable from the fast vector layout PDF.
-export async function divinityBoxProof(opts: DivinityBoxOptions & { dpi?: number }): Promise<Uint8Array> {
+/* Draw one composed spot plane (W1 or V1) onto a page as an 8-bit Separation
+   image over the whole sheet — a REAL plate that follows the artwork, the
+   knockout and the choke, never a panel rectangle. `under` prepends it so it
+   sits beneath whatever the page already holds. Shared by the proof PDF and
+   the layout PDF. */
+async function drawDivinitySpotPlate(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const PL: any = await import('pdf-lib');
-  const { PDFDocument, PDFName, PDFRawStream, PDFDict, rgb } = PL;
-  const dpi = opts.dpi ?? 150;                 // a proof doesn't need press res
-  const MM = PT / 25.4;
-  const sheetW = DBOX_SHEET_W_MM * MM, sheetH = DBOX_SHEET_H_MM * MM;
-  const { W, H, spp, buf } = await composeDivinityBox(opts, dpi);
-
-  const out = await PDFDocument.create();
-  const pg = out.addPage([sheetW, sheetH]);
+  PL: any, out: any, pg: any, cache: SepCache,
+  plate: { W: number; H: number; spp: number; buf: Uint8Array }, chan: number,
+  spot: string, preview: { r: number; g: number; b: number }, under: boolean,
+  sheetW: number, sheetH: number,
+): Promise<void> {
+  const { PDFName, PDFRawStream, PDFDict } = PL;
+  const { W, H, spp, buf } = plate;
   const ctx = out.context;
-
+  const plane = new Uint8Array(W * H);
+  let ink = 0;
+  for (let i = 0, p = chan; i < W * H; i++, p += spp) { plane[i] = buf[p]!; if (plane[i]) ink++; }
+  if (!ink) return;                                       // plate is empty
   const deflate = async (u8: Uint8Array): Promise<Uint8Array | null> => {
     try {
       if (typeof CompressionStream === 'undefined') return null;
@@ -4166,38 +4182,40 @@ export async function divinityBoxProof(opts: DivinityBoxOptions & { dpi?: number
       return new Uint8Array(await new Response(st).arrayBuffer());
     } catch { return null; }
   };
-  // Put an XObject in the page's /XObject resources and return its name.
-  const putXObject = (name: string, ref: unknown): string => {
-    pg.node.normalize();
-    let res = pg.node.Resources();
-    if (!res) { res = ctx.obj({}); pg.node.set(PDFName.of('Resources'), res); }
-    let xo = res.lookupMaybe(PDFName.of('XObject'), PDFDict);
-    if (!xo) { xo = ctx.obj({}); res.set(PDFName.of('XObject'), xo); }
-    xo.set(PDFName.of(name), ref);
-    return name;
+  const csName = ensureSeparation(PL, out, pg, spot, preview, cache);
+  const packed = await deflate(plane);
+  const dict: Record<string, unknown> = {
+    Type: 'XObject', Subtype: 'Image', Width: W, Height: H,
+    BitsPerComponent: 8, ColorSpace: PDFName.of(csName),
   };
+  if (packed) dict.Filter = 'FlateDecode';
+  const ref = ctx.register(PDFRawStream.of(ctx.obj(dict), packed ?? plane));
+  pg.node.normalize();
+  let res = pg.node.Resources();
+  if (!res) { res = ctx.obj({}); pg.node.set(PDFName.of('Resources'), res); }
+  let xo = res.lookupMaybe(PDFName.of('XObject'), PDFDict);
+  if (!xo) { xo = ctx.obj({}); res.set(PDFName.of('XObject'), xo); }
+  const nm = `Sep${spot.replace(/[^A-Za-z0-9]/g, '')}`;
+  xo.set(PDFName.of(nm), ref);
+  addContentStream(PL, ctx, pg, `\nq\n${F(sheetW)} 0 0 ${F(sheetH)} 0 0 cm\n/${nm} Do\nQ\n`, under);
+}
 
+export async function divinityBoxProof(opts: DivinityBoxOptions & { dpi?: number }): Promise<Uint8Array> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const PL: any = await import('pdf-lib');
+  const { PDFDocument, rgb } = PL;
+  const dpi = opts.dpi ?? 150;                 // a proof doesn't need press res
+  const MM = PT / 25.4;
+  const sheetW = DBOX_SHEET_W_MM * MM, sheetH = DBOX_SHEET_H_MM * MM;
+  const plate = await composeDivinityBox(opts, dpi);
+  const { W, H, spp, buf } = plate;
+
+  const out = await PDFDocument.create();
+  const pg = out.addPage([sheetW, sheetH]);
   const cache: SepCache = new Map();
-  // One 8-bit Separation image per spot, drawn over the whole sheet.
-  const drawSeparation = async (chan: number, spot: string, preview: { r: number; g: number; b: number }) => {
-    const plane = new Uint8Array(W * H);
-    let ink = 0;
-    for (let i = 0, p = chan; i < W * H; i++, p += spp) { plane[i] = buf[p]!; if (plane[i]) ink++; }
-    if (!ink) return;                                     // plate is empty
-    const csName = ensureSeparation(PL, out, pg, spot, preview, cache);
-    const packed = await deflate(plane);
-    const dict: Record<string, unknown> = {
-      Type: 'XObject', Subtype: 'Image', Width: W, Height: H,
-      BitsPerComponent: 8, ColorSpace: PDFName.of(csName),
-    };
-    if (packed) dict.Filter = 'FlateDecode';
-    const ref = ctx.register(PDFRawStream.of(ctx.obj(dict), packed ?? plane));
-    const nm = putXObject(`Sep${spot.replace(/[^A-Za-z0-9]/g, '')}`, ref);
-    addContentStream(PL, ctx, pg, `\nq\n${F(sheetW)} 0 0 ${F(sheetH)} 0 0 cm\n/${nm} Do\nQ\n`, false);
-  };
 
   // W1 first (under the art), then the artwork, then V1 on top.
-  if (opts.whiteUnder !== false) await drawSeparation(4, 'W1', { r: 1, g: 1, b: 1 });
+  if (opts.whiteUnder !== false) await drawDivinitySpotPlate(PL, out, pg, cache, plate, 4, 'W1', { r: 1, g: 1, b: 1 }, false, sheetW, sheetH);
 
   // Artwork RGBA → PNG, drawn at full sheet size.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -4215,7 +4233,7 @@ export async function divinityBoxProof(opts: DivinityBoxOptions & { dpi?: number
   const art = await out.embedPng(new Uint8Array(await blob.arrayBuffer()));
   pg.drawImage(art, { x: 0, y: 0, width: sheetW, height: sheetH });
 
-  if (opts.varnish) await drawSeparation(5, 'V1', { r: 0.85, g: 0.86, b: 0.92 });
+  if (opts.varnish) await drawDivinitySpotPlate(PL, out, pg, cache, plate, 5, 'V1', { r: 0.85, g: 0.86, b: 0.92 }, false, sheetW, sheetH);
 
   // Fold ticks in the no-print gaps, same as the layout PDF.
   if (opts.foldMarks) {
