@@ -433,8 +433,30 @@ function bookletOpts(s: StepSettings) {
     rotatePages: !!s.rotatePages,
   };
 }
-function nupOpts(s: StepSettings) {
+/* The gang tools whose typed card size IS the product: the art fills that
+   size (stretch) unless the step chooses otherwise, and a doc-bleed PDF's trim
+   is scaled onto it. The owner selected 2.5 x 3.5 landscape, got the right
+   height and the wrong width — the app-wide CONTAIN default had kept the
+   art's own proportions inside the card. Folded pieces, signage, art prints
+   and the free grid keep CONTAIN: there the art is a whole layout or a photo
+   and distorting it is worse than a margin. */
+export const CARD_SIZE_TOOLS = new Set<StepType>([
+  'cards', 'trading', 'bookmark', 'flyer', 'indexcard', 'business', 'postcard', 'rackcard', 'hangtag',
+  'label', 'namebadge', 'ticket', 'coupon', 'placecard', 'greeting', 'doorhanger', 'coaster', 'contact', 'compslip',
+]);
+export function cellIsTarget(s: StepSettings, type?: StepType): boolean {
+  return !!type && CARD_SIZE_TOOLS.has(type) && (s.cellWIn ?? 0) > 0 && (s.cellHIn ?? 0) > 0;
+}
+/** The fit an N-up step runs with: what it stores, else STRETCH for a card tool
+ *  with a card size, else CONTAIN. The panel shows this same value. */
+export function effectiveFit(s: StepSettings, type?: StepType): 'contain' | 'cover' | 'stretch' {
+  const f = s.fit as 'contain' | 'cover' | 'stretch' | undefined;
+  return f ?? (cellIsTarget(s, type) ? 'stretch' : 'contain');
+}
+
+function nupOpts(s: StepSettings, type?: StepType) {
   return {
+    fitTrimToCell: cellIsTarget(s, type),
     cols: s.cols, rows: s.rows, sheetWIn: s.sheetWIn, sheetHIn: s.sheetHIn,
     cellWIn: s.cellWIn || undefined, cellHIn: s.cellHIn || undefined,
     autoOrient: s.autoOrient !== false,   // orient the cell to the artwork by default
@@ -449,7 +471,7 @@ function nupOpts(s: StepSettings) {
        the fixed-bleed number was forwarded — so a bleed page was contained into
        a trim cell and the whole book came out 3.6% small. */
     bleedFromDoc: s.bleedMode === 'doc',
-    fit: s.fit ?? 'contain', imageZoom: s.imageZoom, imageOffsetX: s.imageOffsetX, imageOffsetY: s.imageOffsetY,
+    fit: effectiveFit(s, type), imageZoom: s.imageZoom, imageOffsetX: s.imageOffsetX, imageOffsetY: s.imageOffsetY,
     // The crop dialog stores per-image {fit,zoom,offsetX,offsetY}; map it to the
     // engine's {fit,imageZoom,imageOffsetX,imageOffsetY} shape.
     perImage: s.perImage
@@ -594,7 +616,7 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
         if (s.trimArt) b = await trimToArtwork(b, { page: s.page ?? 1 });
         // Single-sheet gang tools can opt into Replicate (auto-sized sheet +
         // copies + extra art); otherwise the normal fixed-sheet N-up runs.
-        b = s.replicate ? await replicateFill(b, replicateOpts(s)) : await imposeNUp(b, nupOpts(s)); break;
+        b = s.replicate ? await replicateFill(b, replicateOpts(s)) : await imposeNUp(b, nupOpts(s, step.type)); break;
       case 'artprint':
         // Art print sizes INCLUDE the 0.125" bleed by shop spec, ALWAYS — force
         // the fixed bleed here so cut marks sit at the trim even on steps whose

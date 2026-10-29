@@ -509,6 +509,11 @@ import '../polyfills.ts';
 // ── N-Up Grid / Step & Repeat ───────────────────────────────────────────────
 
 export interface NUpOptions {
+  /** The cell IS the product size (a card tool with a typed card size): a
+   *  doc-bleed page whose TrimBox is not that size is scaled so its TRIM lands
+   *  on the cell (per `fit`), bleed scaling with it — instead of the book rule
+   *  of placing it 1:1. Off, the page is placed at its own size. */
+  fitTrimToCell?: boolean;
   cols: number;
   rows: number;
   sheetWIn: number;
@@ -758,11 +763,25 @@ export async function imposeNUp(bytes: Uint8Array, opts: NUpOptions): Promise<Ui
     if (bd && !turn) {
       const spineLeft = isBack ? !spineLeftOnFront : spineLeftOnFront;
       const src = (isBack ? backEmbeds : frontEmbeds)?.[pi] ?? emb;
+      /* CARD TOOLS (fitTrimToCell): the typed card size is the product, so a
+         page whose trim is some other size is scaled until its TRIM is the
+         cell — stretch maps it exactly, contain/cover keep its proportions
+         (centered). The owner selected 2.5 x 3.5 and got the file's own trim
+         instead ("it does not export the image at that size"). Books keep
+         the 1:1 rule below. */
+      let sx = 1, sy = 1;
+      if (opts.fitTrimToCell && opts.cellWIn && opts.cellHIn) {
+        const fx = cellW / bd.trimW, fy = cellH / bd.trimH;
+        if (fit === 'stretch') { sx = fx; sy = fy; }
+        else { sx = sy = fit === 'cover' ? Math.max(fx, fy) : Math.min(fx, fy); }
+      }
       // Within the cropped art the trim starts at 0 on the spine side and after
-      // the kept bleed on the other; line that trim up with the cell.
-      const dx = x - (spineLeft ? 0 : bd.l);
-      const dy = y - bd.b;
-      sheet.drawPage(src, { x: dx, y: dy, width: src.width, height: src.height });
+      // the kept bleed on the other; line that trim up with the cell (centered
+      // in it when a proportional scale leaves it short on one side).
+      const cx = (cellW - bd.trimW * sx) / 2, cy = (cellH - bd.trimH * sy) / 2;
+      const dx = x + cx - (spineLeft ? 0 : bd.l) * sx;
+      const dy = y + cy - bd.b * sy;
+      sheet.drawPage(src, { x: dx, y: dy, width: src.width * sx, height: src.height * sy });
       placed = true;
     }
     if (placed) { /* nothing more to draw — marks still run below */ }

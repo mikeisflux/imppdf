@@ -95,6 +95,18 @@ by explicit owner instruction — do not "fix" it to combine pages.
 
 - All N-up tools default to 1 column × 1 row unless the tool is specifically
   designed otherwise, and default image fit is CONTAIN (never crop/stretch).
+  EXCEPTION (owner, 2026-10-29): **the card tools fill the typed card size**
+  (`CARD_SIZE_TOOLS` / `effectiveFit` in steps.ts — trading cards, business
+  cards, postcards, index cards, tags, tickets, labels and the rest of the
+  card family): with a card size set, the art is STRETCHED to it unless the
+  step chooses Contain or Cover, and a doc-bleed PDF whose TrimBox is some
+  other size is scaled so its TRIM is the cell (`fitTrimToCell`). The owner
+  selected 2.5 × 3.5 landscape and the cards came out the right height and
+  the wrong width — contain had kept the art's own proportions inside the
+  card, and the doc-bleed rule placed a PDF at its own trim. "When I select
+  the image size, export the image at that size." Folded pieces, signage,
+  art prints and the free grid keep CONTAIN; books keep the 1:1 doc-bleed
+  rule (a book must never be rescaled — see perfect-bound-bleed.test.ts).
   EXCEPTION (owner): **Divinity Trading Cards** is 2×4 and STRETCHES the art.
   **The cell is the card AS THE BLADES CUT IT** — **91 / 90.5 × 63 on Letter**
   (left column / right column), where the red cut lines showed where the four

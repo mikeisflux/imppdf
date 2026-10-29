@@ -11,7 +11,7 @@ import {
   BC_BLEED_MM, BC_CARD_W_MM, BC_CARD_H_MM, BC_CARD_WIDTHS_MM, BC_MARK_W_MM, BC_MARK_H_MM, BC_MARK_INSET_MM,
 } from '@/lib/imposition-toolkit/fit/a4-business-cards';
 import { Icons, OP_GROUPS, findOp, type IconName } from './operations';
-import { defaultSettings, type StepSettings, type StepType, type WorkflowStep } from './steps';
+import { defaultSettings, effectiveFit, type StepSettings, type StepType, type WorkflowStep } from './steps';
 import { ImageFitModal } from './image-fit-modal';
 
 // ── Units ────────────────────────────────────────────────────────────────────
@@ -293,7 +293,9 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
     [cw, ch] = orientCell(cw, ch, src.wPt > src.hPt);
   }
   const cellAspect = cw / ch, srcAspect = src && src.hPt ? src.wPt / src.hPt : cellAspect;
-  const willCrop = !!thumb && (s.fit ?? 'contain') === 'cover'
+  // Card tools with a card size fill it (stretch) unless the step says otherwise.
+  const fitNow = effectiveFit(s, p.type);
+  const willCrop = !!thumb && fitNow === 'cover'
     && s.imageOffsetX == null && Math.abs(cellAspect - srcAspect) / cellAspect > 0.04;
   // How many fixed-size cells actually fit the SELECTED sheet inside its margins.
   // Used to cap the Columns/Rows inputs so the layout can never exceed the paper.
@@ -374,12 +376,12 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
       <Section label="// ARTWORK" help="Crop the uploaded page down to the artwork itself. Design tools export from a template at full sheet size with the design in one slot — without this the gang tiles the whole sheet and the art lands tiny inside its cell.">
         <Check icon="crop" label="Trim to artwork" sub="Ignore the empty paper around the design" checked={!!s.trimArt} onChange={(v) => up({ trimArt: v })} />
       </Section>
-      <Section label="// IMAGE FIT" help="How each page/image fills its cell. Contain (default) keeps the whole graphic and its proportions; Cover fills the cell and crops the overflow.">
+      <Section label="// IMAGE FIT" help="How each page/image fills its cell. Card tools with a card size fill it exactly (Stretch) so the card comes out at the size you typed; Contain keeps the whole graphic and its proportions inside the cell; Cover fills the cell and crops the overflow.">
         <div className="pe-row" style={{ gap: 8 }}>
-          <select className="pe-select" value={s.fit ?? 'contain'} onChange={(e) => up({ fit: e.target.value })} style={{ flex: 1 }}>
+          <select className="pe-select" value={fitNow} onChange={(e) => up({ fit: e.target.value })} style={{ flex: 1 }}>
             <option value="contain">Contain — show whole graphic</option>
             <option value="cover">Cover — fill &amp; crop</option>
-            <option value="stretch">Stretch — distort to fill</option>
+            <option value="stretch">Stretch — fill the card size exactly</option>
           </select>
           <button className="pe-btn" disabled={!thumb} title={thumb ? '' : 'Add a PDF/image first'} onClick={() => setFitOpen(true)}>Adjust &amp; crop…</button>
         </div>
@@ -401,7 +403,7 @@ function NUpPanel(p: PanelProps & { kind: 'cards' | 'grid' | 'cutstack' | 'perfe
       {fitOpen && thumb && (
         <ImageFitModal thumbs={thumbs} cellWIn={+cw.toFixed(2)} cellHIn={+ch.toFixed(2)}
           values={(s.perImage ?? {}) as Record<number, { fit: 'cover' | 'contain' | 'stretch'; zoom: number; offsetX: number; offsetY: number }>}
-          fallback={{ fit: s.fit ?? 'contain', zoom: s.imageZoom ?? 1, offsetX: s.imageOffsetX ?? 0.5, offsetY: s.imageOffsetY ?? 0.5 }}
+          fallback={{ fit: fitNow, zoom: s.imageZoom ?? 1, offsetX: s.imageOffsetX ?? 0.5, offsetY: s.imageOffsetY ?? 0.5 }}
           onApply={(v) => { up({ perImage: v }); setFitOpen(false); }}
           onClose={() => setFitOpen(false)} />
       )}

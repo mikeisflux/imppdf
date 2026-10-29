@@ -693,3 +693,50 @@ test('blackSwathKeepMask: grain in a black background does not speckle the knock
   // pixels print MORE (keep higher than the open background), never less.
   assert.ok(keep[150 * w + 148]! >= meanK - 5, 'edge of the swath beside the subject keeps ink');
 });
+
+/** Inflated content of an output page, to read the placement matrices. */
+async function nupContentOf(bytes: Uint8Array, pageIndex: number) {
+  const zlib = await import('node:zlib');
+  const { PDFStream } = await import('pdf-lib');
+  const doc = await PDFDocument.load(bytes);
+  const cs = doc.getPage(pageIndex).node.normalizedEntries().Contents;
+  let t = '';
+  for (let i = 0; cs && i < cs.size(); i++) {
+    const raw = (doc.context.lookup(cs.get(i), PDFStream) as unknown as { getContents(): Uint8Array }).getContents();
+    try { t += zlib.inflateSync(Buffer.from(raw)).toString('latin1'); }
+    catch { t += Buffer.from(raw).toString('latin1'); }
+  }
+  return t;
+}
+const placementScales = (t: string) => Array.from(t.matchAll(/([-\d.]+) 0 0 ([-\d.]+) [-\d.]+ [-\d.]+ cm/g))
+  .map((m) => [Number(m[1]), Number(m[2])] as [number, number])
+  .filter(([sx, sy]) => !(Math.abs(sx - 1) < 1e-9 && Math.abs(sy - 1) < 1e-9));   // translate-only matrices are not placements
+
+test('card size: stretch fills the typed 3.5 x 2.5 card from art of another proportion', async () => {
+  // 5:3 art (1000 x 600 pt) into a landscape 3.5 x 2.5" card. Contain would
+  // give the right height and a 4.17" width — the owner's complaint.
+  const out = await imposeNUp(await pdfOf(1, 1000, 600), { ...baseNUp, cols: 1, rows: 1, cellWIn: 3.5, cellHIn: 2.5, fit: 'stretch' });
+  const [sc] = placementScales(await nupContentOf(out, 0));
+  assert.ok(sc, 'art placed');
+  assert.ok(Math.abs(sc![0] * 1000 - 3.5 * 72) < 0.01, `width ${sc![0] * 1000 / 72}" should be 3.5`);
+  assert.ok(Math.abs(sc![1] * 600 - 2.5 * 72) < 0.01, `height ${sc![1] * 600 / 72}" should be 2.5`);
+});
+
+test('card size: a doc-bleed page whose trim is another size is scaled onto the cell when the cell is the target', async () => {
+  // Trim 2.5 x 3.5 with 1/8" bleed all round; cell 3 x 4 (portrait, a different size).
+  const bleed = 9, trimW = 2.5 * 72, trimH = 3.5 * 72;
+  const d = await PDFDocument.create();
+  const pg = d.addPage([trimW + 2 * bleed, trimH + 2 * bleed]);
+  pg.setTrimBox(bleed, bleed, trimW, trimH);
+  pg.drawRectangle({ x: 0, y: 0, width: pg.getWidth(), height: pg.getHeight() });
+  const bytes = await d.save();
+  const base = { ...baseNUp, cols: 1, rows: 1, cellWIn: 3, cellHIn: 4, bleedFromDoc: true };
+  // Book rule (default): 1:1, never scaled.
+  const book = placementScales(await nupContentOf(await imposeNUp(bytes, { ...base }), 0));
+  assert.equal(book.length, 0, 'without fitTrimToCell the page is placed 1:1');
+  // Card rule: the TRIM becomes the cell.
+  const card = placementScales(await nupContentOf(await imposeNUp(bytes, { ...base, fit: 'stretch', fitTrimToCell: true }), 0));
+  assert.equal(card.length, 1);
+  assert.ok(Math.abs(card[0]![0] - 3 * 72 / trimW) < 1e-6, `x scale ${card[0]![0]}`);
+  assert.ok(Math.abs(card[0]![1] - 4 * 72 / trimH) < 1e-6, `y scale ${card[0]![1]}`);
+});
