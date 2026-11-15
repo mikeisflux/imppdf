@@ -308,8 +308,23 @@ export function PressEditor({ initialOp, usage, onUpgrade, onSignIn, gateExport 
           await new Promise((r) => setTimeout(r, 300));   // let the browser flush each download
         });
       } else if (sp) {
+        /* Split: every part finished like any export, then ONE zip. Firing a
+           download per part gets all but the first blocked by the browser. */
         const parts = await runSplit(out, sp);
-        parts.forEach((p, i) => downloadPdf(p, namedOutput().replace(/\.pdf$/, `-part${i + 1}.pdf`), finishOpts));
+        const base = namedOutput().replace(/\.pdf$/i, '');
+        const width = String(Math.max(1, ...parts.map((p) => p.last))).length;
+        const pad = (n: number) => String(n).padStart(width, '0');
+        const { finalizePdfForExport } = await import('@/lib/imposition-toolkit/pdf-finish');
+        const finished = await Promise.all(parts.map(async (p) => {
+          let b = p.bytes;
+          try { b = await finalizePdfForExport(p.bytes, { creator: 'ImpositionPDF', ...finishOpts }); } catch { /* unfinished beats nothing */ }
+          return { name: `${base}-p${p.first === p.last ? pad(p.first) : `${pad(p.first)}-${pad(p.last)}`}.pdf`, bytes: b };
+        }));
+        if (finished.length === 1) downloadFile(finished[0]!.bytes, finished[0]!.name, 'application/pdf');
+        else {
+          const { zipStore } = await import('@/lib/imposition-toolkit/zip');
+          downloadFile(zipStore(finished), `${base}-split.zip`, 'application/zip');
+        }
       } else {
         downloadPdf(out, namedOutput(), finishOpts);
       }

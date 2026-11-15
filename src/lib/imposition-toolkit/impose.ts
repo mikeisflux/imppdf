@@ -1054,6 +1054,43 @@ export async function splitPdf(bytes: Uint8Array, ranges: string): Promise<Uint8
 }
 
 // Chunk mode: split into files of `size` pages each (last may be shorter).
+/* Split into named parts. `mode` 'each': one file per page; 'every': files of
+   `size` pages; 'ranges': the typed page ranges. Each part carries the page
+   numbers it holds so the file names say what is in them. */
+export interface SplitPart { bytes: Uint8Array; first: number; last: number; }
+export async function splitPdfParts(
+  bytes: Uint8Array, mode: 'each' | 'every' | 'ranges', opts: { size?: number; ranges?: string } = {},
+): Promise<SplitPart[]> {
+  const { PDFDocument } = await import('pdf-lib');
+  const srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const n = srcDoc.getPageCount();
+  const groups: number[][] = [];
+  if (mode === 'ranges' && opts.ranges?.trim()) {
+    for (const part of opts.ranges.split(',').map((s) => s.trim())) {
+      const m = part.match(/^(\d+)(?:-(\d+))?$/);
+      if (!m) continue;
+      const start = parseInt(m[1]!) - 1, end = m[2] ? parseInt(m[2]!) - 1 : start;
+      const idx: number[] = [];
+      for (let i = Math.max(0, start); i <= end && i < n; i++) idx.push(i);
+      if (idx.length) groups.push(idx);
+    }
+  } else {
+    const step = mode === 'every' ? Math.max(1, Math.floor(opts.size ?? 1)) : 1;
+    for (let start = 0; start < n; start += step) {
+      const idx: number[] = [];
+      for (let i = start; i < start + step && i < n; i++) idx.push(i);
+      groups.push(idx);
+    }
+  }
+  const results: SplitPart[] = [];
+  for (const idx of groups) {
+    const out = await PDFDocument.create();
+    const pages = await out.copyPages(srcDoc, idx);
+    for (const pg of pages) out.addPage(pg);
+    results.push({ bytes: await out.save(), first: idx[0]! + 1, last: idx[idx.length - 1]! + 1 });
+  }
+  return results;
+}
 export async function splitPdfChunks(bytes: Uint8Array, size: number): Promise<Uint8Array[]> {
   const { PDFDocument } = await import('pdf-lib');
   const srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });

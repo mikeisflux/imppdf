@@ -1435,13 +1435,34 @@ function SimplePanels({ type, s, up, unit, onUnit, pageCount }: PanelProps & { t
           )}
         </Section>
       );
-    case 'split':
+    case 'split': {
+      const mode: string = s.mode ?? (s.ranges?.trim() ? 'ranges' : 'each');
+      const every = Math.max(1, Math.round(s.every ?? 2));
+      const files = !pageCount ? 0 : mode === 'each' ? pageCount : mode === 'every' ? Math.ceil(pageCount / every)
+        : String(s.ranges ?? '').split(',').filter((r) => /^\s*\d+(\s*-\s*\d+)?\s*$/.test(r)).length;
       return (
-        <Section label="// RANGES" help="Comma-separated page ranges; each becomes a file at export.">
-          <input className="pe-input" value={s.ranges} onChange={(e) => up({ ranges: e.target.value })} placeholder={pageCount ? `1-${pageCount}` : '1-5, 6-10'} />
-          <div className="pe-note">Each range downloads as a separate PDF. The preview shows the un-split output.</div>
+        <Section label="// SPLIT" help="How the output is cut into files when you click Download. The parts come down as one zip, named by the pages they hold. The preview shows the whole, un-split output.">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Radio label="Every page" sub="One PDF per page" on={mode === 'each'} onSelect={() => up({ mode: 'each' })} />
+            <Radio label="Every N pages" sub="Files of N pages each" on={mode === 'every'} onSelect={() => up({ mode: 'every' })} />
+            <Radio label="Page ranges" sub="Type the ranges yourself" on={mode === 'ranges'} onSelect={() => up({ mode: 'ranges' })} />
+          </div>
+          {mode === 'every' && (
+            <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+              <span className="pe-label-sm">Pages per file</span>
+              <input className="pe-input" type="number" min={1} value={every} onChange={(e) => up({ every: Math.max(1, Number(e.target.value) || 1) })} style={{ width: 80 }} />
+            </div>
+          )}
+          {mode === 'ranges' && (
+            <input className="pe-input" style={{ marginTop: 8 }} value={s.ranges ?? ''} onChange={(e) => up({ ranges: e.target.value })} placeholder={pageCount ? `1-${pageCount}` : '1-5, 6-10'} />
+          )}
+          <div className="pe-note" style={{ marginTop: 8 }}>
+            {pageCount ? <>{files} file{files === 1 ? '' : 's'} from {pageCount} page{pageCount === 1 ? '' : 's'}. </> : null}
+            Download gives one zip of the parts{files === 1 ? ' (a single part comes down as a PDF)' : ''}.
+          </div>
         </Section>
       );
+    }
     case 'merge':
       return (
         <Section label="// FILES" help="PDFs appended after the loaded document, in order.">

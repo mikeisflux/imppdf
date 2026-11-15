@@ -198,7 +198,7 @@ export const OP_GROUPS: OpGroup[] = [
     { id: 'resize', label: 'Resize', icon: 'resize', tip: 'Scale or fit pages to a new size.' },
     { id: 'rotate', label: 'Rotate', icon: 'rotate', tip: 'Rotate pages by 90°, 180° or 270°.' },
     { id: 'crop', label: 'Crop', icon: 'crop', tip: 'Trim page edges by setting the crop/trim boxes inward.' },
-    { id: 'split', label: 'Split', icon: 'split', tip: 'Split the output into separate files by page ranges.' },
+    { id: 'split', label: 'Split', icon: 'split', tip: 'Cut the output into separate PDFs at download: one per page, every N pages, or typed page ranges. The parts come down as one zip, named by the pages they hold.' },
     { id: 'flip', label: 'Flip', icon: 'flip', tip: 'Mirror pages horizontally or vertically (true content mirror).' },
     { id: 'merge', label: 'Merge PDFs', icon: 'merge', tip: 'Append other PDFs before the pipeline runs.' },
     { id: 'overlay', label: 'Overlay', icon: 'overlay', tip: 'Stamp another PDF over every page (proofs, brands, forms).' },

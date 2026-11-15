@@ -5,7 +5,7 @@
 
 import {
   imposeBooklet, fieryBooklet, stampSerialNumber, serialLabel, imposeNUp, imposeNUpBook, shufflePages, rotatePdf, flipPdf,
-  mergePdfs, splitPdf, cropPdf, resizePdf, overlayPdf, distortPdf, generateBleed,
+  mergePdfs, splitPdf, splitPdfParts, type SplitPart, cropPdf, resizePdf, overlayPdf, distortPdf, generateBleed,
   addHeaderFooter, addPressColorBar, addCutterMarks, addJobSlug, addFoldMarks,
   addCollatingMarks, addOmrMarks, addGatheringMarks, addLayMarks, addTextWatermark,
   addPageNumbers, imposeGangJobs, imposeFoldZine, imposeCustomGrid, getPdfInfo,
@@ -379,7 +379,13 @@ export function defaultSettings(type: StepType): StepSettings {
     case 'flip': return { dir: 'h', pages: 'all' };
     case 'crop': return { top: 0, right: 0, bottom: 0, left: 0, pages: 'all' };
     case 'resize': return { mode: 'fit', scalePct: 100, targetWIn: 8.27, targetHIn: 11.69, pages: 'all' };
-    case 'split': return { ranges: '' };
+    case 'split':
+      /* Split the OUTPUT at download: one file per page by default. The old
+         default was an empty ranges box, and with nothing typed the step did
+         nothing — Download handed over the whole PDF ("it should split the
+         pages"). The parts come down as ONE zip: a browser blocks a burst of
+         separate downloads after the first. */
+      return { mode: 'each', every: 2, ranges: '' };
     case 'merge': return { files: [] };
     case 'overlay': return { stamp: null, stampName: '', opacity: 1, mode: 'center' };
     case 'distort': return { factorPct: 100, direction: 'circ', pages: 'all' };
@@ -884,10 +890,14 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
 }
 
 export function splitStep(steps: WorkflowStep[]): WorkflowStep | undefined {
-  return steps.find((st) => st.enabled && st.type === 'split' && st.s.ranges?.trim());
+  return steps.find((st) => st.enabled && st.type === 'split'
+    && (st.s.mode === 'each' || st.s.mode === 'every' || (st.s.mode ?? 'ranges') === 'ranges' && st.s.ranges?.trim()));
 }
-export async function runSplit(bytes: Uint8Array, step: WorkflowStep): Promise<Uint8Array[]> {
-  return splitPdf(bytes, step.s.ranges);
+/** The parts of a split step, named by the pages they hold. A step saved before
+ *  modes existed (ranges only) still splits by its ranges. */
+export async function runSplit(bytes: Uint8Array, step: WorkflowStep): Promise<SplitPart[]> {
+  const mode: 'each' | 'every' | 'ranges' = step.s.mode === 'every' ? 'every' : step.s.mode === 'each' ? 'each' : 'ranges';
+  return splitPdfParts(bytes, mode, { size: step.s.every ?? 2, ranges: step.s.ranges ?? '' });
 }
 
 // ── Fiery Serial Booklet: numbered edition output ────────────────────────────
