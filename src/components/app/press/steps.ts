@@ -32,7 +32,7 @@ export type StepType =
   | 'collating' | 'omr' | 'gathering' | 'laymarks' | 'watermark' | 'pagenumbers'
   | 'stickers' | 'calendar' | 'insertpages' | 'mix' | 'nudge' | 'backdrop'
   | 'coloreffects' | 'colormanage' | 'barcode' | 'dimensions' | 'whitevarnish'
-  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair' | 'mediafix' | 'divinitycards' | 'a4bizcards';
+  | 'braille' | 'editpdf' | 'pdfx' | 'fierybooklet' | 'fieryserial' | 'replicate' | 'indexcard' | 'artprint' | 'prooflabel' | 'removebg' | 'pbcover' | 'raisedmetal' | 'divinitybox' | 'pdfrepair' | 'mediafix' | 'divinitycards' | 'a4bizcards' | 'flatten';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StepSettings = Record<string, any>;
@@ -167,6 +167,11 @@ export function defaultSettings(type: StepType): StepSettings {
          11 x 17 (two Letter halves of 8). No gutters are stored: an untyped
          gap takes the template's figure for the stock. */
       return { sheet: 'a4', front: null, back: null, page: 1, backPage: 2, backs: true, spinBacks: false, addMarks: true, regMark: true };
+    case 'flatten':
+      /* Render every page flat and write it back as one image per page: no
+         soft masks, groups, blend modes or wrapper XObjects can survive. 300
+         dpi JPEG 92 is the print default; PNG for line art. See flatten.ts. */
+      return { dpi: 300, format: 'jpeg', quality: 92 };
     case 'mediafix':
       /* Center a FINISHED file on the sheet it actually prints on. Scaling is
          off by default — silently shrinking a cover to fit is the failure this
@@ -681,6 +686,16 @@ export async function runPipeline(bytes: Uint8Array, steps: WorkflowStep[], forE
           regSizeMm: s.regSizeMm, regInsetMm: s.regInsetMm,
           regEdge: s.regEdge, regBarLenMm: s.regBarLenMm, regBarDepthMm: s.regBarDepthMm,
           addMarks: s.addMarks !== false,
+        });
+        break;
+      }
+      case 'flatten': {
+        const { flattenPdf } = await import('@/lib/imposition-toolkit/flatten');
+        /* The PREVIEW re-renders on every change, so it flattens at screen
+           resolution; the EXPORT renders at the file resolution chosen. */
+        b = await flattenPdf(b, {
+          dpi: forExport ? (s.dpi ?? 300) : Math.min(s.dpi ?? 300, 72),
+          format: s.format === 'png' ? 'png' : 'jpeg', quality: s.quality ?? 92,
         });
         break;
       }

@@ -19,6 +19,7 @@ const PLUGIN_TO_PRESS_OP: Record<string, string> = {
   cutstack: 'cutstack', shuffle: 'shuffle', rotate: 'rotate', flip: 'flip',
   merge: 'merge', split: 'split',
   repair: 'pdfrepair',
+  flatten: 'flatten',
 };
 
 interface Entitlement {

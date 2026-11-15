@@ -296,6 +296,17 @@ by explicit owner instruction — do not "fix" it to combine pages.
   leading edge), so the press flip is long-edge on A4/Letter and SHORT-edge
   on the stood-up A3/11 × 17; the tool offers no flip choice. Red cut lines
   are on a switch for honing, same reading as the trading cards.
+- **Flatten for Print** (`flatten.ts`, step `flatten`) is the one flattening
+  nothing survives: every page is rendered by pdf.js exactly as Acrobat shows
+  it and written back as ONE opaque image per page (300 dpi JPEG 92 default,
+  PNG for line art), trim and bleed boxes carried over through /Rotate. It
+  exists because a client's flipbook export (every page a transparency group
+  under a 74 dpi raster soft mask) imported into Affinity as Mask / Group /
+  Clipping Mask stacks and came up blank from page 12, and Acrobat's
+  flattener and PDF/X-1a left the groups behind. `inspectTransparency`
+  counts soft masks, groups, blend modes, partial opacity, image masks and
+  wrapper XObjects; the acceptance test is every count zero after. The live
+  preview flattens at 72 dpi, the export at the chosen resolution.
 - Never assume how many items fit a sheet: always run the fit calculation
   accounting for margins, gutters, crop marks, and bleed before placing.
 - If rotating an item 90° lets more fit, rotate it.

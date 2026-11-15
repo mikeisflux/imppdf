@@ -2803,6 +2803,73 @@ function Line({ ok, label, detail }: { ok?: boolean; label: string; detail?: str
  * what to do with it — and it decides by rotating and scaling to taste. The
  * artwork is the right size in the PDF and the wrong size off the press. This
  * settles it in the file: name the media, center the job on it at 1:1, done. */
+function FlattenPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: PanelProps) {
+  const [rep, setRep] = useState<import('@/lib/imposition-toolkit/flatten').TransparencyReport | null | 'loading'>(null);
+  useEffect(() => {
+    if (!sourceBytes) { setRep(null); return; }
+    let dead = false; setRep('loading');
+    import('@/lib/imposition-toolkit/flatten')
+      .then(({ inspectTransparency }) => inspectTransparency(sourceBytes.slice()))
+      .then((r) => { if (!dead) setRep(r); })
+      .catch(() => { if (!dead) setRep(null); });
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceBytes, pageCount]);
+  const r = rep && rep !== 'loading' ? rep : null;
+  const dpi = s.dpi ?? 300, fmt = s.format === 'png' ? 'png' : 'jpeg';
+  const first = pageSizes[0];
+  const px = first ? `${Math.round(first.wPt / 72 * dpi)} × ${Math.round(first.hPt / 72 * dpi)} px` : '';
+  const found: [string, number][] = r ? [
+    ['soft masks', r.softMasks], ['transparency groups', r.transparencyGroups], ['blend modes', r.blendModes],
+    ['partial opacity', r.constantAlpha], ['image masks', r.imageMasks], ['wrapper XObjects', r.formXObjects],
+  ].filter(([, n]) => (n as number) > 0) as [string, number][] : [];
+  return (
+    <>
+      <Section label="// WHAT THIS DOES" help="The one flattening nothing survives: every page is rendered the way Acrobat shows it and written back as a single opaque image at the resolution you pick. Text becomes pixels, so pick 450–600 dpi for lettering-heavy pages.">
+        <div className="pe-note">
+          For files that import into Affinity or InDesign as a pile of masks and groups, or come up blank on some pages. Acrobat&apos;s flattener and PDF/X-1a leave the groups and clip masks behind; this does not. Trim and bleed boxes carry over, so the file imposes like the original.
+        </div>
+      </Section>
+      <Section label="// THIS FILE" help="Counted from the PDF's objects before anything is done to it. After flattening, every count is zero.">
+        {!sourceBytes ? <div className="pe-note">Add a PDF to see what it carries.</div>
+          : rep === 'loading' ? <div className="pe-note">Reading…</div>
+          : !r ? <div className="pe-note">Could not read this file&apos;s objects.</div>
+          : r.flat ? <div className="pe-note">✓ {r.pages} page{r.pages === 1 ? '' : 's'}, already flat: no masks, groups or blend modes. Flattening it only rasterizes.</div>
+          : (
+            <div className="pe-note">
+              <b>{r.pages} page{r.pages === 1 ? '' : 's'}, {r.rasters} image{r.rasters === 1 ? '' : 's'}.</b> Carries {found.map(([k, n]) => `${n} ${k}`).join(', ')}. These are what Affinity shows as Mask / Group / Clipping Mask layers.
+            </div>
+          )}
+      </Section>
+      <Section label="// OUTPUT" help="Resolution is the FILE's. The press screens at its own. 300 dpi is standard for comic interiors and photos; 600 for fine lettering or line art.">
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center' }}>
+          <span className="pe-label-sm" style={{ width: 90 }}>Resolution</span>
+          <select className="pe-select" value={dpi} onChange={(e) => up({ dpi: Number(e.target.value) })} style={{ width: 130 }}>
+            {[150, 200, 300, 400, 450, 600].map((d) => <option key={d} value={d}>{d} dpi</option>)}
+          </select>
+          {px ? <span className="pe-note" style={{ margin: 0 }}>{px} a page</span> : null}
+        </div>
+        <div className="pe-row" style={{ gap: 8, alignItems: 'center', marginTop: 8 }}>
+          <span className="pe-label-sm" style={{ width: 90 }}>Format</span>
+          <select className="pe-select" value={fmt} onChange={(e) => up({ format: e.target.value })} style={{ width: 130 }}>
+            <option value="jpeg">JPEG</option>
+            <option value="png">PNG (lossless)</option>
+          </select>
+          {fmt === 'jpeg' && (
+            <>
+              <span className="pe-label-sm">Quality</span>
+              <input className="pe-input" type="number" min={60} max={100} value={s.quality ?? 92} onChange={(e) => up({ quality: Math.max(60, Math.min(100, Number(e.target.value) || 92)) })} style={{ width: 70 }} />
+            </>
+          )}
+        </div>
+        <div className="pe-note" style={{ marginTop: 8 }}>
+          The preview flattens at screen resolution so it stays quick; the export renders at {dpi} dpi. A 48-page interior takes about a minute.
+        </div>
+      </Section>
+    </>
+  );
+}
+
 function MediaFixPanel({ s, up, sourceBytes, pageSizes = [], pageCount = 0 }: PanelProps) {
   const mw = s.mediaWIn ?? 11, mh = s.mediaHIn ?? 17;
   /* The file's RAW boxes. A tool that places a page has to agree with the viewer
@@ -3475,6 +3542,7 @@ export function StepPanelBody(props: PanelProps & { type: StepType }) {
   const { type } = props;
   if (type === 'pdfrepair') return <PdfRepairPanel {...props} />;
   if (type === 'mediafix') return <MediaFixPanel {...props} />;
+  if (type === 'flatten') return <FlattenPanel {...props} />;
   if (type === 'divinitycards') return <DivinityCardsPanel {...props} />;
   if (type === 'a4bizcards') return <BusinessCardsPanel {...props} />;
   if (type === 'raisedmetal') return <RaisedMetalPanel {...props} />;

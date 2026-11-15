@@ -140,6 +140,7 @@ export const TOOLS: Tool[] = [
   { slug: 'layers', name: 'Layers', blurb: 'Toggle and flatten PDF layers.', category: 'advanced', engine: 'layers', inPlugin: true, featured: true, cta: 'Manage layers' },
   { slug: 'pdf-tools', name: 'PDF Tools', blurb: 'Optimize, decrypt and repair PDFs.', category: 'advanced', engine: 'pdftools', inPlugin: true, cta: 'Open PDF tools' },
   { slug: 'pdf-repair', name: 'PDF Repair', blurb: 'Rebuild and recover damaged PDFs.', category: 'advanced', engine: 'repair', inPlugin: true, cta: 'Repair a PDF' },
+  { slug: 'flatten-for-print', name: 'Flatten for Print', blurb: 'One flat image per page: no masks, groups or layers.', category: 'advanced', engine: 'flatten', inPlugin: true, cta: 'Flatten a PDF' },
   { slug: 'jdf-export', name: 'JDF / CIP4 Export', blurb: 'Emit a CIP4 JDF job ticket.', category: 'advanced', engine: 'jdf', inPlugin: true, featured: true, cta: 'Export JDF' },
   { slug: 'nesting', name: 'Nesting / Stickers', blurb: 'True-shape sticker & label nesting.', category: 'advanced', engine: 'nest', inPlugin: true, cta: 'Nest shapes' },
   { slug: 'page-preview', name: 'Page Preview', blurb: 'See every imposed sheet before you print.', category: 'advanced', engine: 'preview', inPlugin: true, cta: 'Open a document' },
@@ -182,7 +183,7 @@ export const SLUG_TO_PLUGIN_ID: Record<string, string> = {
   'name-badges': 'namebadge', 'rotate': 'rotate', 'crop': 'crop', 'split': 'split', 'flip': 'flip',
   'merge': 'merge', 'overlay': 'overlay', 'shuffle': 'shuffle', 'nudge': 'nudge', 'resize': 'resize',
   'insert-pages': 'insertpages', 'mix': 'mix', 'edit-pdf': 'editpdf', 'distortion-comp': 'distort',
-  'layers': 'layers', 'pdf-tools': 'pdftools', 'pdf-repair': 'repair', 'jdf-export': 'jdf',
+  'layers': 'layers', 'pdf-tools': 'pdftools', 'pdf-repair': 'repair', 'flatten-for-print': 'flatten', 'jdf-export': 'jdf',
   'nesting': 'nest', 'page-preview': 'dimensions',
 };
 
